@@ -11,7 +11,7 @@ import SwiftUI
 struct irodoriApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            CameraView()
         }
     }
 }
