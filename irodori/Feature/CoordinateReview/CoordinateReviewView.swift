@@ -32,8 +32,12 @@ struct CoordinateReviewView: View {
         .onAppear {
             isShowFullReview = coordinateReview.coordinateReview.count < 150
         }
-        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
-            WebView(url: URL(string: tappedRecommendItem.itemURL))
+//        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
+//            WebView(url: URL(string: tappedRecommendItem.itemURL))
+//        }
+        .onChange(of: tappedRecommendItem) {
+            let url = URL(string: tappedRecommendItem!.itemURL)!   // TODO: エラーハンドリング
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
 

@@ -20,7 +20,7 @@ struct RecommendItems: Identifiable {
     let recommendItems: [RecommendItem]
 }
 
-struct RecommendItem: Identifiable {
+struct RecommendItem: Identifiable, Equatable {
     let id: Int
     let name: String
     let company: String
