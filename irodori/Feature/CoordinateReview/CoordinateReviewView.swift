@@ -17,17 +17,20 @@ struct CoordinateReviewView: View {
     カジュアルが似合う方におすすめのコーデタイプは、シンプルで洗練された印象が特徴のノームコアです。
     画像の黒パンツに合うのは、白や淡いブルーのシャツです。理由としては、黒のパンツと明るい色味のシャツは相性がよく、シンプルながら爽やかで大人っぽい印象になるからです。
     """
+    let recommendItemUIImages: [UIImage]
     @State private var isShowFullReview = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 36) {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 48) {
                 Image(uiImage: coordinateImage)
                     .resizable()
                     .frame(width: 300/1.5, height: 400/1.5)   // WEARのコーデ画像サイズ をリサイズ
                     .scaledToFit()
 
                 ReviewText()
+
+                RecommendItems()
             }
         }
         .padding(.horizontal, 24)
@@ -63,18 +66,65 @@ struct CoordinateReviewView: View {
     }
 
     private func RecommendItems() -> some View {
-        HStack(spacing: 24) {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("おすすめアイテム")
+                .font(.system(size: 24, weight: .bold))
 
+            Text("カジュアル で 黒のワイドパンツ に似合う アウター")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 24) {
+                    ForEach(recommendItemUIImages, id: \.self) { itemUIImage in
+                        ItemCard(itemUIImage: itemUIImage)
+                    }
+                }
+            }
+
+            Text("カジュアル で グレーのニット に似合う パンツ")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(.secondary)
+                .padding(.top, 24)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 24) {
+                    ForEach(recommendItemUIImages, id: \.self) { itemUIImage in
+                        ItemCard(itemUIImage: itemUIImage)
+                    }
+                }
+            }
         }
     }
 
-    private func ItemCard(cardUIImage: UIImage) -> some View {
-        ZStack {
-            Image(uiImage: cardUIImage)
+    private func ItemCard(itemUIImage: UIImage) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ZStack {
+                Image(uiImage: itemUIImage)
+                    .resizable()
+                    .frame(width: 215/1.8, height: 258/1.8)   // ZOZOTOWN の商品画像サイズ をリサイズ
+                    .scaledToFill()
+            }
+
+            Text("ブルゾン")
+                .font(.system(size: 14, weight: .semibold))
+            Text("BEAMS")
+                .font(.system(size: 14, weight: .regular))
+                .padding(.top, -6)
+            Text("¥3,000")
+                .font(.system(size: 16, weight: .bold))
+
         }
     }
 }
 
 #Preview {
-    CoordinateReviewView(coordinateImage: UIImage(resource: .coordinate1))
+    CoordinateReviewView(
+        coordinateImage: UIImage(resource: .coordinate1),
+        recommendItemUIImages: [
+            .init(resource: .item1),
+            .init(resource: .item2),
+            .init(resource: .item3),
+            .init(resource: .item4),
+            .init(resource: .item5)
+        ]
+    )
 }
