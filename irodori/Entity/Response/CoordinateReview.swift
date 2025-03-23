@@ -51,7 +51,7 @@ extension CoordinateReview {
                     .init(id: 4, name: "ブルゾン", company: "Starting Over", price: 7920, imageURL: "https://c.imgz.jp/735/88461735/88461735b_8_d_215.jpg", itemURL: "https://zozo.jp/shop/startingover/goods-sale/87461735/?did=141864675"),
                     .init(id: 5, name: "ブルゾン", company: "BEAMS", price: 50600, imageURL: "https://c.imgz.jp/554/79150554/79150554b_8_d_215.jpg", itemURL: "https://zozo.jp/shop/beams/goods/78150554/?did=127820453"),
                 ]),
-            .init(id: 1, title: "あなたのグレーのニットに合う デニムパンツ",
+            .init(id: 2, title: "あなたのグレーのニットに合う デニムパンツ",
                   recommendItems: [
                     .init(id: 1, name: "", company: "Levi's", price: 9350, imageURL: "https://c.imgz.jp/052/38900052/38900052b_8_d_215.jpg", itemURL: "https://zozo.jp/shop/levisstore/goods/37900052/?did=111454083"),
                     .init(id: 2, name: "", company: "Levi's", price: 9350, imageURL: "https://c.imgz.jp/052/38900052/38900052b_5_d_215.jpg", itemURL: "https://zozo.jp/shop/levisstore/goods/37900052/?did=114636341"),

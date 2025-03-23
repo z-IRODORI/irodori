@@ -9,15 +9,8 @@ import SwiftUI
 
 struct CoordinateReviewView: View {
     let coordinateImage: UIImage
-    let review = """
-    黒のショルダーバッグがシンプルでコーデの引き締め役になっていて素敵ですね。
-    トップスを軽くインしているので、ラフすぎず清潔感があります。\n程よくワイドなパンツを履いているので、リラックス感のある大人な印象を受けます。
-    あなたのシルエットは「I」です。Iが似合うのは、縦長でスタイリッシュな印象を好む方や、シンプルで洗練された雰囲気を持った方です。
-    また、あなたのコーデはカジュアルです。
-    カジュアルが似合う方におすすめのコーデタイプは、シンプルで洗練された印象が特徴のノームコアです。
-    画像の黒パンツに合うのは、白や淡いブルーのシャツです。理由としては、黒のパンツと明るい色味のシャツは相性がよく、シンプルながら爽やかで大人っぽい印象になるからです。
-    """
-    let recommendItemUIImages: [UIImage]
+    let coordinateReview: CoordinateReview
+
     @State private var isShowFullReview = false
 
     var body: some View {
@@ -36,21 +29,21 @@ struct CoordinateReviewView: View {
         .padding(.horizontal, 24)
         .frame(maxHeight: .infinity, alignment: .top)
         .onAppear {
-            isShowFullReview = review.count < 150
+            isShowFullReview = coordinateReview.coordinateReview.count < 150
         }
     }
 
     private func ReviewText() -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("AIからのコーデコメント")
-                .font(.system(size: 24, weight: .bold))
+                .font(.system(size: 20, weight: .bold))
 
             if isShowFullReview {
-                Text("\(review)")
+                Text("\(coordinateReview.coordinateReview)")
                     .font(.system(size: 16, weight: .light))
             } else {
                 ZStack(alignment: .bottomTrailing) {
-                    Text("\(review.prefix(150)) ...")
+                    Text("\(coordinateReview.coordinateReview.prefix(150)) ...")
                         .font(.system(size: 16, weight: .light))
                     Button(action: {
                         isShowFullReview = true
@@ -58,7 +51,7 @@ struct CoordinateReviewView: View {
                         Text("続きを見る")
                             .font(.system(size: 16, weight: .regular, design: .rounded))
                             .foregroundStyle(.blue)
-                            .offset(y: 10)
+                            .offset(y: 26)
                     }
                 }
             }
@@ -68,49 +61,49 @@ struct CoordinateReviewView: View {
     private func RecommendItems() -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("おすすめアイテム")
-                .font(.system(size: 24, weight: .bold))
+                .font(.system(size: 20, weight: .bold))
 
-            Text("カジュアル で 黒のワイドパンツ に似合う アウター")
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(.secondary)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 24) {
-                    ForEach(recommendItemUIImages, id: \.self) { itemUIImage in
-                        ItemCard(itemUIImage: itemUIImage)
-                    }
-                }
-            }
-
-            Text("カジュアル で グレーのニット に似合う パンツ")
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(.secondary)
-                .padding(.top, 24)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 24) {
-                    ForEach(recommendItemUIImages, id: \.self) { itemUIImage in
-                        ItemCard(itemUIImage: itemUIImage)
+            ForEach(coordinateReview.recommend, id: \.id) { recommend in
+                Text("\(recommend.title)")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(.secondary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 24) {
+                        ForEach(recommend.recommendItems, id: \.id) { recommendItem in
+                            Button(action: {
+                                print("Tapped Item Card")
+                            }) {
+                                ItemCard(recommendItem: recommendItem)
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    private func ItemCard(itemUIImage: UIImage) -> some View {
+    private func ItemCard(recommendItem: RecommendItem) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             ZStack {
-                Image(uiImage: itemUIImage)
-                    .resizable()
-                    .frame(width: 215/1.8, height: 258/1.8)   // ZOZOTOWN の商品画像サイズ をリサイズ
-                    .scaledToFill()
+                AsyncImage(url: URL(string: recommendItem.imageURL)!) { image in
+                    image.resizable()
+                } placeholder: {
+                    ProgressView()
+                }
+                .frame(width: 215/1.8, height: 258/1.8)   // ZOZOTOWN の商品画像サイズ をリサイズ
+                .scaledToFill()
             }
 
-            Text("ブルゾン")
+            Text("\(recommendItem.name)")
                 .font(.system(size: 14, weight: .semibold))
-            Text("BEAMS")
+                .foregroundStyle(.black)
+            Text("\(recommendItem.company)")
                 .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(.black)
                 .padding(.top, -6)
-            Text("¥3,000")
+            Text("¥\(recommendItem.price)")
                 .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.black)
 
         }
     }
@@ -119,12 +112,6 @@ struct CoordinateReviewView: View {
 #Preview {
     CoordinateReviewView(
         coordinateImage: UIImage(resource: .coordinate1),
-        recommendItemUIImages: [
-            .init(resource: .item1),
-            .init(resource: .item2),
-            .init(resource: .item3),
-            .init(resource: .item4),
-            .init(resource: .item5)
-        ]
+        coordinateReview: .mock()
     )
 }
