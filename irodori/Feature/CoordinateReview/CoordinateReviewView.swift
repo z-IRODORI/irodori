@@ -90,13 +90,10 @@ struct CoordinateReviewView: View {
                 } placeholder: {
                     ProgressView()
                 }
-                .frame(width: 215/1.8, height: 258/1.8)   // ZOZOTOWN の商品画像サイズ をリサイズ
+                .frame(width: 215/2, height: 258/2)   // ZOZOTOWN の商品画像サイズ をリサイズ
                 .scaledToFill()
             }
 
-            Text("\(recommendItem.name)")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.black)
             Text("\(recommendItem.company)")
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(.black)
