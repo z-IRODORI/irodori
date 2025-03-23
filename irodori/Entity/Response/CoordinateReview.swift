@@ -8,19 +8,19 @@
 import Foundation
 
 // APIを作った場合使う
-struct CoordinateReview {
+struct CoordinateReview: Identifiable {
     let id: Int
     let coordinateReview: String
     let recommend: [RecommendItems]
 }
 
-struct RecommendItems {
+struct RecommendItems: Identifiable {
     let id: Int
     let title: String    // 黒のワイドパンツ に似合う レザージャケット
     let recommendItems: [RecommendItem]
 }
 
-struct RecommendItem {
+struct RecommendItem: Identifiable {
     let id: Int
     let name: String
     let company: String

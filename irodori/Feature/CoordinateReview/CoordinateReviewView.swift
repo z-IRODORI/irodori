@@ -12,6 +12,7 @@ struct CoordinateReviewView: View {
     let coordinateReview: CoordinateReview
 
     @State private var isShowFullReview = false
+    @State private var tappedRecommendItem: RecommendItem? = nil
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -30,6 +31,9 @@ struct CoordinateReviewView: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .onAppear {
             isShowFullReview = coordinateReview.coordinateReview.count < 150
+        }
+        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
+            WebView(url: URL(string: tappedRecommendItem.itemURL))
         }
     }
 
@@ -71,7 +75,7 @@ struct CoordinateReviewView: View {
                     HStack(spacing: 24) {
                         ForEach(recommend.recommendItems, id: \.id) { recommendItem in
                             Button(action: {
-                                print("Tapped Item Card")
+                                tappedRecommendItem = recommendItem
                             }) {
                                 ItemCard(recommendItem: recommendItem)
                             }
