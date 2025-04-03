@@ -26,6 +26,7 @@ class CameraViewModel: NSObject, ObservableObject {
     func setupCamera() {
         do {
             self.session.beginConfiguration()
+            self.session.sessionPreset = .iFrame1280x720
 
             // デバイス設定
             guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
@@ -95,6 +96,7 @@ extension CameraViewModel: AVCapturePhotoCaptureDelegate {
 
         // キャプチャ画像を長方形にトリミングする
         DispatchQueue.main.async {
+            //guard let croppedUIImage = UIImage(data: imageData)?.crop(to: CGSize(width: 400, height: 300)) else { return }
             self.capturedImage = UIImage(data: imageData)
         }
     }

@@ -76,12 +76,12 @@ extension CameraView {
             Color.black.opacity(0.5)
                 .edgesIgnoringSafeArea(.all)
             RoundedRectangle(cornerRadius: 15)
-                .frame(width: 300, height: 500)
+                .frame(width: 300, height: 400)
                 .blendMode(.destinationOut)
             Text("全身が映るよう撮影してください")
                 .foregroundStyle(.white)
                 .fontWeight(.bold)
-                .padding(.bottom, 500 + 50)   // くり抜きの上に文字が配置されるよ
+                .padding(.bottom, 400 + 50)   // くり抜きの上に文字が配置されるよ
         }
         .compositingGroup()
     }
