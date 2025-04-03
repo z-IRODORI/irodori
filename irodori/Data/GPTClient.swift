@@ -18,7 +18,7 @@ struct ImageRequest: Encodable {
 }
 
 final class GPTClient {
-    func postImageToGPT(image: UIImage) async throws -> String {
+    func postImageToGPT(image: UIImage) async throws -> CoordinateReview? {
         let baseURL = "http://10.203.100.35:5000"
         let endpoint = "coordinate-review"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
@@ -41,11 +41,12 @@ final class GPTClient {
             // URLSessionでリクエストを送信
             let (data, _) = try await URLSession.shared.data(for: request)
             // JSONレスポンスをデコード
-            let response = try JSONDecoder().decode(GPTResponse.self, from: data)
-            return response.result
+            let response = try JSONDecoder().decode(CoordinateReview.self, from: data)
+            return response
         } catch {
+            // TODO: エラーハンドリング
             print(error.localizedDescription)
-            return error.localizedDescription
+            return nil
         }
     }
 }

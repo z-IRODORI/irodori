@@ -19,7 +19,7 @@ struct LoadingView: View {
 
     let client: GPTClient = .init()
     @State private var isFinishedRequest = false
-    @State private var reviewText = ""
+    @State private var coordinateReview: CoordinateReview = .mock()
 
     let coordinateImage: UIImage
     init(coordinateImage: UIImage) {
@@ -36,21 +36,17 @@ struct LoadingView: View {
             KFAnimatedImage(loadingGIFURL)
                 .frame(width: 100 * 2, height: 80 * 2)
                 .scaledToFit()
-
-            if isFinishedRequest {
-                Text(reviewText)
-            }
         }
         .onAppear {
             Task {
                 // GPT (port5000)
-                let result = try await client.postImageToGPT(image: coordinateImage)
+                guard let result = try await client.postImageToGPT(image: coordinateImage) else { return }
                 // SearchMyFashon (port8000)
 //                let searchMyFashionClient: SerchMyFashionClient = .init()
 //                let result = try await searchMyFashionClient.postImage(image: coordinateImage)
 //                print(result?.similar_wear.first?.username)
                 await MainActor.run {
-                    reviewText = result
+                    coordinateReview = result
                     isFinishedRequest = true
                 }
             }
@@ -58,7 +54,7 @@ struct LoadingView: View {
         .navigationDestination(isPresented: $isFinishedRequest) {
             CoordinateReviewView(
                 coordinateImage: coordinateImage,
-                coordinateReview: .init(id: 1, coordinateReview: reviewText, recommend: [])
+                coordinateReview: coordinateReview
             )
         }
     }
