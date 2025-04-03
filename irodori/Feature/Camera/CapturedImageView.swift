@@ -32,9 +32,16 @@ struct CapturedImageView: View {
 
                     Spacer()
 
-                    Button("保存") {
-                        // 画像を保存
-                        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+//                    Button("保存") {
+//                        // 画像を保存
+//                        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+//                        isPresented = false
+//                    }
+//                    .foregroundColor(.white)
+//                    .padding()
+
+                    Button("送信") {
+                        
                         isPresented = false
                     }
                     .foregroundColor(.white)
