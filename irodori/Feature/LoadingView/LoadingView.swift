@@ -43,8 +43,12 @@ struct LoadingView: View {
         }
         .onAppear {
             Task {
+                // GPT (port5000)
                 let result = try await client.postImageToGPT(image: coordinateImage)
-                isFinishedRequest = true
+                // SearchMyFashon (port8000)
+//                let searchMyFashionClient: SerchMyFashionClient = .init()
+//                let result = try await searchMyFashionClient.postImage(image: coordinateImage)
+//                print(result?.similar_wear.first?.username)
                 await MainActor.run {
                     reviewText = result
                     isFinishedRequest = true
