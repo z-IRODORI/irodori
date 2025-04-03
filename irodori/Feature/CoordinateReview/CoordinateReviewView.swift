@@ -11,7 +11,7 @@ struct CoordinateReviewView: View {
     let coordinateImage: UIImage
     let coordinateReview: CoordinateReview
 
-    private let criterionShortText = 50
+    private let criterionShortText = 150
     @State private var reviewText = ""
     @State private var isShowFullReview = false
     @State private var tappedRecommendItem: RecommendItem? = nil
@@ -26,19 +26,11 @@ struct CoordinateReviewView: View {
 
                 ReviewText()
 
-                RecommendItems()
+//                RecommendItems()
             }
         }
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onAppear {
-            Task {
-                let client: GPTClient = .init()
-                reviewText = try await client.postImageToGPT(image: coordinateImage)
-                print(reviewText)
-                isShowFullReview = reviewText.count < criterionShortText
-            }
-        }
 //        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
 //            WebView(url: URL(string: tappedRecommendItem.itemURL))
 //        }
@@ -54,27 +46,22 @@ struct CoordinateReviewView: View {
                 .font(.system(size: 20, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // TODO: enumを使いステータスを表現する
-            if !reviewText.isEmpty {
-                if isShowFullReview {
-                    Text("\(reviewText)")
+            if isShowFullReview {
+                Text("\(coordinateReview.coordinateReview)")
+                    .font(.system(size: 16, weight: .light))
+            } else {
+                ZStack(alignment: .bottomTrailing) {
+                    Text("\(coordinateReview.coordinateReview.prefix(criterionShortText)) ...")
                         .font(.system(size: 16, weight: .light))
-                } else {
-                    ZStack(alignment: .bottomTrailing) {
-                        Text("\(reviewText.prefix(criterionShortText)) ...")
-                            .font(.system(size: 16, weight: .light))
-                        Button(action: {
-                            isShowFullReview = true
-                        }) {
-                            Text("続きを見る")
-                                .font(.system(size: 16, weight: .regular, design: .rounded))
-                                .foregroundStyle(.blue)
-                                .padding(.top, 26)
-                        }
+                    Button(action: {
+                        isShowFullReview = true
+                    }) {
+                        Text("続きを見る")
+                            .font(.system(size: 16, weight: .regular, design: .rounded))
+                            .foregroundStyle(.blue)
+                            .padding(.top, 26)
                     }
                 }
-            } else {
-                ProgressView()
             }
         }
     }
