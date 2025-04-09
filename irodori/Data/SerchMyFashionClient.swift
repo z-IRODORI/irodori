@@ -1,26 +1,16 @@
 //
-//  GPTClient.swift
+//  SerchMyFashionClient.swift
 //  irodori
 //
-//  Created by 濵田　悠樹 on 2025/03/25.
+//  Created by yuki.hamada on 2025/04/04.
 //
 
-import Foundation
 import UIKit
 
-// レスポンスの構造体
-struct GPTResponse: Decodable {
-    let result: String
-}
-
-struct ImageRequest: Encodable {
-    let image_base64: String
-}
-
-final class GPTClient {
-    func postImageToGPT(image: UIImage) async throws -> CoordinateReview? {
-        let baseURL = "https://nfzoiluhpi.execute-api.ap-northeast-1.amazonaws.com/prod/"
-        let endpoint = "coordinate-review"
+final class SerchMyFashionClient {
+    func postImage(image: UIImage) async throws -> PredictResponse? {
+        let baseURL = "http://52.194.210.2:8000"
+        let endpoint = "predict"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 
         // UIImageをJPEGデータに変換し、Base64エンコード
@@ -41,13 +31,13 @@ final class GPTClient {
             // URLSessionでリクエストを送信
             let (data, _) = try await URLSession.shared.data(for: request)
             // JSONレスポンスをデコード
-            let response = try JSONDecoder().decode(CoordinateReview.self, from: data)
+            let response = try JSONDecoder().decode(PredictResponse.self, from: data)
             return response
         } catch {
-            // TODO: エラーハンドリング
             print(error.localizedDescription)
             return nil
         }
     }
 }
+
 
