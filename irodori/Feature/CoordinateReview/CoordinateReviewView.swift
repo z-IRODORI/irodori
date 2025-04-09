@@ -119,25 +119,22 @@ struct CoordinateReviewView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 24) {
                         ForEach(predictResponse.similar_wear, id: \.self) { similarWearItem in
-                            VStack(spacing: 12) {
-                                AsyncImage(url: URL(string: similarWearItem.image_url)!) { image in
-                                    image
-                                        .resizable()
-                                        .frame(width: 30 * 4.5, height: 40 * 4.5)
-                                } placeholder: {
-                                    ProgressView()
-                                }
-                                .onAppear {
-                                    print(similarWearItem.post_url)
-                                }
+                            Button(action: {
+                                tappedURL = similarWearItem.post_url
+                            }, label: {
+                                VStack(spacing: 12) {
+                                    AsyncImage(url: URL(string: similarWearItem.image_url)!) { image in
+                                        image
+                                            .resizable()
+                                            .frame(width: 30 * 4.5, height: 40 * 4.5)
+                                    } placeholder: {
+                                        ProgressView()
+                                    }
 
-                                Button(action: {
-                                    tappedURL = similarWearItem.post_url
-                                }, label: {
                                     Text("@\(similarWearItem.username)")
                                         .lineLimit(1)
-                                })
-                            }
+                                }
+                            })
                         }
                     }
                 }
