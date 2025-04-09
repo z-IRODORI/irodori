@@ -50,7 +50,7 @@ struct LoadingView: View {
                 print(response1)
                 // SearchMyFashon (port8000)
                 let searchMyFashionClient: SerchMyFashionClient = .init()
-                guard let response2: PredictResponse = try await searchMyFashionClient.postImage(image: coordinateImage) else { return }
+                guard let response2: PredictResponse = try await searchMyFashionClient.postImage(image: coordinateImage.correctOrientation) else { return }
                 predictResponse = response2
 //                predictResponse = .init(graph_image: "", similar_wear: [])
 
