@@ -25,8 +25,11 @@ struct CoordinateReviewView: View {
                     .resizable()
                     .frame(width: 360/1.8, height: 640/1.8)   // WEARのコーデ画像サイズ をリサイズ
                     .scaledToFit()
+
                 ReviewText()
+
                 CoordinateGraph()
+                
                 RecommendItems()
             }
         }
@@ -141,29 +144,6 @@ struct CoordinateReviewView: View {
             }
         }
     }
-
-//    private func ItemCard(recommendItem: RecommendItem) -> some View {
-//        VStack(alignment: .leading, spacing: 12) {
-//            ZStack {
-//                AsyncImage(url: URL(string: recommendItem.imageURL)!) { image in
-//                    image.resizable()
-//                } placeholder: {
-//                    ProgressView()
-//                }
-//                .frame(width: 215/2, height: 258/2)   // ZOZOTOWN の商品画像サイズ をリサイズ
-//                .scaledToFill()
-//            }
-//
-//            Text("\(recommendItem.company)")
-//                .font(.system(size: 14, weight: .regular))
-//                .foregroundStyle(.black)
-//                .padding(.top, -6)
-//            Text("¥\(recommendItem.price)")
-//                .font(.system(size: 16, weight: .bold))
-//                .foregroundStyle(.black)
-//
-//        }
-//    }
 }
 
 #Preview {
