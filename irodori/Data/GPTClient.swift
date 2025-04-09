@@ -19,7 +19,7 @@ struct ImageRequest: Encodable {
 
 final class GPTClient {
     func postImageToGPT(image: UIImage) async throws -> CoordinateReview? {
-        let baseURL = "http://10.203.100.35:5000"
+        let baseURL = "https://nfzoiluhpi.execute-api.ap-northeast-1.amazonaws.com/prod/"
         let endpoint = "coordinate-review"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 

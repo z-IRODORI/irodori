@@ -12,7 +12,9 @@ struct PredictResponse: Decodable {
     let similar_wear: [SimilarWearItem]
 }
 
-struct SimilarWearItem: Decodable {
+struct SimilarWearItem: Decodable, Hashable {
     let username: String
     let image_base64: String
+    let image_url: String
+    let post_url: String
 }
