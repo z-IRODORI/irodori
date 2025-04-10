@@ -15,7 +15,7 @@ struct irodoriApp: App {
 //                coordinateImage: UIImage(resource: .coordinate1),
 //                coordinateReview: .mock()
 //            )
-            CameraView()
+            SelectTagView()
 
 //            LoadingView(
 //                coordinateImage: UIImage(resource: .coordinate1)
