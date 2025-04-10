@@ -20,7 +20,7 @@ final class SerchMyFashionClient {
         let base64String = jpegData.base64EncodedString()
 
 
-        let requestBody = ImageRequest(image_base64: base64String)
+        let requestBody = PredictRequest(image_base64: base64String)
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

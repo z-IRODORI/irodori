@@ -31,4 +31,18 @@ enum OutingPurposeType: CaseIterable {
         case .nothing: return "特になし"
         }
     }
+
+    var number: Int {
+        switch self {
+        case .business: return 0
+        case .couple: return 1
+        case .shopping: return 2
+        case .school: return 3
+        case .cafe: return 4
+        case .dining: return 5
+        case .diningWithOppositeSex: return 6
+        case .excercise: return 7
+        case .nothing: return 8
+        }
+    }
 }

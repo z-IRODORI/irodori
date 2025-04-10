@@ -9,8 +9,14 @@ import SwiftUI
 
 struct SelectTagView: View {
     @State private var selectedTag: OutingPurposeType = .business
+    @State private var isPresentedLoadingView: Bool = false
 
     private let viewModel: SelectTagViewModel = .init()
+
+    let coordinateImage: UIImage
+    init(coordinateImage: UIImage) {
+        self.coordinateImage = coordinateImage
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -18,9 +24,27 @@ struct SelectTagView: View {
                 .font(.system(size: 24, weight: .bold))
 
             TagButtons()
+
+            Button(action: {
+                isPresentedLoadingView = true
+            }, label: {
+                Text("レビューする")
+                    .font(.system(size: 24, weight: .bold))
+                    .frame(maxWidth: .infinity, maxHeight: 50)
+                    .foregroundStyle(.white)
+                    .background(.blue)
+                    .padding(12)
+                    .presentationCornerRadius(20)
+            })
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 24)
+        .navigationDestination(isPresented: $isPresentedLoadingView) {
+            LoadingView(
+                coordinateImage: coordinateImage,
+                tag: selectedTag
+            )
+        }
 
     }
 
@@ -82,5 +106,5 @@ struct SelectTagView: View {
 }
 
 #Preview {
-    SelectTagView()
+    SelectTagView(coordinateImage: UIImage(resource: .coordinate1))
 }

@@ -8,18 +8,10 @@
 import Foundation
 import UIKit
 
-// レスポンスの構造体
-struct GPTResponse: Decodable {
-    let result: String
-}
-
-struct ImageRequest: Encodable {
-    let image_base64: String
-}
-
 final class GPTClient {
-    func postImageToGPT(image: UIImage) async throws -> CoordinateReview? {
-        let baseURL = "https://nfzoiluhpi.execute-api.ap-northeast-1.amazonaws.com/prod/"
+    func postImageToGPT(image: UIImage, outingPurposeType: OutingPurposeType) async throws -> CoordinateReview? {
+//        let baseURL = "https://nfzoiluhpi.execute-api.ap-northeast-1.amazonaws.com/prod/"
+        let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "coordinate-review"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 
@@ -30,7 +22,10 @@ final class GPTClient {
         let base64String = jpegData.base64EncodedString()
 
 
-        let requestBody = ImageRequest(image_base64: base64String)
+        let requestBody = CoordinateReviewRequest(
+            image_base64: base64String,
+            outing_purpose_id: outingPurposeType.number
+        )
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
