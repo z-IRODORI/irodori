@@ -29,13 +29,21 @@ struct SelectTagView: View {
                 isPresentedLoadingView = true
             }, label: {
                 Text("レビューする")
-                    .font(.system(size: 24, weight: .bold))
-                    .frame(maxWidth: .infinity, maxHeight: 50)
-                    .foregroundStyle(.white)
-                    .background(.blue)
+                    .font(.system(size: 20, weight: .bold))
+                    .frame(maxWidth: .infinity, maxHeight: 30)
                     .padding(12)
-                    .presentationCornerRadius(20)
+                    .foregroundStyle(.white)
+                    .background(.black)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(.blue, lineWidth: 1)
+                    )
+                    .mask {
+                        RoundedRectangle(cornerRadius: 16)
+                    }
+                    .cornerRadius(16)
             })
+            .padding(.top, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 24)
@@ -90,14 +98,14 @@ struct SelectTagView: View {
 
         return Text(tag.name)
             .font(.system(size: 16, weight: .regular))
-            .foregroundStyle(selectedTag == tag ? .black.opacity(0.8) : .gray)
+            .foregroundStyle(selectedTag == tag ? .white : .gray)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(selectedTag == tag ? .blue.opacity(0.3) : .white)
+            .background(selectedTag == tag ? .black.opacity(0.5) : .white)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(
-                        selectedTag == tag ? .blue : .gray,
+                        selectedTag == tag ? .black : .gray,
                         lineWidth: selectedTag == tag ? 4 : 1
                     )
             )
