@@ -33,6 +33,7 @@ struct CoordinateReviewView: View {
                 RecommendItems()
             }
         }
+        .navigationBarBackButtonHidden(true)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, 24)
 //        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
@@ -67,7 +68,7 @@ struct CoordinateReviewView: View {
                         Text("続きを見る")
                             .font(.system(size: 16, weight: .regular, design: .rounded))
                             .foregroundStyle(.blue)
-                            .padding(.top, 32)
+                            .background(.white)
                     }
                 }
             }

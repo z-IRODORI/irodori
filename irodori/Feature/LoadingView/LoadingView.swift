@@ -34,17 +34,20 @@ struct LoadingView: View {
 
     var body: some View {
         VStack(spacing: 48) {
-            Text("レビューコメント生成中...")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.gray)
-            Text("※ コメント生成に 30秒ほど 時間かかります...")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.gray)
+            VStack(spacing: 12) {
+                Text("レビューコメント生成中...")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.gray)
+                Text("※ コメント生成に 30秒ほど 時間かかります...")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.gray)
+            }
 
             KFAnimatedImage(loadingGIFURL)
                 .frame(width: 100 * 2, height: 80 * 2)
                 .scaledToFit()
         }
+        .navigationBarBackButtonHidden(true)
         .onAppear {
             Task {
                 // GPT (port5000)
