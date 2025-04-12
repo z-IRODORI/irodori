@@ -53,7 +53,7 @@ struct CapturedImageView: View {
                 }
             }
             .navigationDestination(isPresented: $isPresentedLoadingView) {
-                LoadingView(coordinateImage: image)
+                SelectTagView(coordinateImage: image)
             }
         }
     }

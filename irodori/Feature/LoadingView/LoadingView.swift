@@ -24,35 +24,39 @@ struct LoadingView: View {
     @State private var predictResponse: PredictResponse = .init(graph_image: "", similar_wear: [])
 
     let coordinateImage: UIImage
-    init(coordinateImage: UIImage) {
+    let tag: OutingPurposeType
+    init(coordinateImage: UIImage, tag: OutingPurposeType) {
         self.coordinateImage = coordinateImage
+        self.tag = tag
     }
 
     private let loadingGIFURL = URL(string: "https://cdn.pixabay.com/animation/2024/07/27/09/34/09-34-07-906_512.gif")!
 
     var body: some View {
         VStack(spacing: 48) {
-            Text("レビューコメント生成中...")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.gray)
-            Text("※ コメント生成に 30秒ほど 時間かかります...")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.gray)
+            VStack(spacing: 12) {
+                Text("レビューコメント生成中...")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.gray)
+                Text("※ コメント生成に 30秒ほど 時間かかります...")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.gray)
+            }
 
             KFAnimatedImage(loadingGIFURL)
                 .frame(width: 100 * 2, height: 80 * 2)
                 .scaledToFit()
         }
+        .navigationBarBackButtonHidden(true)
         .onAppear {
             Task {
                 // GPT (port5000)
-                guard let response1: CoordinateReview = try await client.postImageToGPT(image: coordinateImage) else { return }
+                guard let response1: CoordinateReview = try await client.postImageToGPT(image: coordinateImage, outingPurposeType: tag) else { return }
                 print(response1)
                 // SearchMyFashon (port8000)
                 let searchMyFashionClient: SerchMyFashionClient = .init()
                 guard let response2: PredictResponse = try await searchMyFashionClient.postImage(image: coordinateImage.correctOrientation) else { return }
                 predictResponse = response2
-//                predictResponse = .init(graph_image: "", similar_wear: [])
 
                 await MainActor.run {
                     coordinateReview = response1
@@ -75,6 +79,7 @@ struct LoadingView: View {
 
 #Preview {
     LoadingView(
-        coordinateImage: UIImage(resource: .coordinate1)
+        coordinateImage: UIImage(resource: .coordinate1),
+        tag: .nothing
     )
 }

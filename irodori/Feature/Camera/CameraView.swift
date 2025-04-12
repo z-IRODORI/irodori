@@ -36,6 +36,7 @@ struct CameraView: View {
                     .padding(.bottom, 60)
             }
         }
+        .navigationBarBackButtonHidden()
         .ignoresSafeArea()
         .onAppear {
             checkCameraPermission()   // カメラを初期化
@@ -53,7 +54,7 @@ extension CameraView {
         Button(action: {
             cameraViewModel.capturePhoto()
             // キャプチャ成功後に画像表示
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 if cameraViewModel.capturedImage != nil {
                     showCapturedImage = true
                 }

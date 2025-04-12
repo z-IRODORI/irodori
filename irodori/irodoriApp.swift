@@ -11,15 +11,7 @@ import SwiftUI
 struct irodoriApp: App {
     var body: some Scene {
         WindowGroup {
-//            CoordinateReviewView(
-//                coordinateImage: UIImage(resource: .coordinate1),
-//                coordinateReview: .mock()
-//            )
             CameraView()
-
-//            LoadingView(
-//                coordinateImage: UIImage(resource: .coordinate1)
-//            )
         }
     }
 }
