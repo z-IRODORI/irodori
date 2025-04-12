@@ -36,6 +36,7 @@ struct CameraView: View {
                     .padding(.bottom, 60)
             }
         }
+        .navigationBarBackButtonHidden()
         .ignoresSafeArea()
         .onAppear {
             checkCameraPermission()   // カメラを初期化

@@ -17,6 +17,7 @@ struct CoordinateReviewView: View {
     @State private var isShowFullReview = false
     @State private var tappedURL = ""
     @State private var graphImage: UIImage = .init()
+    @State private var isPresentedCameraView = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -34,6 +35,15 @@ struct CoordinateReviewView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: {
+                    isPresentedCameraView = true
+                }, label: {
+                    Text("再撮影")
+                })
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, 24)
 //        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
@@ -46,6 +56,9 @@ struct CoordinateReviewView: View {
         .onAppear {
             guard let imageData = Data(base64Encoded: predictResponse.graph_image) else { return }
             graphImage = UIImage(data: imageData)!
+        }
+        .navigationDestination(isPresented: $isPresentedCameraView) {
+            CameraView()
         }
     }
 
