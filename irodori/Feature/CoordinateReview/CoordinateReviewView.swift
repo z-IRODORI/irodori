@@ -18,6 +18,7 @@ struct CoordinateReviewView: View {
     )
 
     private let criterionShortText = 150
+    @State private var currentSchedule = ""   // YYYY/MM/DD
     @State private var reviewText = ""
     @State private var isShowFullReview = false
     @State private var tappedURL = ""
@@ -27,33 +28,10 @@ struct CoordinateReviewView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 48) {
-                Image(uiImage: coordinateImage)
-                    .resizable()
-                    .frame(width: 360/1.8, height: 640/1.8)   // WEARのコーデ画像サイズ をリサイズ
-                    .scaledToFit()
-
-                HStack(spacing: 24) {
-                    AsyncImage(url: URL(string: coordinateItem.topsURL)!) { image in
-                        image
-                            .resizable()
-                            .frame(width: 95, height: 120)
-                    } placeholder: {
-                        ProgressView()
-                    }
-
-                    AsyncImage(url: URL(string: coordinateItem.pantsURL)!) { image in
-                        image
-                            .resizable()
-                            .frame(width: 95, height: 120)
-                    } placeholder: {
-                        ProgressView()
-                    }
-                }
-
+                CapturedImage()
+                ItemsImage()
                 ReviewText()
-
                 CoordinateGraph()
-                
                 RecommendItems()
             }
         }
@@ -82,6 +60,53 @@ struct CoordinateReviewView: View {
         }
         .navigationDestination(isPresented: $isPresentedCameraView) {
             CameraView()
+        }
+    }
+
+    private func CapturedImage() -> some View {
+        VStack(spacing: 12) {
+            Text("\(currentSchedule)")
+                .font(.system(size: 20))
+                .foregroundStyle(.gray)
+
+            Image(uiImage: coordinateImage)
+                .resizable()
+                .frame(width: 360/1.8, height: 640/1.8)   // WEARのコーデ画像サイズ をリサイズ
+                .scaledToFit()
+        }
+        .onAppear {
+            // TODO: VM に移行
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy/MM/dd"
+            dateFormatter.locale = Locale(identifier: "ja_JP")
+            let now = Date()
+            currentSchedule = dateFormatter.string(from: now)
+        }
+    }
+
+    private func ItemsImage() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("AIからのコーデコメント")
+                .font(.system(size: 20, weight: .bold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 24) {
+                AsyncImage(url: URL(string: coordinateItem.topsURL)!) { image in
+                    image
+                        .resizable()
+                        .frame(width: 95, height: 120)
+                } placeholder: {
+                    ProgressView()
+                }
+
+                AsyncImage(url: URL(string: coordinateItem.pantsURL)!) { image in
+                    image
+                        .resizable()
+                        .frame(width: 95, height: 120)
+                } placeholder: {
+                    ProgressView()
+                }
+            }
         }
     }
 

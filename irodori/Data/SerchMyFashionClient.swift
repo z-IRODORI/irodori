@@ -9,7 +9,7 @@ import UIKit
 
 final class SerchMyFashionClient {
     func postImage(image: UIImage) async throws -> PredictResponse? {
-        let baseURL = "https://irodori.click"
+        let baseURL = "http://13.113.88.225:8000"
         let endpoint = "predict"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 
