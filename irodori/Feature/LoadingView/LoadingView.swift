@@ -16,6 +16,7 @@ enum LoadingState {
 }
 
 struct LoadingView: View {
+    @Environment(\.dismiss) private var dismiss
 
     let client: GPTClient = .init()
     @State private var isFinishedRequest = false
@@ -38,7 +39,7 @@ struct LoadingView: View {
                 Text("レビューコメント生成中...")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(.gray)
-                Text("※ コメント生成に 30秒ほど 時間かかります...")
+                Text("※ コメント生成に 20秒ほど 時間かかります...")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.gray)
             }
@@ -51,19 +52,29 @@ struct LoadingView: View {
         .onAppear {
             Task {
                 // GPT (port5000)
-                guard let response1: CoordinateReview = try await client.postImageToGPT(image: coordinateImage, outingPurposeType: tag) else { return }
-                print(response1)
+                async let response1: Result<CoordinateReview, Error> = client.postImageToGPT(image: coordinateImage, outingPurposeType: tag)
                 // SearchMyFashon (port8000)
                 let searchMyFashionClient: SerchMyFashionClient = .init()
-                guard let response2: PredictResponse = try await searchMyFashionClient.postImage(image: coordinateImage.correctOrientation) else { return }
-                predictResponse = response2
+                async let response2: Result<PredictResponse, Error> = searchMyFashionClient.postImage(image: coordinateImage.correctOrientation)
 
-                await MainActor.run {
-                    coordinateReview = response1
-                    isFinishedRequest = true
+                // 両方の結果を await で待つ. ここで最も遅いタスクの完了を待つことになります
+                let apiResponse1 = try await response1
+                let apiResponse2 = try await response2
 
-                    guard let imageData = Data(base64Encoded: response2.graph_image) else { return }
-                    fashionGraphImage = UIImage(data: imageData)!
+                switch (apiResponse1, apiResponse2) {
+                case (.failure(let error), _), (_, .failure(let error)):
+                    print("Error: \(error)")
+                    dismiss()
+                    return
+                case (.success(let response1), .success(let response2)):
+                    await MainActor.run {
+                        coordinateReview = response1
+                        predictResponse = response2
+                        isFinishedRequest = true
+
+                        guard let imageData = Data(base64Encoded: response2.graph_image) else { return }
+                        fashionGraphImage = UIImage(data: imageData)!
+                    }
                 }
             }
         }

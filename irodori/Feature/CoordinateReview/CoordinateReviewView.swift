@@ -29,7 +29,7 @@ struct CoordinateReviewView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 48) {
                 CapturedImage()
-                ItemsImage()
+//                ItemsImage()
                 ReviewText()
                 CoordinateGraph()
                 RecommendItems()
@@ -66,7 +66,7 @@ struct CoordinateReviewView: View {
     private func CapturedImage() -> some View {
         VStack(spacing: 12) {
             Text("\(currentSchedule)")
-                .font(.system(size: 20))
+                .font(.system(size: 16))
                 .foregroundStyle(.gray)
 
             Image(uiImage: coordinateImage)

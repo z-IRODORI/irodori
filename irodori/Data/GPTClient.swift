@@ -9,7 +9,7 @@ import Foundation
 import UIKit
 
 final class GPTClient {
-    func postImageToGPT(image: UIImage, outingPurposeType: OutingPurposeType) async throws -> CoordinateReview? {
+    func postImageToGPT(image: UIImage, outingPurposeType: OutingPurposeType) async throws -> Result<CoordinateReview, Error> {
 //        let baseURL = "https://nfzoiluhpi.execute-api.ap-northeast-1.amazonaws.com/prod/"
         let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "coordinate-review"
@@ -37,11 +37,11 @@ final class GPTClient {
             let (data, _) = try await URLSession.shared.data(for: request)
             // JSONレスポンスをデコード
             let response = try JSONDecoder().decode(CoordinateReview.self, from: data)
-            return response
+            return .success(response)
         } catch {
             // TODO: エラーハンドリング
             print(error.localizedDescription)
-            return nil
+            return .failure(error)
         }
     }
 }
