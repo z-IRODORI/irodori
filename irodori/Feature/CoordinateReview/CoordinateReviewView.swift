@@ -11,6 +11,11 @@ struct CoordinateReviewView: View {
     let coordinateImage: UIImage
     let coordinateReview: CoordinateReview
     let predictResponse: PredictResponse
+    let coordinateItem: CoordinateItem = .init(
+        id: 0,
+        topsURL: "https://c.imgz.jp/679/73552679/73552679_21_d_500.jpg",
+        pantsURL: "https://c.imgz.jp/311/93793311/93793311_16_d_500.jpg"
+    )
 
     private let criterionShortText = 150
     @State private var reviewText = ""
@@ -26,6 +31,24 @@ struct CoordinateReviewView: View {
                     .resizable()
                     .frame(width: 360/1.8, height: 640/1.8)   // WEARのコーデ画像サイズ をリサイズ
                     .scaledToFit()
+
+                HStack(spacing: 24) {
+                    AsyncImage(url: URL(string: coordinateItem.topsURL)!) { image in
+                        image
+                            .resizable()
+                            .frame(width: 95, height: 120)
+                    } placeholder: {
+                        ProgressView()
+                    }
+
+                    AsyncImage(url: URL(string: coordinateItem.pantsURL)!) { image in
+                        image
+                            .resizable()
+                            .frame(width: 95, height: 120)
+                    } placeholder: {
+                        ProgressView()
+                    }
+                }
 
                 ReviewText()
 
