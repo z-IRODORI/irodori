@@ -8,7 +8,7 @@
 import UIKit
 
 final class SerchMyFashionClient {
-    func postImage(image: UIImage) async throws -> PredictResponse? {
+    func postImage(image: UIImage) async throws -> Result<PredictResponse, Error> {
         let baseURL = "https://irodori.click"
         let endpoint = "predict"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
@@ -32,10 +32,10 @@ final class SerchMyFashionClient {
             let (data, _) = try await URLSession.shared.data(for: request)
             // JSONレスポンスをデコード
             let response = try JSONDecoder().decode(PredictResponse.self, from: data)
-            return response
+            return .success(response)
         } catch {
             print(error.localizedDescription)
-            return nil
+            return .failure(error)
         }
     }
 }
