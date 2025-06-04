@@ -31,17 +31,11 @@ final class FashionReviewClient {
         // Bodyの設定
         request.httpBody = body
 
-        print(headers)
-        print(body)
-
-
         do {
             // URLSessionでリクエストを送信
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
-            print(urlResponse)
             // JSONレスポンスをデコード
             let response = try JSONDecoder().decode(FashionReviewResponse.self, from: data)
-            print(response)
             return .success(response)
         } catch {
             print(error.localizedDescription)

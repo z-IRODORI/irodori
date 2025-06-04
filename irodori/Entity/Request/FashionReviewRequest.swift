@@ -23,7 +23,6 @@ extension FashionReviewRequest {
         parameters["outing_purpose_id"] = outing_purpose_id ?? ""
         parameters["query_width"] = query_width
         parameters["query_height"] = query_height
-        print(parameters)
         return parameters
     }
 }
