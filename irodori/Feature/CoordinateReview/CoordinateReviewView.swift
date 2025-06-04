@@ -75,25 +75,37 @@ struct CoordinateReviewView: View {
 
     private func ItemsImage() -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("AIからのコーデコメント")
+            Text("今日着用しているアイテム")
                 .font(.system(size: 20, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 24) {
-                AsyncImage(url: URL(string: fashionReview.tops_image_url)!) { image in
-                    image
-                        .resizable()
-                        .frame(width: 95, height: 120)
-                } placeholder: {
-                    ProgressView()
+            HStack(spacing: 48) {
+                VStack(spacing: 6) {
+                    Text("トップス")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.gray)
+
+                    AsyncImage(url: URL(string: fashionReview.tops_image_url)!) { image in
+                        image
+                            .resizable()
+                            .frame(width: 120, height: 120)
+                    } placeholder: {
+                        ProgressView()
+                    }
                 }
 
-                AsyncImage(url: URL(string: fashionReview.bottoms_image_url)!) { image in
-                    image
-                        .resizable()
-                        .frame(width: 95, height: 120)
-                } placeholder: {
-                    ProgressView()
+                VStack(spacing: 6) {
+                    Text("ボトムス")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.gray)
+
+                    AsyncImage(url: URL(string: fashionReview.bottoms_image_url)!) { image in
+                        image
+                            .resizable()
+                            .frame(width: 120, height: 120)
+                    } placeholder: {
+                        ProgressView()
+                    }
                 }
             }
         }
