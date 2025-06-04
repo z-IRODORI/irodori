@@ -9,27 +9,20 @@ import SwiftUI
 
 struct CoordinateReviewView: View {
     let coordinateImage: UIImage
-    let coordinateReview: CoordinateReview
-    let predictResponse: PredictResponse
-    let coordinateItem: CoordinateItem = .init(
-        id: 0,
-        topsURL: "https://c.imgz.jp/679/73552679/73552679_21_d_500.jpg",
-        pantsURL: "https://c.imgz.jp/311/93793311/93793311_16_d_500.jpg"
-    )
+    let fashionReview: FashionReviewResponse
 
     private let criterionShortText = 150
     @State private var currentSchedule = ""   // YYYY/MM/DD
     @State private var reviewText = ""
     @State private var isShowFullReview = false
     @State private var tappedURL = ""
-    @State private var graphImage: UIImage = .init()
     @State private var isPresentedCameraView = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 48) {
                 CapturedImage()
-//                ItemsImage()
+                ItemsImage()
                 ReviewText()
                 CoordinateGraph()
                 RecommendItems()
@@ -53,10 +46,6 @@ struct CoordinateReviewView: View {
         .onChange(of: tappedURL) {
             let url = URL(string: tappedURL)!   // TODO: エラーハンドリング
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
-        }
-        .onAppear {
-            guard let imageData = Data(base64Encoded: predictResponse.graph_image) else { return }
-            graphImage = UIImage(data: imageData)!
         }
         .navigationDestination(isPresented: $isPresentedCameraView) {
             CameraView()
@@ -86,25 +75,37 @@ struct CoordinateReviewView: View {
 
     private func ItemsImage() -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("AIからのコーデコメント")
+            Text("今日着用しているアイテム")
                 .font(.system(size: 20, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 24) {
-                AsyncImage(url: URL(string: coordinateItem.topsURL)!) { image in
-                    image
-                        .resizable()
-                        .frame(width: 95, height: 120)
-                } placeholder: {
-                    ProgressView()
+            HStack(spacing: 48) {
+                VStack(spacing: 6) {
+                    Text("トップス")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.gray)
+
+                    AsyncImage(url: URL(string: fashionReview.tops_image_url)!) { image in
+                        image
+                            .resizable()
+                            .frame(width: 120, height: 120)
+                    } placeholder: {
+                        ProgressView()
+                    }
                 }
 
-                AsyncImage(url: URL(string: coordinateItem.pantsURL)!) { image in
-                    image
-                        .resizable()
-                        .frame(width: 95, height: 120)
-                } placeholder: {
-                    ProgressView()
+                VStack(spacing: 6) {
+                    Text("ボトムス")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.gray)
+
+                    AsyncImage(url: URL(string: fashionReview.bottoms_image_url)!) { image in
+                        image
+                            .resizable()
+                            .frame(width: 120, height: 120)
+                    } placeholder: {
+                        ProgressView()
+                    }
                 }
             }
         }
@@ -117,11 +118,11 @@ struct CoordinateReviewView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if isShowFullReview {
-                Text("\(coordinateReview.coordinate_review)")
+                Text("\(fashionReview.coordinate.coordinate_review)")
                     .font(.system(size: 16, weight: .light))
             } else {
                 ZStack(alignment: .bottomTrailing) {
-                    Text("\(coordinateReview.coordinate_review.prefix(criterionShortText)) ...")
+                    Text("\(fashionReview.coordinate.coordinate_review.prefix(criterionShortText)) ...")
                         .font(.system(size: 16, weight: .light))
                     Button(action: {
                         isShowFullReview = true
@@ -141,18 +142,37 @@ struct CoordinateReviewView: View {
             Text("おすすめアイテム")
                 .font(.system(size: 20, weight: .bold))
 
-            RecommendItemText(coordinate_item: coordinateReview.coordinate_item01, recommend_item: coordinateReview.recommend_item01, recommend_item_url: coordinateReview.recommend_item01_url)
+            RecommendItemText(
+                // TODO: [BE担当] recommend_item01 と coordinate_item01 を逆にする
+//                coordinate_item: fashionReview.coordinate.coordinate_item01,
+//                recommend_item: fashionReview.coordinate.recommend_item01,
+                coordinate_item: fashionReview.coordinate.recommend_item01,
+                recommend_item: fashionReview.coordinate.coordinate_item01,
+                recommend_item_url: ""//fashionReview.coordinate.recommend_item01_url!
+            )
 
-            RecommendItemText(coordinate_item: coordinateReview.coordinate_item02, recommend_item: coordinateReview.recommend_item02, recommend_item_url: coordinateReview.recommend_item02_url)
+            RecommendItemText(
+//                coordinate_item: fashionReview.coordinate.coordinate_item02,
+//                recommend_item: fashionReview.coordinate.recommend_item02,
+                coordinate_item: fashionReview.coordinate.recommend_item02,
+                recommend_item: fashionReview.coordinate.coordinate_item02,
+                recommend_item_url: ""//fashionReview.coordinate.recommend_item02_url!
+            )
 
-            RecommendItemText(coordinate_item: coordinateReview.coordinate_item03, recommend_item: coordinateReview.recommend_item03, recommend_item_url: coordinateReview.recommend_item03_url)
+            RecommendItemText(
+//                coordinate_item: fashionReview.coordinate.coordinate_item03,
+//                recommend_item: fashionReview.coordinate.recommend_item03,
+                coordinate_item: fashionReview.coordinate.recommend_item03,
+                recommend_item: fashionReview.coordinate.coordinate_item03,
+                recommend_item_url: ""//fashionReview.coordinate.recommend_item03_url!
+            )
         }
     }
 
     private func RecommendItemText(coordinate_item: String, recommend_item: String, recommend_item_url: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Button(action: {
-                tappedURL = recommend_item_url
+//                tappedURL = recommend_item_url
             }, label: {
                 Text("🔍 \(recommend_item)")
                     .font(.system(size: 16, weight: .bold))
@@ -170,10 +190,14 @@ struct CoordinateReviewView: View {
                     .font(.system(size: 20, weight: .bold))
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Image(uiImage: graphImage)
-                    .resizable()
-                    .frame(maxWidth: 320, maxHeight: 320)
-                    .border(.gray, width: 2)
+                AsyncImage(url: URL(string: fashionReview.graph_image)!) { image in
+                    image
+                        .resizable()
+                        .frame(maxWidth: 320, maxHeight: 320)
+                        .border(.gray, width: 2)
+                } placeholder: {
+                    ProgressView()
+                }
             }
 
             VStack(spacing: 12) {
@@ -183,7 +207,7 @@ struct CoordinateReviewView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 24) {
-                        ForEach(predictResponse.similar_wear, id: \.self) { similarWearItem in
+                        ForEach(fashionReview.recommendations, id: \.self) { similarWearItem in
                             Button(action: {
                                 tappedURL = similarWearItem.post_url
                             }, label: {
@@ -211,7 +235,6 @@ struct CoordinateReviewView: View {
 #Preview {
     CoordinateReviewView(
         coordinateImage: UIImage(resource: .coordinate1),
-        coordinateReview: .mock(),
-        predictResponse: .init(graph_image: "", similar_wear: [])
+        fashionReview: .mock()
     )
 }

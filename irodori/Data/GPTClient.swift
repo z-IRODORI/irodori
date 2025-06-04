@@ -32,6 +32,7 @@ final class GPTClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(requestBody)
 
+
         do {
             // URLSessionでリクエストを送信
             let (data, _) = try await URLSession.shared.data(for: request)

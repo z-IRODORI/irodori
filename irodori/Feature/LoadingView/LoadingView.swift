@@ -20,9 +20,7 @@ struct LoadingView: View {
 
     let client: GPTClient = .init()
     @State private var isFinishedRequest = false
-    @State private var coordinateReview: CoordinateReview = .mock()
-    @State private var fashionGraphImage: UIImage = .init()
-    @State private var predictResponse: PredictResponse = .init(graph_image: "", similar_wear: [])
+    @State private var fashionReview: FashionReviewResponse = .init(createdAt: "", tops_image_url: "", bottoms_image_url: "", coordinate: .mock(), graph_image: "", recommendations: [])
 
     let coordinateImage: UIImage
     let tag: OutingPurposeType
@@ -51,38 +49,30 @@ struct LoadingView: View {
         .navigationBarBackButtonHidden(true)
         .onAppear {
             Task {
-                // GPT (port5000)
-                async let response1: Result<CoordinateReview, Error> = client.postImageToGPT(image: coordinateImage, outingPurposeType: tag)
-                // SearchMyFashon (port8000)
-                let searchMyFashionClient: SerchMyFashionClient = .init()
-                async let response2: Result<PredictResponse, Error> = searchMyFashionClient.postImage(image: coordinateImage.correctOrientation)
+                let fashionReviewClient: FashionReviewClient = .init()
+                let fashionReviewResponse: Result<FashionReviewResponse, Error> = try await fashionReviewClient.post(
+                    uid: UUID().uuidString,
+                    image: coordinateImage.correctOrientation,
+                    purposeNum: nil//tag.number
+                )
 
-                // 両方の結果を await で待つ. ここで最も遅いタスクの完了を待つことになります
-                let apiResponse1 = try await response1
-                let apiResponse2 = try await response2
-
-                switch (apiResponse1, apiResponse2) {
-                case (.failure(let error), _), (_, .failure(let error)):
+                switch fashionReviewResponse {
+                case .success(let fashionReview):
+                    await MainActor.run {
+                        self.fashionReview = fashionReview
+                        isFinishedRequest = true
+                    }
+                case .failure(let error):
                     print("Error: \(error)")
                     dismiss()
                     return
-                case (.success(let response1), .success(let response2)):
-                    await MainActor.run {
-                        coordinateReview = response1
-                        predictResponse = response2
-                        isFinishedRequest = true
-
-                        guard let imageData = Data(base64Encoded: response2.graph_image) else { return }
-                        fashionGraphImage = UIImage(data: imageData)!
-                    }
                 }
             }
         }
         .navigationDestination(isPresented: $isFinishedRequest) {
             CoordinateReviewView(
                 coordinateImage: coordinateImage,
-                coordinateReview: coordinateReview,
-                predictResponse: predictResponse
+                fashionReview: fashionReview
             )
         }
     }
