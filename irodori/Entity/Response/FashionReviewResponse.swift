@@ -43,8 +43,8 @@ extension FashionReviewResponse {
     static func mock() -> Self {
         .init(
             createdAt: "20250605044340",
-            tops_image_url: "https://irodori-s3.s3.amazonaws.com/output/0123456789-20250605044340-tops.png?AWSAccessKeyId=AKIASOABXO7KE57BCH5N&Signature=LbRfdoqPKLe3IuCv2quWDJeB4hc%3D&Expires=1749069823",
-            bottoms_image_url: "https://irodori-s3.s3.amazonaws.com/output/0123456789-20250605044340-bottoms.png?AWSAccessKeyId=AKIASOABXO7KE57BCH5N&Signature=tX7MG%2FThd%2FKnZvGE3pSZeLJ4vrU%3D&Expires=1749069823",
+            tops_image_url: "https://c.imgz.jp/086/75033086/75033086b_144_d_500.jpg",
+            bottoms_image_url: "https://c.imgz.jp/407/81070407/81070407_5_d_500.jpg",
             coordinate: .init(
                 coordinate_review: "素敵なコーデですね！グリーンのニットとチェックのシャツが重ね着されていて、明るくて元気な印象を与えています。ギンガムチェックの襟元がオシャレで、スカートのストライプが全体を引き締めています。全体的にカジュアルなのに、ちょっとしたエレガンスも感じられる素敵なスタイルです。",
                 coordinate_item01: "グリーンのニット",
@@ -57,12 +57,22 @@ extension FashionReviewResponse {
                 recommend_item03: "ミディスカートと合わせて、トレンド感をプラスするのも良いですね。"//,
 //                recommend_item03_url: "https://zozo.jp/"
             ),
-            graph_image: "https://irodori-s3.s3.amazonaws.com/graph_image/0123456789-20250605044340-graph.png?AWSAccessKeyId=AKIASOABXO7KE57BCH5N&Signature=OXL7FJRw0BoBQNQOseiZPVKAaCY%3D&Expires=1749069841",
+            graph_image: "https://images.wear2.jp/coordinate/bBildLXx/f42NPtI0/1748770665_1000.jpg",
             recommendations: [
                 .init(
                     username: "10momoon10",
                     post_url: "https://wear.jp/10momoon10/23659966/",
                     image_url: "https://images.wear2.jp/coordinate/GrigMn7m/QRJwxFx7/1702044228_276.jpg"
+                ),
+                .init(
+                    username: "みさね",
+                    post_url: "https://wear.jp/misane1209/25473513/",
+                    image_url: "https://images.wear2.jp/coordinate/zaib64wl/3GUjtLHo/1750110272_1000.jpg"
+                ),
+                .init(
+                    username: "UMI",
+                    post_url: "https://wear.jp/umichuxx/25450621/",
+                    image_url: "https://images.wear2.jp/coordinate/bBildLXx/POZ0Kpli/1749600374_1000.jpg"
                 )
             ]
         )
