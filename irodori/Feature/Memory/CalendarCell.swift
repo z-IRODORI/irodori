@@ -9,9 +9,7 @@ import SwiftUI
 import Kingfisher
 
 struct CalendarCell: View {
-    var beforeImageURL: String
-    var afterImageURL: String
-    var date: String
+    var thumbnailImageURL: String
     var height: CGFloat
     var dayOfMonth: Int
 
@@ -23,7 +21,7 @@ struct CalendarCell: View {
         } label: {
             ZStack {
                 // 全身画像
-                if let imageURL = URL(string: afterImageURL) {
+                if let imageURL = URL(string: thumbnailImageURL) {
                     KFImage.url(imageURL)
                         .loadDiskFileSynchronously()
                         .cacheMemoryOnly()

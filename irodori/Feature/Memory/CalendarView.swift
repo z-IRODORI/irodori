@@ -53,9 +53,7 @@ struct CalendarView: View {
                     // Days in a month
                     ForEach(1..<month.amountOfDays + 1, id: \.self) { i in
                         CalendarCell(
-                            beforeImageURL: "",
-                            afterImageURL: "https://images.wear2.jp/coordinate/bBildLXx/oztkGRxb/1749994312_1000.jpg",
-                            date: "",
+                            thumbnailImageURL: "https://images.wear2.jp/coordinate/bBildLXx/oztkGRxb/1749994312_1000.jpg",
                             height: UIScreen.main.bounds.width/6.5,
                             dayOfMonth: i
                         )
