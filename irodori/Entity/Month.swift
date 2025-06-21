@@ -9,7 +9,7 @@ import Foundation
 
 struct Month: Identifiable {
     var id: String = UUID().uuidString
-    var month: String = ""
+    var title: String = ""
     var monthOfTheYear: Int = 0
     var year: Int = 0
 

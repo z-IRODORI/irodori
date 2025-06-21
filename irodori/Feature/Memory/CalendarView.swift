@@ -29,7 +29,7 @@ struct CalendarView: View {
 
             // Amount of months since December 2022
             ForEach(viewModel.months) { month in
-                Text("\(month.month). \(month.year)")
+                Text("\(month.title). \(month.year, specifier: "%d")")
                     .font(.caption.weight(.semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
