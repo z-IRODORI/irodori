@@ -13,10 +13,12 @@ struct irodoriApp: App {
         WindowGroup {
 //            CameraView()
 
-            CoordinateReviewView(
-                coordinateImage: UIImage(resource: .coordinate1),
-                fashionReview: .mock()
-            )
+//            CoordinateReviewView(
+//                coordinateImage: UIImage(resource: .coordinate1),
+//                fashionReview: .mock()
+//            )
+
+            CalendarView()
         }
     }
 }
