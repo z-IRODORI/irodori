@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 struct CalendarCell: View {
     var beforeImageURL: String
@@ -21,21 +22,15 @@ struct CalendarCell: View {
             showSheet = true
         } label: {
             if let imageURL = URL(string: afterImageURL) {
-                AsyncImage(url: imageURL) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: height)
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: 4)
-                        )
-                } placeholder: {
-                    ProgressView()
-                        .background(.gray.opacity(0.4))
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: 4)
-                        )
-                }
+                KFImage.url(imageURL)
+                    .loadDiskFileSynchronously()
+                    .cacheMemoryOnly()
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: height)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 4)
+                    )
             } else {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
@@ -52,5 +47,11 @@ struct CalendarCell: View {
         .sheet(isPresented: $showSheet) {
             //
         }
+    }
+
+    private func PlaceholderView() -> some View {
+        ProgressView()
+            .background(.gray.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
