@@ -21,26 +21,26 @@ struct CalendarCell: View {
         Button {
             showSheet = true
         } label: {
-            if let imageURL = URL(string: afterImageURL) {
-                KFImage.url(imageURL)
-                    .loadDiskFileSynchronously()
-                    .cacheMemoryOnly()
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: height)
-                    .clipShape(
-                        RoundedRectangle(cornerRadius: 4)
-                    )
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(.gray)
+            ZStack {
+                // 全身画像
+                if let imageURL = URL(string: afterImageURL) {
+                    KFImage.url(imageURL)
+                        .loadDiskFileSynchronously()
+                        .cacheMemoryOnly()
+                        .resizable()
+                        .scaledToFill()
                         .frame(height: height)
-                    Text(dayOfMonth.description)
-                        .foregroundColor(.white)
-                        .font(.headline)
-                        .shadow(radius: 3)
+                        .overlay { Color.black.opacity(0.3) }
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
+
+                // 日付
+                Text(dayOfMonth.description)
+                    .foregroundColor(.white)
+                    .font(.headline)
+                    .shadow(radius: 3)
+                    .frame(height: height)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }
         .buttonStyle(.automatic)
