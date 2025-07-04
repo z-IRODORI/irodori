@@ -22,7 +22,11 @@ struct CameraView: View {
                     .foregroundColor(.white)
 
             case .connectedDevice:
-                CameraPreviewView(cameraViewModel: cameraViewModel)
+                VStack(spacing: 100) {
+                    Spacer()
+                    CameraPreviewView(cameraViewModel: cameraViewModel)
+                        .aspectRatio(3/4, contentMode: .fit)
+                }
                 CameraOverlayView()
                 CaptureButton()
                     .frame(maxHeight: .infinity, alignment: .bottom)
