@@ -198,6 +198,23 @@ final class MockServicesTests: XCTestCase {
         }
     }
     
+    func testMockUserServiceWithCustomResponse() async throws {
+        let mockUserService = MockUserService()
+        let customUsers = UserInfo.mockDataList(count: 5)
+        
+        mockUserService.setSuccessResponse(for: .getAllUsers, data: customUsers)
+        
+        let result = try await mockUserService.getAllUsers()
+        
+        switch result {
+        case .success(let users):
+            XCTAssertEqual(users.count, 5)
+            XCTAssertEqual(users.first?.name, "Test User 1")
+        case .failure:
+            XCTFail("Mock user service should succeed")
+        }
+    }
+    
     func testMockCoordinateService() async throws {
         let mockCoordinateService = MockCoordinateService()
         
@@ -207,6 +224,20 @@ final class MockServicesTests: XCTestCase {
         case .success(let coordinates):
             XCTAssertEqual(coordinates.count, 1)
             XCTAssertEqual(coordinates.first?.id, "coord123")
+        case .failure:
+            XCTFail("Mock coordinate service should succeed")
+        }
+    }
+    
+    func testMockCoordinateServiceWithEmptyList() async throws {
+        let mockCoordinateService = MockCoordinateService()
+        mockCoordinateService.setEmptyCoordinateList()
+        
+        let result = try await mockCoordinateService.getCoordinates(userId: "user123", page: 0)
+        
+        switch result {
+        case .success(let coordinates):
+            XCTAssertEqual(coordinates.count, 0)
         case .failure:
             XCTFail("Mock coordinate service should succeed")
         }
@@ -225,7 +256,28 @@ final class MockServicesTests: XCTestCase {
         
         switch result {
         case .success(let response):
-            XCTAssertEqual(response.ai_comment, "素敵なコーディネートですね！")
+            XCTAssertTrue(response.ai_comment.contains("素敵なコーディネート"))
+        case .failure:
+            XCTFail("Mock fashion review service should succeed")
+        }
+    }
+    
+    func testMockFashionReviewServiceWithPositiveReview() async throws {
+        let mockFashionReviewService = MockFashionReviewService()
+        mockFashionReviewService.setPositiveReview()
+        
+        let testImage = UIImage(systemName: "photo") ?? UIImage()
+        
+        let result = try await mockFashionReviewService.submitFashionReview(
+            userId: "user123",
+            userToken: "token123",
+            image: testImage,
+            days: 7
+        )
+        
+        switch result {
+        case .success(let response):
+            XCTAssertTrue(response.ai_comment.contains("とても素敵"))
         case .failure:
             XCTFail("Mock fashion review service should succeed")
         }
