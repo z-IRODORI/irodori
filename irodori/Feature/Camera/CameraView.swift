@@ -10,7 +10,7 @@ import AVFoundation
 
 // メインカメラView
 struct CameraView: View {
-    @StateObject private var cameraViewModel = CameraViewModel()
+    @StateObject private var cameraViewModel: CameraViewModel = .init()
     @State private var showCapturedImage = false
 
     var body: some View {
@@ -29,7 +29,7 @@ struct CameraView: View {
                         .font(.system(size: 24, weight: .bold))
                         .foregroundStyle(.black)
                         .padding(.top, 80)
-                    CameraPreviewView(cameraViewModel: cameraViewModel)
+                    CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
                         .aspectRatio(3/4, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
                     CaptureButton()
