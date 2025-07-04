@@ -18,7 +18,7 @@ enum LoadingState {
 struct LoadingView: View {
     @Environment(\.dismiss) private var dismiss
 
-    let client: GPTClient = .init()
+    private let fashionReviewService: FashionReviewService = .init()
     @State private var isFinishedRequest = false
     @State private var fashionReview: FashionReviewResponse = .init(createdAt: "", tops_image_url: "", bottoms_image_url: "", coordinate: .mock(), graph_image: "", recommendations: [])
 
@@ -49,23 +49,49 @@ struct LoadingView: View {
         .navigationBarBackButtonHidden(true)
         .onAppear {
             Task {
-                let fashionReviewClient: FashionReviewClient = .init()
-                let fashionReviewResponse: Result<FashionReviewResponse, Error> = try await fashionReviewClient.post(
-                    uid: UUID().uuidString,
-                    image: coordinateImage.correctOrientation,
-                    purposeNum: nil//tag.number
-                )
-
-                switch fashionReviewResponse {
-                case .success(let fashionReview):
-                    await MainActor.run {
-                        self.fashionReview = fashionReview
-                        isFinishedRequest = true
+                do {
+                    let result = try await fashionReviewService.submitFashionReview(
+                        userId: UUID().uuidString,
+                        userToken: UUID().uuidString,
+                        image: coordinateImage.correctOrientation,
+                        days: 7
+                    )
+                    
+                    switch result {
+                    case .success(let apiResponse):
+                        // Convert APIFashionReviewResponse to legacy FashionReviewResponse
+                        let legacyResponse = FashionReviewResponse(
+                            createdAt: nil,
+                            tops_image_url: "",
+                            bottoms_image_url: "",
+                            coordinate: FashionReviewResponse.Coordinate(
+                                coordinate_review: apiResponse.ai_comment,
+                                coordinate_item01: apiResponse.items.first?.item_type ?? "",
+                                recommend_item01: "",
+                                coordinate_item02: apiResponse.items.count > 1 ? apiResponse.items[1].item_type : "",
+                                recommend_item02: "",
+                                coordinate_item03: apiResponse.items.count > 2 ? apiResponse.items[2].item_type : "",
+                                recommend_item03: ""
+                            ),
+                            graph_image: apiResponse.current_coordinate.coodinate_image_path,
+                            recommendations: []
+                        )
+                        
+                        await MainActor.run {
+                            self.fashionReview = legacyResponse
+                            isFinishedRequest = true
+                        }
+                    case .failure(let error):
+                        print("Error: \(error)")
+                        await MainActor.run {
+                            dismiss()
+                        }
                     }
-                case .failure(let error):
+                } catch {
                     print("Error: \(error)")
-                    dismiss()
-                    return
+                    await MainActor.run {
+                        dismiss()
+                    }
                 }
             }
         }
