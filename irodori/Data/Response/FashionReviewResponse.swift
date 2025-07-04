@@ -7,6 +7,7 @@
 
 import Foundation
 
+// MARK: - Legacy FashionReviewResponse (for backward compatibility)
 struct FashionReviewResponse: Decodable {
     var createdAt: String?
     var tops_image_url: String
@@ -101,4 +102,18 @@ extension FashionReviewResponse.Coordinate {
             coordinate_item03: "coordinate_item03", recommend_item03: "recommend_item03"
         )
     }
+}
+
+// MARK: - API-Compatible FashionReviewResponse
+struct APIFashionReviewResponse: Codable {
+    let current_coordinate: APICoordinateResponseDetail
+    let recent_coordinates: [APICoordinateResponseDetail]
+    let items: [APICoordinateItem]
+    let ai_comment: String
+}
+
+struct APICoordinateResponseDetail: Codable {
+    let id: String
+    let date: String
+    let coodinate_image_path: String
 }
