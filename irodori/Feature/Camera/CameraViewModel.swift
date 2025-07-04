@@ -26,7 +26,7 @@ class CameraViewModel: NSObject, ObservableObject {
     func setupCamera() {
         do {
             self.session.beginConfiguration()
-            self.session.sessionPreset = .iFrame1280x720
+            self.session.sessionPreset = .photo
 
             // デバイス設定
             guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
