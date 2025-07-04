@@ -37,17 +37,6 @@ extension MockFashionReviewService {
         mockAPIClient.setError(for: SubmitFashionReviewRequest.self, error: error)
     }
     
-    func setPositiveReview() {
-        setSuccessResponse(APIFashionReviewResponse.mockPositiveReview())
-    }
-    
-    func setConstructiveReview() {
-        setSuccessResponse(APIFashionReviewResponse.mockConstructiveReview())
-    }
-    
-    func setCustomReview(comment: String) {
-        setSuccessResponse(APIFashionReviewResponse.mockDataWithCustomComment(comment))
-    }
     
     func setDelay(_ delay: TimeInterval) {
         mockAPIClient.setDelay(delay)

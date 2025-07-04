@@ -262,24 +262,4 @@ final class MockServicesTests: XCTestCase {
         }
     }
     
-    func testMockFashionReviewServiceWithPositiveReview() async throws {
-        let mockFashionReviewService = MockFashionReviewService()
-        mockFashionReviewService.setPositiveReview()
-        
-        let testImage = UIImage(systemName: "photo") ?? UIImage()
-        
-        let result = try await mockFashionReviewService.submitFashionReview(
-            userId: "user123",
-            userToken: "token123",
-            image: testImage,
-            days: 7
-        )
-        
-        switch result {
-        case .success(let response):
-            XCTAssertTrue(response.ai_comment.contains("とても素敵"))
-        case .failure:
-            XCTFail("Mock fashion review service should succeed")
-        }
-    }
 }
