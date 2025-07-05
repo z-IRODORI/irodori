@@ -9,41 +9,43 @@ import Foundation
 import UIKit
 
 final class GPTClient {
-    func postImageToGPT(image: UIImage, outingPurposeType: OutingPurposeType) async throws -> Result<CoordinateReview, Error> {
-//        let baseURL = "https://nfzoiluhpi.execute-api.ap-northeast-1.amazonaws.com/prod/"
-        let baseURL = "https://irodori-api.onrender.com"
-        let endpoint = "coordinate-review"
-        let url = URL(string: "\(baseURL)/\(endpoint)")!
+    private let apiClient: APIClient
+    
+    init(apiClient: APIClient = .shared) {
+        self.apiClient = apiClient
+    }
+    
+    func postImageToGPT(image: UIImage, outingPurposeType: OutingPurposeType) async throws -> Result<CoordinateReview, HTTPError> {
+        let request = CoordinateReviewRequest(image: image, outingPurposeType: outingPurposeType)
+        return try await apiClient.request(request)
+    }
+}
 
-        // UIImageをJPEGデータに変換し、Base64エンコード
+// MARK: - Coordinate Review Request
+
+struct CoordinateReviewRequest: JSONRequestProtocol {
+    typealias Response = CoordinateReview
+    
+    let path: String = "/coordinate-review"
+    let method: HTTPMethod = .post
+    let requestBody: RequestBody?
+    
+    struct RequestBody: Codable {
+        let imageBase64: String
+        let outingPurposeId: Int
+    }
+    
+    init(image: UIImage, outingPurposeType: OutingPurposeType) {
         guard let jpegData = image.jpegData(compressionQuality: 0.8) else {
-            throw URLError(.badURL)
+            self.requestBody = nil
+            return
         }
+        
         let base64String = jpegData.base64EncodedString()
-
-
-        let requestBody = CoordinateReviewRequest(
-            image_base64: base64String,
-            outing_purpose_id: outingPurposeType.number
+        self.requestBody = RequestBody(
+            imageBase64: base64String,
+            outingPurposeId: outingPurposeType.number
         )
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(requestBody)
-
-
-        do {
-            // URLSessionでリクエストを送信
-            let (data, _) = try await URLSession.shared.data(for: request)
-            // JSONレスポンスをデコード
-            let response = try JSONDecoder().decode(CoordinateReview.self, from: data)
-            return .success(response)
-        } catch {
-            // TODO: エラーハンドリング
-            print(error.localizedDescription)
-            return .failure(error)
-        }
     }
 }
 
