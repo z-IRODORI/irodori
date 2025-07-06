@@ -7,8 +7,9 @@
 
 import SwiftUI
 
-class TermsOfServiceViewModel: ObservableObject {
-    @Published var hasAgreedToTerms: Bool = false
+@Observable
+final class TermsOfServiceViewModel {
+    var hasAgreedToTerms: Bool = false
     
     private let userDefaults = UserDefaults.standard
     private let termsAgreementKey = "hasAgreedToTermsOfService"

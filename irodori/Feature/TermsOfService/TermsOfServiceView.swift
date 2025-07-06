@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct TermsOfServiceView: View {
-    @StateObject private var viewModel = TermsOfServiceViewModel()
+    let viewModel: TermsOfServiceViewModel
     @State private var showingAlert = false
     
     var body: some View {
@@ -74,7 +74,6 @@ struct TermsOfServiceView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 40)
         }
-        .navigationBarHidden(true)
         .background(Color.white)
         .alert("アプリを終了", isPresented: $showingAlert) {
             Button("キャンセル", role: .cancel) { }
@@ -88,5 +87,5 @@ struct TermsOfServiceView: View {
 }
 
 #Preview {
-    TermsOfServiceView()
+    TermsOfServiceView(viewModel: .init())
 }

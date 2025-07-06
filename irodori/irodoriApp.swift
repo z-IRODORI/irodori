@@ -9,14 +9,14 @@ import SwiftUI
 
 @main
 struct irodoriApp: App {
-    @StateObject private var termsViewModel = TermsOfServiceViewModel()
+    private var termsViewModel = TermsOfServiceViewModel()
     
     var body: some Scene {
         WindowGroup {
             if termsViewModel.hasAgreedToTerms {
                 CameraView()
             } else {
-                TermsOfServiceView()
+                TermsOfServiceView(viewModel: termsViewModel)
             }
 
 //            CoordinateReviewView(
