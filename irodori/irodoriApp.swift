@@ -9,9 +9,15 @@ import SwiftUI
 
 @main
 struct irodoriApp: App {
+    @StateObject private var termsViewModel = TermsOfServiceViewModel()
+    
     var body: some Scene {
         WindowGroup {
-            CameraView()
+            if termsViewModel.hasAgreedToTerms {
+                CameraView()
+            } else {
+                TermsOfServiceView()
+            }
 
 //            CoordinateReviewView(
 //                coordinateImage: UIImage(resource: .coordinate1),
