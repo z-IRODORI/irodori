@@ -10,13 +10,16 @@ import SwiftUI
 @main
 struct irodoriApp: App {
     private var termsViewModel = TermsOfServiceViewModel()
+    private var userInfoViewModel = UserInfoViewModel()
     
     var body: some Scene {
         WindowGroup {
-            if termsViewModel.hasAgreedToTerms {
-                CameraView()
-            } else {
+            if !termsViewModel.hasAgreedToTerms {
                 TermsOfServiceView(viewModel: termsViewModel)
+            } else if !userInfoViewModel.hasCompletedUserInfo {
+                UserInfoView(viewModel: userInfoViewModel)
+            } else {
+                CameraView()
             }
 
 //            CoordinateReviewView(
