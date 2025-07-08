@@ -6,17 +6,19 @@
 //
 
 import SwiftUI
+import Combine
+
+enum FocusedField: Hashable {
+    case year, month, day
+}
 
 struct UserInfoView: View {
-    let viewModel: UserInfoViewModel
     @FocusState private var focusedField: FocusedField?
-    
-    enum FocusedField {
-        case year, month, day
-    }
-    
+    @State private(set) var viewModel: UserInfoViewModel
+    var cancellables = Set<AnyCancellable>()
+
     var body: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 60) {
             // ヘッダー
             VStack(spacing: 12) {
                 Text("IRODORI")
@@ -27,7 +29,7 @@ struct UserInfoView: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(.gray)
             }
-            .padding(.top, 60)
+            .padding(.top, 70)
             
             // フォーム
             VStack(spacing: 24) {
@@ -51,13 +53,13 @@ struct UserInfoView: View {
                 
                 // 誕生日入力
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("誕生日")
+                    Text("生年月日")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.black)
                     
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         // 年入力
-                        TextField("YYYY", text: Bindable(viewModel).yearInput)
+                        TextField("YYYY", text: $viewModel.birthDay.year)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.center)
                             .font(.system(size: 16, weight: .medium))
@@ -65,47 +67,61 @@ struct UserInfoView: View {
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(8)
                             .focused($focusedField, equals: .year)
-                            .onChange(of: viewModel.yearInput) { _, newValue in
-                                viewModel.updateYearInput(newValue)
-                                if newValue.count == 4 {
+                            .onChange(of: viewModel.birthDay.year) { value, newValue in
+                                if viewModel.birthDay.year.count == 4 {
                                     focusedField = .month
+                                } else if viewModel.birthDay.year.count > 4 {
+                                    focusedField = .month
+                                    viewModel.updateYear(value)
                                 }
                             }
+                        Text("年")
+                            .font(.system(size: 16, weight: .medium))
 
                         // 月入力
-                        TextField("MM", text: Bindable(viewModel).monthInput)
+                        TextField("MM", text: $viewModel.birthDay.month)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.center)
                             .font(.system(size: 16, weight: .medium))
                             .frame(height: 44)
+                            .padding(.leading, 8)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(8)
                             .focused($focusedField, equals: .month)
-                            .onChange(of: viewModel.monthInput) { _, newValue in
-                                viewModel.updateMonthInput(newValue)
-                                if newValue.count == 2 {
+                            .onChange(of: viewModel.birthDay.month) { value, newValue in
+                                if viewModel.birthDay.month.count == 2 {
                                     focusedField = .day
+                                } else if viewModel.birthDay.month.count > 2 {
+                                    focusedField = .day
+                                    viewModel.updateMonth(value)
                                 }
                             }
+                        Text("月")
+                            .font(.system(size: 16, weight: .medium))
 
                         // 日入力
-                        TextField("DD", text: Bindable(viewModel).dayInput)
+                        TextField("DD", text: $viewModel.birthDay.day)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.center)
                             .font(.system(size: 16, weight: .medium))
                             .frame(height: 44)
+                            .padding(.leading, 8)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(8)
                             .focused($focusedField, equals: .day)
-                            .onChange(of: viewModel.dayInput) { _, newValue in
-                                viewModel.updateDayInput(newValue)
-                                if newValue.count == 2 {
-                                    focusedField = nil // キーボードを閉じる
+                            .onChange(of: viewModel.birthDay.day) { value, newValue in
+                                if viewModel.birthDay.day.count == 2 {
+                                    focusedField = nil
+                                } else if viewModel.birthDay.day.count > 2 {
+                                    focusedField = nil
+                                    viewModel.updateDay(value)
                                 }
                             }
+                        Text("日")
+                            .font(.system(size: 16, weight: .medium))
                     }
                 }
-                
+
                 // 性別選択
                 VStack(alignment: .leading, spacing: 8) {
                     Text("性別")
@@ -155,11 +171,7 @@ struct UserInfoView: View {
         }
         .background(Color.white)
         .ignoresSafeArea()
-        .onAppear {
-            focusedField = .year
-        }
         .onTapGesture {
-            // 背景タップでキーボードを閉じる
             focusedField = nil
         }
     }

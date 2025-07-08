@@ -14,6 +14,7 @@ struct irodoriApp: App {
     
     var body: some Scene {
         WindowGroup {
+            // TODO: VMを介さずに、UserDafaults を使う
             if !termsViewModel.hasAgreedToTerms {
                 TermsOfServiceView(viewModel: termsViewModel)
             } else if !userInfoViewModel.hasCompletedUserInfo {

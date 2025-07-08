@@ -13,14 +13,14 @@ enum Gender: String, CaseIterable, Codable {
     case other = "その他"
 }
 
+struct BirthDay: Codable {
+    var year: String
+    var month: String
+    var day: String
+}
+
 struct User: Codable {
-    let username: String
-    let birthday: Date
-    let gender: Gender
-    
-    init(username: String, birthday: Date, gender: Gender) {
-        self.username = username
-        self.birthday = birthday
-        self.gender = gender
-    }
+    var username: String
+    var birthday: BirthDay
+    var gender: Gender
 }
