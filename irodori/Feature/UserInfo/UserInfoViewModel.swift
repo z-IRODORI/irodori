@@ -15,7 +15,6 @@ final class UserInfoViewModel {
     var username: String = ""
     var birthDay: BirthDay = .init(year: "", month: "", day: "")
     var selectedGender: Gender = .male
-    var hasCompletedUserInfo: Bool = false
     /// 実際の日付として有効かチェック
     var isBirthdayValid: Bool {
         guard let year = Int(birthDay.year), year >= 1900 && year <= 2100,
@@ -49,9 +48,8 @@ final class UserInfoViewModel {
         let user = User(username: username, birthday: birthDay, gender: selectedGender)
 
         if let encoded = try? JSONEncoder().encode(user) {
-            userDefaults.set(encoded, forKey: "userInfo")
-            userDefaults.set(true, forKey: "hasCompletedUserInfo")
-            hasCompletedUserInfo = true
+            userDefaults.set(encoded, forKey: UserDefaultsKey.userInfo.rawValue)
+            userDefaults.set(true, forKey: UserDefaultsKey.hasCompletedUserInfo.rawValue)
         }
     }
 }

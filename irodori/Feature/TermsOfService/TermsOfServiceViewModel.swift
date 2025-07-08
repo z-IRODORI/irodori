@@ -9,22 +9,18 @@ import SwiftUI
 
 @Observable
 final class TermsOfServiceViewModel {
-    var hasAgreedToTerms: Bool = false
-    
     private let userDefaults = UserDefaults.standard
-    private let termsAgreementKey = "hasAgreedToTermsOfService"
     
     init() {
         checkTermsAgreement()
     }
     
     func checkTermsAgreement() {
-        hasAgreedToTerms = userDefaults.bool(forKey: termsAgreementKey)
+        userDefaults.bool(forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue)
     }
     
     func agreeToTerms() {
-        userDefaults.set(true, forKey: termsAgreementKey)
-        hasAgreedToTerms = true
+        userDefaults.set(true, forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue)
     }
     
     func exitApp() {

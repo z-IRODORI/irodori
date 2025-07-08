@@ -9,16 +9,16 @@ import SwiftUI
 
 @main
 struct irodoriApp: App {
-    private var termsViewModel = TermsOfServiceViewModel()
-    private var userInfoViewModel = UserInfoViewModel()
-    
+    private let userDeufalts = UserDefaults.standard
+
     var body: some Scene {
         WindowGroup {
-            // TODO: VMを介さずに、UserDafaults を使う
-            if !termsViewModel.hasAgreedToTerms {
-                TermsOfServiceView(viewModel: termsViewModel)
-            } else if !userInfoViewModel.hasCompletedUserInfo {
-                UserInfoView(viewModel: userInfoViewModel)
+            // TODO: - スプラッシュ画面を実装して、そこで画面遷移を実行
+            // 既存の実装では 利用規約を確認したこと や ユーザー情報を入力したこと を検知できないため画面遷移できない
+            if !userDeufalts.bool(forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue) {
+                TermsOfServiceView(viewModel: TermsOfServiceViewModel())
+            } else if userDeufalts.object(forKey: UserDefaultsKey.userInfo.rawValue) == nil {
+                UserInfoView(viewModel: UserInfoViewModel())
             } else {
                 CameraView()
             }
