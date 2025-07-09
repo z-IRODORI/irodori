@@ -13,15 +13,7 @@ struct irodoriApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // TODO: - スプラッシュ画面を実装して、そこで画面遷移を実行
-            // 既存の実装では 利用規約を確認したこと や ユーザー情報を入力したこと を検知できないため画面遷移できない
-            if !userDeufalts.bool(forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue) {
-                TermsOfServiceView(viewModel: TermsOfServiceViewModel())
-            } else if userDeufalts.object(forKey: UserDefaultsKey.userInfo.rawValue) == nil {
-                UserInfoView(viewModel: UserInfoViewModel())
-            } else {
-                CameraView()
-            }
+            SplashView()
 
 //            CoordinateReviewView(
 //                coordinateImage: UIImage(resource: .coordinate1),

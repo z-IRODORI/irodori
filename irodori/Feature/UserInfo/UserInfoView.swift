@@ -15,6 +15,8 @@ enum FocusedField: Hashable {
 struct UserInfoView: View {
     @FocusState private var focusedField: FocusedField?
     @State private(set) var viewModel: UserInfoViewModel
+    let finishedInputUserInfo: () -> Void
+
     var cancellables = Set<AnyCancellable>()
 
     var body: some View {
@@ -156,6 +158,7 @@ struct UserInfoView: View {
             // 完了ボタン
             Button(action: {
                 viewModel.saveUserInfo()
+                finishedInputUserInfo()
             }) {
                 Text("完了")
                     .font(.system(size: 16, weight: .medium))
@@ -178,5 +181,5 @@ struct UserInfoView: View {
 }
 
 #Preview {
-    UserInfoView(viewModel: UserInfoViewModel())
+    UserInfoView(viewModel: UserInfoViewModel(), finishedInputUserInfo: {})
 }
