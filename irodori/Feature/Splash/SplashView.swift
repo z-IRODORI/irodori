@@ -19,7 +19,7 @@ struct SplashView: View {
                 viewModel.updateState()
             })
         case .userInfo:
-            UserInfoView(viewModel: .init(), finishedInputUserInfo: {
+            InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {
                 viewModel.updateState()
             })
         case .home:

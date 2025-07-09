@@ -1,5 +1,5 @@
 //
-//  UserInfoViewModel.swift
+//  InputUserInfoViewModel.swift
 //  irodori
 //
 //  Created by Claude on 2025/07/07.
@@ -11,7 +11,7 @@ import SwiftUI
 
 @Observable
 @MainActor
-final class UserInfoViewModel {
+final class InputUserInfoViewModel {
     var username: String = ""
     var birthDay: BirthDay = .init(year: "", month: "", day: "")
     var selectedGender: Gender = .male

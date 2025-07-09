@@ -1,5 +1,5 @@
 //
-//  UserInfoView.swift
+//  InputUserInfoView.swift
 //  irodori
 //
 //  Created by Claude on 2025/07/07.
@@ -12,9 +12,9 @@ enum FocusedField: Hashable {
     case year, month, day
 }
 
-struct UserInfoView: View {
+struct InputUserInfoView: View {
     @FocusState private var focusedField: FocusedField?
-    @State private(set) var viewModel: UserInfoViewModel
+    @State private(set) var viewModel: InputUserInfoViewModel
     let finishedInputUserInfo: () -> Void
 
     var cancellables = Set<AnyCancellable>()
@@ -181,5 +181,5 @@ struct UserInfoView: View {
 }
 
 #Preview {
-    UserInfoView(viewModel: UserInfoViewModel(), finishedInputUserInfo: {})
+    InputUserInfoView(viewModel: InputUserInfoViewModel(), finishedInputUserInfo: {})
 }
