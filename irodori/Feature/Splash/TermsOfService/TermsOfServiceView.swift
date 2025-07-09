@@ -9,6 +9,8 @@ import SwiftUI
 
 struct TermsOfServiceView: View {
     let viewModel: TermsOfServiceViewModel
+    let hasAgreeToTermsOfService: () -> Void
+
     @State private var showingAlert = false
     
     var body: some View {
@@ -46,6 +48,7 @@ struct TermsOfServiceView: View {
             VStack(spacing: 16) {
                 Button(action: {
                     viewModel.agreeToTerms()
+                    hasAgreeToTermsOfService()
                 }) {
                     Text("同意する")
                         .font(.system(size: 16, weight: .medium))
@@ -87,5 +90,5 @@ struct TermsOfServiceView: View {
 }
 
 #Preview {
-    TermsOfServiceView(viewModel: .init())
+    TermsOfServiceView(viewModel: .init(), hasAgreeToTermsOfService: {})
 }
