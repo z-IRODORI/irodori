@@ -20,7 +20,7 @@ struct InputUserInfoView: View {
     var cancellables = Set<AnyCancellable>()
 
     var body: some View {
-        VStack(spacing: 60) {
+        VStack(spacing: 30) {
             // ヘッダー
             VStack(spacing: 12) {
                 Text("IRODORI")
@@ -31,7 +31,7 @@ struct InputUserInfoView: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(.gray)
             }
-            .padding(.top, 70)
+            .padding(.top, 80)
             
             // フォーム
             VStack(spacing: 24) {
