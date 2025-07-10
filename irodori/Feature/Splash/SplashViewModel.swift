@@ -29,4 +29,8 @@ final class SplashViewModel {
         }
         state = .home
     }
+
+    func setupSignUpDate() {
+        
+    }
 }

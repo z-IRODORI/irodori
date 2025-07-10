@@ -28,6 +28,9 @@ struct SplashView: View {
             })
         case .home:
             CameraView()
+                .onAppear {
+                    
+                }
         }
     }
 }
