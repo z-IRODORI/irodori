@@ -67,7 +67,7 @@ struct CalendarView: View {
         .navigationBarHidden(true)
         .overlay(
             VStack(spacing: 15) {
-                Text("Progress")
+                Text("カレンダー")
                     .font(.headline)
                     .padding(.top, 7)
             }
