@@ -11,4 +11,5 @@ enum UserDefaultsKey: String {
     case hasAgreedToTermsOfService
     case userInfo
     case hasCompletedUserInfo
+    case signUpDate
 }
