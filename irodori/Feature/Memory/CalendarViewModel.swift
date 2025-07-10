@@ -11,18 +11,37 @@ import Observation
 @MainActor
 @Observable
 final class CalendarViewModel {
-    let months: [Month] = [
-        .init(title: "12月", monthOfTheYear: 12, year: 2022),
-        .init(title: "1月", monthOfTheYear: 1, year: 2023),
-        .init(title: "2月", monthOfTheYear: 2, year: 2023),
-        .init(title: "3月", monthOfTheYear: 3, year: 2023),
-        .init(title: "4月", monthOfTheYear: 4, year: 2023),
-        .init(title: "5月", monthOfTheYear: 5, year: 2023),
-        .init(title: "6月", monthOfTheYear: 6, year: 2023),
-        .init(title: "7月", monthOfTheYear: 7, year: 2023),
-        .init(title: "8月", monthOfTheYear: 8, year: 2023),
-    ]
+    var months: [Month] = []
     let daysOfTheWeek: [Week] = Week.allCases
-    let hoge = ""
+
+    init(repository: SignUpDateRepositoryProtocol = SignUpDateRepository()) {
+        let calendar = Calendar(identifier: .gregorian)
+        let today = Date()
+
+        // 年月を一意にするために最初の日に合わせる
+        guard let signupDate = repository.load(),
+              let startDate = calendar.date(from: calendar.dateComponents([.year, .month], from: signupDate)),
+              let endDate = calendar.date(from: calendar.dateComponents([.year, .month], from: today))
+        else {
+            // TODO: エラー表示
+            self.months = []
+            return
+        }
+
+        var date = startDate
+        var monthList: [Month] = []
+
+        while date <= endDate {
+            let components = calendar.dateComponents([.year, .month], from: date)
+            if let year = components.year, let month = components.month {
+                let title = "\(month)月"
+                monthList.append(Month(title: title, monthOfTheYear: month, year: year))
+            }
+
+            // 次の月へ進める
+            date = calendar.date(byAdding: .month, value: 1, to: date)!
+        }
+        self.months = monthList
+    }
 }
 
