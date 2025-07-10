@@ -24,13 +24,11 @@ struct SplashView: View {
             })
         case .userInfo:
             InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {
+                viewModel.setupSignUpDate()   // アプリインストールしてから一度しか呼ばれない想定
                 viewModel.updateState()
             })
         case .home:
             CameraView()
-                .onAppear {
-                    
-                }
         }
     }
 }

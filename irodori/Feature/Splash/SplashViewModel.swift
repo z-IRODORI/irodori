@@ -31,6 +31,7 @@ final class SplashViewModel {
     }
 
     func setupSignUpDate() {
-        
+        let repository = SignUpDateRepository()
+        repository.saveNow()
     }
 }
