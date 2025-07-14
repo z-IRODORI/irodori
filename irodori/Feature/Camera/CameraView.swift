@@ -12,41 +12,52 @@ import AVFoundation
 struct CameraView: View {
     @StateObject private var cameraViewModel: CameraViewModel = .init()
     @State private var showCapturedImage = false
+    @State private var path: [ViewType] = []
 
     var body: some View {
-        ZStack {
-            switch cameraViewModel.cameraState {
-            case .initial:
-                Color.black
-                Text("カメラ準備中...")
-                    .foregroundColor(.white)
+        NavigationStack(path: $path) {
+            ZStack {
+                switch cameraViewModel.cameraState {
+                case .initial:
+                    Color.black
+                    Text("カメラ準備中...")
+                        .foregroundColor(.white)
 
-            case .connectedDevice:
-                Color.white
+                case .connectedDevice:
+                    Color.white
 
-                VStack(spacing: 32) {
-                    Header()
-                        .padding(.top, 80)
-                        .padding(.horizontal, 24)
-                    CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
-                        .aspectRatio(3/4, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                    CaptureButton()
+                    VStack(spacing: 32) {
+                        Header()
+                            .padding(.top, 80)
+                            .padding(.horizontal, 24)
+                        CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
+                            .aspectRatio(3/4, contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 24))
+                        CaptureButton()
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
+
+                case .noDevice, .error:
+                    Color.red.opacity(0.6)
                 }
-                .frame(maxHeight: .infinity, alignment: .top)
-
-            case .noDevice, .error:
-                Color.red.opacity(0.6)
             }
-        }
-        .navigationBarBackButtonHidden()
-        .ignoresSafeArea()
-        .onAppear {
-            checkCameraPermission()   // カメラを初期化
-        }
-        .fullScreenCover(isPresented: $showCapturedImage) {
-            if let image = cameraViewModel.capturedImage {
-                CapturedImageView(image: image, isPresented: $showCapturedImage)   // キャプチャした画像表示画面
+            .navigationBarBackButtonHidden()
+            .ignoresSafeArea()
+            .onAppear {
+                checkCameraPermission()   // カメラを初期化
+            }
+            .fullScreenCover(isPresented: $showCapturedImage) {
+                if let image = cameraViewModel.capturedImage {
+                    CapturedImageView(image: image, isPresented: $showCapturedImage)   // キャプチャした画像表示画面
+                }
+            }
+            .navigationDestination(for: ViewType.self) { viewType in
+                switch viewType {
+                case .calendar:
+                    CalendarView(path: $path)
+                case .camera:
+                    EmptyView()
+                }
             }
         }
     }
@@ -57,7 +68,7 @@ struct CameraView: View {
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(.black)
             Button(action: {
-
+                path.append(.calendar)
             }) {
                 Image(systemName: "calendar")
                     .resizable()

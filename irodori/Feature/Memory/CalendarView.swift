@@ -11,7 +11,7 @@ import SwiftUI
 struct CalendarView: View {
     @Environment(\.presentationMode) var mode
     
-    private var columns = [
+    private let columns = [
         GridItem.init(.flexible(), alignment: .center),
         GridItem.init(.flexible(), alignment: .center),
         GridItem.init(.flexible(), alignment: .center),
@@ -21,14 +21,12 @@ struct CalendarView: View {
         GridItem.init(.flexible(), alignment: .center)
     ]
 
+    @Binding var path: [ViewType]
     @State var viewModel: CalendarViewModel = .init()
 
     var body: some View {
 
         ZStack(alignment: .top) {
-            Header()
-                .padding(.horizontal, 24)
-
             ScrollView(showsIndicators: false) {
 
                 // Amount of months since December 2022
@@ -66,8 +64,10 @@ struct CalendarView: View {
                     .padding(.horizontal)
                 }
                 .padding(.top, 75)
-
             }
+
+            Header()
+                .padding(.horizontal, 24)
         }
         .navigationBarHidden(true)
         .onAppear {
@@ -80,8 +80,10 @@ struct CalendarView: View {
             Text("IRODORI")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(.black)
+            // TODO: - なぜかタップ反応が悪い
             Button(action: {
-                mode.wrappedValue.dismiss()
+                print("tapped header back button")
+                path.removeLast()
             }) {
                 Image(systemName: "arrow.backward")
                     .font(.headline)
@@ -95,5 +97,5 @@ struct CalendarView: View {
 }
 
 #Preview {
-    CalendarView()
+    CalendarView(path: .constant([]))
 }
