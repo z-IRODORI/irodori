@@ -59,8 +59,10 @@ struct SplashView: View {
                     isPresentedTermsOfService = true
                 }) {
                     Text("利用規約")
-                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(.primary)
+                        .font(.system(size: 12, weight: .semibold))
                 }
+                .padding(.bottom, 24)
 
                 Button(action: {
                     viewModel.nextButtonTapped()
@@ -76,7 +78,7 @@ struct SplashView: View {
                 }
             }
             .frame(maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, 32)
+            .padding(.bottom, 40)
         }
         .ignoresSafeArea()
     }
