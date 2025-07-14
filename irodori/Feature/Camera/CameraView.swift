@@ -25,10 +25,9 @@ struct CameraView: View {
                 Color.white
 
                 VStack(spacing: 32) {
-                    Text("IRODORI")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(.black)
+                    Header()
                         .padding(.top, 80)
+                        .padding(.horizontal, 24)
                     CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
                         .aspectRatio(3/4, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
@@ -50,6 +49,25 @@ struct CameraView: View {
                 CapturedImageView(image: image, isPresented: $showCapturedImage)   // キャプチャした画像表示画面
             }
         }
+    }
+
+    private func Header() -> some View {
+        ZStack {
+            Text("IRODORI")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(.black)
+            Button(action: {
+
+            }) {
+                Image(systemName: "calendar")
+                    .resizable()
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(.black)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 30)
     }
 }
 
