@@ -34,4 +34,9 @@ final class SplashViewModel {
         let repository = SignUpDateRepository()
         repository.saveNow()
     }
+
+    func nextButtonTapped() {
+        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue)
+        state = .userInfo
+    }
 }

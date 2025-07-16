@@ -79,6 +79,13 @@ class CameraViewModel: NSObject, ObservableObject {
     func stopSession() {
         self.session.stopRunning()
     }
+
+    /// 利用規約とユーザー情報をリセットする
+    /// 利用規約画面からUI/UXを確認できるように
+    func earserButtonTapped() {
+        UserDefaults.standard.set(false, forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue)
+        UserDefaults.standard.set(nil, forKey: UserDefaultsKey.userInfo.rawValue)
+    }
 }
 
 // 写真キャプチャデリゲート
