@@ -13,13 +13,12 @@ struct irodoriApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SplashView()
+//            SplashView()
 //            CalendarView()
-//            CoordinateReviewView(
-//                coordinateImage: UIImage(resource: .coordinate2),
-//                fashionReview: .mock()
-//            )
-
+            CoordinateReviewView(
+                coordinateImage: UIImage(resource: .coordinate2),
+                fashionReview: .mock()
+            )
 
 //            CoordinateReviewView(
 //                coordinateImage: UIImage(resource: .coordinate1),

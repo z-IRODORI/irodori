@@ -19,9 +19,14 @@ struct CameraView: View {
             ZStack {
                 switch cameraViewModel.cameraState {
                 case .initial:
-                    Color.black
-                    Text("カメラ準備中...")
-                        .foregroundColor(.white)
+                    VStack(spacing: 24) {
+                        Text("カメラ準備中...")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.pink)
+                        Image(.splash03)
+                            .resizable()
+                            .frame(width: 200, height: 300)
+                    }
 
                 case .connectedDevice:
                     Color.white
@@ -67,13 +72,26 @@ struct CameraView: View {
             Text("IRODORI")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(.black)
-            Button(action: {
-                path.append(.calendar)
-            }) {
-                Image(systemName: "calendar")
-                    .resizable()
-                    .frame(width: 20, height: 20)
-                    .foregroundStyle(.black)
+            HStack(spacing: 24) {
+                Button(action: {
+                    path.append(.calendar)
+                }) {
+                    Image(systemName: "calendar")
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                        .foregroundStyle(.black)
+                }
+
+                // TODO: リリース時は削除
+                Button(action: {
+                    cameraViewModel.earserButtonTapped()
+                    exit(0)
+                }) {
+                    Image(systemName: "eraser")
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                        .foregroundStyle(.black)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
