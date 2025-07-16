@@ -62,10 +62,13 @@ struct CoordinateReviewView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     Spacer().frame(width: 12)
-                    RecentCoordinateCard(image: UIImage(named: "coordinate-3")!, text: "2025 06/25")
-                    RecentCoordinateCard(image: UIImage(named: "coordinate-4")!, text: "2025 06/25")
-                    RecentCoordinateCard(image: UIImage(named: "coordinate-5")!, text: "2025 06/25")
-                    RecentCoordinateCard(image: UIImage(named: "coordinate-6")!, text: "2025 06/25")
+
+                    ForEach(fashionReview.recent_coordinates, id: \.self) { fashionReview in
+                        RecentCoordinateCard(
+                            imageURL: fashionReview.coodinate_image_path,
+                            text: fashionReview.date
+                        )
+                    }
                 }
             }
         }
@@ -78,8 +81,12 @@ struct CoordinateReviewView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    CoordinateItemCard(image: UIImage(named: "tops1")!, text: "トップス", textColor: .black)
-                    CoordinateItemCard(image: UIImage(named: "bottoms1")!, text: "ボトムス", textColor: .black)
+                    ForEach(fashionReview.items, id: \.self) { item in
+                        CoordinateItemCard(
+                            imageURL: item.item_image_path,
+                            text: item.item_type, textColor: .black
+                        )
+                    }
                 }
             }
         }
@@ -143,11 +150,11 @@ struct CoordinateReviewView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if isShowFullReview {
-                Text("\(fashionReview.coordinate.coordinate_review)")
+                Text(.init(fashionReview.ai_comment))
                     .font(.system(size: 16, weight: .regular))
             } else {
                 VStack {
-                    Text("\(fashionReview.coordinate.coordinate_review.prefix(shortTextCriterion)) ...")
+                    Text("\(fashionReview.ai_comment.prefix(shortTextCriterion)) ...")
                         .font(.system(size: 16, weight: .regular))
                     Button(action: {
                         isShowFullReview = true
@@ -161,20 +168,7 @@ struct CoordinateReviewView: View {
             }
         }
         .onAppear {
-            isShowFullReview = fashionReview.coordinate.coordinate_review.count < shortTextCriterion
-        }
-    }
-
-    private func ItemsImage() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("今日着用しているアイテム")
-                .font(.system(size: 20, weight: .bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: 48) {
-                RecentCoordinateCard(image: UIImage(named: "coordinate-2")!, text: "2025 06/25")
-                RecentCoordinateCard(image: UIImage(named: "coordinate-2")!, text: "2025 06/25")
-            }
+            isShowFullReview = fashionReview.ai_comment.count < shortTextCriterion
         }
     }
 
@@ -192,12 +186,17 @@ struct CoordinateReviewView: View {
         }
     }
 
-    private func RecentCoordinateCard(image: UIImage, text: String, _ textColor: Color = .secondary) -> some View {
+    private func RecentCoordinateCard(imageURL: String, text: String, _ textColor: Color = .secondary) -> some View {
         VStack(spacing: 0) {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(3/4, contentMode: .fit)
-                .frame(width: 110)
+            AsyncImage(url: URL(string: imageURL)!) { image in
+                image
+                    .resizable()
+                    .aspectRatio(3/4, contentMode: .fit)
+                    .frame(width: 110)
+            } placeholder: {
+                ProgressView()
+            }
+
             Text("\(text)")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(textColor)
@@ -207,12 +206,16 @@ struct CoordinateReviewView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func CoordinateItemCard(image: UIImage, text: String, textColor: Color = .secondary) -> some View {
+    private func CoordinateItemCard(imageURL: String, text: String, textColor: Color = .secondary) -> some View {
         VStack(spacing: 0) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 110, height: 110)
+            AsyncImage(url: URL(string: imageURL)!) { image in
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 110, height: 110)
+            } placeholder: {
+                ProgressView()
+            }
             Text("\(text)")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(textColor)

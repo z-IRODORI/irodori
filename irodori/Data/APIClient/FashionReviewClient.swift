@@ -18,7 +18,7 @@ final class FashionReviewClient {
             throw URLError(.badURL)
         }
 
-        let fashionReviewRequest = FashionReviewRequest(image: jpegData, user_token: uid, outing_purpose_id: purposeNum)
+        let fashionReviewRequest = FashionReviewRequest(user_id: uid, user_token: UUID().uuidString, file: jpegData)
         let requestParameters: [String: Any] = fashionReviewRequest.createParameters()
         let (headers, body) = createMultiPartPost(parameters: requestParameters)
 

@@ -20,7 +20,7 @@ struct LoadingView: View {
 
     let client: GPTClient = .init()
     @State private var isFinishedRequest = false
-    @State private var fashionReview: FashionReviewResponse = .init(createdAt: "", tops_image_url: "", bottoms_image_url: "", coordinate: .mock(), graph_image: "", recommendations: [])
+    @State private var fashionReview: FashionReviewResponse = .mock()
 
     let coordinateImage: UIImage
     let tag: OutingPurposeType
