@@ -7,7 +7,11 @@
 
 import UIKit
 
-final class FashionReviewClient {
+protocol FashionReviewClientProtocol {
+    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, Error>
+}
+
+final class FashionReviewClient: FashionReviewClientProtocol {
     func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, Error> {
         let baseURL = "https://irodori.click"
         let endpoint = "v1/fashion-review"
@@ -77,5 +81,13 @@ final class FashionReviewClient {
         }
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         return (header, body)
+    }
+}
+
+// MARK: - Mock
+
+final class MockFashionReviewClient: FashionReviewClientProtocol {
+    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, any Error> {
+        return .success(.mock())
     }
 }
