@@ -10,7 +10,7 @@ import UIKit
 final class FashionReviewClient {
     func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, Error> {
         let baseURL = "https://irodori.click"
-        let endpoint = "v1/fashion-review"
+        let endpoint = "api/fashion_review"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 
         // UIImageをJPEGデータに変換
