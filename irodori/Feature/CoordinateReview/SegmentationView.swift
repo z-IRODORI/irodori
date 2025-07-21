@@ -42,11 +42,12 @@ final class SegmentationViewModel {
 
     init() {
         let config = MLModelConfiguration()
-        config.computeUnits = .cpuOnly
+        config.computeUnits = .cpuAndGPU
         do {
             self.model = try Model(configuration: config)
         } catch {
             self.model = nil
+            print("モデルのロードまたは設定に失敗しました: \(error)")
         }
     }
 
@@ -59,12 +60,9 @@ final class SegmentationViewModel {
             let input = ModelInput(image: pixelBuffer)
             guard let model else { return }
             let output = try await model.prediction(input: input)
-            let multiArray = output.classLabels
-            let segmentationImage: UIImage = try SegmentationConverter.convertToUIImage(from: multiArray, originalSize: inputUIImage.size)
-            await MainActor.run {
-                self.outputUIImage = segmentationImage
-            }
-            print("finished Segmentation")
+            guard let outputUIImage = SegmentationConverter.createOutputUIImage(output: output) else { return }
+            let segmentationImage: UIImage = outputUIImage.resize(to: inputUIImage.size)
+            self.outputUIImage = segmentationImage
         }
     }
 }
