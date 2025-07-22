@@ -53,7 +53,10 @@ struct CapturedImageView: View {
                 }
             }
             .navigationDestination(isPresented: $isPresentedLoadingView) {
-                SelectTagView(coordinateImage: image)
+                CoordinateReviewView(viewModel: .init(
+                    coordinateImage: image,
+                    apiClient: FashionReviewClient()
+                ))
             }
         }
     }

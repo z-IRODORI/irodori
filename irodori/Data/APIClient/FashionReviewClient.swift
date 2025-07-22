@@ -7,7 +7,11 @@
 
 import UIKit
 
-final class FashionReviewClient {
+protocol FashionReviewClientProtocol {
+    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, Error>
+}
+
+final class FashionReviewClient: FashionReviewClientProtocol {
     func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, Error> {
         let baseURL = "https://irodori.click"
         let endpoint = "api/fashion_review"
@@ -18,7 +22,7 @@ final class FashionReviewClient {
             throw URLError(.badURL)
         }
 
-        let fashionReviewRequest = FashionReviewRequest(image: jpegData, user_token: uid, outing_purpose_id: purposeNum)
+        let fashionReviewRequest = FashionReviewRequest(user_id: uid, user_token: UUID().uuidString, file: jpegData)
         let requestParameters: [String: Any] = fashionReviewRequest.createParameters()
         let (headers, body) = createMultiPartPost(parameters: requestParameters)
 
@@ -77,5 +81,13 @@ final class FashionReviewClient {
         }
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         return (header, body)
+    }
+}
+
+// MARK: - Mock
+
+final class MockFashionReviewClient: FashionReviewClientProtocol {
+    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, any Error> {
+        return .success(.mock())
     }
 }

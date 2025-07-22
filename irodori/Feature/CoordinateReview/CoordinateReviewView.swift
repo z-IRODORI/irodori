@@ -8,8 +8,7 @@
 import SwiftUI
 
 struct CoordinateReviewView: View {
-    let coordinateImage: UIImage
-    let fashionReview: FashionReviewResponse
+    let viewModel: CoordinateReviewViewModel
 
     private let shortTextCriterion = 50
     @State private var currentSchedule = ""   // YYYY/MM/DD
@@ -19,38 +18,52 @@ struct CoordinateReviewView: View {
     @State private var isPresentedCameraView = false
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 32) {
-                Coordinate()
-                RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
-                ReviewText()
-                    .padding(.horizontal, 24)
-                CoordinateItems()
-                    .padding(.horizontal, 24)
+        if let fashionReview = viewModel.fashionReview {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 32) {
+                    Coordinate()
+                    RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
+                    ReviewText()
+                        .padding(.horizontal, 24)
+                    CoordinateItems()
+                        .padding(.horizontal, 24)
+                }
+            }
+            .navigationBarBackButtonHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: {
+                        isPresentedCameraView = true
+                    }, label: {
+                        Text("再撮影")
+                    })
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    //        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
+    //            WebView(url: URL(string: tappedRecommendItem.itemURL))
+    //        }
+            .onChange(of: tappedURL) {
+                let url = URL(string: tappedURL)!   // TODO: エラーハンドリング
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
+            .navigationDestination(isPresented: $isPresentedCameraView) {
+                CameraView()
+            }
+            .background(.gray.opacity(0.08))
+        } else {
+            VStack(spacing: 24) {
+                Text("レビュー作成中...")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.pink)
+                Image(.splash03)
+                    .resizable()
+                    .frame(width: 200, height: 300)
+            }
+            .task {
+                await viewModel.loadingOnAppear()
             }
         }
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: {
-                    isPresentedCameraView = true
-                }, label: {
-                    Text("再撮影")
-                })
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-//        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
-//            WebView(url: URL(string: tappedRecommendItem.itemURL))
-//        }
-        .onChange(of: tappedURL) {
-            let url = URL(string: tappedURL)!   // TODO: エラーハンドリング
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
-        }
-        .navigationDestination(isPresented: $isPresentedCameraView) {
-            CameraView()
-        }
-        .background(.gray.opacity(0.08))
     }
 
     private func RecentCoordinates() -> some View {
@@ -62,10 +75,13 @@ struct CoordinateReviewView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     Spacer().frame(width: 12)
-                    RecentCoordinateCard(image: UIImage(named: "coordinate-3")!, text: "2025 06/25")
-                    RecentCoordinateCard(image: UIImage(named: "coordinate-4")!, text: "2025 06/25")
-                    RecentCoordinateCard(image: UIImage(named: "coordinate-5")!, text: "2025 06/25")
-                    RecentCoordinateCard(image: UIImage(named: "coordinate-6")!, text: "2025 06/25")
+
+                    ForEach(viewModel.fashionReview!.recent_coordinates, id: \.self) { fashionReview in
+                        RecentCoordinateCard(
+                            imageURL: fashionReview.coodinate_image_path,
+                            text: fashionReview.date
+                        )
+                    }
                 }
             }
         }
@@ -78,8 +94,12 @@ struct CoordinateReviewView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    CoordinateItemCard(image: UIImage(named: "tops1")!, text: "トップス", textColor: .black)
-                    CoordinateItemCard(image: UIImage(named: "bottoms1")!, text: "ボトムス", textColor: .black)
+                    ForEach(viewModel.fashionReview!.items, id: \.self) { item in
+                        CoordinateItemCard(
+                            imageURL: item.item_image_path,
+                            text: item.item_type, textColor: .black
+                        )
+                    }
                 }
             }
         }
@@ -87,7 +107,7 @@ struct CoordinateReviewView: View {
 
     private func Coordinate() -> some View {
         ZStack {
-            Image(uiImage: coordinateImage)
+            Image(uiImage: viewModel.coordinateImage)
                 .resizable()
                 .aspectRatio(3/4, contentMode: .fit)
                 .overlay {
@@ -143,11 +163,11 @@ struct CoordinateReviewView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if isShowFullReview {
-                Text("\(fashionReview.coordinate.coordinate_review)")
+                Text(.init(viewModel.fashionReview!.ai_comment))
                     .font(.system(size: 16, weight: .regular))
             } else {
                 VStack {
-                    Text("\(fashionReview.coordinate.coordinate_review.prefix(shortTextCriterion)) ...")
+                    Text("\(viewModel.fashionReview!.ai_comment.prefix(shortTextCriterion)) ...")
                         .font(.system(size: 16, weight: .regular))
                     Button(action: {
                         isShowFullReview = true
@@ -161,20 +181,7 @@ struct CoordinateReviewView: View {
             }
         }
         .onAppear {
-            isShowFullReview = fashionReview.coordinate.coordinate_review.count < shortTextCriterion
-        }
-    }
-
-    private func ItemsImage() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("今日着用しているアイテム")
-                .font(.system(size: 20, weight: .bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: 48) {
-                RecentCoordinateCard(image: UIImage(named: "coordinate-2")!, text: "2025 06/25")
-                RecentCoordinateCard(image: UIImage(named: "coordinate-2")!, text: "2025 06/25")
-            }
+            isShowFullReview = viewModel.fashionReview!.ai_comment.count < shortTextCriterion
         }
     }
 
@@ -192,12 +199,17 @@ struct CoordinateReviewView: View {
         }
     }
 
-    private func RecentCoordinateCard(image: UIImage, text: String, _ textColor: Color = .secondary) -> some View {
+    private func RecentCoordinateCard(imageURL: String, text: String, _ textColor: Color = .secondary) -> some View {
         VStack(spacing: 0) {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(3/4, contentMode: .fit)
-                .frame(width: 110)
+            AsyncImage(url: URL(string: imageURL)!) { image in
+                image
+                    .resizable()
+                    .aspectRatio(3/4, contentMode: .fit)
+                    .frame(width: 110)
+            } placeholder: {
+                ProgressView()
+            }
+
             Text("\(text)")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(textColor)
@@ -207,12 +219,16 @@ struct CoordinateReviewView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func CoordinateItemCard(image: UIImage, text: String, textColor: Color = .secondary) -> some View {
+    private func CoordinateItemCard(imageURL: String, text: String, textColor: Color = .secondary) -> some View {
         VStack(spacing: 0) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 110, height: 110)
+            AsyncImage(url: URL(string: imageURL)!) { image in
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 110, height: 110)
+            } placeholder: {
+                ProgressView()
+            }
             Text("\(text)")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(textColor)
@@ -224,8 +240,8 @@ struct CoordinateReviewView: View {
 }
 
 #Preview {
-    CoordinateReviewView(
+    CoordinateReviewView(viewModel: .init(
         coordinateImage: UIImage(resource: .coordinate2),
-        fashionReview: .mock()
-    )
+        apiClient: MockFashionReviewClient()
+    ))
 }

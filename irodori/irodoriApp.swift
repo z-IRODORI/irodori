@@ -6,19 +6,20 @@
 //
 
 import SwiftUI
+import CoreML
+import Vision
 
 @main
 struct irodoriApp: App {
-    private let userDeufalts = UserDefaults.standard
-
     var body: some Scene {
         WindowGroup {
 //            SplashView()
 //            CalendarView()
-            CoordinateReviewView(
+//            SegmentationView()
+            CoordinateReviewView(viewModel: .init(
                 coordinateImage: UIImage(resource: .coordinate2),
-                fashionReview: .mock()
-            )
+                apiClient: MockFashionReviewClient()
+            ))
 
 //            CoordinateReviewView(
 //                coordinateImage: UIImage(resource: .coordinate1),
@@ -26,4 +27,5 @@ struct irodoriApp: App {
 //            )
         }
     }
+
 }

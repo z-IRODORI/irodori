@@ -7,98 +7,57 @@
 
 import Foundation
 
-struct FashionReviewResponse: Decodable {
-    var createdAt: String?
-    var tops_image_url: String
-    var bottoms_image_url: String
-    var coordinate: Coordinate
-    var graph_image: String   // URL
-    var recommendations: [WEARUser]
+struct FashionReviewResponse: Decodable, Hashable {
+    var id: String = UUID().uuidString
+    var current_coordinate: CurrentCoordinate
+    var recent_coordinates: [RecentCoordinate]
+    var items: [Item]
+    var ai_comment: String
 
-    struct Coordinate: Decodable {
-        var coordinate_review: String
-
-        // TODO: 01~03 をリストで管理
-        var coordinate_item01: String
-        var recommend_item01: String
-//        var recommend_item01_url: String? = "https://zozo.jp/"
-
-        var coordinate_item02: String
-        var recommend_item02: String
-//        var recommend_item02_url: String? = "https://zozo.jp/"
-
-        var coordinate_item03: String
-        var recommend_item03: String
-//        var recommend_item03_url: String? = "https://zozo.jp/"
+    struct CurrentCoordinate: Decodable, Hashable {
+        var id: String
+        var date: String
+        var coodinate_image_path: String
     }
-
-    struct WEARUser: Decodable, Hashable {
-        var username: String
-        var post_url: String
-        var image_url: String
+    struct RecentCoordinate: Decodable, Hashable {
+        var id: String
+        var date: String
+        var coodinate_image_path: String
+    }
+    struct Item: Decodable, Hashable {
+        var id: String
+        var coordinate_id: String
+        var item_type: String
+        var item_image_path: String
     }
 }
+
+// MARK: - Mock
 
 extension FashionReviewResponse {
     static func mock() -> Self {
         .init(
-            createdAt: "20250605044340",
-            tops_image_url: "https://c.imgz.jp/086/75033086/75033086b_144_d_500.jpg",
-            bottoms_image_url: "https://c.imgz.jp/407/81070407/81070407_5_d_500.jpg",
-            coordinate: .init(
-                coordinate_review: "素敵なコーデですね！グリーンのニットとチェックのシャツが重ね着されていて、明るくて元気な印象を与えています。ギンガムチェックの襟元がオシャレで、スカートのストライプが全体を引き締めています。全体的にカジュアルなのに、ちょっとしたエレガンスも感じられる素敵なスタイルです。",
-                coordinate_item01: "グリーンのニット",
-                recommend_item01: "白のフレアパンツで、軽やかさを演出するとさらに良いでしょう。",
-//                recommend_item01_url: "https://zozo.jp/",
-                coordinate_item02: "チェックのシャツ",
-                recommend_item02: "無地のブラウスに変えて、よりシンプルにまとめて大人っぽく見せるのもおすすめです。",
-//                recommend_item02_url: "https://zozo.jp/",
-                coordinate_item03: "ストライプのスカート",
-                recommend_item03: "ミディスカートと合わせて、トレンド感をプラスするのも良いですね。"//,
-//                recommend_item03_url: "https://zozo.jp/"
-            ),
-            graph_image: "https://images.wear2.jp/coordinate/bBildLXx/f42NPtI0/1748770665_1000.jpg",
-            recommendations: [
-                .init(
-                    username: "10momoon10",
-                    post_url: "https://wear.jp/10momoon10/23659966/",
-                    image_url: "https://images.wear2.jp/coordinate/GrigMn7m/QRJwxFx7/1702044228_276.jpg"
-                ),
-                .init(
-                    username: "みさね",
-                    post_url: "https://wear.jp/misane1209/25473513/",
-                    image_url: "https://images.wear2.jp/coordinate/zaib64wl/3GUjtLHo/1750110272_1000.jpg"
-                ),
-                .init(
-                    username: "UMI",
-                    post_url: "https://wear.jp/umichuxx/25450621/",
-                    image_url: "https://images.wear2.jp/coordinate/bBildLXx/POZ0Kpli/1749600374_1000.jpg"
-                )
-            ]
-        )
-    }
-}
+            current_coordinate: .init(id: "1", date: "2025/01/01", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/yMN071qf/1752555537_1000.jpg"),
+            recent_coordinates: [
+                .init(id: "1", date: "2025/01/01", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/iO87m45l/1751811504_1000.jpg"),
+                .init(id: "2", date: "2025/01/02", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/GSrtWHRb/1751733151_1000.jpg"),
+                .init(id: "3", date: "2025/01/03", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/NUZmuZyQ/1751726257_1000.jpg"),
+                .init(id: "4", date: "2025/01/04", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/iO87m45l/1751811504_1000.jpg"),
+                .init(id: "5", date: "2025/01/05", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/augDFt7T/1751359316_1000.jpg"),
+            ],
+            items: [
+                .init(id: "1", coordinate_id: "1", item_type: "Tops", item_image_path: "https://c.imgz.jp/860/92598860/92598860b_b_81_500.jpg"),
+                .init(id: "2", coordinate_id: "2", item_type: "Bottoms", item_image_path: "https://c.imgz.jp/394/92427394/92427394b_b_66_500.jpg"),
+            ],
+            ai_comment: """
+            控えめで自己主張が苦手な一方で、内に秘めた個性を大切にしながら周囲との調和を保つあなた。遊び心のあるTシャツがその繊細な自己表現の一面をさりげなく映し出しており、安心感と自由さのバランスが絶妙です。
 
-extension FashionReviewResponse.Coordinate {
-    static func mock() -> Self {
-        let coordinateReview: String = """
-        黒のショルダーバッグがシンプルでコーデの引き締め役になっていて素敵ですね。
-        トップスを軽くインしているので、ラフすぎず清潔感があります。\n程よくワイドなパンツを履いているので、リラックス感のある大人な印象を受けます。
-        あなたのシルエットは「I」です。Iが似合うのは、縦長でスタイリッシュな印象を好む方や、シンプルで洗練された雰囲気を持った方です。
-        また、あなたのコーデはカジュアルです。
-        カジュアルが似合う方におすすめのコーデタイプは、シンプルで洗練された印象が特徴のノームコアです。
-        画像の黒パンツに合うのは、白や淡いブルーのシャツです。理由としては、黒のパンツと明るい色味のシャツは相性がよく、シンプルながら爽やかで大人っぽい印象になるからです。
-        """
+            **他者からの見られ方**
+            周囲には知的でセンスの良い印象を与え、同年代からは親しみやすくも頼れる存在として見られます。目上の人からは誠実かつ控えめな印象を持たれ、目下からは信頼される優しい先輩像として慕われるでしょう。
 
-        return .init(
-            coordinate_review: coordinateReview,
-//            coordinate_item01: "coordinate_item01", recommend_item01: "recommend_item01", recommend_item01_url: "https://zozo.jp/",
-//            coordinate_item02: "coordinate_item02", recommend_item02: "recommend_item02", recommend_item02_url: "https://zozo.jp/",
-//            coordinate_item03: "coordinate_item03", recommend_item03: "recommend_item03", recommend_item03_url: "https://zozo.jp/"
-
-            coordinate_item01: "coordinate_item01", recommend_item01: "recommend_item01",
-            coordinate_item02: "coordinate_item02", recommend_item02: "recommend_item02",
-            coordinate_item03: "coordinate_item03", recommend_item03: "recommend_item03"
+            **改善点, 伸ばせば良いポイント**
+            黒パンツと靴の落ち着いたトーンが全体を引き締めていますが、バッグの素材感や色味に少し遊びを加えるとより個性が際立ちます。アクセサリーでさりげない光沢や色を取り入れるのも効果的です。
+            """
         )
     }
 }
