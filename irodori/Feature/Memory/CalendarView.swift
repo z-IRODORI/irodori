@@ -70,21 +70,18 @@ struct CalendarView: View {
                 .padding(.horizontal, 24)
         }
         .navigationBarHidden(true)
-        .onAppear {
-//            viewModel.fetchPosts()
-        }
-    }
-
-    private func Header() -> some View {
-        ZStack {
-            Text("IRODORI")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(.black)
-            // TODO: - なぜかタップ反応が悪い
-            Button(action: {
-                print("tapped header back button")
-                path.removeLast()
-            }) {
+        .overlay(
+            VStack(spacing: 15) {
+                Text("カレンダー")
+                    .font(.headline)
+                    .padding(.top, 7)
+            }
+            , alignment: .top
+        )
+        .overlay(
+            Button {
+                mode.wrappedValue.dismiss()
+            } label: {
                 Image(systemName: "arrow.backward")
                     .font(.headline)
                     .foregroundColor(.primary)
