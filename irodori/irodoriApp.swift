@@ -15,12 +15,12 @@ struct irodoriApp: App {
         WindowGroup {
 //            SplashView()
 //            CalendarView()
-//            SegmentationView()
+            SegmentationView()
 
-            CoordinateReviewView(viewModel: .init(
-                coordinateImage: UIImage(resource: .coordinate3),
-                apiClient: FashionReviewClient() //MockFashionReviewClient()
-            ))
+//            CoordinateReviewView(viewModel: .init(
+//                coordinateImage: UIImage(resource: .coordinate3),
+//                apiClient: FashionReviewClient() //MockFashionReviewClient()
+//            ))
 
 //            CoordinateReviewView(
 //                coordinateImage: UIImage(resource: .coordinate1),

@@ -13,11 +13,27 @@ struct SegmentationView: View {
 
     var body: some View {
         VStack(spacing: 24) {
+            HStack(spacing: 48) {
+                ForEach(SegmentationViewModel.ImageType.allCases, id: \.self) { type in
+                    Button(action: {
+                        ViewModel.tappedImageChangeButton(type: type)
+                    }) {
+                        Text("\(type.rawValue)")
+                    }
+                }
+            }
+
+            Divider().frame(maxWidth: .infinity, maxHeight: 2)
+
             Button(action: {
                 ViewModel.segment()
             }) {
-                Text("Segmentation")
+                Text("コーデアイテム抽出")
+                    .bold()
             }
+
+            Text("\(String(format: "%.3f", ViewModel.segmentTime)) s")
+                .padding(.bottom, -12)
 
             ZStack {
                 Image(uiImage: ViewModel.inputUIImage)
@@ -26,43 +42,21 @@ struct SegmentationView: View {
                     .resizable()
             }
             .aspectRatio(3/4, contentMode: .fit)
+
+            HStack(spacing: 24) {
+                Image(uiImage: ViewModel.topsUIImage)
+                    .resizable()
+                    .frame(maxWidth: 200, maxHeight: 200)
+                Image(uiImage: ViewModel.bottomsUIImage)
+                    .resizable()
+                    .frame(maxWidth: 200, maxHeight: 200)
+            }
         }
+        .padding(.horizontal, 24)
+        .padding(.vertical,32)
     }
 }
 
 #Preview {
     SegmentationView()
-}
-
-@MainActor @Observable
-final class SegmentationViewModel {
-    var inputUIImage: UIImage = .init(resource: .coordinate4)
-    var outputUIImage: UIImage = .init(resource: .coordinate4)
-    let model: Model?
-
-    init() {
-        let config = MLModelConfiguration()
-        config.computeUnits = .cpuAndGPU
-        do {
-            self.model = try Model(configuration: config)
-        } catch {
-            self.model = nil
-            print("モデルのロードまたは設定に失敗しました: \(error)")
-        }
-    }
-
-    func segment() {
-        Task {
-            print("start Segmentation")
-            guard let pixelBuffer = inputUIImage.toCVPixelBuffer() else {
-                throw NSError(domain: "ImageConversion", code: -1, userInfo: nil)
-            }
-            let input = ModelInput(image: pixelBuffer)
-            guard let model else { return }
-            let output = try await model.prediction(input: input)
-            guard let outputUIImage = SegmentationConverter.createOutputUIImage(output: output) else { return }
-            let segmentationImage: UIImage = outputUIImage.resize(to: inputUIImage.size)
-            self.outputUIImage = segmentationImage
-        }
-    }
 }
