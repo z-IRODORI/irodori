@@ -22,7 +22,7 @@ final class FashionReviewClient: FashionReviewClientProtocol {
             throw URLError(.badURL)
         }
 
-        let fashionReviewRequest = FashionReviewRequest(user_id: uid, user_token: UUID().uuidString, file: jpegData)
+        let fashionReviewRequest = FashionReviewRequest(user_id: uid, user_token: uid, file: jpegData)
         let requestParameters: [String: Any] = fashionReviewRequest.createParameters()
         let (headers, body) = createMultiPartPost(parameters: requestParameters)
 
@@ -38,6 +38,7 @@ final class FashionReviewClient: FashionReviewClientProtocol {
         do {
             // URLSessionでリクエストを送信
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            print(data)
             // JSONレスポンスをデコード
             let response = try JSONDecoder().decode(FashionReviewResponse.self, from: data)
             return .success(response)

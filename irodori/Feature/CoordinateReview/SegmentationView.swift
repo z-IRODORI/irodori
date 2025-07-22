@@ -36,8 +36,8 @@ struct SegmentationView: View {
 
 @MainActor @Observable
 final class SegmentationViewModel {
-    var inputUIImage: UIImage = .init(resource: .coordinate1)
-    var outputUIImage: UIImage = .init(resource: .coordinate1)
+    var inputUIImage: UIImage = .init(resource: .coordinate4)
+    var outputUIImage: UIImage = .init(resource: .coordinate4)
     let model: Model?
 
     init() {

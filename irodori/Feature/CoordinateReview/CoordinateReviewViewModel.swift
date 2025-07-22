@@ -22,8 +22,9 @@ final class CoordinateReviewViewModel {
 
     func loadingOnAppear() async {
         do {
+            guard let uid = UserDefaults.standard.object(forKey: UserDefaultsKey.userInfo.rawValue) as? String else { return }
             let fashionReviewResponse: Result<FashionReviewResponse, Error> = try await apiClient.post(
-                uid: UUID().uuidString,
+                uid: uid,
                 image: coordinateImage.correctOrientation,
                 purposeNum: nil//tag.number
             )

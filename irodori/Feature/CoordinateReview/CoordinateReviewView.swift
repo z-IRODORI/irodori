@@ -139,10 +139,10 @@ struct CoordinateReviewView: View {
                 .foregroundStyle(.white)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .padding(.top, 12)
-            Text("ロックな自由人、知的さと遊び心の絶妙ミックス")
+            Text("\(viewModel.fashionReview!.ai_catchphrase)")
                 .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(maxHeight: .infinity, alignment: .bottom)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
         }
@@ -163,11 +163,11 @@ struct CoordinateReviewView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if isShowFullReview {
-                Text(.init(viewModel.fashionReview!.ai_comment))
+                Text(.init(viewModel.fashionReview!.ai_review_comment))
                     .font(.system(size: 16, weight: .regular))
             } else {
                 VStack {
-                    Text("\(viewModel.fashionReview!.ai_comment.prefix(shortTextCriterion)) ...")
+                    Text("\(viewModel.fashionReview!.ai_review_comment.prefix(shortTextCriterion)) ...")
                         .font(.system(size: 16, weight: .regular))
                     Button(action: {
                         isShowFullReview = true
@@ -181,7 +181,7 @@ struct CoordinateReviewView: View {
             }
         }
         .onAppear {
-            isShowFullReview = viewModel.fashionReview!.ai_comment.count < shortTextCriterion
+            isShowFullReview = viewModel.fashionReview!.ai_review_comment.count < shortTextCriterion
         }
     }
 

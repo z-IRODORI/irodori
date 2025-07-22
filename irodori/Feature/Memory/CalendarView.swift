@@ -66,8 +66,8 @@ struct CalendarView: View {
                 .padding(.top, 75)
             }
 
-            Header()
-                .padding(.horizontal, 24)
+//            Header()
+//                .padding(.horizontal, 24)
         }
         .navigationBarHidden(true)
         .overlay(
@@ -87,7 +87,7 @@ struct CalendarView: View {
                     .foregroundColor(.primary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        )
         .frame(maxWidth: .infinity)
         .frame(height: 30)
     }

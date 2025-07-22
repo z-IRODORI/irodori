@@ -16,9 +16,10 @@ struct irodoriApp: App {
 //            SplashView()
 //            CalendarView()
 //            SegmentationView()
+
             CoordinateReviewView(viewModel: .init(
-                coordinateImage: UIImage(resource: .coordinate2),
-                apiClient: MockFashionReviewClient()
+                coordinateImage: UIImage(resource: .coordinate3),
+                apiClient: FashionReviewClient() //MockFashionReviewClient()
             ))
 
 //            CoordinateReviewView(
