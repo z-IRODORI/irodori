@@ -56,7 +56,7 @@ struct TermsOfServiceView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
                         .background(Color.blue)
-                        .cornerRadius(12)
+                        .cornerRadius(24)
                 }
 
                 Button(action: {
@@ -69,7 +69,7 @@ struct TermsOfServiceView: View {
                         .frame(height: 50)
                         .background(Color.white)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: 24)
                                 .stroke(Color.gray, lineWidth: 1)
                         )
                 }

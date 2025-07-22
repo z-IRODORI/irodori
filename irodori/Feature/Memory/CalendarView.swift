@@ -11,7 +11,7 @@ import SwiftUI
 struct CalendarView: View {
     @Environment(\.presentationMode) var mode
     
-    private var columns = [
+    private let columns = [
         GridItem.init(.flexible(), alignment: .center),
         GridItem.init(.flexible(), alignment: .center),
         GridItem.init(.flexible(), alignment: .center),
@@ -21,48 +21,53 @@ struct CalendarView: View {
         GridItem.init(.flexible(), alignment: .center)
     ]
 
+    @Binding var path: [ViewType]
     @State var viewModel: CalendarViewModel = .init()
 
     var body: some View {
 
-        ScrollView(showsIndicators: false) {
+        ZStack(alignment: .top) {
+            ScrollView(showsIndicators: false) {
 
-            // Amount of months since December 2022
-            ForEach(viewModel.months) { month in
-                Text("\(month.title)  \(String(month.year))")
-                    .font(.caption.weight(.semibold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    .padding(.top)
+                // Amount of months since December 2022
+                ForEach(viewModel.months) { month in
+                    Text("\(month.title)  \(String(month.year))")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                        .padding(.top)
 
-                HStack(spacing: 0) {
-                    Spacer()
-                    ForEach(viewModel.daysOfTheWeek, id: \.self) { day in
-                        Text(day.rawValue)
+                    HStack(spacing: 0) {
                         Spacer()
+                        ForEach(viewModel.daysOfTheWeek, id: \.self) { day in
+                            Text(day.rawValue)
+                            Spacer()
+                        }
                     }
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundColor(.primary)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.primary)
 
-                LazyVGrid(columns: columns, alignment: .center, pinnedViews: .sectionHeaders) {
-                    ForEach(1..<month.spacesBeforeFirst, id: \.self) { _ in
-                        Text("")
-                    }
+                    LazyVGrid(columns: columns, alignment: .center, pinnedViews: .sectionHeaders) {
+                        ForEach(1..<month.spacesBeforeFirst, id: \.self) { _ in
+                            Text("")
+                        }
 
-                    // Days in a month
-                    ForEach(1..<month.amountOfDays + 1, id: \.self) { i in
-                        CalendarCell(
-                            thumbnailImageURL: "https://images.wear2.jp/coordinate/bBildLXx/oztkGRxb/1749994312_1000.jpg",
-                            height: UIScreen.main.bounds.width/6.5,
-                            dayOfMonth: i
-                        )
+                        // Days in a month
+                        ForEach(1..<month.amountOfDays + 1, id: \.self) { i in
+                            CalendarCell(
+                                thumbnailImageURL: "https://images.wear2.jp/coordinate/bBildLXx/oztkGRxb/1749994312_1000.jpg",
+                                height: UIScreen.main.bounds.width/6.5,
+                                dayOfMonth: i
+                            )
+                        }
                     }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
+                .padding(.top, 75)
             }
-            .padding(.top, 75)
 
+            Header()
+                .padding(.horizontal, 24)
         }
         .navigationBarHidden(true)
         .overlay(
@@ -80,27 +85,14 @@ struct CalendarView: View {
                 Image(systemName: "arrow.backward")
                     .font(.headline)
                     .foregroundColor(.primary)
-                    .padding(10)
             }
-            .buttonStyle(.automatic)
-            .padding(.leading)
-
-            , alignment: .topLeading
-        )
-        .overlay(
-            VStack {
-                LinearGradient(colors: [.clear, .black.opacity(0.3), .black.opacity(0.7)], startPoint: .bottom, endPoint: .top)
-                    .frame(height: UIScreen.main.bounds.height/12)
-                Spacer()
-            }
-            .ignoresSafeArea()
-        )
-        .onAppear {
-//            viewModel.fetchPosts()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 30)
     }
 }
 
 #Preview {
-    CalendarView()
+    CalendarView(path: .constant([]))
 }

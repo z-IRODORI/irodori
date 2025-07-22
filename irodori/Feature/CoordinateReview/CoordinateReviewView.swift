@@ -8,10 +8,9 @@
 import SwiftUI
 
 struct CoordinateReviewView: View {
-    let coordinateImage: UIImage
-    let fashionReview: FashionReviewResponse
+    let viewModel: CoordinateReviewViewModel
 
-    private let criterionShortText = 150
+    private let shortTextCriterion = 50
     @State private var currentSchedule = ""   // YYYY/MM/DD
     @State private var reviewText = ""
     @State private var isShowFullReview = false
@@ -19,49 +18,133 @@ struct CoordinateReviewView: View {
     @State private var isPresentedCameraView = false
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 48) {
-                CapturedImage()
-                ItemsImage()
-                ReviewText()
-                CoordinateGraph()
-                RecommendItems()
+        if let fashionReview = viewModel.fashionReview {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 32) {
+                    Coordinate()
+                    RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
+                    ReviewText()
+                        .padding(.horizontal, 24)
+                    CoordinateItems()
+                        .padding(.horizontal, 24)
+                }
             }
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: {
-                    isPresentedCameraView = true
-                }, label: {
-                    Text("再撮影")
-                })
+            .navigationBarBackButtonHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: {
+                        isPresentedCameraView = true
+                    }, label: {
+                        Text("再撮影")
+                    })
+                }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.horizontal, 24)
-//        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
-//            WebView(url: URL(string: tappedRecommendItem.itemURL))
-//        }
-        .onChange(of: tappedURL) {
-            let url = URL(string: tappedURL)!   // TODO: エラーハンドリング
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
-        }
-        .navigationDestination(isPresented: $isPresentedCameraView) {
-            CameraView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    //        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
+    //            WebView(url: URL(string: tappedRecommendItem.itemURL))
+    //        }
+            .onChange(of: tappedURL) {
+                let url = URL(string: tappedURL)!   // TODO: エラーハンドリング
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
+            .navigationDestination(isPresented: $isPresentedCameraView) {
+                CameraView()
+            }
+            .background(.gray.opacity(0.08))
+        } else {
+            VStack(spacing: 24) {
+                Text("レビュー作成中...")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.pink)
+                Image(.splash03)
+                    .resizable()
+                    .frame(width: 200, height: 300)
+            }
+            .task {
+                await viewModel.loadingOnAppear()
+            }
         }
     }
 
-    private func CapturedImage() -> some View {
+    private func RecentCoordinates() -> some View {
         VStack(spacing: 12) {
-            Text("\(currentSchedule)")
-                .font(.system(size: 16))
-                .foregroundStyle(.gray)
+            Text("直近のコーデ")
+                .font(.system(size: 20, weight: .bold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    Spacer().frame(width: 12)
 
-            Image(uiImage: coordinateImage)
+                    ForEach(viewModel.fashionReview!.recent_coordinates, id: \.self) { fashionReview in
+                        RecentCoordinateCard(
+                            imageURL: fashionReview.coodinate_image_path,
+                            text: fashionReview.date
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func CoordinateItems() -> some View {
+        VStack(spacing: 12) {
+            Text("着用しているアイテム")
+                .font(.system(size: 20, weight: .bold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(viewModel.fashionReview!.items, id: \.self) { item in
+                        CoordinateItemCard(
+                            imageURL: item.item_image_path,
+                            text: item.item_type, textColor: .black
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func Coordinate() -> some View {
+        ZStack {
+            Image(uiImage: viewModel.coordinateImage)
                 .resizable()
-                .frame(width: 360/1.8, height: 640/1.8)   // WEARのコーデ画像サイズ をリサイズ
-                .scaledToFit()
+                .aspectRatio(3/4, contentMode: .fit)
+                .overlay {
+                    GeometryReader { geometry in
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.clear, Color.black.opacity(0.8)]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: geometry.size.height / 2)
+                        .position(x: geometry.size.width / 2,
+                                  y: geometry.size.height - (geometry.size.height / 4))
+                    }
+                }
+                .overlay {
+                    GeometryReader { geometry in
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.black.opacity(0.3), Color.clear]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: 50)
+                        .position(x: geometry.size.width / 2, y: 24)
+                    }
+                }
+
+            Text("\(currentSchedule)")
+                .font(.system(size: 20, weight: .regular))
+                .foregroundStyle(.white)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, 12)
+            Text("ロックな自由人、知的さと遊び心の絶妙ミックス")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
         }
         .onAppear {
             // TODO: VM に移行
@@ -73,99 +156,32 @@ struct CoordinateReviewView: View {
         }
     }
 
-    private func ItemsImage() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("今日着用しているアイテム")
-                .font(.system(size: 20, weight: .bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: 48) {
-                VStack(spacing: 6) {
-                    Text("トップス")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.gray)
-
-                    AsyncImage(url: URL(string: fashionReview.tops_image_url)!) { image in
-                        image
-                            .resizable()
-                            .frame(width: 120, height: 120)
-                    } placeholder: {
-                        ProgressView()
-                    }
-                }
-
-                VStack(spacing: 6) {
-                    Text("ボトムス")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.gray)
-
-                    AsyncImage(url: URL(string: fashionReview.bottoms_image_url)!) { image in
-                        image
-                            .resizable()
-                            .frame(width: 120, height: 120)
-                    } placeholder: {
-                        ProgressView()
-                    }
-                }
-            }
-        }
-    }
-
     private func ReviewText() -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("AIからのコーデコメント")
+            Text("AIのコーデコメント")
                 .font(.system(size: 20, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if isShowFullReview {
-                Text("\(fashionReview.coordinate.coordinate_review)")
-                    .font(.system(size: 16, weight: .light))
+                Text(.init(viewModel.fashionReview!.ai_comment))
+                    .font(.system(size: 16, weight: .regular))
             } else {
-                ZStack(alignment: .bottomTrailing) {
-                    Text("\(fashionReview.coordinate.coordinate_review.prefix(criterionShortText)) ...")
-                        .font(.system(size: 16, weight: .light))
+                VStack {
+                    Text("\(viewModel.fashionReview!.ai_comment.prefix(shortTextCriterion)) ...")
+                        .font(.system(size: 16, weight: .regular))
                     Button(action: {
                         isShowFullReview = true
                     }) {
                         Text("続きを見る")
-                            .font(.system(size: 16, weight: .regular, design: .rounded))
+                            .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(.blue)
-                            .background(.white)
                     }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
         }
-    }
-
-    private func RecommendItems() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("おすすめアイテム")
-                .font(.system(size: 20, weight: .bold))
-
-            RecommendItemText(
-                // TODO: [BE担当] recommend_item01 と coordinate_item01 を逆にする
-//                coordinate_item: fashionReview.coordinate.coordinate_item01,
-//                recommend_item: fashionReview.coordinate.recommend_item01,
-                coordinate_item: fashionReview.coordinate.recommend_item01,
-                recommend_item: fashionReview.coordinate.coordinate_item01,
-                recommend_item_url: ""//fashionReview.coordinate.recommend_item01_url!
-            )
-
-            RecommendItemText(
-//                coordinate_item: fashionReview.coordinate.coordinate_item02,
-//                recommend_item: fashionReview.coordinate.recommend_item02,
-                coordinate_item: fashionReview.coordinate.recommend_item02,
-                recommend_item: fashionReview.coordinate.coordinate_item02,
-                recommend_item_url: ""//fashionReview.coordinate.recommend_item02_url!
-            )
-
-            RecommendItemText(
-//                coordinate_item: fashionReview.coordinate.coordinate_item03,
-//                recommend_item: fashionReview.coordinate.recommend_item03,
-                coordinate_item: fashionReview.coordinate.recommend_item03,
-                recommend_item: fashionReview.coordinate.coordinate_item03,
-                recommend_item_url: ""//fashionReview.coordinate.recommend_item03_url!
-            )
+        .onAppear {
+            isShowFullReview = viewModel.fashionReview!.ai_comment.count < shortTextCriterion
         }
     }
 
@@ -183,58 +199,49 @@ struct CoordinateReviewView: View {
         }
     }
 
-    private func CoordinateGraph() -> some View {
-        VStack(spacing: 48) {
-            VStack(spacing: 12) {
-                Text("あなたと似ているWEARユーザー")
-                    .font(.system(size: 20, weight: .bold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                AsyncImage(url: URL(string: fashionReview.graph_image)!) { image in
-                    image
-                        .resizable()
-                        .frame(maxWidth: 320, maxHeight: 320)
-                        .border(.gray, width: 2)
-                } placeholder: {
-                    ProgressView()
-                }
+    private func RecentCoordinateCard(imageURL: String, text: String, _ textColor: Color = .secondary) -> some View {
+        VStack(spacing: 0) {
+            AsyncImage(url: URL(string: imageURL)!) { image in
+                image
+                    .resizable()
+                    .aspectRatio(3/4, contentMode: .fit)
+                    .frame(width: 110)
+            } placeholder: {
+                ProgressView()
             }
 
-            VStack(spacing: 12) {
-                Text("あなたと似ているコーディネート")
-                    .font(.system(size: 20, weight: .bold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 24) {
-                        ForEach(fashionReview.recommendations, id: \.self) { similarWearItem in
-                            Button(action: {
-                                tappedURL = similarWearItem.post_url
-                            }, label: {
-                                VStack(spacing: 12) {
-                                    AsyncImage(url: URL(string: similarWearItem.image_url)!) { image in
-                                        image
-                                            .resizable()
-                                            .frame(width: 30 * 4.5, height: 40 * 4.5)
-                                    } placeholder: {
-                                        ProgressView()
-                                    }
-
-                                    Text("@\(similarWearItem.username)")
-                                        .lineLimit(1)
-                                }
-                            })
-                        }
-                    }
-                }
-            }
+            Text("\(text)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(textColor)
+                .padding(.vertical, 10)
         }
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func CoordinateItemCard(imageURL: String, text: String, textColor: Color = .secondary) -> some View {
+        VStack(spacing: 0) {
+            AsyncImage(url: URL(string: imageURL)!) { image in
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 110, height: 110)
+            } placeholder: {
+                ProgressView()
+            }
+            Text("\(text)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(textColor)
+                .padding(.vertical, 10)
+        }
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
 #Preview {
-    CoordinateReviewView(
-        coordinateImage: UIImage(resource: .coordinate1),
-        fashionReview: .mock()
-    )
+    CoordinateReviewView(viewModel: .init(
+        coordinateImage: UIImage(resource: .coordinate2),
+        apiClient: MockFashionReviewClient()
+    ))
 }
