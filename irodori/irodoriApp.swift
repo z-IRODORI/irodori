@@ -15,10 +15,10 @@ struct irodoriApp: App {
         WindowGroup {
 //            SplashView()
 //            CalendarView()
-            CoordinateReviewView(
+            CoordinateReviewView(viewModel: .init(
                 coordinateImage: UIImage(resource: .coordinate2),
-                fashionReview: .mock()
-            )
+                apiClient: MockFashionReviewClient()
+            ))
 
 //            CoordinateReviewView(
 //                coordinateImage: UIImage(resource: .coordinate1),
