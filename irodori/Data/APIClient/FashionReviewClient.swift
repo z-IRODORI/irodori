@@ -18,7 +18,7 @@ final class FashionReviewClient: FashionReviewClientProtocol {
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 
         // UIImageをJPEGデータに変換
-        guard let jpegData = image.jpegData(compressionQuality: 0.8) else {
+        guard let jpegData = image.jpegData(compressionQuality: 0.5) else {
             throw URLError(.badURL)
         }
 

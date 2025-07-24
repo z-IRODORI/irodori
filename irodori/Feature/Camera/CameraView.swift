@@ -53,17 +53,25 @@ struct CameraView: View {
             }
             .fullScreenCover(isPresented: $showCapturedImage) {
                 if let image = cameraViewModel.capturedImage {
-                    CapturedImageView(image: image, isPresented: $showCapturedImage)   // キャプチャした画像表示画面
+                    CapturedImageView(image: image, isPresented: $showCapturedImage, okButtonTapped: {
+                        path.append(.coordinateReview)
+                    })   // キャプチャした画像表示画面
                 }
             }
             .navigationDestination(for: ViewType.self) { viewType in
                 switch viewType {
+                case .coordinateReview:
+                    CoordinateReviewView(viewModel: .init(
+                        coordinateImage: cameraViewModel.capturedImage!.correctOrientation,
+                        apiClient: FashionReviewClient()
+                    ), path: $path)
                 case .calendar:
-                    CalendarView(path: $path)
+                    CalendarView()
                 case .camera:
                     EmptyView()
                 }
             }
+            
         }
     }
 
@@ -83,15 +91,15 @@ struct CameraView: View {
                 }
 
                 // TODO: リリース時は削除
-                Button(action: {
-                    cameraViewModel.earserButtonTapped()
-                    exit(0)
-                }) {
-                    Image(systemName: "eraser")
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                        .foregroundStyle(.black)
-                }
+//                Button(action: {
+//                    cameraViewModel.earserButtonTapped()
+//                    exit(0)
+//                }) {
+//                    Image(systemName: "eraser")
+//                        .resizable()
+//                        .frame(width: 20, height: 20)
+//                        .foregroundStyle(.black)
+//                }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }

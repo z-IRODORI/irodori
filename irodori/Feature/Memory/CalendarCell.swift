@@ -9,19 +9,18 @@ import SwiftUI
 import Kingfisher
 
 struct CalendarCell: View {
-    var thumbnailImageURL: String
+    var thumbnailImageURL: String?
     var height: CGFloat
     var dayOfMonth: Int
 
-    @State var showSheet:Bool = false
-
     var body: some View {
         Button {
-            showSheet = true
+            
         } label: {
             ZStack {
                 // 全身画像
-                if let imageURL = URL(string: thumbnailImageURL) {
+                if let thumbnailImageURL,
+                   let imageURL = URL(string: thumbnailImageURL) {
                     KFImage.url(imageURL)
                         .loadDiskFileSynchronously()
                         .cacheMemoryOnly()
@@ -34,17 +33,14 @@ struct CalendarCell: View {
 
                 // 日付
                 Text(dayOfMonth.description)
-                    .foregroundColor(.white)
+                    .foregroundColor(thumbnailImageURL == nil ? .gray : .white)
                     .font(.headline)
-                    .shadow(radius: 3)
+                    .shadow(radius: thumbnailImageURL == nil ? 0 : 3)
                     .frame(height: height)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .frame(maxWidth: .infinity)
             }
         }
         .buttonStyle(.automatic)
-        .sheet(isPresented: $showSheet) {
-            //
-        }
     }
 
     private func PlaceholderView() -> some View {

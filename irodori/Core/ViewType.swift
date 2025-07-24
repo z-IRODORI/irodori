@@ -10,4 +10,5 @@ import Foundation
 enum ViewType {
     case camera
     case calendar
+    case coordinateReview
 }

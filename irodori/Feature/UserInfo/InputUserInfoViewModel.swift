@@ -44,12 +44,20 @@ final class InputUserInfoViewModel {
         birthDay.day = day
     }
 
-    func saveUserInfo() {
-        let user = User(username: username, birthday: birthDay, gender: selectedGender)
+    func okButtonTapped() async {
+        let createUserClient: CreateUserClient = CreateUserClient()
+        let uid = UUID().uuidString
+        userDefaults.set(uid, forKey: UserDefaultsKey.userId.rawValue)
 
-        if let encoded = try? JSONEncoder().encode(user) {
-            userDefaults.set(encoded, forKey: UserDefaultsKey.userInfo.rawValue)
-            userDefaults.set(true, forKey: UserDefaultsKey.hasCompletedUserInfo.rawValue)
+        let user = User(username: username, birthday: birthDay, gender: selectedGender)
+        do {
+            let _ = try await createUserClient.post(createUserRequest: .init(id: uid, cognito_id: uid, user_name: username, year: Int(birthDay.year)!, month: Int(birthDay.month)!, day: Int(birthDay.day)!, gender: selectedGender.number))
+            if let encoded = try? JSONEncoder().encode(user) {
+                userDefaults.set(encoded, forKey: UserDefaultsKey.userInfo.rawValue)
+                userDefaults.set(true, forKey: UserDefaultsKey.hasCompletedUserInfo.rawValue)
+            }
+        } catch {
+
         }
     }
 }

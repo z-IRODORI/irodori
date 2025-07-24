@@ -8,7 +8,6 @@
 import Foundation
 
 struct FashionReviewResponse: Decodable, Hashable {
-    //var id: String = UUID().uuidString
     var current_coordinate: CurrentCoordinate
     var recent_coordinates: [RecentCoordinate]
     var items: [Item]

@@ -9,6 +9,7 @@ import Foundation
 
 enum UserDefaultsKey: String {
     case hasAgreedToTermsOfService
+    case userId
     case userInfo
     case hasCompletedUserInfo
     case signUpDate

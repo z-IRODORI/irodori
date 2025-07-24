@@ -11,14 +11,15 @@ import Vision
 
 @main
 struct irodoriApp: App {
+    @State private var path: [ViewType] = []
     var body: some Scene {
         WindowGroup {
-//            SplashView()
+            SplashView()
 //            CalendarView()
-            SegmentationView()
+//            SegmentationView()
 
 //            CoordinateReviewView(viewModel: .init(
-//                coordinateImage: UIImage(resource: .coordinate3),
+//                coordinateImage: UIImage(resource: .coordinate10),
 //                apiClient: FashionReviewClient() //MockFashionReviewClient()
 //            ))
 

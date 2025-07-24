@@ -8,11 +8,9 @@
 import Foundation
 
 struct CoordinateListResponse: Decodable {
-    var items: [Item]
-
-    struct Item: Decodable {
-        var date: String
-        var id: String?
-        var coodinate_image_path: String?
-    }
+    var year: Int
+    var month: Int
+    var day: Int
+    var id: String?
+    var coodinate_image_path: String?
 }

@@ -16,6 +16,7 @@ struct CoordinateReviewView: View {
     @State private var isShowFullReview = false
     @State private var tappedURL = ""
     @State private var isPresentedCameraView = false
+    @Binding var path: [ViewType]
 
     var body: some View {
         if let fashionReview = viewModel.fashionReview {
@@ -33,9 +34,9 @@ struct CoordinateReviewView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {
-                        isPresentedCameraView = true
+                        path.removeAll()
                     }, label: {
-                        Text("再撮影")
+                        Text("ホームへ")
                     })
                 }
             }
@@ -51,6 +52,7 @@ struct CoordinateReviewView: View {
                 CameraView()
             }
             .background(.gray.opacity(0.08))
+            .navigationBarBackButtonHidden()
         } else {
             VStack(spacing: 24) {
                 Text("レビュー作成中...")
@@ -63,6 +65,7 @@ struct CoordinateReviewView: View {
             .task {
                 await viewModel.loadingOnAppear()
             }
+            .navigationBarBackButtonHidden()
         }
     }
 
@@ -72,15 +75,19 @@ struct CoordinateReviewView: View {
                 .font(.system(size: 20, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    Spacer().frame(width: 12)
+            if viewModel.fashionReview!.recent_coordinates.isEmpty {
+                Text("コーデが存在しません...")
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        Spacer().frame(width: 12)
 
-                    ForEach(viewModel.fashionReview!.recent_coordinates, id: \.self) { fashionReview in
-                        RecentCoordinateCard(
-                            imageURL: fashionReview.coodinate_image_path,
-                            text: fashionReview.date
-                        )
+                        ForEach(viewModel.fashionReview!.recent_coordinates, id: \.self) { fashionReview in
+                            RecentCoordinateCard(
+                                imageURL: fashionReview.coodinate_image_path,
+                                text: fashionReview.date
+                            )
+                        }
                     }
                 }
             }
@@ -94,12 +101,23 @@ struct CoordinateReviewView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(viewModel.fashionReview!.items, id: \.self) { item in
-                        CoordinateItemCard(
-                            imageURL: item.item_image_path,
-                            text: item.item_type, textColor: .black
-                        )
-                    }
+                    CoordinateItemCard(
+                        uiImage: viewModel.topsUIImage,
+                        text: "トップス", textColor: .black
+                    )
+
+                    CoordinateItemCard(
+                        uiImage: viewModel.bottomsUIImage,
+                        text: "ボトムス", textColor: .black
+                    )
+
+                    // APIレスポンスからデータ受け取れるようになったら使う
+//                    ForEach(viewModel.fashionReview!.items, id: \.self) { item in
+//                        CoordinateItemCard(
+//                            imageURL: item.item_image_path,
+//                            text: item.item_type, textColor: .black
+//                        )
+//                    }
                 }
             }
         }
@@ -237,11 +255,32 @@ struct CoordinateReviewView: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
+
+    private func CoordinateItemCard(uiImage: UIImage?, text: String, textColor: Color = .secondary) -> some View {
+        VStack(spacing: 0) {
+            if let uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 110, height: 110)
+                    .padding(12)
+            } else {
+                ProgressView()
+            }
+
+            Text("\(text)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(textColor)
+                .padding(.vertical, 10)
+        }
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
 }
 
 #Preview {
     CoordinateReviewView(viewModel: .init(
         coordinateImage: UIImage(resource: .coordinate2),
         apiClient: MockFashionReviewClient()
-    ))
+    ), path: .constant([]))
 }

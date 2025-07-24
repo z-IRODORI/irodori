@@ -157,8 +157,10 @@ struct InputUserInfoView: View {
             
             // 完了ボタン
             Button(action: {
-                viewModel.saveUserInfo()
-                finishedInputUserInfo()
+                Task {
+                    await viewModel.okButtonTapped()
+                    finishedInputUserInfo()
+                }
             }) {
                 Text("完了")
                     .font(.system(size: 16, weight: .medium))
