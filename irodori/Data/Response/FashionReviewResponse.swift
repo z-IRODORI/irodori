@@ -8,11 +8,11 @@
 import Foundation
 
 struct FashionReviewResponse: Decodable, Hashable {
-    var id: String = UUID().uuidString
     var current_coordinate: CurrentCoordinate
     var recent_coordinates: [RecentCoordinate]
     var items: [Item]
-    var ai_comment: String
+    var ai_catchphrase: String
+    var ai_review_comment: String
 
     struct CurrentCoordinate: Decodable, Hashable {
         var id: String
@@ -49,7 +49,9 @@ extension FashionReviewResponse {
                 .init(id: "1", coordinate_id: "1", item_type: "Tops", item_image_path: "https://c.imgz.jp/860/92598860/92598860b_b_81_500.jpg"),
                 .init(id: "2", coordinate_id: "2", item_type: "Bottoms", item_image_path: "https://c.imgz.jp/394/92427394/92427394b_b_66_500.jpg"),
             ],
-            ai_comment: """
+
+            ai_catchphrase: "明るさ全開の朝ドラ女優",
+            ai_review_comment: """
             控えめで自己主張が苦手な一方で、内に秘めた個性を大切にしながら周囲との調和を保つあなた。遊び心のあるTシャツがその繊細な自己表現の一面をさりげなく映し出しており、安心感と自由さのバランスが絶妙です。
 
             **他者からの見られ方**

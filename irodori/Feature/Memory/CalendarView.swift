@@ -21,8 +21,7 @@ struct CalendarView: View {
         GridItem.init(.flexible(), alignment: .center)
     ]
 
-    @Binding var path: [ViewType]
-    @State var viewModel: CalendarViewModel = .init()
+    @State var viewModel: CalendarViewModel = .init(apiClient: CoordinateListClient())
 
     var body: some View {
 
@@ -30,8 +29,9 @@ struct CalendarView: View {
             ScrollView(showsIndicators: false) {
 
                 // Amount of months since December 2022
-                ForEach(viewModel.months) { month in
-                    Text("\(month.title)  \(String(month.year))")
+//                ForEach(viewModel.months) { month in
+                ForEach(0..<viewModel.coordinateListResponses.count, id: \.self) { i in
+                    Text("\(viewModel.months[i].title)  \(String(viewModel.months[i].year))")
                         .font(.caption.weight(.semibold))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal)
@@ -48,16 +48,16 @@ struct CalendarView: View {
                     .foregroundColor(.primary)
 
                     LazyVGrid(columns: columns, alignment: .center, pinnedViews: .sectionHeaders) {
-                        ForEach(1..<month.spacesBeforeFirst, id: \.self) { _ in
+                        ForEach(1..<viewModel.months[i].spacesBeforeFirst, id: \.self) { _ in
                             Text("")
                         }
 
                         // Days in a month
-                        ForEach(1..<month.amountOfDays + 1, id: \.self) { i in
+                        ForEach(1..<viewModel.months[i].amountOfDays + 1, id: \.self) { day in
                             CalendarCell(
-                                thumbnailImageURL: "https://images.wear2.jp/coordinate/bBildLXx/oztkGRxb/1749994312_1000.jpg",
+                                thumbnailImageURL: viewModel.coordinateListResponses[i][day - 1].coodinate_image_path,
                                 height: UIScreen.main.bounds.width/6.5,
-                                dayOfMonth: i
+                                dayOfMonth: day
                             )
                         }
                     }
@@ -70,29 +70,33 @@ struct CalendarView: View {
                 .padding(.horizontal, 24)
         }
         .navigationBarHidden(true)
-        .overlay(
-            VStack(spacing: 15) {
-                Text("カレンダー")
-                    .font(.headline)
-                    .padding(.top, 7)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            Task {
+                await viewModel.onAppear()
             }
-            , alignment: .top
-        )
-        .overlay(
+        }
+    }
+
+    private func Header() -> some View {
+        ZStack {
+            Text("カレンダー")
+                .font(.headline)
+                .padding(.top, 7)
+
             Button {
                 mode.wrappedValue.dismiss()
             } label: {
                 Image(systemName: "arrow.backward")
                     .font(.headline)
                     .foregroundColor(.primary)
+                    .frame(maxWidth: 30, maxHeight: 30)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 30)
     }
 }
 
 #Preview {
-    CalendarView(path: .constant([]))
+    CalendarView()
 }

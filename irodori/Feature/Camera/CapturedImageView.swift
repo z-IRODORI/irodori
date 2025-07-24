@@ -11,7 +11,7 @@ import SwiftUI
 struct CapturedImageView: View {
     let image: UIImage
     @Binding var isPresented: Bool
-    @State private var isPresentedLoadingView = false
+    let okButtonTapped: () -> Void
 
     var body: some View {
         NavigationStack {
@@ -43,7 +43,8 @@ struct CapturedImageView: View {
     //                    .padding()
 
                         Button("送信") {
-                            isPresentedLoadingView = true
+                            okButtonTapped()
+                            isPresented = false
                         }
                         .foregroundColor(.white)
                         .padding()
@@ -52,16 +53,10 @@ struct CapturedImageView: View {
                     .padding(.bottom, 30)
                 }
             }
-            .navigationDestination(isPresented: $isPresentedLoadingView) {
-                CoordinateReviewView(viewModel: .init(
-                    coordinateImage: image,
-                    apiClient: FashionReviewClient()
-                ))
-            }
         }
     }
 }
 
 #Preview {
-    CapturedImageView(image: UIImage(), isPresented: Binding.constant(true))
+    CapturedImageView(image: UIImage(), isPresented: Binding.constant(true), okButtonTapped: {})
 }

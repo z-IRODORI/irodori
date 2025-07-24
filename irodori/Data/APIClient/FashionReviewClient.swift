@@ -14,15 +14,15 @@ protocol FashionReviewClientProtocol {
 final class FashionReviewClient: FashionReviewClientProtocol {
     func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, Error> {
         let baseURL = "https://irodori.click"
-        let endpoint = "v1/fashion-review"
+        let endpoint = "api/fashion_review"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 
         // UIImageをJPEGデータに変換
-        guard let jpegData = image.jpegData(compressionQuality: 0.8) else {
+        guard let jpegData = image.jpegData(compressionQuality: 0.5) else {
             throw URLError(.badURL)
         }
 
-        let fashionReviewRequest = FashionReviewRequest(user_id: uid, user_token: UUID().uuidString, file: jpegData)
+        let fashionReviewRequest = FashionReviewRequest(user_id: uid, user_token: uid, file: jpegData)
         let requestParameters: [String: Any] = fashionReviewRequest.createParameters()
         let (headers, body) = createMultiPartPost(parameters: requestParameters)
 
@@ -38,6 +38,7 @@ final class FashionReviewClient: FashionReviewClientProtocol {
         do {
             // URLSessionでリクエストを送信
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            print(data)
             // JSONレスポンスをデコード
             let response = try JSONDecoder().decode(FashionReviewResponse.self, from: data)
             return .success(response)

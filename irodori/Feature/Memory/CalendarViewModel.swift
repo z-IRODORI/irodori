@@ -13,8 +13,13 @@ import Observation
 final class CalendarViewModel {
     var months: [Month] = []
     let daysOfTheWeek: [Week] = Week.allCases
+    var coordinateListResponses: [[CoordinateListResponse]] = []
+    let uid: String
 
-    init(repository: SignUpDateRepositoryProtocol = SignUpDateRepository()) {
+    let apiClient: CoordinateListClientProtocol
+    init(apiClient: CoordinateListClientProtocol, repository: SignUpDateRepositoryProtocol = SignUpDateRepository()) {
+        self.apiClient = apiClient
+        self.uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue)!
         let calendar = Calendar(identifier: .gregorian)
         let today = Date()
 
@@ -42,6 +47,23 @@ final class CalendarViewModel {
             date = calendar.date(byAdding: .month, value: 1, to: date)!
         }
         self.months = monthList
+        print(self.months)
+    }
+
+    func onAppear() async {
+        do {
+            for month in months {
+                let result = try await apiClient.get(uid: uid, year: month.year, month: month.monthOfTheYear)
+                switch result {
+                case .success(let response):
+                    coordinateListResponses.append(response)
+                case .failure(let error):
+                    print(error)
+                }
+            }
+        } catch {
+
+        }
     }
 }
 
