@@ -53,9 +53,14 @@ struct CameraView: View {
             }
             .fullScreenCover(isPresented: $showCapturedImage) {
                 if let image = cameraViewModel.capturedImage {
-                    CapturedImageView(image: image, isPresented: $showCapturedImage, okButtonTapped: {
-                        path.append(.coordinateReview)
-                    })   // キャプチャした画像表示画面
+                    CapturedImageView(
+                        image: image,
+                        viewModel: .init(inputUIImage: image),
+                        isPresented: $showCapturedImage,
+                        okButtonTapped: {
+                            path.append(.coordinateReview)
+                        }
+                    )   // キャプチャした画像表示画面
                 }
             }
             .navigationDestination(for: ViewType.self) { viewType in

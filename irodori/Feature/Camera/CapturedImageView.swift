@@ -10,8 +10,15 @@ import SwiftUI
 // キャプチャした画像表示View
 struct CapturedImageView: View {
     let image: UIImage
+    let viewModel: CapturedImageViewModel
     @Binding var isPresented: Bool
     let okButtonTapped: () -> Void
+    init(image: UIImage, viewModel: CapturedImageViewModel, isPresented: Binding<Bool>, okButtonTapped: @escaping () -> Void) {
+        self.image = image
+        self.viewModel = viewModel
+        self._isPresented = isPresented
+        self.okButtonTapped = okButtonTapped
+    }
 
     var body: some View {
         NavigationStack {
@@ -52,11 +59,25 @@ struct CapturedImageView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 30)
                 }
+
+                if viewModel.isLoading {
+                    Color.black.opacity(0.5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ProgressView()
+                }
+            }
+            .onAppear {
+                viewModel.onAppear()
             }
         }
     }
 }
 
 #Preview {
-    CapturedImageView(image: UIImage(), isPresented: Binding.constant(true), okButtonTapped: {})
+    CapturedImageView(
+        image: UIImage(),
+        viewModel: .init(inputUIImage: .init()),
+        isPresented: Binding.constant(true),
+        okButtonTapped: {}
+    )
 }
