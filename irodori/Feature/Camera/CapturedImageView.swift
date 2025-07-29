@@ -65,6 +65,13 @@ struct CapturedImageView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     ProgressView()
                 }
+
+                if let errorMessage = viewModel.mlErrorMessage,
+                   !viewModel.isDetectHuman {
+                    ErrorMessageView(errorMessage: errorMessage, dismiss: {
+                        isPresented = false
+                    })
+                }
             }
             .onAppear {
                 viewModel.onAppear()

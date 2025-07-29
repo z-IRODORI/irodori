@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum MLError {
+enum MLError: Error {
     // DetectHuman
     case notHuman
 

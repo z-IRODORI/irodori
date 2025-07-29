@@ -12,6 +12,7 @@ import UIKit
 final class CapturedImageViewModel {
     var isLoading: Bool = false
     var isDetectHuman: Bool = false
+    var mlErrorMessage: ErrorMessage?
     private let detectHuman = DetectHuman()
     let inputUIImage: UIImage
     init(inputUIImage: UIImage) {
@@ -24,7 +25,12 @@ final class CapturedImageViewModel {
             isLoading = false
             return
         }
-        isDetectHuman = detectHuman.detect(inputCIImage: inputCIImage)   // 処理時間めっちゃ短い
+        do {
+            isDetectHuman = try detectHuman.detect(inputCIImage: inputCIImage)   // 処理時間めっちゃ短い
+        } catch {
+            let mlError: MLError = error
+            mlErrorMessage = .init(title: mlError.title, description: mlError.errorDescription)
+        }
         isLoading = false
     }
 }
