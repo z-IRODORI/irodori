@@ -30,17 +30,16 @@ struct ErrorMessageView: View {
                     Text("OK")
                         .font(.system(size: 12, weight: .regular))
                         .foregroundStyle(.white)
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 36)
-                        .background(.red)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .frame(maxWidth: 120, maxHeight: 30)
+                        .background(.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 48))
                 })
-                .padding(.top, 24)
+                .padding(.top, 12)
             }
-            .padding(.vertical, 24)
+            .padding(.vertical, 40)
             .padding(.horizontal, 32)
             .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 32))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
     }
 }
