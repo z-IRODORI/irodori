@@ -82,10 +82,13 @@ final class CoordinateReviewViewModel {
 
             if squareTopsUIImage == nil && squareBottomsUIImage == nil {
                 setErrerMessage(mlError: .notTopsAndBottoms)
+                return
             } else if squareTopsUIImage == nil {
                 setErrerMessage(mlError: .notTops)
+                return
             } else if squareBottomsUIImage == nil {
                 setErrerMessage(mlError: .notBottoms)
+                return
             }
              self.outputUIImage = outputUIImage
              self.topsUIImage = squareTopsUIImage!   // nil にはならない
