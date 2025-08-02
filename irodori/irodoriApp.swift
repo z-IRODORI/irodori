@@ -14,7 +14,7 @@ struct irodoriApp: App {
     @State private var path: [ViewType] = []
     var body: some Scene {
         WindowGroup {
-            SplashView()
+//            SplashView()
 //            CalendarView()
 //            SegmentationView()
 
@@ -27,6 +27,8 @@ struct irodoriApp: App {
 //                coordinateImage: UIImage(resource: .coordinate1),
 //                fashionReview: .mock()
 //            )
+
+            OnboardingView(closeButtonTapped: {})
         }
     }
 
