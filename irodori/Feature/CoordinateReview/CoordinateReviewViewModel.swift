@@ -31,6 +31,7 @@ final class CoordinateReviewViewModel {
 
     var fashionReview: FashionReviewResponse?
     var isFinishedRequest = false
+    var errroMessage: ErrorMessage?
 
     // アイテム抽出の結果
     var outputUIImage: UIImage = .init(resource: .coordinate4)
@@ -38,7 +39,11 @@ final class CoordinateReviewViewModel {
     var bottomsUIImage: UIImage?
 
     func loadingOnAppear() async {
-        segment()
+        await segment()
+        await coordinateReview()
+    }
+
+    private func coordinateReview() async {
         do {
             let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue)!
             let fashionReviewResponse: Result<FashionReviewResponse, Error> = try await apiClient.post(
@@ -60,24 +65,35 @@ final class CoordinateReviewViewModel {
         }
     }
 
-    func segment() {
-        Task {
-            guard let pixelBuffer = coordinateImage.toCVPixelBuffer() else {
-                throw NSError(domain: "ImageConversion", code: -1, userInfo: nil)
-            }
-            let input = ModelInput(image: pixelBuffer)
-            guard let model else { return }
-            let output = try await model.prediction(input: input)
-            let items: [SegmentationConverter.FashionItemType] = output.classLabelsShapedArray.scalars.map { SegmentationConverter.fashionItems[Int($0)] }   // [.background, .background, ・・・]
-            guard let outputUIImage = SegmentationConverter.createOutputUIImage(output: output) else { return }
-            let topsMaskUIImage = SegmentationConverter.createMaskUIImage(from: items, targetItems: [.upperClothes, .leftArm, .rightArm, .bag]).resize(to: coordinateImage.size)
-            let squareTopsUIImage = coordinateImage.mask(image: topsMaskUIImage).croppedNonTransparentToSquare512()!
-            let bottomsMaskUIImage = SegmentationConverter.createMaskUIImage(from: items, targetItems: [.belt, .pants, .skirt]).resize(to: coordinateImage.size)
-            let squareBottomsUIImage = coordinateImage.mask(image: bottomsMaskUIImage).croppedNonTransparentToSquare512()!
-
-            self.outputUIImage = outputUIImage
-            self.topsUIImage = squareTopsUIImage
-            self.bottomsUIImage = squareBottomsUIImage
+    // TODO: エラー処理
+    func segment() async {
+        guard let pixelBuffer = coordinateImage.toCVPixelBuffer() else {
+            throw NSError(domain: "ImageConversion", code: -1, userInfo: nil)
         }
+        let input = ModelInput(image: pixelBuffer)
+        guard let model else { return }
+        let output = try await model.prediction(input: input)
+        let items: [SegmentationConverter.FashionItemType] = output.classLabelsShapedArray.scalars.map { SegmentationConverter.fashionItems[Int($0)] }   // [.background, .background, ・・・]
+        guard let outputUIImage = SegmentationConverter.createOutputUIImage(output: output) else { return }
+        let topsMaskUIImage = SegmentationConverter.createMaskUIImage(from: items, targetItems: [.upperClothes, .leftArm, .rightArm, .bag]).resize(to: coordinateImage.size)
+        let bottomsMaskUIImage = SegmentationConverter.createMaskUIImage(from: items, targetItems: [.belt, .pants, .skirt]).resize(to: coordinateImage.size)
+        // トップスとボトムス両方検出できたなら画像更新
+        let squareTopsUIImage = coordinateImage.mask(image: topsMaskUIImage).croppedNonTransparentToSquare512()
+        let squareBottomsUIImage = coordinateImage.mask(image: bottomsMaskUIImage).croppedNonTransparentToSquare512()
+
+        if squareTopsUIImage == nil && squareBottomsUIImage == nil {
+            setErrerMessage(mlError: .notTopsAndBottoms)
+        } else if squareTopsUIImage == nil {
+            setErrerMessage(mlError: .notTops)
+        } else if squareBottomsUIImage == nil {
+            setErrerMessage(mlError: .notBottoms)
+        }
+         self.outputUIImage = outputUIImage
+         self.topsUIImage = squareTopsUIImage!   // nil にはならない
+         self.bottomsUIImage = squareBottomsUIImage!   // nil にはならない
+    }
+
+    private func setErrerMessage(mlError: MLError) {
+        errroMessage = .init(title: mlError.title, description: mlError.errorDescription)
     }
 }
