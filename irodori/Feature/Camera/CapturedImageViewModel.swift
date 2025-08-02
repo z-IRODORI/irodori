@@ -27,6 +27,9 @@ final class CapturedImageViewModel {
         }
         do {
             isDetectHuman = try detectHuman.detect(inputCIImage: inputCIImage)   // 処理時間めっちゃ短い
+            if !isDetectHuman {
+                mlErrorMessage = .init(title: MLError.notHuman.title, description: MLError.notHuman.errorDescription)
+            }
         } catch {
             let mlError: MLError = error
             mlErrorMessage = .init(title: mlError.title, description: mlError.errorDescription)

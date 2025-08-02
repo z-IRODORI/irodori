@@ -24,7 +24,7 @@ struct DetectHuman {
             guard let obs = request.results?.first as? VNDetectedObjectObservation else { return false }
             return obs.confidence > 0.6
         } catch {
-            throw MLError.notHuman
+            throw MLError.unknwon
         }
     }
 }

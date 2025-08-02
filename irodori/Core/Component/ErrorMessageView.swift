@@ -18,35 +18,36 @@ struct ErrorMessageView: View {
 
             VStack(spacing: 12) {
                 Text("\(errorMessage.title)")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
 
                 Text("\(errorMessage.description)")
-                    .font(.system(size: 12, weight: .regular))
+                    .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(.gray)
 
                 Button(action: {
                     dismiss()
                 }, label: {
                     Text("OK")
-                        .font(.system(size: 12, weight: .regular))
+                        .font(.system(size: 18, weight: .regular))
                         .foregroundStyle(.white)
-                        .frame(maxWidth: 120, maxHeight: 30)
+                        .frame(maxWidth: 150, maxHeight: 50)
                         .background(.black)
                         .clipShape(RoundedRectangle(cornerRadius: 48))
                 })
-                .padding(.top, 12)
+                .padding(.top, 24)
             }
+            .frame(maxWidth: 200)
             .padding(.vertical, 40)
             .padding(.horizontal, 32)
             .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
         }
     }
 }
 
 #Preview {
     ErrorMessageView(
-        errorMessage: .init(title: HTTPError.unknownError.title, description: HTTPError.unknownError.errorDescription),
+        errorMessage: .init(title: MLError.notHuman.title, description: MLError.notHuman.errorDescription),
         dismiss: {}
     )
 }

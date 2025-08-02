@@ -67,30 +67,33 @@ final class CoordinateReviewViewModel {
 
     // TODO: エラー処理
     func segment() async {
-        guard let pixelBuffer = coordinateImage.toCVPixelBuffer() else {
-            throw NSError(domain: "ImageConversion", code: -1, userInfo: nil)
-        }
+        guard let pixelBuffer = coordinateImage.toCVPixelBuffer() else { return }
         let input = ModelInput(image: pixelBuffer)
         guard let model else { return }
-        let output = try await model.prediction(input: input)
-        let items: [SegmentationConverter.FashionItemType] = output.classLabelsShapedArray.scalars.map { SegmentationConverter.fashionItems[Int($0)] }   // [.background, .background, ・・・]
-        guard let outputUIImage = SegmentationConverter.createOutputUIImage(output: output) else { return }
-        let topsMaskUIImage = SegmentationConverter.createMaskUIImage(from: items, targetItems: [.upperClothes, .leftArm, .rightArm, .bag]).resize(to: coordinateImage.size)
-        let bottomsMaskUIImage = SegmentationConverter.createMaskUIImage(from: items, targetItems: [.belt, .pants, .skirt]).resize(to: coordinateImage.size)
-        // トップスとボトムス両方検出できたなら画像更新
-        let squareTopsUIImage = coordinateImage.mask(image: topsMaskUIImage).croppedNonTransparentToSquare512()
-        let squareBottomsUIImage = coordinateImage.mask(image: bottomsMaskUIImage).croppedNonTransparentToSquare512()
+        do {
+            let output = try await model.prediction(input: input)
+            let items: [SegmentationConverter.FashionItemType] = output.classLabelsShapedArray.scalars.map { SegmentationConverter.fashionItems[Int($0)] }   // [.background, .background, ・・・]
+            guard let outputUIImage = SegmentationConverter.createOutputUIImage(output: output) else { return }
+            let topsMaskUIImage = SegmentationConverter.createMaskUIImage(from: items, targetItems: [.upperClothes, .leftArm, .rightArm, .bag]).resize(to: coordinateImage.size)
+            let bottomsMaskUIImage = SegmentationConverter.createMaskUIImage(from: items, targetItems: [.belt, .pants, .skirt]).resize(to: coordinateImage.size)
+            // トップスとボトムス両方検出できたなら画像更新
+            let squareTopsUIImage = coordinateImage.mask(image: topsMaskUIImage).croppedNonTransparentToSquare512()
+            let squareBottomsUIImage = coordinateImage.mask(image: bottomsMaskUIImage).croppedNonTransparentToSquare512()
 
-        if squareTopsUIImage == nil && squareBottomsUIImage == nil {
-            setErrerMessage(mlError: .notTopsAndBottoms)
-        } else if squareTopsUIImage == nil {
-            setErrerMessage(mlError: .notTops)
-        } else if squareBottomsUIImage == nil {
-            setErrerMessage(mlError: .notBottoms)
+            if squareTopsUIImage == nil && squareBottomsUIImage == nil {
+                setErrerMessage(mlError: .notTopsAndBottoms)
+            } else if squareTopsUIImage == nil {
+                setErrerMessage(mlError: .notTops)
+            } else if squareBottomsUIImage == nil {
+                setErrerMessage(mlError: .notBottoms)
+            }
+             self.outputUIImage = outputUIImage
+             self.topsUIImage = squareTopsUIImage!   // nil にはならない
+             self.bottomsUIImage = squareBottomsUIImage!   // nil にはならない
+        } catch {
+            print(error.localizedDescription)
+            return
         }
-         self.outputUIImage = outputUIImage
-         self.topsUIImage = squareTopsUIImage!   // nil にはならない
-         self.bottomsUIImage = squareBottomsUIImage!   // nil にはならない
     }
 
     private func setErrerMessage(mlError: MLError) {
