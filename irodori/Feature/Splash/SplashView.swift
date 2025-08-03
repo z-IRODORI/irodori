@@ -31,6 +31,11 @@ struct SplashView: View {
                 viewModel.setupSignUpDate()   // アプリインストールしてから一度しか呼ばれない想定
                 viewModel.updateState()
             })
+        case .onboarding:
+            OnboardingView(closeButtonTapped: {
+                viewModel.viewedOnboarding()
+                viewModel.updateState()
+            })
         case .home:
             CameraView()
         }

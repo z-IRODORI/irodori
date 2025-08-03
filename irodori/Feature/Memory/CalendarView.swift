@@ -67,7 +67,7 @@ struct CalendarView: View {
             }
 
             Header()
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 12)
         }
         .navigationBarHidden(true)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

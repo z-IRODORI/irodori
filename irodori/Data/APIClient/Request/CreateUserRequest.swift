@@ -11,7 +11,7 @@ struct CreateUserRequest: Encodable {
     let id: String
     let cognito_id: String
     let user_name: String
-    let email: String = ""
+    let email: String = "test@gmail.com"
     let icon_url: String = ""
     let year: Int
     let month: Int

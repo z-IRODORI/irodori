@@ -14,6 +14,7 @@ final class SplashViewModel {
         case termsOfService
         case userInfo
         case home
+        case onboarding
     }
     var state: State = .termsOfService
 
@@ -27,12 +28,20 @@ final class SplashViewModel {
             state = .userInfo
             return
         }
+        if !UserDefaults.standard.bool(forKey: UserDefaultsKey.hasOnboarding.rawValue) {
+            state = .onboarding
+            return
+        }
         state = .home
     }
 
     func setupSignUpDate() {
         let repository = SignUpDateRepository()
         repository.saveNow()
+    }
+
+    func viewedOnboarding() {
+        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasOnboarding.rawValue)
     }
 
     func nextButtonTapped() {

@@ -17,6 +17,7 @@ struct irodoriApp: App {
             SplashView()
 //            CalendarView()
 //            SegmentationView()
+//            OnboardingView(closeButtonTapped: {})
 
 //            CoordinateReviewView(viewModel: .init(
 //                coordinateImage: UIImage(resource: .coordinate10),

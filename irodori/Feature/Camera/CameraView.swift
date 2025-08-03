@@ -13,6 +13,7 @@ struct CameraView: View {
     @StateObject private var cameraViewModel: CameraViewModel = .init()
     @State private var showCapturedImage = false
     @State private var path: [ViewType] = []
+    @State private var isShowOnboardingModal: Bool = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -53,9 +54,14 @@ struct CameraView: View {
             }
             .fullScreenCover(isPresented: $showCapturedImage) {
                 if let image = cameraViewModel.capturedImage {
-                    CapturedImageView(image: image, isPresented: $showCapturedImage, okButtonTapped: {
-                        path.append(.coordinateReview)
-                    })   // キャプチャした画像表示画面
+                    CapturedImageView(
+                        image: image,
+                        viewModel: .init(inputUIImage: image),
+                        isPresented: $showCapturedImage,
+                        okButtonTapped: {
+                            path.append(.coordinateReview)
+                        }
+                    )   // キャプチャした画像表示画面
                 }
             }
             .navigationDestination(for: ViewType.self) { viewType in
@@ -71,7 +77,12 @@ struct CameraView: View {
                     EmptyView()
                 }
             }
-            
+            .sheet(isPresented: $isShowOnboardingModal) {
+                OnboardingView(closeButtonTapped: {
+                    isShowOnboardingModal = false
+                })
+                .interactiveDismissDisabled()
+            }
         }
     }
 
@@ -86,7 +97,16 @@ struct CameraView: View {
                 }) {
                     Image(systemName: "calendar")
                         .resizable()
-                        .frame(width: 20, height: 20)
+                        .frame(width: 25, height: 25)
+                        .foregroundStyle(.black)
+                }
+
+                Button(action: {
+                    isShowOnboardingModal = true
+                }) {
+                    Image(systemName: "questionmark.circle")
+                        .resizable()
+                        .frame(width: 25, height: 25)
                         .foregroundStyle(.black)
                 }
 
