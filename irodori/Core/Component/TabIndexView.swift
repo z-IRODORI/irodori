@@ -11,7 +11,7 @@ struct TabIndexView: View {
     let numberOfPages: Int
     let currentIndex: Int
 
-    var dotSize = 12.0
+    var dotSize = 10.0
     var spacing = 20.0
     var dotColor = Color.gray.opacity(0.3)
     var selectedDotColor = Color.black

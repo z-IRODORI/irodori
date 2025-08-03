@@ -39,6 +39,7 @@ struct OnboardingView: View {
             NextButton()
         }
         .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.top, 32)
     }
 
     private func OnboardingCardView(onbordingInfo: OnboardingInfo) -> some View {
