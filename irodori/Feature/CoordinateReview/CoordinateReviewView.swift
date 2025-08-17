@@ -19,53 +19,66 @@ struct CoordinateReviewView: View {
     @Binding var path: [ViewType]
 
     var body: some View {
-        if let fashionReview = viewModel.fashionReview {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 32) {
-                    Coordinate()
-                    RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
-                    ReviewText()
-                        .padding(.horizontal, 24)
-                    CoordinateItems()
-                        .padding(.horizontal, 24)
+        ZStack {
+            if let fashionReview = viewModel.fashionReview {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 32) {
+                        Coordinate()
+                        RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
+                        ReviewText()
+                            .padding(.horizontal, 24)
+                        CoordinateItems()
+                            .padding(.horizontal, 24)
+                    }
+                }
+                .navigationBarBackButtonHidden(true)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: {
+                            path.removeAll()
+                        }, label: {
+                            Text("ホームへ")
+                        })
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        //        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
+        //            WebView(url: URL(string: tappedRecommendItem.itemURL))
+        //        }
+                .onChange(of: tappedURL) {
+                    let url = URL(string: tappedURL)!   // TODO: エラーハンドリング
+                    UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                }
+                .navigationDestination(isPresented: $isPresentedCameraView) {
+                    CameraView()
+                }
+                .background(.gray.opacity(0.08))
+                .navigationBarBackButtonHidden()
+            } else {
+                VStack(spacing: 24) {
+                    VStack(spacing: 12) {
+                    Text("レビュー作成中...")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.pink)
+                    Text("作成に8〜10秒ほど時間がかかります")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(.pink.opacity(0.5))
+                    }
+                    Image(.splash03)
+                        .resizable()
+                        .frame(width: 200, height: 300)
+                }
+                .task {
+                    await viewModel.loadingOnAppear()
+                }
+                .navigationBarBackButtonHidden()
+            }
+
+            if let errorMessage = viewModel.errroMessage {
+                ErrorMessageView(errorMessage: errorMessage) {
+                    path.removeAll()   // カメラ画面へ戻る
                 }
             }
-            .navigationBarBackButtonHidden(true)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {
-                        path.removeAll()
-                    }, label: {
-                        Text("ホームへ")
-                    })
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    //        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
-    //            WebView(url: URL(string: tappedRecommendItem.itemURL))
-    //        }
-            .onChange(of: tappedURL) {
-                let url = URL(string: tappedURL)!   // TODO: エラーハンドリング
-                UIApplication.shared.open(url, options: [:], completionHandler: nil)
-            }
-            .navigationDestination(isPresented: $isPresentedCameraView) {
-                CameraView()
-            }
-            .background(.gray.opacity(0.08))
-            .navigationBarBackButtonHidden()
-        } else {
-            VStack(spacing: 24) {
-                Text("レビュー作成中...")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.pink)
-                Image(.splash03)
-                    .resizable()
-                    .frame(width: 200, height: 300)
-            }
-            .task {
-                await viewModel.loadingOnAppear()
-            }
-            .navigationBarBackButtonHidden()
         }
     }
 

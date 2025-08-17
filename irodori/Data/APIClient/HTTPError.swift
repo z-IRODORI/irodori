@@ -55,7 +55,7 @@ enum HTTPError: Error {
     var errorDescription: String {
         switch self {
         case .responseError:
-            return "レスポンスを受信できませんでした"
+            return "通信状況に問題があるかもしれません"
         case .decodeError:
             return "データのデコード中にエラーが発生しました"
         // 4xx クライアントエラー
@@ -92,6 +92,43 @@ enum HTTPError: Error {
             return "サーバーエラーが発生しました (\(code))"
         case .unknownError:
             return "未知のエラーが発生しました"
+        }
+    }
+    
+    static func fromStatusCode(_ statusCode: Int) -> HTTPError {
+        switch statusCode {
+        case 400:
+            return .badRequest
+        case 401:
+            return .unauthorized
+        case 403:
+            return .forbidden
+        case 404:
+            return .notFound
+        case 405:
+            return .methodNotAllowed
+        case 408:
+            return .requestTimeout
+        case 409:
+            return .conflict
+        case 429:
+            return .tooManyRequests
+        case 400..<500:
+            return .clientError(statusCode)
+        case 500:
+            return .internalServerError
+        case 501:
+            return .notImplemented
+        case 502:
+            return .badGateway
+        case 503:
+            return .serviceUnavailable
+        case 504:
+            return .gatewayTimeout
+        case 500..<600:
+            return .serverError(statusCode)
+        default:
+            return .unknownError
         }
     }
 }

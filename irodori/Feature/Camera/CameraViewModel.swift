@@ -7,6 +7,8 @@
 
 import UIKit
 import AVFoundation
+import Photos
+import PhotosUI
 
 enum CameraState {
     case initial
@@ -21,6 +23,8 @@ class CameraViewModel: NSObject, ObservableObject {
     @Published var output = AVCapturePhotoOutput()
     @Published var isFlashOn = false
     @Published var cameraState: CameraState = .initial
+    @Published var showPhotoLibraryPermissionAlert = false
+    @Published var showImagePicker = false
 
     // カメラセットアップ
     func setupCamera() {
@@ -85,6 +89,35 @@ class CameraViewModel: NSObject, ObservableObject {
     func earserButtonTapped() {
         UserDefaults.standard.set(false, forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue)
         UserDefaults.standard.set(nil, forKey: UserDefaultsKey.userInfo.rawValue)
+    }
+    
+    // フォトライブラリアクセス権限チェック
+    func checkPhotoLibraryPermission() {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        
+        switch status {
+        case .authorized, .limited:
+            showImagePicker = true
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] newStatus in
+                DispatchQueue.main.async {
+                    if newStatus == .authorized || newStatus == .limited {
+                        self?.showImagePicker = true
+                    } else {
+                        self?.showPhotoLibraryPermissionAlert = true
+                    }
+                }
+            }
+        case .denied, .restricted:
+            showPhotoLibraryPermissionAlert = true
+        @unknown default:
+            showPhotoLibraryPermissionAlert = true
+        }
+    }
+    
+    // PHPickerから選択された画像を処理
+    func processPickedImage(_ image: UIImage) {
+        self.capturedImage = image
     }
 }
 
