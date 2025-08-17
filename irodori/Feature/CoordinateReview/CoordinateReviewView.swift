@@ -55,9 +55,14 @@ struct CoordinateReviewView: View {
             .navigationBarBackButtonHidden()
         } else {
             VStack(spacing: 24) {
+                VStack(spacing: 12) {
                 Text("レビュー作成中...")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.pink)
+                Text("作成に8〜10秒ほど時間がかかります")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(.pink.opacity(0.5))
+                }
                 Image(.splash03)
                     .resizable()
                     .frame(width: 200, height: 300)
