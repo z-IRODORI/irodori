@@ -7,5 +7,7 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>コーディネート画像をフォトライブラリから選択するために写真へのアクセスが必要です。</string>
 </dict>
 </plist>

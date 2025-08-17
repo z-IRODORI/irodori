@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFoundation
+import Photos
 
 // メインカメラView
 struct CameraView: View {
@@ -39,7 +40,13 @@ struct CameraView: View {
                         CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
                             .aspectRatio(3/4, contentMode: .fit)
                             .clipShape(RoundedRectangle(cornerRadius: 24))
-                        CaptureButton()
+
+                        HStack(spacing: 40) {
+                            PhotoLibraryButton()
+                            CaptureButton()
+                            Spacer()
+                                .frame(width: 50)
+                        }
                     }
                     .frame(maxHeight: .infinity, alignment: .top)
 
@@ -82,6 +89,24 @@ struct CameraView: View {
                     isShowOnboardingModal = false
                 })
                 .interactiveDismissDisabled()
+            }
+            .sheet(isPresented: $cameraViewModel.showImagePicker) {
+                PhotoPickerView(isPresented: $cameraViewModel.showImagePicker) { image in
+                    cameraViewModel.processPickedImage(image)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showCapturedImage = true
+                    }
+                }
+            }
+            .alert("フォトライブラリへのアクセス", isPresented: $cameraViewModel.showPhotoLibraryPermissionAlert) {
+                Button("設定") {
+                    if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(settingsUrl)
+                    }
+                }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text("写真を選択するには、設定でフォトライブラリへのアクセスを許可してください。")
             }
         }
     }
@@ -129,6 +154,21 @@ struct CameraView: View {
 }
 
 extension CameraView {
+    private func PhotoLibraryButton() -> some View {
+        Button(action: {
+            cameraViewModel.checkPhotoLibraryPermission()
+        }) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.8))
+                    .frame(width: 50, height: 50)
+                Image(systemName: "photo.stack")
+                    .font(.system(size: 20))
+                    .foregroundColor(.black)
+            }
+        }
+    }
+    
     private func CaptureButton() -> some View {
         Button(action: {
             cameraViewModel.capturePhoto()
