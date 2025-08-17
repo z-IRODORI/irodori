@@ -8,18 +8,18 @@
 import UIKit
 
 protocol FashionReviewClientProtocol {
-    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, Error>
+    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError>
 }
 
 final class FashionReviewClient: FashionReviewClientProtocol {
-    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, Error> {
+    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError> {
         let baseURL = "https://irodori.click"
         let endpoint = "api/fashion_review"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 
         // UIImageをJPEGデータに変換
         guard let jpegData = image.jpegData(compressionQuality: 0.5) else {
-            throw URLError(.badURL)
+            return .failure(.badRequest)
         }
 
         let fashionReviewRequest = FashionReviewRequest(user_id: uid, user_token: uid, file: jpegData)
@@ -38,13 +38,26 @@ final class FashionReviewClient: FashionReviewClientProtocol {
         do {
             // URLSessionでリクエストを送信
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            
+            // ステータスコードをチェック
+            if let httpResponse = urlResponse as? HTTPURLResponse {
+                let statusCode = httpResponse.statusCode
+                if statusCode >= 400 {
+                    return .failure(HTTPError.fromStatusCode(statusCode))
+                }
+            }
+            
             print(data)
             // JSONレスポンスをデコード
-            let response = try JSONDecoder().decode(FashionReviewResponse.self, from: data)
-            return .success(response)
+            do {
+                let response = try JSONDecoder().decode(FashionReviewResponse.self, from: data)
+                return .success(response)
+            } catch {
+                return .failure(.decodeError)
+            }
         } catch {
             print(error.localizedDescription)
-            return .failure(error)
+            return .failure(.responseError)
         }
     }
 
@@ -88,7 +101,7 @@ final class FashionReviewClient: FashionReviewClientProtocol {
 // MARK: - Mock
 
 final class MockFashionReviewClient: FashionReviewClientProtocol {
-    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, any Error> {
+    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError> {
         return .success(.mock())
     }
 }
