@@ -41,11 +41,11 @@ struct CameraView: View {
                             .aspectRatio(3/4, contentMode: .fit)
                             .clipShape(RoundedRectangle(cornerRadius: 24))
 
-                        HStack(spacing: 40) {
+                        ZStack(alignment: .center) {
                             PhotoLibraryButton()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.leading, 24)
                             CaptureButton()
-                            Spacer()
-                                .frame(width: 50)
                         }
                     }
                     .frame(maxHeight: .infinity, alignment: .top)
@@ -161,9 +161,9 @@ extension CameraView {
             ZStack {
                 Circle()
                     .fill(Color.white.opacity(0.8))
-                    .frame(width: 50, height: 50)
-                Image(systemName: "photo.stack")
-                    .font(.system(size: 20))
+                    .frame(width: 80, height: 80)
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 30))
                     .foregroundColor(.black)
             }
         }
