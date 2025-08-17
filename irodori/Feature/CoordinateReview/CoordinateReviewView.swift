@@ -71,6 +71,13 @@ struct CoordinateReviewView: View {
                 await viewModel.loadingOnAppear()
             }
             .navigationBarBackButtonHidden()
+            .overlay {
+                if let errorMessage = viewModel.errroMessage {
+                    ErrorMessageView(errorMessage: errorMessage) {
+                        path.removeAll()   // カメラ画面へ戻る
+                    }
+                }
+            }
         }
     }
 

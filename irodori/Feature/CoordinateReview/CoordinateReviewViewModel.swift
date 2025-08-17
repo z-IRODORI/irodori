@@ -57,15 +57,14 @@ final class CoordinateReviewViewModel {
                 self.fashionReview = fashionReview
                 isFinishedRequest = true
             case .failure(let error):
-                print("Error: \(error)")
+                handleAPIError(error)
                 return
             }
         } catch {
-            // TODO: - エラー処理
+            handleAPIError(error)
         }
     }
 
-    // TODO: エラー処理
     func segment() async {
         guard let pixelBuffer = coordinateImage.toCVPixelBuffer() else { return }
         let input = ModelInput(image: pixelBuffer)
@@ -94,12 +93,19 @@ final class CoordinateReviewViewModel {
              self.topsUIImage = squareTopsUIImage!   // nil にはならない
              self.bottomsUIImage = squareBottomsUIImage!   // nil にはならない
         } catch {
-            print(error.localizedDescription)
-            return
+            setErrerMessage(mlError: .unknwon)
         }
     }
 
     private func setErrerMessage(mlError: MLError) {
         errroMessage = .init(title: mlError.title, description: mlError.errorDescription)
+    }
+    
+    private func handleAPIError(_ error: Error) {
+        if let httpError = error as? HTTPError {
+            errroMessage = .init(title: httpError.title, description: httpError.errorDescription)
+        } else {
+            errroMessage = .init(title: "通信エラー", description: "サーバーとの通信中にエラーが発生しました")
+        }
     }
 }
