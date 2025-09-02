@@ -14,15 +14,15 @@ struct irodoriApp: App {
     @State private var path: [ViewType] = []
     var body: some Scene {
         WindowGroup {
-            SplashView()
+//            SplashView()
 //            CalendarView()
 //            SegmentationView()
 //            OnboardingView(closeButtonTapped: {})
 
-//            CoordinateReviewView(viewModel: .init(
-//                coordinateImage: UIImage(resource: .coordinate10),
-//                apiClient: FashionReviewClient() //MockFashionReviewClient()
-//            ))
+            CoordinateReviewView(viewModel: .init(
+                coordinateImage: UIImage(resource: .coordinate2),
+                apiClient: MockFashionReviewClient()
+            ), path: .constant([]))
 
 //            CoordinateReviewView(
 //                coordinateImage: UIImage(resource: .coordinate1),
