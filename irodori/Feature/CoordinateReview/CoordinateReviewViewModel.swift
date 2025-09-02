@@ -13,10 +13,13 @@ import CoreML
 final class CoordinateReviewViewModel {
     let coordinateImage: UIImage
     let apiClient: FashionReviewClientProtocol
+    let recommendCoordinateClient: RecommendCoordinateClientProtocol
     let model: Model?
-    init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol) {
+    
+    init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol, recommendCoordinateClient: RecommendCoordinateClientProtocol = RecommendCoordinateClient()) {
         self.coordinateImage = coordinateImage
         self.apiClient = apiClient
+        self.recommendCoordinateClient = recommendCoordinateClient
 
         // Model の初期化
         let config = MLModelConfiguration()
@@ -32,6 +35,9 @@ final class CoordinateReviewViewModel {
     var fashionReview: FashionReviewResponse?
     var isFinishedRequest = false
     var errroMessage: ErrorMessage?
+    
+    // おすすめコーディネート
+    var recommendCoordinatesURL: [String] = []
 
     // アイテム抽出の結果
     var outputUIImage: UIImage = .init(resource: .coordinate4)
@@ -41,6 +47,11 @@ final class CoordinateReviewViewModel {
     func loadingOnAppear() async {
         await segment()
         await coordinateReview()
+        
+        // おすすめコーディネートは別タスクで実行（UI表示をブロックしない）
+        Task { @MainActor in
+            await fetchRecommendCoordinates()
+        }
     }
 
     private func coordinateReview() async {
@@ -99,6 +110,38 @@ final class CoordinateReviewViewModel {
 
     private func setErrerMessage(mlError: MLError) {
         errroMessage = .init(title: mlError.title, description: mlError.errorDescription)
+    }
+
+    
+    private func fetchRecommendCoordinates() async {
+        do {
+            // 性別を取得（デフォルトは"other"）
+            let gender = UserDefaults.standard.string(forKey: "gender") ?? "other"
+            
+            let result = try await recommendCoordinateClient.post(gender: gender)
+            
+            switch result {
+            case .success(let response):
+                // APIレスポンスからURLを抽出してrecommendCoordinatesURLに格納
+                recommendCoordinatesURL = response.coordinates.map { $0.image_url }
+            case .failure(_):
+                recommendCoordinatesURL = [
+                    "https://i.pinimg.com/736x/a6/5a/50/a65a50686f1c10f5c98f2bedd434bf1e.jpg",
+                    "https://i.pinimg.com/736x/82/77/a9/8277a98095eda2e3b1435905296dd056.jpg",
+                    "https://i.pinimg.com/736x/ef/5c/fa/ef5cfadb23b246687241c487a4e8c733.jpg",
+                    "https://i.pinimg.com/736x/f1/4a/99/f14a99899c89588a6cac83481d4f6769.jpg",
+                    "https://i.pinimg.com/736x/3f/23/fa/3f23fa51d563253e78a5d31269d0d532.jpg"
+                ]
+            }
+        } catch {
+            recommendCoordinatesURL = [
+                "https://i.pinimg.com/736x/a6/5a/50/a65a50686f1c10f5c98f2bedd434bf1e.jpg",
+                "https://i.pinimg.com/736x/82/77/a9/8277a98095eda2e3b1435905296dd056.jpg",
+                "https://i.pinimg.com/736x/ef/5c/fa/ef5cfadb23b246687241c487a4e8c733.jpg",
+                "https://i.pinimg.com/736x/f1/4a/99/f14a99899c89588a6cac83481d4f6769.jpg",
+                "https://i.pinimg.com/736x/3f/23/fa/3f23fa51d563253e78a5d31269d0d532.jpg"
+            ]
+        }
     }
     
     private func handleAPIError(_ error: Error) {

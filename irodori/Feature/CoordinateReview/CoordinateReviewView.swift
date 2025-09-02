@@ -18,13 +18,6 @@ struct CoordinateReviewView: View {
     @State private var isPresentedCameraView = false
     @Binding var path: [ViewType]
 
-    private let recommendCoordinatesURL: [String] = [
-        "https://i.pinimg.com/736x/a6/5a/50/a65a50686f1c10f5c98f2bedd434bf1e.jpg",
-        "https://i.pinimg.com/736x/82/77/a9/8277a98095eda2e3b1435905296dd056.jpg",
-        "https://i.pinimg.com/736x/ef/5c/fa/ef5cfadb23b246687241c487a4e8c733.jpg",
-        "https://i.pinimg.com/736x/f1/4a/99/f14a99899c89588a6cac83481d4f6769.jpg",
-        "https://i.pinimg.com/736x/3f/23/fa/3f23fa51d563253e78a5d31269d0d532.jpg",
-    ]
 
     var body: some View {
         ZStack {
@@ -235,7 +228,7 @@ struct CoordinateReviewView: View {
                     // 左端に24pxの空白を空けたいのでSpacerで表現
                     // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
                     Spacer().frame(width: 24)
-                    ForEach(recommendCoordinatesURL, id: \.self) { imageURL in
+                    ForEach(viewModel.recommendCoordinatesURL, id: \.self) { imageURL in
                         RecommendCoordinateCard(imageURL: imageURL)
                     }
                 }
@@ -282,8 +275,8 @@ struct CoordinateReviewView: View {
             AsyncImage(url: URL(string: imageURL)!) { image in
                 image
                     .resizable()
-                    .aspectRatio(3/4, contentMode: .fill)
-                    .frame(width: 110)
+                    .scaledToFill()
+                    .frame(width: 110, height: 110 * (4/3))
             } placeholder: {
                 ProgressView()
             }
@@ -319,6 +312,7 @@ struct CoordinateReviewView: View {
 #Preview {
     CoordinateReviewView(viewModel: .init(
         coordinateImage: UIImage(resource: .coordinate2),
-        apiClient: MockFashionReviewClient()
+        apiClient: MockFashionReviewClient(),
+        recommendCoordinateClient: MockRecommendCoordinateClient()
     ), path: .constant([]))
 }
