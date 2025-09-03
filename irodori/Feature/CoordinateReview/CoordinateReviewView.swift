@@ -199,8 +199,8 @@ struct CoordinateReviewView: View {
                 Text(.init(viewModel.fashionReview!.ai_review_comment))
                     .font(.system(size: 16, weight: .regular))
             } else {
-                VStack {
-                    Text("\(viewModel.fashionReview!.ai_review_comment.prefix(shortTextCriterion)) ...")
+                VStack(alignment: .leading) {
+                    Text(.init("\(viewModel.fashionReview!.ai_review_comment.prefix(shortTextCriterion)) ..."))
                         .font(.system(size: 16, weight: .regular))
                     Button(action: {
                         isShowFullReview = true
@@ -230,7 +230,16 @@ struct CoordinateReviewView: View {
                     Spacer().frame(width: 24)
                     ForEach(viewModel.recommendCoordinatesURL, id: \.self) { imageURL in
                         RecommendCoordinateCard(imageURL: imageURL)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(viewModel.selectedRcommendCoordinateImageURL == imageURL ? .green : .clear, lineWidth: 5)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .onTapGesture {
+                                viewModel.updateSelectedRecommendCoordinate(imageURL: imageURL)
+                            }
                     }
+                    Spacer().frame(width: 24)
                 }
             }
         }
@@ -282,7 +291,6 @@ struct CoordinateReviewView: View {
             }
         }
         .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     // コーデアイテム抽出をローカルで実行しているためuiImageを渡している

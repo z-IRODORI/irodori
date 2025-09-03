@@ -11,6 +11,9 @@ import CoreML
 @MainActor
 @Observable
 final class CoordinateReviewViewModel {
+    var selectedRcommendCoordinateImageURL = ""
+    var isTappedRecommendCoordinate = false
+
     let coordinateImage: UIImage
     let apiClient: FashionReviewClientProtocol
     let recommendCoordinateClient: RecommendCoordinateClientProtocol
@@ -52,6 +55,13 @@ final class CoordinateReviewViewModel {
         Task { @MainActor in
             await fetchRecommendCoordinates()
         }
+    }
+
+    func updateSelectedRecommendCoordinate(imageURL: String) {
+        selectedRcommendCoordinateImageURL = imageURL
+    }
+    func updateSIstTapedRecomendCoordinate(isTaped: Bool) {
+        isTappedRecommendCoordinate = isTaped
     }
 
     private func coordinateReview() async {
