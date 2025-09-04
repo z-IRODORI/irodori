@@ -29,6 +29,8 @@ struct CoordinateReviewView: View {
                         ReviewText()
                             .padding(.horizontal, 24)
                         RecommendCoordinates()
+                        AnalysisCoordinateSection()
+                            .padding(.horizontal, 24)
                         CoordinateItems()
                             .padding(.horizontal, 24)
                     }
@@ -315,12 +317,76 @@ struct CoordinateReviewView: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
+    
+    private func AnalysisCoordinateSection() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("アイテム検索")
+                .font(.system(size: 20, weight: .bold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            if viewModel.isLoadingAnalysisCoordinate {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                    Text("アイテムを解析しています...")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else if let analysisResponse = viewModel.analysisCoordinateResponse {
+                if let coordinateReview = analysisResponse.coordinate_review {
+                    Text(coordinateReview)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 8)
+                }
+                
+                VStack(spacing: 8) {
+                    if let topsURL = analysisResponse.tops_categorize {
+                        ItemSearchButton(title: "トップスを探す", url: topsURL)
+                    }
+                    
+                    if let bottomsURL = analysisResponse.bottoms_categorize {
+                        ItemSearchButton(title: "ボトムスを探す", url: bottomsURL)
+                    }
+                }
+            } else {
+                Text("アイテム情報の取得に失敗しました")
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 20)
+            }
+        }
+    }
+    
+    private func ItemSearchButton(title: String, url: String) -> some View {
+        Button(action: {
+            if let urlObj = URL(string: url) {
+                UIApplication.shared.open(urlObj, options: [:], completionHandler: nil)
+            }
+        }) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.blue)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
 }
 
 #Preview {
     CoordinateReviewView(viewModel: .init(
         coordinateImage: UIImage(resource: .coordinate2),
         apiClient: MockFashionReviewClient(),
-        recommendCoordinateClient: MockRecommendCoordinateClient()
+        recommendCoordinateClient: MockRecommendCoordinateClient(),
+        analysisCoordinateClient: MockAnalysisCoordinateClient()
     ), path: .constant([]))
 }

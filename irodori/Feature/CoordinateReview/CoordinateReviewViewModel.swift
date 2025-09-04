@@ -17,12 +17,14 @@ final class CoordinateReviewViewModel {
     let coordinateImage: UIImage
     let apiClient: FashionReviewClientProtocol
     let recommendCoordinateClient: RecommendCoordinateClientProtocol
+    let analysisCoordinateClient: AnalysisCoordinateClientProtocol
     let model: Model?
     
-    init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol, recommendCoordinateClient: RecommendCoordinateClientProtocol = RecommendCoordinateClient()) {
+    init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol, recommendCoordinateClient: RecommendCoordinateClientProtocol = RecommendCoordinateClient(), analysisCoordinateClient: AnalysisCoordinateClientProtocol = AnalysisCoordinateClient()) {
         self.coordinateImage = coordinateImage
         self.apiClient = apiClient
         self.recommendCoordinateClient = recommendCoordinateClient
+        self.analysisCoordinateClient = analysisCoordinateClient
 
         // Model の初期化
         let config = MLModelConfiguration()
@@ -46,19 +48,31 @@ final class CoordinateReviewViewModel {
     var outputUIImage: UIImage = .init(resource: .coordinate4)
     var topsUIImage: UIImage?
     var bottomsUIImage: UIImage?
+    
+    // コーディネート解析結果
+    var analysisCoordinateResponse: AnalysisCoordinateResponse?
+    var isLoadingAnalysisCoordinate = false
 
     func loadingOnAppear() async {
         await segment()
         await coordinateReview()
         
-        // おすすめコーディネートは別タスクで実行（UI表示をブロックしない）
+        // おすすめコーディネートとコーディネート解析は別タスクで実行（UI表示をブロックしない）
         Task { @MainActor in
             await fetchRecommendCoordinates()
+        }
+        Task { @MainActor in
+            await analysisCoordinate()
         }
     }
 
     func updateSelectedRecommendCoordinate(imageURL: String) {
         selectedRcommendCoordinateImageURL = imageURL
+        
+        // 選択したrecommend coordinateでanalysis-coordinate APIを実行
+        Task { @MainActor in
+            await analysisCoordinateWithRecommendImage(imageURL: imageURL)
+        }
     }
     func updateSIstTapedRecomendCoordinate(isTaped: Bool) {
         isTappedRecommendCoordinate = isTaped
@@ -134,6 +148,15 @@ final class CoordinateReviewViewModel {
             case .success(let response):
                 // APIレスポンスからURLを抽出してrecommendCoordinatesURLに格納
                 recommendCoordinatesURL = response.coordinates.map { $0.image_url }
+                
+                // 初期選択を先頭のコーディネートに設定
+                if let firstImageURL = recommendCoordinatesURL.first {
+                    selectedRcommendCoordinateImageURL = firstImageURL
+                    // 初期選択のコーディネートでanalysis-coordinate APIを実行
+                    Task { @MainActor in
+                        await analysisCoordinateWithRecommendImage(imageURL: firstImageURL)
+                    }
+                }
             case .failure(_):
                 recommendCoordinatesURL = [
                     "https://i.pinimg.com/736x/a6/5a/50/a65a50686f1c10f5c98f2bedd434bf1e.jpg",
@@ -151,7 +174,57 @@ final class CoordinateReviewViewModel {
                 "https://i.pinimg.com/736x/f1/4a/99/f14a99899c89588a6cac83481d4f6769.jpg",
                 "https://i.pinimg.com/736x/3f/23/fa/3f23fa51d563253e78a5d31269d0d532.jpg"
             ]
+            
+            // フォールバック時も初期選択を設定
+            if let firstImageURL = recommendCoordinatesURL.first {
+                selectedRcommendCoordinateImageURL = firstImageURL
+                Task { @MainActor in
+                    await analysisCoordinateWithRecommendImage(imageURL: firstImageURL)
+                }
+            }
         }
+    }
+    
+    private func analysisCoordinate() async {
+        isLoadingAnalysisCoordinate = true
+        do {
+            let gender = UserDefaults.standard.string(forKey: "gender") ?? "other"
+            let response = try await analysisCoordinateClient.analysisCoordinate(
+                image: coordinateImage.correctOrientation,
+                gender: gender
+            )
+            analysisCoordinateResponse = response
+        } catch {
+            print("Analysis coordinate API error: \(error)")
+        }
+        isLoadingAnalysisCoordinate = false
+    }
+    
+    private func analysisCoordinateWithRecommendImage(imageURL: String) async {
+        isLoadingAnalysisCoordinate = true
+        do {
+            guard let url = URL(string: imageURL) else { 
+                isLoadingAnalysisCoordinate = false
+                return 
+            }
+            
+            // URLから画像をダウンロード
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard let downloadedImage = UIImage(data: data) else { 
+                isLoadingAnalysisCoordinate = false
+                return 
+            }
+            
+            let gender = UserDefaults.standard.string(forKey: "gender") ?? "other"
+            let response = try await analysisCoordinateClient.analysisCoordinate(
+                image: downloadedImage,
+                gender: gender
+            )
+            analysisCoordinateResponse = response
+        } catch {
+            print("Analysis coordinate with recommend image API error: \(error)")
+        }
+        isLoadingAnalysisCoordinate = false
     }
     
     private func handleAPIError(_ error: Error) {
