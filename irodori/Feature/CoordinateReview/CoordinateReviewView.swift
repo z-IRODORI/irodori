@@ -223,6 +223,7 @@ struct CoordinateReviewView: View {
     private func RecommendCoordinates() -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("これまでのコーデからおすすめコーデ")
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 24)
             if let recommendCoordinates = viewModel.recommendCoordinates {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -345,17 +346,55 @@ struct CoordinateReviewView: View {
                         .padding(.bottom, 8)
                 }
                 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
                     if let topsCategorize = analysisResponse.tops_categorize {
-                        Text(topsCategorize)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.blue)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(topsCategorize)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.blue)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(analysisResponse.affiliate_tops, id: \.self) { product in
+                                        AsyncImage(url: URL(string: product.image_url)) { image in
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Color.gray.opacity(0.3)
+                                        }
+                                        .frame(width: 120 * 0.8, height: 140 * 0.8)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                }
+                                .padding(.horizontal, 1)
+                            }
+                        }
                     }
                     
                     if let bottomsCategorize = analysisResponse.bottoms_categorize {
-                        Text(bottomsCategorize)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.blue)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(bottomsCategorize)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.blue)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(analysisResponse.affiliate_bottoms, id: \.self) { product in
+                                        AsyncImage(url: URL(string: product.image_url)) { image in
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Color.gray.opacity(0.3)
+                                        }
+                                        .frame(width: 120 * 0.8, height: 140 * 0.8)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                }
+                                .padding(.horizontal, 1)
+                            }
+                        }
                     }
                 }
             } else {
