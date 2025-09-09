@@ -12,7 +12,7 @@ struct RecommendCoordinateResponse: Codable {
     let genres: [Genre]?
 }
 
-struct RecommendCoordinate: Codable {
+struct RecommendCoordinate: Codable, Hashable {
     let id: Int
     let image_url: String
     let pin_url_guess: String

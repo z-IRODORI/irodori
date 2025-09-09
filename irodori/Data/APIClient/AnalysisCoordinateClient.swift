@@ -2,22 +2,17 @@ import Foundation
 import UIKit
 
 protocol AnalysisCoordinateClientProtocol {
-    func analysisCoordinate(image: UIImage, gender: String) async throws -> AnalysisCoordinateResponse
+    func analysisCoordinate(id: Int, gender: String) async throws -> AnalysisCoordinateResponse
 }
 
 struct AnalysisCoordinateClient: AnalysisCoordinateClientProtocol {
-    func analysisCoordinate(image: UIImage, gender: String) async throws -> AnalysisCoordinateResponse {
+    func analysisCoordinate(id: Int, gender: String) async throws -> AnalysisCoordinateResponse {
         guard let url = URL(string: "https://irodori-api.onrender.com/analysis-coordinate") else {
             throw URLError(.badURL)
         }
         
-        guard let jpegData = image.jpegData(compressionQuality: 0.8) else {
-            throw URLError(.badURL)
-        }
-        let base64String = jpegData.base64EncodedString()
-        
         let requestBody = AnalysisCoordinateRequest(
-            image_base64: base64String,
+            image_id: id,
             gender: gender
         )
         
@@ -46,7 +41,7 @@ struct AnalysisCoordinateClient: AnalysisCoordinateClientProtocol {
 }
 
 struct MockAnalysisCoordinateClient: AnalysisCoordinateClientProtocol {
-    func analysisCoordinate(image: UIImage, gender: String) async throws -> AnalysisCoordinateResponse {
+    func analysisCoordinate(id: Int, gender: String) async throws -> AnalysisCoordinateResponse {
         try await Task.sleep(nanoseconds: 1_000_000_000)
         return AnalysisCoordinateResponse.mock
     }

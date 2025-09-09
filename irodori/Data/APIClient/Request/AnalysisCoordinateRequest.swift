@@ -1,12 +1,12 @@
 import Foundation
 
 struct AnalysisCoordinateRequest: Encodable {
-    let image_base64: String
+    let image_id: Int
     let gender: String
     
     func createParameters() -> [String: Any] {
         var parameters: [String: Any] = [:]
-        parameters["image_base64"] = image_base64
+        parameters["image_id"] = image_id
         parameters["gender"] = gender
         return parameters
     }
@@ -14,7 +14,7 @@ struct AnalysisCoordinateRequest: Encodable {
 
 extension AnalysisCoordinateRequest {
     static let mock = AnalysisCoordinateRequest(
-        image_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P//PwAFhAJ/wlseKgAAAABJRU5ErkJggg==",
+        image_id: 1,
         gender: "men"
     )
 }

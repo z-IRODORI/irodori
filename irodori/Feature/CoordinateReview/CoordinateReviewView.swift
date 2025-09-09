@@ -224,25 +224,28 @@ struct CoordinateReviewView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("これまでのコーデからおすすめコーデ")
                 .padding(.leading, 24)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    // 左端に24pxの空白を空けたいのでSpacerで表現
-                    // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
-                    Spacer().frame(width: 24)
-                    ForEach(viewModel.recommendCoordinatesURL, id: \.self) { imageURL in
-                        RecommendCoordinateCard(imageURL: imageURL)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(viewModel.selectedRcommendCoordinateImageURL == imageURL ? .green : .clear, lineWidth: 5)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .onTapGesture {
-                                viewModel.updateSelectedRecommendCoordinate(imageURL: imageURL)
-                            }
+            if let recommendCoordinates = viewModel.recommendCoordinates {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        // 左端に24pxの空白を空けたいのでSpacerで表現
+                        // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
+                        Spacer().frame(width: 24)
+                        ForEach(recommendCoordinates.coordinates, id: \.self) { recommendCoordinate in
+                            RecommendCoordinateCard(imageURL: recommendCoordinate.image_url)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(viewModel.selectedRecommendCoordinate.id == recommendCoordinate.id ? .green : .clear, lineWidth: 5)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .onTapGesture {
+                                    viewModel.selectedRecommendCoordinate(recommendCoordinate: recommendCoordinate)
+                                }
+                        }
+                        Spacer().frame(width: 24)
                     }
-                    Spacer().frame(width: 24)
                 }
+            } else {
+                ProgressView()
             }
         }
     }
@@ -342,13 +345,17 @@ struct CoordinateReviewView: View {
                         .padding(.bottom, 8)
                 }
                 
-                VStack(spacing: 8) {
-                    if let topsURL = analysisResponse.tops_categorize {
-                        ItemSearchButton(title: "トップスを探す", url: topsURL)
+                VStack(alignment: .leading, spacing: 8) {
+                    if let topsCategorize = analysisResponse.tops_categorize {
+                        Text(topsCategorize)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.blue)
                     }
                     
-                    if let bottomsURL = analysisResponse.bottoms_categorize {
-                        ItemSearchButton(title: "ボトムスを探す", url: bottomsURL)
+                    if let bottomsCategorize = analysisResponse.bottoms_categorize {
+                        Text(bottomsCategorize)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.blue)
                     }
                 }
             } else {
