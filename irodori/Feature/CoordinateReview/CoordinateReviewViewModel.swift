@@ -11,7 +11,16 @@ import CoreML
 @MainActor
 @Observable
 final class CoordinateReviewViewModel {
-    var selectedRecommendCoordinate: RecommendCoordinate = .init(id: 0, image_url: "", pin_url_guess: "")
+    var selectedRecommendCoordinate: RecommendCoordinate = .init(
+        id: 0, 
+        image_url: "", 
+        pin_url_guess: "", 
+        coordinate_review: nil, 
+        tops_categorize: nil, 
+        bottoms_categorize: nil, 
+        affiliate_tops: [], 
+        affiliate_bottoms: []
+    )
     var isTappedRecommendCoordinate = false
 
     let coordinateImage: UIImage
@@ -62,16 +71,34 @@ final class CoordinateReviewViewModel {
             await fetchRecommendCoordinates()
             guard let recommendCoordinates = recommendCoordinates else { return }
             if !recommendCoordinates.coordinates.isEmpty {
-                // recommendCoordinates の先頭のコーデを analysisCoordinateへ送る
-                await analysisCoordinate(id: recommendCoordinates.coordinates[0].id)
+                let firstCoordinate = recommendCoordinates.coordinates[0]
+                selectedRecommendCoordinate = firstCoordinate
+                
+                // アフィリエイトデータがない場合のみanalysisCoordinate APIを呼び出し
+                let hasAffiliateData = !firstCoordinate.affiliate_tops.isEmpty || !firstCoordinate.affiliate_bottoms.isEmpty
+                if !hasAffiliateData {
+                    await analysisCoordinate(id: firstCoordinate.id)
+                }
             }
         }
     }
 
     func selectedRecommendCoordinate(recommendCoordinate: RecommendCoordinate) {
         Task { @MainActor in
+            // まず選択状態を更新
             selectedRecommendCoordinate = recommendCoordinate
-            await analysisCoordinate(id: recommendCoordinate.id)
+            
+            // アフィリエイトデータがない場合のみanalysisCoordinate APIを呼び出し
+            let hasAffiliateData = !recommendCoordinate.affiliate_tops.isEmpty || !recommendCoordinate.affiliate_bottoms.isEmpty
+            
+            if hasAffiliateData {
+                // アフィリエイトデータがある場合はanalysisCoordinateResponseを即座にクリア
+                // （recommend-coordinatesからのデータ表示を優先するため）
+                analysisCoordinateResponse = nil
+            } else {
+                // アフィリエイトデータがない場合はanalysisCoordinate APIを呼び出し
+                await analysisCoordinate(id: recommendCoordinate.id)
+            }
         }
     }
     func updateSIstTapedRecomendCoordinate(isTaped: Bool) {
