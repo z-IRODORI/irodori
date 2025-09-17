@@ -63,24 +63,30 @@ final class CoordinateReviewViewModel {
     var isLoadingAnalysisCoordinate = false
 
     func loadingOnAppear() async {
-        await segment()
-        await coordinateReview()
-        
-        // おすすめコーディネートとコーディネート解析は別タスクで実行（UI表示をブロックしない）
-        Task { @MainActor in
-            await fetchRecommendCoordinates()
-            guard let recommendCoordinates = recommendCoordinates else { return }
-            if !recommendCoordinates.coordinates.isEmpty {
-                let firstCoordinate = recommendCoordinates.coordinates[0]
-                selectedRecommendCoordinate = firstCoordinate
-                
-                // アフィリエイトデータがない場合のみanalysisCoordinate APIを呼び出し
-                let hasAffiliateData = !firstCoordinate.affiliate_tops.isEmpty || !firstCoordinate.affiliate_bottoms.isEmpty
-                if !hasAffiliateData {
-                    await analysisCoordinate(id: firstCoordinate.id)
-                }
-            }
-        }
+        // 3つの非同期処理を並列実行
+        async let segmentTask = segment()
+        async let coordinateReviewTask = coordinateReview()
+        async let fetchRecommendCoordinatesTask = fetchRecommendCoordinates()
+
+        // 3つ全ての処理が完了するまで待機
+        let _ = await (segmentTask, coordinateReviewTask, fetchRecommendCoordinatesTask)
+
+        // 3つのレスポンスが全て返ってきた後にMainActorで実行
+//        await MainActor.run {
+//            guard let recommendCoordinates = recommendCoordinates else { return }
+//            if !recommendCoordinates.coordinates.isEmpty {
+//                let firstCoordinate = recommendCoordinates.coordinates[0]
+//                selectedRecommendCoordinate = firstCoordinate
+//
+//                // アフィリエイトデータがない場合のみanalysisCoordinate APIを呼び出し
+//                let hasAffiliateData = !firstCoordinate.affiliate_tops.isEmpty || !firstCoordinate.affiliate_bottoms.isEmpty
+//                if !hasAffiliateData {
+//                    Task {
+//                        await analysisCoordinate(id: firstCoordinate.id)
+//                    }
+//                }
+//            }
+//        }
     }
 
     func selectedRecommendCoordinate(recommendCoordinate: RecommendCoordinate) {

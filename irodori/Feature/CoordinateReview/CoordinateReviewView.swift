@@ -24,18 +24,36 @@ struct CoordinateReviewView: View {
     var body: some View {
         ZStack {
             if let fashionReview = viewModel.fashionReview {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 32) {
-                        Coordinate()
-                        RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
-                        ReviewText()
-                            .padding(.horizontal, 24)
-                        RecommendCoordinates()
-                        AnalysisCoordinateSection()
-                            .padding(.horizontal, 24)
-                        CoordinateItems()
-                            .padding(.horizontal, 24)
+                ZStack {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 32) {
+                            Coordinate()
+                            RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
+                            ReviewText()
+                                .padding(.horizontal, 24)
+                            RecommendCoordinates()
+//                            AnalysisCoordinateSection()
+//                                .padding(.horizontal, 24)
+                            CoordinateItems()
+                                .padding(.horizontal, 24)
+                                .padding(.bottom, 80)
+                        }
                     }
+
+                    Button(action: {
+                        // action
+                    }) {
+                        Text("おすすめコーデを見る")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color.green)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .padding(.horizontal, 12)
+                    }
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+//                    .padding(.bottom, 48)
                 }
                 .navigationBarBackButtonHidden(true)
                 .toolbar {
