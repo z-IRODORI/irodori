@@ -34,6 +34,7 @@ final class RecommendCoordinateClient: RecommendCoordinateClientProtocol {
             
             if let httpResponse = urlResponse as? HTTPURLResponse {
                 let statusCode = httpResponse.statusCode
+                print(statusCode)
                 if statusCode >= 400 {
                     return .failure(HTTPError.fromStatusCode(statusCode))
                 }

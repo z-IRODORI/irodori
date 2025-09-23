@@ -29,8 +29,6 @@ struct CoordinateReviewView: View {
                         ReviewText()
                             .padding(.horizontal, 24)
                         RecommendCoordinates()
-                        AnalysisCoordinateSection()
-                            .padding(.horizontal, 24)
                         CoordinateItems()
                             .padding(.horizontal, 24)
                     }
@@ -225,28 +223,42 @@ struct CoordinateReviewView: View {
             Text("これまでのコーデからおすすめコーデ")
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 24)
-            if let recommendCoordinates = viewModel.recommendCoordinates {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        // 左端に24pxの空白を空けたいのでSpacerで表現
-                        // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
-                        Spacer().frame(width: 24)
-                        ForEach(recommendCoordinates.coordinates, id: \.self) { recommendCoordinate in
-                            RecommendCoordinateCard(imageURL: recommendCoordinate.image_url)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(viewModel.selectedRecommendCoordinate.id == recommendCoordinate.id ? .green : .clear, lineWidth: 5)
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .onTapGesture {
-                                    viewModel.selectedRecommendCoordinate(recommendCoordinate: recommendCoordinate)
-                                }
-                        }
-                        Spacer().frame(width: 24)
-                    }
-                }
-            } else {
+            switch viewModel.recommendCoordinatesState {
+            case .loading, .initial:
                 ProgressView()
+                    .padding(.leading, 24)
+            case .loaded(let recommendCoordinates):
+                VStack {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            // 左端に24pxの空白を空けたいのでSpacerで表現
+                            // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
+                            Spacer().frame(width: 24)
+                            ForEach(recommendCoordinates.coordinates, id: \.self) { recommendCoordinate in
+                                RecommendCoordinateCard(imageURL: recommendCoordinate.image_url)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(viewModel.selectedRecommendCoordinate.id == recommendCoordinate.id ? .green : .clear, lineWidth: 5)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .onTapGesture {
+                                        viewModel.selectedRecommendCoordinate(recommendCoordinate: recommendCoordinate)
+                                    }
+                            }
+                            Spacer().frame(width: 24)
+                        }
+                    }
+
+                    AnalysisCoordinateSection()
+                        .padding(.horizontal, 24)
+                }
+            case .failed(_):
+                Button(action: {
+                    // action
+                }, label: {
+                    Image(systemName: "arrow.trianglehead.clockwise")
+                })
+                .padding(.leading, 24)
             }
         }
     }
@@ -324,35 +336,28 @@ struct CoordinateReviewView: View {
     
     private func AnalysisCoordinateSection() -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("アイテム検索")
+            Text("コーデアイテム")
                 .font(.system(size: 20, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
-            if viewModel.isLoadingAnalysisCoordinate {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                    Text("アイテムを解析しています...")
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-            } else if let analysisResponse = viewModel.analysisCoordinateResponse {
+
+            switch viewModel.analysisCoordinateState {
+            case .loading, .initial:
+                ProgressView()
+            case .loaded(let analysisResponse):
                 if let coordinateReview = analysisResponse.coordinate_review {
                     Text(coordinateReview)
                         .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 12) {
                     if let topsCategorize = analysisResponse.tops_categorize {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(topsCategorize)
                                 .font(.system(size: 12))
                                 .foregroundStyle(.blue)
-                            
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
                                     ForEach(analysisResponse.affiliate_tops, id: \.self) { product in
@@ -371,13 +376,13 @@ struct CoordinateReviewView: View {
                             }
                         }
                     }
-                    
+
                     if let bottomsCategorize = analysisResponse.bottoms_categorize {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(bottomsCategorize)
                                 .font(.system(size: 12))
                                 .foregroundStyle(.blue)
-                            
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
                                     ForEach(analysisResponse.affiliate_bottoms, id: \.self) { product in
@@ -397,7 +402,7 @@ struct CoordinateReviewView: View {
                         }
                     }
                 }
-            } else {
+            case .failed(_):
                 Text("アイテム情報の取得に失敗しました")
                     .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(.secondary)

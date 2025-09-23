@@ -42,7 +42,7 @@ final class CoordinateReviewViewModel {
     var errroMessage: ErrorMessage?
     
     // おすすめコーディネート
-    var recommendCoordinates: RecommendCoordinateResponse?
+    var recommendCoordinatesState: FetchState<RecommendCoordinateResponse> = .initial
 
     // アイテム抽出の結果
     var outputUIImage: UIImage = .init(resource: .coordinate4)
@@ -50,27 +50,40 @@ final class CoordinateReviewViewModel {
     var bottomsUIImage: UIImage?
     
     // コーディネート解析結果
-    var analysisCoordinateResponse: AnalysisCoordinateResponse?
-    var isLoadingAnalysisCoordinate = false
+    var analysisCoordinateState: FetchState<AnalysisCoordinateResponse> = .initial
 
     func loadingOnAppear() async {
+        // CoreMLの制限により、segment()は単独で実行する必要がある
+        // 理由:
+        // 1. CoreMLは内部的にシリアル実行を強制する
+        //    - Appleは並列予測を許可しているように見えるが、実際には内部で順次実行される
+        //    - 複数のモデル予測を同時に実行しようとするとエラーが発生する可能性がある
+        // 2. 計算ユニット（.cpuAndGPU）の競合
+        //    - 複数の処理が同時にGPUリソースにアクセスしようとすると、推論コンテキストの作成に失敗
+        //    - "Could not create inference context" エラーの原因
+        // 3. メモリとリソースの競合
+        //    - Neural EngineやGPUのメモリ制限により、並列実行時にリソース不足が発生
         await segment()
-        await coordinateReview()
         
-        // おすすめコーディネートとコーディネート解析は別タスクで実行（UI表示をブロックしない）
-        Task { @MainActor in
-            await fetchRecommendCoordinates()
-            guard let recommendCoordinates = recommendCoordinates else { return }
-            if !recommendCoordinates.coordinates.isEmpty {
-                // recommendCoordinates の先頭のコーデを analysisCoordinateへ送る
-                await analysisCoordinate(id: recommendCoordinates.coordinates[0].id)
+        // segmentが成功した場合のみ、API呼び出しを並列実行
+        if errroMessage == nil {
+            // coordinateReviewとfetchRecommendCoordinatesはAPI呼び出しのため並列実行可能
+            async let reviewTask: Void = coordinateReview()
+            async let recommendTask: Void = fetchRecommendCoordinates()
+            
+            _ = await (reviewTask, recommendTask)
+            
+            // おすすめコーディネートの解析
+            if case .loaded(let response) = recommendCoordinatesState,
+               !response.coordinates.isEmpty {
+                await analysisCoordinate(id: response.coordinates[0].id)
             }
         }
     }
 
     func selectedRecommendCoordinate(recommendCoordinate: RecommendCoordinate) {
-        Task { @MainActor in
-            selectedRecommendCoordinate = recommendCoordinate
+        selectedRecommendCoordinate = recommendCoordinate
+        Task {
             await analysisCoordinate(id: recommendCoordinate.id)
         }
     }
@@ -80,7 +93,7 @@ final class CoordinateReviewViewModel {
 
     private func coordinateReview() async {
         do {
-            let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue)!
+            let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
             let fashionReviewResponse: Result<FashionReviewResponse, HTTPError> = try await apiClient.post(
                 uid: uid,
                 image: coordinateImage.correctOrientation,
@@ -140,34 +153,35 @@ final class CoordinateReviewViewModel {
     private func fetchRecommendCoordinates() async {
         do {
             // 性別を取得（デフォルトは"other"）
-            let gender = UserDefaults.standard.string(forKey: "gender") ?? "other"
-            
+            let gender = UserDefaults.standard.string(forKey: "gender") ?? "men"
+
+            recommendCoordinatesState = .loading
             let result = try await recommendCoordinateClient.post(gender: gender)
             
             switch result {
             case .success(let response):
-                recommendCoordinates = response
-            case .failure(_):
-                recommendCoordinates = nil
+                recommendCoordinatesState = .loaded(response)
+            case .failure(let httpError):
+                recommendCoordinatesState = .failed(httpError)
             }
         } catch {
-            recommendCoordinates = nil
+            recommendCoordinatesState = .failed(HTTPError.badRequest)
         }
     }
     
     private func analysisCoordinate(id: Int) async {
-        isLoadingAnalysisCoordinate = true
+        analysisCoordinateState = .loading
         do {
             let gender = UserDefaults.standard.string(forKey: "gender") ?? "other"
             let response = try await analysisCoordinateClient.analysisCoordinate(
                 id: id,
                 gender: gender
             )
-            analysisCoordinateResponse = response
+            analysisCoordinateState = .loaded(response)
         } catch {
             print("Analysis coordinate API error: \(error)")
+            analysisCoordinateState = .failed(HTTPError.badRequest)
         }
-        isLoadingAnalysisCoordinate = false
     }
 
     private func handleAPIError(_ error: Error) {
