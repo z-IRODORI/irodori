@@ -59,3 +59,34 @@ final class MockRecommendCoordinateClient: RecommendCoordinateClientProtocol {
         return .success(.mock())
     }
 }
+
+// テスト用: アフィリエイトデータなしのコーディネートのみを返すMockクライアント
+final class MockEmptyAffiliateRecommendCoordinateClient: RecommendCoordinateClientProtocol {
+    func post(gender: String) async throws -> Result<RecommendCoordinateResponse, HTTPError> {
+        let emptyAffiliateCoordinates = RecommendCoordinateResponse(
+            coordinates: [
+                RecommendCoordinate(
+                    id: 10,
+                    image_url: "https://i.pinimg.com/736x/test/test1.jpg",
+                    pin_url_guess: "https://pinterest.com/pin/test1",
+                    coordinate_review: "アフィリエイトデータなしのテストコーディネート",
+                    tops_categorize: "シャツ 無地 レギュラー ブルー",
+                    bottoms_categorize: "パンツ 無地 スリム ベージュ",
+                    affiliate_tops: [],
+                    affiliate_bottoms: []
+                )
+            ],
+            genres: [
+                Genre(genre: "test", count: 1)
+            ]
+        )
+        return .success(emptyAffiliateCoordinates)
+    }
+}
+
+// テスト用: エラーを返すMockクライアント
+final class MockErrorRecommendCoordinateClient: RecommendCoordinateClientProtocol {
+    func post(gender: String) async throws -> Result<RecommendCoordinateResponse, HTTPError> {
+        return .failure(.unknownError)
+    }
+}

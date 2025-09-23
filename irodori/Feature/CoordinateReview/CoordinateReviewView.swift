@@ -16,6 +16,8 @@ struct CoordinateReviewView: View {
     @State private var isShowFullReview = false
     @State private var tappedURL = ""
     @State private var isPresentedCameraView = false
+    @State private var tappedAffiliateProduct: AffiliateProduct?
+    @State private var isShowingWebView = false
     @Binding var path: [ViewType]
 
 
@@ -80,6 +82,14 @@ struct CoordinateReviewView: View {
                 ErrorMessageView(errorMessage: errorMessage) {
                     path.removeAll()   // カメラ画面へ戻る
                 }
+            }
+        }
+        .sheet(isPresented: $isShowingWebView) {
+            if let product = tappedAffiliateProduct {
+                AffiliateWebView(
+                    url: URL(string: product.url),
+                    productName: product.name
+                )
             }
         }
     }
@@ -242,7 +252,9 @@ struct CoordinateReviewView: View {
                                     )
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .onTapGesture {
-                                        viewModel.selectedRecommendCoordinate(recommendCoordinate: recommendCoordinate)
+                                        Task {
+                                            await viewModel.selectedRecommendCoordinate(recommendCoordinate: recommendCoordinate)
+                                        }
                                     }
                             }
                             Spacer().frame(width: 24)
@@ -344,69 +356,117 @@ struct CoordinateReviewView: View {
             case .loading, .initial:
                 ProgressView()
             case .loaded(let analysisResponse):
-                if let coordinateReview = analysisResponse.coordinate_review {
-                    Text(coordinateReview)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 8)
+                let hasRecommendAffiliateData = viewModel.selectedRecommendCoordinate.id != 0 &&
+                    (!viewModel.selectedRecommendCoordinate.affiliate_tops.isEmpty ||
+                     !viewModel.selectedRecommendCoordinate.affiliate_bottoms.isEmpty)
+                let hasAnalysisData = (!analysisResponse.affiliate_tops.isEmpty || !analysisResponse.affiliate_bottoms.isEmpty)
+
+                if hasRecommendAffiliateData || hasAnalysisData {
+                    // アフィリエイトデータの表示（recommend-coordinatesを優先）
+                    AffiliateDataView(
+                        shouldShowRecommendData: hasRecommendAffiliateData,
+                        recommendCoordinate: viewModel.selectedRecommendCoordinate,
+                        analysisResponse: analysisResponse,
+                        onProductTapped: { product in
+                            tappedAffiliateProduct = product
+                            isShowingWebView = true
+                        }
+                    )
                 }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    if let topsCategorize = analysisResponse.tops_categorize {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(topsCategorize)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.blue)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(analysisResponse.affiliate_tops, id: \.self) { product in
-                                        AsyncImage(url: URL(string: product.image_url)) { image in
-                                            image
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                        } placeholder: {
-                                            Color.gray.opacity(0.3)
-                                        }
-                                        .frame(width: 120 * 0.8, height: 140 * 0.8)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                }
-                                .padding(.horizontal, 1)
-                            }
-                        }
-                    }
-
-                    if let bottomsCategorize = analysisResponse.bottoms_categorize {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(bottomsCategorize)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.blue)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(analysisResponse.affiliate_bottoms, id: \.self) { product in
-                                        AsyncImage(url: URL(string: product.image_url)) { image in
-                                            image
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                        } placeholder: {
-                                            Color.gray.opacity(0.3)
-                                        }
-                                        .frame(width: 120 * 0.8, height: 140 * 0.8)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                }
-                                .padding(.horizontal, 1)
-                            }
-                        }
-                    }
-                }
             case .failed(_):
                 Text("アイテム情報の取得に失敗しました")
                     .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 20)
+            }
+        }
+    }
+    
+    // アフィリエイトデータ表示用のヘルパーView
+    private func AffiliateDataView(
+        shouldShowRecommendData: Bool,
+        recommendCoordinate: RecommendCoordinate,
+        analysisResponse: AnalysisCoordinateResponse?,
+        onProductTapped: @escaping (AffiliateProduct) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // データソースを決定
+            let (topsCategorize, bottomsCategorize, affiliateTops, affiliateBottoms): 
+            (String?, String?, [AffiliateProduct], [AffiliateProduct]) = {
+                if shouldShowRecommendData {
+                    return (
+                        recommendCoordinate.tops_categorize,
+                        recommendCoordinate.bottoms_categorize,
+                        recommendCoordinate.affiliate_tops,
+                        recommendCoordinate.affiliate_bottoms
+                    )
+                } else if let analysis = analysisResponse {
+                    return (
+                        analysis.tops_categorize,
+                        analysis.bottoms_categorize,
+                        analysis.affiliate_tops,
+                        analysis.affiliate_bottoms
+                    )
+                } else {
+                    return (nil, nil, [], [])
+                }
+            }()
+            
+            // トップス表示
+            if topsCategorize != nil && !affiliateTops.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("トップス")
+                        .font(.system(size: 14))
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(affiliateTops, id: \.self) { product in
+                                AsyncImage(url: URL(string: product.image_url)) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Color.gray.opacity(0.3)
+                                }
+                                .frame(width: 120 * 0.8, height: 140 * 0.8)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .onTapGesture {
+                                    onProductTapped(product)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 1)
+                    }
+                }
+            }
+            
+            // ボトムス表示
+            if bottomsCategorize != nil && !affiliateBottoms.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("ボトムス")
+                        .font(.system(size: 14))
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(affiliateBottoms, id: \.self) { product in
+                                AsyncImage(url: URL(string: product.image_url)) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Color.gray.opacity(0.3)
+                                }
+                                .frame(width: 120 * 0.8, height: 140 * 0.8)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .onTapGesture {
+                                    onProductTapped(product)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 1)
+                    }
+                }
             }
         }
     }
@@ -433,11 +493,29 @@ struct CoordinateReviewView: View {
     }
 }
 
-#Preview {
+#Preview("アフィリエイトデータありのRecommendCoordinates") {
     CoordinateReviewView(viewModel: .init(
         coordinateImage: UIImage(resource: .coordinate2),
         apiClient: MockFashionReviewClient(),
         recommendCoordinateClient: MockRecommendCoordinateClient(),
         analysisCoordinateClient: MockAnalysisCoordinateClient()
+    ), path: .constant([]))
+}
+
+#Preview("アフィリエイトデータなし→AnalysisCoordinate表示") {
+    CoordinateReviewView(viewModel: .init(
+        coordinateImage: UIImage(resource: .coordinate2),
+        apiClient: MockFashionReviewClient(),
+        recommendCoordinateClient: MockEmptyAffiliateRecommendCoordinateClient(),
+        analysisCoordinateClient: MockAnalysisCoordinateClient()
+    ), path: .constant([]))
+}
+
+#Preview("両方とも空データ→エラー表示") {
+    CoordinateReviewView(viewModel: .init(
+        coordinateImage: UIImage(resource: .coordinate2),
+        apiClient: MockFashionReviewClient(),
+        recommendCoordinateClient: MockEmptyAffiliateRecommendCoordinateClient(),
+        analysisCoordinateClient: MockEmptyAnalysisCoordinateClient()
     ), path: .constant([]))
 }

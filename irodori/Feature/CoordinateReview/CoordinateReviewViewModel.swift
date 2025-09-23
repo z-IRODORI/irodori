@@ -11,7 +11,16 @@ import CoreML
 @MainActor
 @Observable
 final class CoordinateReviewViewModel {
-    var selectedRecommendCoordinate: RecommendCoordinate = .init(id: 0, image_url: "", pin_url_guess: "")
+    var selectedRecommendCoordinate: RecommendCoordinate = .init(
+        id: 0, 
+        image_url: "", 
+        pin_url_guess: "", 
+        coordinate_review: nil, 
+        tops_categorize: nil, 
+        bottoms_categorize: nil, 
+        affiliate_tops: [], 
+        affiliate_bottoms: []
+    )
     var isTappedRecommendCoordinate = false
 
     let coordinateImage: UIImage
@@ -81,12 +90,16 @@ final class CoordinateReviewViewModel {
         }
     }
 
-    func selectedRecommendCoordinate(recommendCoordinate: RecommendCoordinate) {
+    func selectedRecommendCoordinate(recommendCoordinate: RecommendCoordinate) async {
         selectedRecommendCoordinate = recommendCoordinate
-        Task {
+
+        // アフィリエイトデータがない場合はanalysisCoordinate APIを呼び出し
+        let hasAffiliateData = !recommendCoordinate.affiliate_tops.isEmpty || !recommendCoordinate.affiliate_bottoms.isEmpty
+        if !hasAffiliateData {
             await analysisCoordinate(id: recommendCoordinate.id)
         }
     }
+
     func updateSIstTapedRecomendCoordinate(isTaped: Bool) {
         isTappedRecommendCoordinate = isTaped
     }

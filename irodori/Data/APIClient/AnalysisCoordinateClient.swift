@@ -46,3 +46,19 @@ struct MockAnalysisCoordinateClient: AnalysisCoordinateClientProtocol {
         return AnalysisCoordinateResponse.mock
     }
 }
+
+// テスト用の空データを返すMockクライアント
+struct MockEmptyAnalysisCoordinateClient: AnalysisCoordinateClientProtocol {
+    func analysisCoordinate(id: Int, gender: String) async throws -> AnalysisCoordinateResponse {
+        try await Task.sleep(nanoseconds: 500_000_000)
+        return AnalysisCoordinateResponse.mockEmpty
+    }
+}
+
+// テスト用のエラーを返すMockクライアント
+struct MockErrorAnalysisCoordinateClient: AnalysisCoordinateClientProtocol {
+    func analysisCoordinate(id: Int, gender: String) async throws -> AnalysisCoordinateResponse {
+        try await Task.sleep(nanoseconds: 500_000_000)
+        throw URLError(.timedOut)
+    }
+}

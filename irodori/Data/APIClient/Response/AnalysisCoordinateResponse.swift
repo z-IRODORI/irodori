@@ -9,12 +9,15 @@ struct AnalysisCoordinateResponse: Decodable {
     let affiliate_bottoms: [AffiliateProduct]
 }
 
-struct AffiliateProduct: Decodable, Hashable {
-    let name: String
-    let price: Int
-    let url: String
+struct RecommendCoordinate: Codable, Hashable {
+    let id: Int
     let image_url: String
-    let store_name: String
+    let pin_url_guess: String
+    let coordinate_review: String?
+    let tops_categorize: String?
+    let bottoms_categorize: String?
+    let affiliate_tops: [AffiliateProduct]
+    let affiliate_bottoms: [AffiliateProduct]
 }
 
 extension AnalysisCoordinateResponse {
