@@ -21,6 +21,7 @@ final class CoordinateReviewViewModel {
         affiliate_tops: [], 
         affiliate_bottoms: []
     )
+    var selectedCoordinateId: Int = 0
     var isTappedRecommendCoordinate = false
 
     let coordinateImage: UIImage
@@ -92,6 +93,7 @@ final class CoordinateReviewViewModel {
 
     func selectedRecommendCoordinate(recommendCoordinate: RecommendCoordinate) async {
         selectedRecommendCoordinate = recommendCoordinate
+        selectedCoordinateId = recommendCoordinate.id
 
         // アフィリエイトデータがない場合はanalysisCoordinate APIを呼び出し
         let hasAffiliateData = !recommendCoordinate.affiliate_tops.isEmpty || !recommendCoordinate.affiliate_bottoms.isEmpty

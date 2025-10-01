@@ -240,22 +240,20 @@ struct CoordinateReviewView: View {
             case .loaded(let recommendCoordinates):
                 VStack {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
+                        LazyHStack(spacing: 12) {
                             // 左端に24pxの空白を空けたいのでSpacerで表現
                             // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
                             Spacer().frame(width: 24)
                             ForEach(recommendCoordinates.coordinates, id: \.self) { recommendCoordinate in
-                                RecommendCoordinateCard(imageURL: recommendCoordinate.image_url)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(viewModel.selectedRecommendCoordinate.id == recommendCoordinate.id ? .green : .clear, lineWidth: 5)
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .onTapGesture {
+                                MemoizedCoordinateCard(
+                                    coordinate: recommendCoordinate,
+                                    isSelected: viewModel.selectedCoordinateId == recommendCoordinate.id,
+                                    onTap: {
                                         Task {
                                             await viewModel.selectedRecommendCoordinate(recommendCoordinate: recommendCoordinate)
                                         }
                                     }
+                                )
                             }
                             Spacer().frame(width: 24)
                         }
@@ -322,6 +320,34 @@ struct CoordinateReviewView: View {
         }
         .background(.white)
     }
+    
+    // メモ化されたコーデカード（パフォーマンス最適化）
+    private struct MemoizedCoordinateCard: View {
+        let coordinate: RecommendCoordinate
+        let isSelected: Bool
+        let onTap: () -> Void
+        
+        var body: some View {
+            ZStack {
+                CachedAsyncImage(url: URL(string: coordinate.image_url)) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 110, height: 110 * (4/3))
+                } placeholder: {
+                    ProgressView()
+                        .frame(width: 110, height: 110 * (4/3))
+                }
+            }
+            .background(.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? .green : .clear, lineWidth: 5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .onTapGesture(perform: onTap)
+        }
+    }
 
     // コーデアイテム抽出をローカルで実行しているためuiImageを渡している
     // TODO: - コーデアイテム抽出をサーバーで実行可能になった時、このコンポーネントを削除
@@ -346,39 +372,149 @@ struct CoordinateReviewView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
     
+    @ViewBuilder
     private func AnalysisCoordinateSection() -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("コーデアイテム")
                 .font(.system(size: 20, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            switch viewModel.analysisCoordinateState {
-            case .loading, .initial:
-                ProgressView()
-            case .loaded(let analysisResponse):
-                let hasRecommendAffiliateData = viewModel.selectedRecommendCoordinate.id != 0 &&
-                    (!viewModel.selectedRecommendCoordinate.affiliate_tops.isEmpty ||
-                     !viewModel.selectedRecommendCoordinate.affiliate_bottoms.isEmpty)
-                let hasAnalysisData = (!analysisResponse.affiliate_tops.isEmpty || !analysisResponse.affiliate_bottoms.isEmpty)
-
-                if hasRecommendAffiliateData || hasAnalysisData {
-                    // アフィリエイトデータの表示（recommend-coordinatesを優先）
-                    AffiliateDataView(
-                        shouldShowRecommendData: hasRecommendAffiliateData,
-                        recommendCoordinate: viewModel.selectedRecommendCoordinate,
-                        analysisResponse: analysisResponse,
-                        onProductTapped: { product in
-                            tappedAffiliateProduct = product
-                            isShowingWebView = true
-                        }
+            AnalysisCoordinateContent()
+        }
+    }
+    
+    @ViewBuilder
+    private func AnalysisCoordinateContent() -> some View {
+        switch viewModel.analysisCoordinateState {
+        case .loading, .initial:
+            ProgressView()
+        case .loaded(let analysisResponse):
+            OptimizedAffiliateSection(
+                selectedCoordinate: viewModel.selectedRecommendCoordinate,
+                analysisResponse: analysisResponse,
+                onProductTapped: { product in
+                    tappedAffiliateProduct = product
+                    isShowingWebView = true
+                }
+            )
+        case .failed(_):
+            Text("アイテム情報の取得に失敗しました")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(.secondary)
+                .padding(.vertical, 20)
+        }
+    }
+    
+    // 最適化されたアフィリエイトセクション
+    private struct OptimizedAffiliateSection: View {
+        let selectedCoordinate: RecommendCoordinate
+        let analysisResponse: AnalysisCoordinateResponse?
+        let onProductTapped: (AffiliateProduct) -> Void
+        
+        private var hasRecommendAffiliateData: Bool {
+            selectedCoordinate.id != 0 &&
+            (!selectedCoordinate.affiliate_tops.isEmpty ||
+             !selectedCoordinate.affiliate_bottoms.isEmpty)
+        }
+        
+        private var hasAnalysisData: Bool {
+            guard let analysisResponse = analysisResponse else { return false }
+            return !analysisResponse.affiliate_tops.isEmpty || !analysisResponse.affiliate_bottoms.isEmpty
+        }
+        
+        var body: some View {
+            if hasRecommendAffiliateData || hasAnalysisData {
+                CoordinateReviewView.AffiliateDataViewWrapper(
+                    shouldShowRecommendData: hasRecommendAffiliateData,
+                    recommendCoordinate: selectedCoordinate,
+                    analysisResponse: analysisResponse,
+                    onProductTapped: onProductTapped
+                )
+            }
+        }
+    }
+    
+    // AffiliateDataViewのラッパー構造体
+    private struct AffiliateDataViewWrapper: View {
+        let shouldShowRecommendData: Bool
+        let recommendCoordinate: RecommendCoordinate
+        let analysisResponse: AnalysisCoordinateResponse?
+        let onProductTapped: (AffiliateProduct) -> Void
+        
+        var body: some View {
+            VStack(alignment: .leading, spacing: 24) {
+                // データソースを決定
+                let (topsCategorize, bottomsCategorize, affiliateTops, affiliateBottoms):
+                (String?, String?, [AffiliateProduct], [AffiliateProduct]) = {
+                    if shouldShowRecommendData {
+                        return (
+                            recommendCoordinate.tops_categorize,
+                            recommendCoordinate.bottoms_categorize,
+                            recommendCoordinate.affiliate_tops,
+                            recommendCoordinate.affiliate_bottoms
+                        )
+                    } else if let analysis = analysisResponse {
+                        return (
+                            analysis.tops_categorize,
+                            analysis.bottoms_categorize,
+                            analysis.affiliate_tops,
+                            analysis.affiliate_bottoms
+                        )
+                    } else {
+                        return (nil, nil, [], [])
+                    }
+                }()
+                
+                // トップス表示
+                if topsCategorize != nil && !affiliateTops.isEmpty {
+                    AffiliateProductSection(
+                        title: "トップス",
+                        products: affiliateTops,
+                        onProductTapped: onProductTapped
                     )
                 }
-
-            case .failed(_):
-                Text("アイテム情報の取得に失敗しました")
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 20)
+                
+                // ボトムス表示
+                if bottomsCategorize != nil && !affiliateBottoms.isEmpty {
+                    AffiliateProductSection(
+                        title: "ボトムス",
+                        products: affiliateBottoms,
+                        onProductTapped: onProductTapped
+                    )
+                }
+            }
+        }
+    }
+    
+    // アフィリエイト商品セクション
+    private struct AffiliateProductSection: View {
+        let title: String
+        let products: [AffiliateProduct]
+        let onProductTapped: (AffiliateProduct) -> Void
+        
+        var body: some View {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 14))
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(products, id: \.self) { product in
+                            CachedAsyncImage(url: URL(string: product.image_url)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Color.gray.opacity(0.3)
+                            }
+                            .frame(width: 120 * 0.8, height: 140 * 0.8)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .onTapGesture {
+                                onProductTapped(product)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

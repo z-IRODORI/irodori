@@ -15,10 +15,14 @@ final class CalendarViewModel {
     let daysOfTheWeek: [Week] = Week.allCases
     var coordinateListResponses: [[CoordinateListResponse]] = []
     let uid: String
+    var coordinateDetail: CoordinateDetailResponse?
+    var isLoadingDetail = false
 
     let apiClient: CoordinateListClientProtocol
-    init(apiClient: CoordinateListClientProtocol, repository: SignUpDateRepositoryProtocol = SignUpDateRepository()) {
+    let coordinateDetailClient: CoordinateDetailClientProtocol
+    init(apiClient: CoordinateListClientProtocol, coordinateDetailClient: CoordinateDetailClientProtocol = CoordinateDetailClient(), repository: SignUpDateRepositoryProtocol = SignUpDateRepository()) {
         self.apiClient = apiClient
+        self.coordinateDetailClient = coordinateDetailClient
         self.uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue)!
         let calendar = Calendar(identifier: .gregorian)
         let today = Date()
@@ -47,7 +51,6 @@ final class CalendarViewModel {
             date = calendar.date(byAdding: .month, value: 1, to: date)!
         }
         self.months = monthList
-        print(self.months)
     }
 
     func onAppear() async {
@@ -63,6 +66,25 @@ final class CalendarViewModel {
             }
         } catch {
 
+        }
+    }
+    
+    func fetchCoordinateDetail(targetDate: String) async {
+        isLoadingDetail = true
+        defer { isLoadingDetail = false }
+        
+        do {
+            let result = try await coordinateDetailClient.get(uid: uid, targetDate: targetDate)
+            switch result {
+            case .success(let response):
+                if let firstDetail = response.first {
+                    coordinateDetail = firstDetail
+                }
+            case .failure(let error):
+                print("Failed to fetch coordinate detail: \(error)")
+            }
+        } catch {
+            print("Error fetching coordinate detail: \(error)")
         }
     }
 }

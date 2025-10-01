@@ -57,7 +57,18 @@ struct CalendarView: View {
                             CalendarCell(
                                 thumbnailImageURL: viewModel.coordinateListResponses[i][day - 1].coodinate_image_path,
                                 height: UIScreen.main.bounds.width/6.5,
-                                dayOfMonth: day
+                                dayOfMonth: day,
+                                onTap: {
+                                    // 画像がある場合のみ遷移
+                                    if viewModel.coordinateListResponses[i][day - 1].coodinate_image_path != nil {
+                                        let year = viewModel.months[i].year
+                                        let month = viewModel.months[i].monthOfTheYear
+                                        let targetDate = String(format: "%04d-%02d-%02d", year, month, day)
+                                        Task {
+                                            await viewModel.fetchCoordinateDetail(targetDate: targetDate)
+                                        }
+                                    }
+                                }
                             )
                         }
                     }
@@ -71,10 +82,8 @@ struct CalendarView: View {
         }
         .navigationBarHidden(true)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            Task {
-                await viewModel.onAppear()
-            }
+        .task {
+            await viewModel.onAppear()
         }
     }
 
