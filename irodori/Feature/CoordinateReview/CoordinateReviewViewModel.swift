@@ -23,18 +23,17 @@ final class CoordinateReviewViewModel {
     )
     var selectedCoordinateId: Int = 0
     var isTappedRecommendCoordinate = false
+    var currentDateString = ""
 
     let coordinateImage: UIImage
     let apiClient: FashionReviewClientProtocol
     let recommendCoordinateClient: RecommendCoordinateClientProtocol
-    let analysisCoordinateClient: AnalysisCoordinateClientProtocol
     let model: Model?
     
-    init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol, recommendCoordinateClient: RecommendCoordinateClientProtocol = RecommendCoordinateClient(), analysisCoordinateClient: AnalysisCoordinateClientProtocol = AnalysisCoordinateClient()) {
+    init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol, recommendCoordinateClient: RecommendCoordinateClientProtocol = RecommendCoordinateClient()) {
         self.coordinateImage = coordinateImage
         self.apiClient = apiClient
         self.recommendCoordinateClient = recommendCoordinateClient
-        self.analysisCoordinateClient = analysisCoordinateClient
 
         // Model の初期化
         let config = MLModelConfiguration()
@@ -58,11 +57,8 @@ final class CoordinateReviewViewModel {
     var outputUIImage: UIImage = .init(resource: .coordinate4)
     var topsUIImage: UIImage?
     var bottomsUIImage: UIImage?
-    
-    // コーディネート解析結果
-    var analysisCoordinateState: FetchState<AnalysisCoordinateResponse> = .initial
 
-    func loadingOnAppear() async {
+    func onAppear() async {
         // CoreMLの制限により、segment()は単独で実行する必要がある
         // 理由:
         // 1. CoreMLは内部的にシリアル実行を強制する
@@ -82,23 +78,6 @@ final class CoordinateReviewViewModel {
             async let recommendTask: Void = fetchRecommendCoordinates()
             
             _ = await (reviewTask, recommendTask)
-            
-            // おすすめコーディネートの解析
-            if case .loaded(let response) = recommendCoordinatesState,
-               !response.coordinates.isEmpty {
-                await analysisCoordinate(id: response.coordinates[0].id)
-            }
-        }
-    }
-
-    func selectedRecommendCoordinate(recommendCoordinate: RecommendCoordinate) async {
-        selectedRecommendCoordinate = recommendCoordinate
-        selectedCoordinateId = recommendCoordinate.id
-
-        // アフィリエイトデータがない場合はanalysisCoordinate APIを呼び出し
-        let hasAffiliateData = !recommendCoordinate.affiliate_tops.isEmpty || !recommendCoordinate.affiliate_bottoms.isEmpty
-        if !hasAffiliateData {
-            await analysisCoordinate(id: recommendCoordinate.id)
         }
     }
 
@@ -160,6 +139,18 @@ final class CoordinateReviewViewModel {
         }
     }
 
+    func setSelectedRecommendCoordinate(coordinate: RecommendCoordinate) {
+        selectedRecommendCoordinate = coordinate
+    }
+
+    private func setCurrentDateString() {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy/MM/dd"
+        dateFormatter.locale = Locale(identifier: "ja_JP")
+        let now = Date()
+        currentDateString = dateFormatter.string(from: now)
+    }
+
     private func setErrerMessage(mlError: MLError) {
         errroMessage = .init(title: mlError.title, description: mlError.errorDescription)
     }
@@ -176,26 +167,14 @@ final class CoordinateReviewViewModel {
             switch result {
             case .success(let response):
                 recommendCoordinatesState = .loaded(response)
+                if let recommendCoordinate = response.coordinates.first {
+                    selectedRecommendCoordinate = recommendCoordinate
+                }
             case .failure(let httpError):
                 recommendCoordinatesState = .failed(httpError)
             }
         } catch {
             recommendCoordinatesState = .failed(HTTPError.badRequest)
-        }
-    }
-    
-    private func analysisCoordinate(id: Int) async {
-        analysisCoordinateState = .loading
-        do {
-            let gender = UserDefaults.standard.string(forKey: "gender") ?? "other"
-            let response = try await analysisCoordinateClient.analysisCoordinate(
-                id: id,
-                gender: gender
-            )
-            analysisCoordinateState = .loaded(response)
-        } catch {
-            print("Analysis coordinate API error: \(error)")
-            analysisCoordinateState = .failed(HTTPError.badRequest)
         }
     }
 
