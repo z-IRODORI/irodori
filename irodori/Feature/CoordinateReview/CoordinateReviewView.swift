@@ -36,6 +36,7 @@ struct CoordinateReviewView: View {
                         RecommendCoordinates()
                         CoordinateItems()
                             .padding(.horizontal, 24)
+                            .padding(.bottom, 50 + 24)   // ButtonHeight + BottomPadding
                     }
                 }
                 .navigationBarBackButtonHidden(true)
@@ -48,11 +49,21 @@ struct CoordinateReviewView: View {
                         })
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .onChange(of: tappedURL) {
-                    let url = URL(string: tappedURL)!   // TODO: エラーハンドリング
-                    UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                .overlay(alignment: .bottom) {
+                    Button(action: {
+
+                    }) {
+                        Text("おすすめのコーデ/アイテムを見る")
+                            .foregroundStyle(.white)
+                            .font(.system(size: 16, weight: .bold))
+                            .frame(maxWidth: .infinity, maxHeight: 50)
+                            .background(.pink)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 24)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .navigationDestination(isPresented: $isPresentedCameraView) {
                     CameraView()
                 }
@@ -162,7 +173,7 @@ struct CoordinateReviewView: View {
             case .loaded(let recommendCoordinates):
                 VStack(spacing: 24) {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 12) {
+                        HStack(spacing: 12) {
                             // 左端に24pxの空白を空けたいのでSpacerで表現
                             // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
                             Spacer().frame(width: 24)
@@ -170,6 +181,7 @@ struct CoordinateReviewView: View {
                                 CachedAsyncImage(url: .init(string: recommendCoordinate.image_url)) { phase in
                                     if let image = phase.image {
                                         image.resizable()
+                                            .aspectRatio(contentMode: .fit)   // 角丸を適応させるため
                                             .onTapGesture {
                                                 viewModel.setSelectedRecommendCoordinate(coordinate: recommendCoordinate)
                                             }
@@ -179,14 +191,13 @@ struct CoordinateReviewView: View {
                                         Color.gray.opacity(0.5)
                                     }
                                 }
-                                .frame(width: 120, height: 120 * 1.38)   // 1:1.38
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .frame(width: 120, height: 120 * 1.38)   // 1:1.38
 
                             }
                             Spacer().frame(width: 24)
                         }
                     }
-                    .frame(height: 110 * (4/3))
 
                     AffiliateItems(title: "トップス", affiliateProducts: viewModel.selectedRecommendCoordinate.affiliate_tops)
                     AffiliateItems(title: "ボトムス", affiliateProducts: viewModel.selectedRecommendCoordinate.affiliate_bottoms)
@@ -289,6 +300,7 @@ struct CoordinateReviewView: View {
                             CachedAsyncImage(url: .init(string: affiliateProduct.image_url)) { phase in
                                 if let image = phase.image {
                                     image.resizable()
+                                    .aspectRatio(contentMode: .fit)// 角丸を適応させるため
                                     .onTapGesture {
                                         viewModel.setWebViewURLString(url: affiliateProduct.url)
                                     }
@@ -311,9 +323,9 @@ struct CoordinateReviewView: View {
                             .padding(.bottom, 12)
                             .padding(.horizontal, 12)
                         }
-                        .frame(width: 120, height: 180)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
                         .background(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .frame(width: 120, height: 180)
                     }
                     Spacer().frame(width: 24)
                 }
