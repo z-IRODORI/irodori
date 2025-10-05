@@ -14,7 +14,7 @@ struct irodoriApp: App {
     @State private var path: [ViewType] = []
     var body: some Scene {
         WindowGroup {
-            SplashView()
+//            SplashView()
 //            CalendarView()
 //            SegmentationView()
 //            OnboardingView(closeButtonTapped: {})
@@ -24,10 +24,12 @@ struct irodoriApp: App {
 //                apiClient: MockFashionReviewClient()
 //            ), path: .constant([]))
 
-//            CoordinateReviewView(
-//                coordinateImage: UIImage(resource: .coordinate1),
-//                fashionReview: .mock()
-//            )
+
+            CoordinateReviewView(viewModel: .init(
+                coordinateImage: UIImage(resource: .coordinate2),
+                apiClient: MockFashionReviewClient(),
+                recommendCoordinateClient: MockRecommendCoordinateClient()
+            ), path: .constant([]))
         }
     }
 

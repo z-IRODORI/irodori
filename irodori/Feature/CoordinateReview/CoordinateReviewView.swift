@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CoordinateReviewView: View {
-    let viewModel: CoordinateReviewViewModel
+    @State var viewModel: CoordinateReviewViewModel
 
     private let shortTextCriterion = 50
     @State private var currentSchedule = ""   // YYYY/MM/DD
@@ -17,7 +17,6 @@ struct CoordinateReviewView: View {
     @State private var tappedURL = ""
     @State private var isPresentedCameraView = false
     @State private var tappedAffiliateProduct: AffiliateProduct?
-    @State private var isShowingWebView = false
     @Binding var path: [ViewType]
 
 
@@ -82,12 +81,13 @@ struct CoordinateReviewView: View {
                 }
             }
         }
-        .sheet(isPresented: $isShowingWebView) {
-            if let product = tappedAffiliateProduct {
-                AffiliateWebView(
-                    url: URL(string: product.url),
-                    productName: product.name
-                )
+        .sheet(isPresented: $viewModel.isShowingWebView) {
+            if let url = URL(string: viewModel.webURLString) {
+                WebViewContainer(url: url)
+            } else {
+                // TODO: エラー画面実装
+                Text("無効なURLです")
+                    .foregroundStyle(.red)
             }
         }
         .task {
@@ -199,6 +199,9 @@ struct CoordinateReviewView: View {
                                 CachedAsyncImage(url: .init(string: tops.image_url)) { phase in
                                     if let image = phase.image {
                                         image.resizable()
+                                            .onTapGesture {
+                                                viewModel.setWebViewURLString(url: tops.url)
+                                            }
                                     } else if phase.error != nil {
                                         Color.red
                                     } else {
@@ -226,6 +229,9 @@ struct CoordinateReviewView: View {
                                 CachedAsyncImage(url: .init(string: bottoms.image_url)) { phase in
                                     if let image = phase.image {
                                         image.resizable()
+                                        .onTapGesture {
+                                            viewModel.setWebViewURLString(url: bottoms.url)
+                                        }
                                     } else if phase.error != nil {
                                         Color.red
                                     } else {
@@ -312,6 +318,7 @@ struct CoordinateReviewView: View {
 #Preview {
     CoordinateReviewView(viewModel: .init(
         coordinateImage: UIImage(resource: .coordinate2),
-        apiClient: MockFashionReviewClient()
+        apiClient: MockFashionReviewClient(),
+        recommendCoordinateClient: MockRecommendCoordinateClient()
     ), path: .constant([]))
 }

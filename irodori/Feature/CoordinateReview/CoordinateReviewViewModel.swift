@@ -24,6 +24,8 @@ final class CoordinateReviewViewModel {
     var selectedCoordinateId: Int = 0
     var isTappedRecommendCoordinate = false
     var currentDateString = ""
+    var isShowingWebView = false
+    var webURLString: String = ""
 
     let coordinateImage: UIImage
     let apiClient: FashionReviewClientProtocol
@@ -141,6 +143,11 @@ final class CoordinateReviewViewModel {
 
     func setSelectedRecommendCoordinate(coordinate: RecommendCoordinate) {
         selectedRecommendCoordinate = coordinate
+    }
+
+    func setWebViewURLString(url: String) {
+        isShowingWebView = true
+        webURLString = url
     }
 
     private func setCurrentDateString() {
