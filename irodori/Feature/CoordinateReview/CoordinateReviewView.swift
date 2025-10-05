@@ -152,6 +152,7 @@ struct CoordinateReviewView: View {
     private func RecommendCoordinates() -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("これまでのコーデからおすすめコーデ")
+                .font(.system(size: 20, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 24)
             switch viewModel.recommendCoordinatesState {
@@ -159,7 +160,7 @@ struct CoordinateReviewView: View {
                 ProgressView()
                     .padding(.leading, 24)
             case .loaded(let recommendCoordinates):
-                VStack(spacing: 12) {
+                VStack(spacing: 24) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(spacing: 12) {
                             // 左端に24pxの空白を空けたいのでSpacerで表現
@@ -169,38 +170,8 @@ struct CoordinateReviewView: View {
                                 CachedAsyncImage(url: .init(string: recommendCoordinate.image_url)) { phase in
                                     if let image = phase.image {
                                         image.resizable()
-                                    } else if phase.error != nil {
-                                        Color.red
-                                    } else {
-                                        Color.gray.opacity(0.5)
-                                    }
-                                }
-                                .frame(width: 100, height: 150)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .onTapGesture {
-                                    viewModel.setSelectedRecommendCoordinate(coordinate: recommendCoordinate)
-                                }
-                            }
-                            Spacer().frame(width: 24)
-                        }
-                    }
-                    .frame(height: 110 * (4/3))
-
-                    Text("トップス")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 12)
-                        .padding(.leading, 24)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 12) {
-                            // 左端に24pxの空白を空けたいのでSpacerで表現
-                            // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
-                            Spacer().frame(width: 24)
-                            ForEach(viewModel.selectedRecommendCoordinate.affiliate_tops, id: \.self) { tops in
-                                CachedAsyncImage(url: .init(string: tops.image_url)) { phase in
-                                    if let image = phase.image {
-                                        image.resizable()
                                             .onTapGesture {
-                                                viewModel.setWebViewURLString(url: tops.url)
+                                                viewModel.setSelectedRecommendCoordinate(coordinate: recommendCoordinate)
                                             }
                                     } else if phase.error != nil {
                                         Color.red
@@ -208,43 +179,17 @@ struct CoordinateReviewView: View {
                                         Color.gray.opacity(0.5)
                                     }
                                 }
-                                .frame(width: 120, height: 120)
+                                .frame(width: 120, height: 120 * 1.38)   // 1:1.38
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            Spacer().frame(width: 24)
-                        }
-                    }
-                    .frame(height: 120)
 
-                    Text("ボトムス")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 12)
-                        .padding(.leading, 24)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 12) {
-                            // 左端に24pxの空白を空けたいのでSpacerで表現
-                            // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
-                            Spacer().frame(width: 24)
-                            ForEach(viewModel.selectedRecommendCoordinate.affiliate_bottoms, id: \.self) { bottoms in
-                                CachedAsyncImage(url: .init(string: bottoms.image_url)) { phase in
-                                    if let image = phase.image {
-                                        image.resizable()
-                                        .onTapGesture {
-                                            viewModel.setWebViewURLString(url: bottoms.url)
-                                        }
-                                    } else if phase.error != nil {
-                                        Color.red
-                                    } else {
-                                        Color.gray.opacity(0.5)
-                                    }
-                                }
-                                .frame(width: 120, height: 120)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                             Spacer().frame(width: 24)
                         }
                     }
-                    .frame(height: 120)
+                    .frame(height: 110 * (4/3))
+
+                    AffiliateItems(title: "トップス", affiliateProducts: viewModel.selectedRecommendCoordinate.affiliate_tops)
+                    AffiliateItems(title: "ボトムス", affiliateProducts: viewModel.selectedRecommendCoordinate.affiliate_bottoms)
                 }
             case .failed(_):
                 Button(action: {
@@ -259,14 +204,18 @@ struct CoordinateReviewView: View {
 
     private func RecentCoordinateCard(imageURL: String, text: String, _ textColor: Color = .secondary) -> some View {
         VStack(spacing: 0) {
-            AsyncImage(url: URL(string: imageURL)!) { image in
-                image
-                    .resizable()
-                    .aspectRatio(3/4, contentMode: .fit)
-                    .frame(width: 110)
-            } placeholder: {
-                ProgressView()
+
+            CachedAsyncImage(url: URL(string: imageURL)!) { phase in
+                if let image = phase.image {
+                    image.resizable()
+                } else if phase.error != nil {
+                    Color.red
+                } else {
+                    Color.gray.opacity(0.5)
+                }
             }
+            .aspectRatio(3/4, contentMode: .fit)
+            .frame(width: 110)
 
             Text("\(text)")
                 .font(.system(size: 12, weight: .semibold))
@@ -279,14 +228,18 @@ struct CoordinateReviewView: View {
 
     private func RecommendCoordinateCard(imageURL: String) -> some View {
         ZStack {
-            AsyncImage(url: URL(string: imageURL)!) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 110, height: 110 * (4/3))
-            } placeholder: {
-                ProgressView()
+            CachedAsyncImage(url: URL(string: imageURL)!) { phase in
+                if let image = phase.image {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } else if phase.error != nil {
+                    Color.red
+                } else {
+                    Color.gray.opacity(0.5)
+                }
             }
+            .frame(width: 110, height: 110 * (4/3))
         }
         .background(.white)
     }
@@ -312,6 +265,60 @@ struct CoordinateReviewView: View {
         }
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    /// アフェリエイトの商品を横並びに表示する
+    ///
+    /// 商品の表示サイズは width: 100, height: 100
+    /// 商品をタップすると viewModel.setWebViewURLString(url: String) を呼び出し、WebViewを表示する
+    private func AffiliateItems(title: String?, affiliateProducts: [AffiliateProduct]) -> some View {
+        VStack(spacing: 12) {
+            if let title {
+                Text(title)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 24)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    // 左端に24pxの空白を空けたいのでSpacerで表現
+                    // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
+                    Spacer().frame(width: 24)
+                    ForEach(affiliateProducts, id: \.self) { affiliateProduct in
+                        VStack(spacing: 12) {
+                            // 商品画像
+                            CachedAsyncImage(url: .init(string: affiliateProduct.image_url)) { phase in
+                                if let image = phase.image {
+                                    image.resizable()
+                                    .onTapGesture {
+                                        viewModel.setWebViewURLString(url: affiliateProduct.url)
+                                    }
+                                } else if phase.error != nil {
+                                    Color.red
+                                } else {
+                                    Color.gray.opacity(0.5)
+                                }
+                            }
+                            .frame(width: 120, height: 120)
+
+                            // 販売店, 価格
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("\(affiliateProduct.store_name)")
+                                    .lineLimit(2)
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text("¥\(affiliateProduct.price)")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .padding(.bottom, 12)
+                            .padding(.horizontal, 12)
+                        }
+                        .frame(width: 120, height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .background(.white)
+                    }
+                    Spacer().frame(width: 24)
+                }
+            }
+        }
     }
 }
 

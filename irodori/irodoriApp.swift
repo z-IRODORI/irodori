@@ -15,15 +15,6 @@ struct irodoriApp: App {
     var body: some Scene {
         WindowGroup {
 //            SplashView()
-//            CalendarView()
-//            SegmentationView()
-//            OnboardingView(closeButtonTapped: {})
-
-//            CoordinateReviewView(viewModel: .init(
-//                coordinateImage: UIImage(resource: .coordinate2),
-//                apiClient: MockFashionReviewClient()
-//            ), path: .constant([]))
-
 
             CoordinateReviewView(viewModel: .init(
                 coordinateImage: UIImage(resource: .coordinate2),
