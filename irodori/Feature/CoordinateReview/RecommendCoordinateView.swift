@@ -49,9 +49,13 @@ struct RecommendCoordinateView: View {
                                                 Color.gray.opacity(0.5)
                                             }
                                         }
+                                        .overlay(
+                                            // 選択したコーデのみ緑色の枠線をつける
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(viewModel.selectedRecommendCoordinate.id == recommendCoordinate.id ? .green : .clear, lineWidth: 5)
+                                        )
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
                                         .frame(width: 120, height: 120 * 1.38)   // 1:1.38
-
                                     }
                                     Spacer().frame(width: 24)
                                 }
