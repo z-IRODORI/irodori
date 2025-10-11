@@ -61,16 +61,16 @@ struct RecommendCoordinateView: View {
                             AffiliateItems(title: "ボトムス", affiliateProducts: viewModel.selectedRecommendCoordinate.affiliate_bottoms)
                         }
                     }
+                    .background(.gray.opacity(0.08))
                 case .failed(_):
-                    Button(action: {
-                        // action
-                    }, label: {
-                        Image(systemName: "arrow.trianglehead.clockwise")
-                    })
-                    .padding(.leading, 24)
+                    ErrorMessageView(
+                        errorMessage: .init(title: "データの取得に失敗しました。", description: ""),
+                        dismiss: {
+                            dismiss()
+                        }
+                    )
                 }
             }
-            .background(.gray.opacity(0.08))
             .navigationBarTitle("おすすめのコーデ/アイテム", displayMode: .inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {

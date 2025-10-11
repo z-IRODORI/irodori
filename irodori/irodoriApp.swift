@@ -14,12 +14,12 @@ struct irodoriApp: App {
     @State private var path: [ViewType] = []
     var body: some Scene {
         WindowGroup {
-            SplashView()
+//            SplashView()
 
-//            CoordinateReviewView(viewModel: .init(
-//                coordinateImage: UIImage(resource: .coordinate2),
-//                apiClient: MockFashionReviewClient()
-//            ), path: .constant([]))
+            CoordinateReviewView(viewModel: .init(
+                coordinateImage: UIImage(resource: .coordinate2),
+                apiClient: MockFashionReviewClient()
+            ), path: .constant([]))
 
 //            RecommendCoordinateView(
 //                viewModel: .init(recommendCoordinateClient: MockRecommendCoordinateClient())

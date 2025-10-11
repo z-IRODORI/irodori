@@ -18,11 +18,14 @@ struct ErrorMessageView: View {
 
             VStack(spacing: 12) {
                 Text("\(errorMessage.title)")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
 
-                Text("\(errorMessage.description)")
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(.gray)
+                if !errorMessage.description.isEmpty {
+                    Text("\(errorMessage.description)")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(.gray)
+                }
+
 
                 Button(action: {
                     dismiss()

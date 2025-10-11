@@ -44,6 +44,10 @@ final class RecommendCoordinateViewModel {
         webURLString = url
     }
 
+    func tappedReloadButton() async {
+        await fetchRecommendCoordinates()
+    }
+
     private func fetchRecommendCoordinates() async {
         do {
             // 性別を取得（デフォルトは"other"）
