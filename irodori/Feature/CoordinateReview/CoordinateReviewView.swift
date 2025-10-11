@@ -33,10 +33,9 @@ struct CoordinateReviewView: View {
                         RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
                         ReviewText(aiReviewComment: viewModel.fashionReview!.ai_review_comment)
                             .padding(.horizontal, 24)
-                        RecommendCoordinates()
                         CoordinateItems()
                             .padding(.horizontal, 24)
-                            .padding(.bottom, 50 + 24)   // ButtonHeight + BottomPadding
+                            .padding(.bottom, 50 + 12 + 12)   // ButtonHeight + ButtonBottomPadding + BottomPadding
                     }
                 }
                 .navigationBarBackButtonHidden(true)
@@ -51,7 +50,7 @@ struct CoordinateReviewView: View {
                 }
                 .overlay(alignment: .bottom) {
                     Button(action: {
-
+                        viewModel.tappedRecommendCoordinateButton()
                     }) {
                         Text("おすすめのコーデ/アイテムを見る")
                             .foregroundStyle(.white)
@@ -61,7 +60,10 @@ struct CoordinateReviewView: View {
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 12)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 12)
+                }
+                .sheet(isPresented: $viewModel.willShowRecommendCoordinateView) {
+                    RecommendCoordinateView(viewModel: .init(recommendCoordinateClient: RecommendCoordinateClient()))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .navigationDestination(isPresented: $isPresentedCameraView) {
@@ -90,15 +92,6 @@ struct CoordinateReviewView: View {
                 ErrorMessageView(errorMessage: errorMessage) {
                     path.removeAll()   // カメラ画面へ戻る
                 }
-            }
-        }
-        .sheet(isPresented: $viewModel.isShowingWebView) {
-            if let url = URL(string: viewModel.webURLString) {
-                WebViewContainer(url: url)
-            } else {
-                // TODO: エラー画面実装
-                Text("無効なURLです")
-                    .foregroundStyle(.red)
             }
         }
         .task {
@@ -160,62 +153,8 @@ struct CoordinateReviewView: View {
         }
     }
 
-    private func RecommendCoordinates() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("これまでのコーデからおすすめコーデ")
-                .font(.system(size: 20, weight: .bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 24)
-            switch viewModel.recommendCoordinatesState {
-            case .loading, .initial:
-                ProgressView()
-                    .padding(.leading, 24)
-            case .loaded(let recommendCoordinates):
-                VStack(spacing: 24) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            // 左端に24pxの空白を空けたいのでSpacerで表現
-                            // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
-                            Spacer().frame(width: 24)
-                            ForEach(recommendCoordinates.coordinates, id: \.self) { recommendCoordinate in
-                                CachedAsyncImage(url: .init(string: recommendCoordinate.image_url)) { phase in
-                                    if let image = phase.image {
-                                        image.resizable()
-                                            .aspectRatio(contentMode: .fit)   // 角丸を適応させるため
-                                            .onTapGesture {
-                                                viewModel.setSelectedRecommendCoordinate(coordinate: recommendCoordinate)
-                                            }
-                                    } else if phase.error != nil {
-                                        Color.red
-                                    } else {
-                                        Color.gray.opacity(0.5)
-                                    }
-                                }
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .frame(width: 120, height: 120 * 1.38)   // 1:1.38
-
-                            }
-                            Spacer().frame(width: 24)
-                        }
-                    }
-
-                    AffiliateItems(title: "トップス", affiliateProducts: viewModel.selectedRecommendCoordinate.affiliate_tops)
-                    AffiliateItems(title: "ボトムス", affiliateProducts: viewModel.selectedRecommendCoordinate.affiliate_bottoms)
-                }
-            case .failed(_):
-                Button(action: {
-                    // action
-                }, label: {
-                    Image(systemName: "arrow.trianglehead.clockwise")
-                })
-                .padding(.leading, 24)
-            }
-        }
-    }
-
     private func RecentCoordinateCard(imageURL: String, text: String, _ textColor: Color = .secondary) -> some View {
         VStack(spacing: 0) {
-
             CachedAsyncImage(url: URL(string: imageURL)!) { phase in
                 if let image = phase.image {
                     image.resizable()
@@ -277,67 +216,11 @@ struct CoordinateReviewView: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
-
-    /// アフェリエイトの商品を横並びに表示する
-    ///
-    /// 商品の表示サイズは width: 100, height: 100
-    /// 商品をタップすると viewModel.setWebViewURLString(url: String) を呼び出し、WebViewを表示する
-    private func AffiliateItems(title: String?, affiliateProducts: [AffiliateProduct]) -> some View {
-        VStack(spacing: 12) {
-            if let title {
-                Text(title)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 24)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    // 左端に24pxの空白を空けたいのでSpacerで表現
-                    // スクロールすると空白は消えてほしいのでpaddingではなくSpacer
-                    Spacer().frame(width: 24)
-                    ForEach(affiliateProducts, id: \.self) { affiliateProduct in
-                        VStack(spacing: 12) {
-                            // 商品画像
-                            CachedAsyncImage(url: .init(string: affiliateProduct.image_url)) { phase in
-                                if let image = phase.image {
-                                    image.resizable()
-                                    .aspectRatio(contentMode: .fit)// 角丸を適応させるため
-                                    .onTapGesture {
-                                        viewModel.setWebViewURLString(url: affiliateProduct.url)
-                                    }
-                                } else if phase.error != nil {
-                                    Color.red
-                                } else {
-                                    Color.gray.opacity(0.5)
-                                }
-                            }
-                            .frame(width: 120, height: 120)
-
-                            // 販売店, 価格
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("\(affiliateProduct.store_name)")
-                                    .lineLimit(2)
-                                    .font(.system(size: 10, weight: .semibold))
-                                Text("¥\(affiliateProduct.price)")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .padding(.bottom, 12)
-                            .padding(.horizontal, 12)
-                        }
-                        .background(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .frame(width: 120, height: 180)
-                    }
-                    Spacer().frame(width: 24)
-                }
-            }
-        }
-    }
 }
 
 #Preview {
     CoordinateReviewView(viewModel: .init(
         coordinateImage: UIImage(resource: .coordinate2),
-        apiClient: MockFashionReviewClient(),
-        recommendCoordinateClient: MockRecommendCoordinateClient()
+        apiClient: MockFashionReviewClient()
     ), path: .constant([]))
 }

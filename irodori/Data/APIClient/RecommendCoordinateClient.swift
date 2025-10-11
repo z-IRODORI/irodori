@@ -76,6 +76,7 @@ final class MockEmptyAffiliateRecommendCoordinateClient: RecommendCoordinateClie
                     affiliate_bottoms: []
                 )
             ],
+            recommend_reasons: "recommend_reasons",
             genres: [
                 Genre(genre: "test", count: 1)
             ]

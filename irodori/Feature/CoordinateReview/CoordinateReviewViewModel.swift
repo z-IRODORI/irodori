@@ -11,31 +11,22 @@ import CoreML
 @MainActor
 @Observable
 final class CoordinateReviewViewModel {
-    var selectedRecommendCoordinate: RecommendCoordinate = .init(
-        id: 0, 
-        image_url: "", 
-        pin_url_guess: "", 
-        coordinate_review: nil, 
-        tops_categorize: nil, 
-        bottoms_categorize: nil, 
-        affiliate_tops: [], 
-        affiliate_bottoms: []
-    )
-    var selectedCoordinateId: Int = 0
-    var isTappedRecommendCoordinate = false
-    var currentDateString = ""
-    var isShowingWebView = false
-    var webURLString: String = ""
-
     let coordinateImage: UIImage
     let apiClient: FashionReviewClientProtocol
-    let recommendCoordinateClient: RecommendCoordinateClientProtocol
+    var fashionReview: FashionReviewResponse?
+    var isFinishedRequest = false
+    var currentDateString = ""
+    var willShowRecommendCoordinateView = false
     let model: Model?
-    
-    init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol, recommendCoordinateClient: RecommendCoordinateClientProtocol = RecommendCoordinateClient()) {
+    // アイテム抽出の結果
+    var outputUIImage: UIImage = .init(resource: .coordinate4)
+    var topsUIImage: UIImage?
+    var bottomsUIImage: UIImage?
+    var errroMessage: ErrorMessage?
+
+    init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol) {
         self.coordinateImage = coordinateImage
         self.apiClient = apiClient
-        self.recommendCoordinateClient = recommendCoordinateClient
 
         // Model の初期化
         let config = MLModelConfiguration()
@@ -47,19 +38,6 @@ final class CoordinateReviewViewModel {
             print("モデルのロードまたは設定に失敗しました: \(error)")
         }
     }
-
-    var fashionReview: FashionReviewResponse?
-    var isFinishedRequest = false
-    var errroMessage: ErrorMessage?
-    
-    // おすすめコーディネート
-    var recommendCoordinatesState: FetchState<RecommendCoordinateResponse> = .initial
-
-    // アイテム抽出の結果
-    var outputUIImage: UIImage = .init(resource: .coordinate4)
-    var topsUIImage: UIImage?
-    var bottomsUIImage: UIImage?
-
     func onAppear() async {
         // CoreMLの制限により、segment()は単独で実行する必要がある
         // 理由:
@@ -72,19 +50,14 @@ final class CoordinateReviewViewModel {
         // 3. メモリとリソースの競合
         //    - Neural EngineやGPUのメモリ制限により、並列実行時にリソース不足が発生
         await segment()
-        
-        // segmentが成功した場合のみ、API呼び出しを並列実行
+
         if errroMessage == nil {
-            // coordinateReviewとfetchRecommendCoordinatesはAPI呼び出しのため並列実行可能
-            async let reviewTask: Void = coordinateReview()
-            async let recommendTask: Void = fetchRecommendCoordinates()
-            
-            _ = await (reviewTask, recommendTask)
+            await coordinateReview()
         }
     }
 
-    func updateSIstTapedRecomendCoordinate(isTaped: Bool) {
-        isTappedRecommendCoordinate = isTaped
+    func tappedRecommendCoordinateButton() {
+        willShowRecommendCoordinateView.toggle()
     }
 
     private func coordinateReview() async {
@@ -141,15 +114,6 @@ final class CoordinateReviewViewModel {
         }
     }
 
-    func setSelectedRecommendCoordinate(coordinate: RecommendCoordinate) {
-        selectedRecommendCoordinate = coordinate
-    }
-
-    func setWebViewURLString(url: String) {
-        isShowingWebView = true
-        webURLString = url
-    }
-
     private func setCurrentDateString() {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy/MM/dd"
@@ -161,30 +125,7 @@ final class CoordinateReviewViewModel {
     private func setErrerMessage(mlError: MLError) {
         errroMessage = .init(title: mlError.title, description: mlError.errorDescription)
     }
-
     
-    private func fetchRecommendCoordinates() async {
-        do {
-            // 性別を取得（デフォルトは"other"）
-            let gender = UserDefaults.standard.string(forKey: "gender") ?? "men"
-
-            recommendCoordinatesState = .loading
-            let result = try await recommendCoordinateClient.post(gender: gender)
-            
-            switch result {
-            case .success(let response):
-                recommendCoordinatesState = .loaded(response)
-                if let recommendCoordinate = response.coordinates.first {
-                    selectedRecommendCoordinate = recommendCoordinate
-                }
-            case .failure(let httpError):
-                recommendCoordinatesState = .failed(httpError)
-            }
-        } catch {
-            recommendCoordinatesState = .failed(HTTPError.badRequest)
-        }
-    }
-
     private func handleAPIError(_ error: Error) {
         if let httpError = error as? HTTPError {
             errroMessage = .init(title: httpError.title, description: httpError.errorDescription)

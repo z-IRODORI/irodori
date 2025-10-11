@@ -9,6 +9,7 @@ import Foundation
 
 struct RecommendCoordinateResponse: Codable {
     let coordinates: [RecommendCoordinate]
+    let recommend_reasons: String?
     let genres: [Genre]?
 }
 
@@ -110,6 +111,7 @@ extension RecommendCoordinateResponse {
                     ]
                 )
             ],
+            recommend_reasons: "ブラックを基調としたミニマルなスタイルに、チェック柄のシャツを重ね着し、カジュアルさとアクセントを加えることで、単調になりがちなモノトーンコーデに深みと個性をプラスできます。また、ダメージジーンズを取り入れれば、リラックスした雰囲気を演出しつつ、都会的なブラックコーデのカジュアルダウンとしても活躍します。柄や素材感で遊ぶことで、シックな中にも抜け感と遊び心が生まれます。",
             genres: [
                 Genre(genre: "casual", count: 3),
                 Genre(genre: "korean", count: 2)
