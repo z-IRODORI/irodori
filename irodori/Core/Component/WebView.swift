@@ -139,11 +139,9 @@ struct WebViewContainer: View {
                 webViewStore: webViewStore
             )
         }
-        .overlay(alignment: .top) {
+        .overlay(alignment: .center) {
             if isLoading {
                 ProgressView()
-                    .progressViewStyle(LinearProgressViewStyle())
-                    .background(Color(UIColor.systemBackground))
             }
         }
         .navigationBarTitleDisplayMode(.inline)

@@ -150,8 +150,10 @@ struct RecommendCoordinateView: View {
                                 Text("\(affiliateProduct.store_name)")
                                     .lineLimit(2)
                                     .font(.system(size: 10, weight: .semibold))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 Text("¥\(affiliateProduct.price)")
                                     .font(.system(size: 14, weight: .semibold))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .padding(.bottom, 12)
                             .padding(.horizontal, 12)
