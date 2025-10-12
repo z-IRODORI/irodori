@@ -13,7 +13,17 @@ import CoreML
 final class CoordinateReviewViewModel {
     let coordinateImage: UIImage
     let apiClient: FashionReviewClientProtocol
+    var fashionReview: FashionReviewResponse?
+    var isFinishedRequest = false
+    var currentDateString = ""
+    var willShowRecommendCoordinateView = false
     let model: Model?
+    // アイテム抽出の結果
+    var outputUIImage: UIImage = .init(resource: .coordinate4)
+    var topsUIImage: UIImage?
+    var bottomsUIImage: UIImage?
+    var errroMessage: ErrorMessage?
+
     init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol) {
         self.coordinateImage = coordinateImage
         self.apiClient = apiClient
@@ -28,24 +38,31 @@ final class CoordinateReviewViewModel {
             print("モデルのロードまたは設定に失敗しました: \(error)")
         }
     }
-
-    var fashionReview: FashionReviewResponse?
-    var isFinishedRequest = false
-    var errroMessage: ErrorMessage?
-
-    // アイテム抽出の結果
-    var outputUIImage: UIImage = .init(resource: .coordinate4)
-    var topsUIImage: UIImage?
-    var bottomsUIImage: UIImage?
-
-    func loadingOnAppear() async {
+    func onAppear() async {
+        // CoreMLの制限により、segment()は単独で実行する必要がある
+        // 理由:
+        // 1. CoreMLは内部的にシリアル実行を強制する
+        //    - Appleは並列予測を許可しているように見えるが、実際には内部で順次実行される
+        //    - 複数のモデル予測を同時に実行しようとするとエラーが発生する可能性がある
+        // 2. 計算ユニット（.cpuAndGPU）の競合
+        //    - 複数の処理が同時にGPUリソースにアクセスしようとすると、推論コンテキストの作成に失敗
+        //    - "Could not create inference context" エラーの原因
+        // 3. メモリとリソースの競合
+        //    - Neural EngineやGPUのメモリ制限により、並列実行時にリソース不足が発生
         await segment()
-        await coordinateReview()
+
+        if errroMessage == nil {
+            await coordinateReview()
+        }
+    }
+
+    func tappedRecommendCoordinateButton() {
+        willShowRecommendCoordinateView.toggle()
     }
 
     private func coordinateReview() async {
         do {
-            let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue)!
+            let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
             let fashionReviewResponse: Result<FashionReviewResponse, HTTPError> = try await apiClient.post(
                 uid: uid,
                 image: coordinateImage.correctOrientation,
@@ -95,6 +112,14 @@ final class CoordinateReviewViewModel {
         } catch {
             setErrerMessage(mlError: .unknwon)
         }
+    }
+
+    private func setCurrentDateString() {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy/MM/dd"
+        dateFormatter.locale = Locale(identifier: "ja_JP")
+        let now = Date()
+        currentDateString = dateFormatter.string(from: now)
     }
 
     private func setErrerMessage(mlError: MLError) {

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CoordinateReviewView: View {
-    let viewModel: CoordinateReviewViewModel
+    @State var viewModel: CoordinateReviewViewModel
 
     private let shortTextCriterion = 50
     @State private var currentSchedule = ""   // YYYY/MM/DD
@@ -16,19 +16,26 @@ struct CoordinateReviewView: View {
     @State private var isShowFullReview = false
     @State private var tappedURL = ""
     @State private var isPresentedCameraView = false
+    @State private var tappedAffiliateProduct: AffiliateProduct?
     @Binding var path: [ViewType]
+
 
     var body: some View {
         ZStack {
             if let fashionReview = viewModel.fashionReview {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 32) {
-                        Coordinate()
+                        LargeCoordinateCard(
+                            coordinateImage: viewModel.coordinateImage,
+                            currentSchedule: viewModel.currentDateString,
+                            aiCatchphrase: viewModel.fashionReview!.ai_catchphrase
+                        )
                         RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
-                        ReviewText()
+                        ReviewText(aiReviewComment: viewModel.fashionReview!.ai_review_comment)
                             .padding(.horizontal, 24)
                         CoordinateItems()
                             .padding(.horizontal, 24)
+                            .padding(.bottom, 50 + 12 + 12)   // ButtonHeight + ButtonBottomPadding + BottomPadding
                     }
                 }
                 .navigationBarBackButtonHidden(true)
@@ -41,14 +48,24 @@ struct CoordinateReviewView: View {
                         })
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        //        .sheet(item: $tappedRecommendItem) { tappedRecommendItem in
-        //            WebView(url: URL(string: tappedRecommendItem.itemURL))
-        //        }
-                .onChange(of: tappedURL) {
-                    let url = URL(string: tappedURL)!   // TODO: エラーハンドリング
-                    UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                .overlay(alignment: .bottom) {
+                    Button(action: {
+                        viewModel.tappedRecommendCoordinateButton()
+                    }) {
+                        Text("おすすめのコーデ/アイテムを見る")
+                            .foregroundStyle(.white)
+                            .font(.system(size: 16, weight: .bold))
+                            .frame(maxWidth: .infinity, maxHeight: 50)
+                            .background(.pink)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
                 }
+                .sheet(isPresented: $viewModel.willShowRecommendCoordinateView) {
+                    RecommendCoordinateView(viewModel: .init(recommendCoordinateClient: RecommendCoordinateClient()))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .navigationDestination(isPresented: $isPresentedCameraView) {
                     CameraView()
                 }
@@ -68,9 +85,6 @@ struct CoordinateReviewView: View {
                         .resizable()
                         .frame(width: 200, height: 300)
                 }
-                .task {
-                    await viewModel.loadingOnAppear()
-                }
                 .navigationBarBackButtonHidden()
             }
 
@@ -79,6 +93,9 @@ struct CoordinateReviewView: View {
                     path.removeAll()   // カメラ画面へ戻る
                 }
             }
+        }
+        .task {
+            await viewModel.onAppear()
         }
     }
 
@@ -136,110 +153,19 @@ struct CoordinateReviewView: View {
         }
     }
 
-    private func Coordinate() -> some View {
-        ZStack {
-            Image(uiImage: viewModel.coordinateImage)
-                .resizable()
-                .aspectRatio(3/4, contentMode: .fit)
-                .overlay {
-                    GeometryReader { geometry in
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.clear, Color.black.opacity(0.8)]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: geometry.size.height / 2)
-                        .position(x: geometry.size.width / 2,
-                                  y: geometry.size.height - (geometry.size.height / 4))
-                    }
-                }
-                .overlay {
-                    GeometryReader { geometry in
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.black.opacity(0.3), Color.clear]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: 50)
-                        .position(x: geometry.size.width / 2, y: 24)
-                    }
-                }
-
-            Text("\(currentSchedule)")
-                .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(.white)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .padding(.top, 12)
-            Text("\(viewModel.fashionReview!.ai_catchphrase)")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
-        }
-        .onAppear {
-            // TODO: VM に移行
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy/MM/dd"
-            dateFormatter.locale = Locale(identifier: "ja_JP")
-            let now = Date()
-            currentSchedule = dateFormatter.string(from: now)
-        }
-    }
-
-    private func ReviewText() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("AIのコーデコメント")
-                .font(.system(size: 20, weight: .bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            if isShowFullReview {
-                Text(.init(viewModel.fashionReview!.ai_review_comment))
-                    .font(.system(size: 16, weight: .regular))
-            } else {
-                VStack {
-                    Text("\(viewModel.fashionReview!.ai_review_comment.prefix(shortTextCriterion)) ...")
-                        .font(.system(size: 16, weight: .regular))
-                    Button(action: {
-                        isShowFullReview = true
-                    }) {
-                        Text("続きを見る")
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundStyle(.blue)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                }
-            }
-        }
-        .onAppear {
-            isShowFullReview = viewModel.fashionReview!.ai_review_comment.count < shortTextCriterion
-        }
-    }
-
-    private func RecommendItemText(coordinate_item: String, recommend_item: String, recommend_item_url: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button(action: {
-//                tappedURL = recommend_item_url
-            }, label: {
-                Text("🔍 \(recommend_item)")
-                    .font(.system(size: 16, weight: .bold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            })
-            Text("\(coordinate_item)")
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
     private func RecentCoordinateCard(imageURL: String, text: String, _ textColor: Color = .secondary) -> some View {
         VStack(spacing: 0) {
-            AsyncImage(url: URL(string: imageURL)!) { image in
-                image
-                    .resizable()
-                    .aspectRatio(3/4, contentMode: .fit)
-                    .frame(width: 110)
-            } placeholder: {
-                ProgressView()
+            CachedAsyncImage(url: URL(string: imageURL)!) { phase in
+                if let image = phase.image {
+                    image.resizable()
+                } else if phase.error != nil {
+                    Color.red
+                } else {
+                    Color.gray.opacity(0.5)
+                }
             }
+            .aspectRatio(3/4, contentMode: .fit)
+            .frame(width: 110)
 
             Text("\(text)")
                 .font(.system(size: 12, weight: .semibold))
@@ -250,25 +176,26 @@ struct CoordinateReviewView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func CoordinateItemCard(imageURL: String, text: String, textColor: Color = .secondary) -> some View {
-        VStack(spacing: 0) {
-            AsyncImage(url: URL(string: imageURL)!) { image in
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 110, height: 110)
-            } placeholder: {
-                ProgressView()
+    private func RecommendCoordinateCard(imageURL: String) -> some View {
+        ZStack {
+            CachedAsyncImage(url: URL(string: imageURL)!) { phase in
+                if let image = phase.image {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } else if phase.error != nil {
+                    Color.red
+                } else {
+                    Color.gray.opacity(0.5)
+                }
             }
-            Text("\(text)")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(textColor)
-                .padding(.vertical, 10)
+            .frame(width: 110, height: 110 * (4/3))
         }
         .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
+    // コーデアイテム抽出をローカルで実行しているためuiImageを渡している
+    // TODO: - コーデアイテム抽出をサーバーで実行可能になった時、このコンポーネントを削除
     private func CoordinateItemCard(uiImage: UIImage?, text: String, textColor: Color = .secondary) -> some View {
         VStack(spacing: 0) {
             if let uiImage {

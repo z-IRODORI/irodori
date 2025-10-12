@@ -12,10 +12,11 @@ struct CalendarCell: View {
     var thumbnailImageURL: String?
     var height: CGFloat
     var dayOfMonth: Int
+    var onTap: () -> Void
 
     var body: some View {
         Button {
-            
+            onTap()
         } label: {
             ZStack {
                 // 全身画像
