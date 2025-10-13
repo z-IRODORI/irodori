@@ -35,6 +35,7 @@ struct CoordinateDetailView: View {
     //                    .padding(.bottom, 50 + 12 + 12)   // ButtonHeight + ButtonBottomPadding + BottomPadding
                 }
             }
+            .padding(.bottom, 100)
         }
         .overlay(alignment: .bottom) {
             Button(action: {

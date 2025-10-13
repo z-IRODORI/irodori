@@ -53,23 +53,22 @@ struct CalendarView: View {
 
                         // Days in a month
                         ForEach(1..<viewModel.months[i].amountOfDays + 1, id: \.self) { day in
-                            CalendarCell(
-                                thumbnailImageURL: viewModel.coordinateListResponses[i][day - 1].coodinate_image_path,
-                                height: UIScreen.main.bounds.width/6.5,
-                                dayOfMonth: day,
-                                onTap: {
-                                    // 画像がある場合のみ遷移
-                                    if let coordinateImageURL = viewModel.coordinateListResponses[i][day - 1].coodinate_image_path {
-                                        let year = viewModel.months[i].year
-                                        let month = viewModel.months[i].monthOfTheYear
-                                        let targetDateString = String(format: "%04d-%02d-%02d", year, month, day)
-                                        let params: ViewType.CoordinateDetailParams = .init(uid: viewModel.uid, targetDateString: targetDateString, coordinateImageURL: coordinateImageURL)
-                                        path.append(.coordinateDetail(params))
+                            if !viewModel.coordinateListResponses.isEmpty {
+                                CalendarCell(
+                                    thumbnailImageURL: viewModel.coordinateListResponses[i][day - 1].coodinate_image_path,
+                                    height: UIScreen.main.bounds.width/6.5,
+                                    dayOfMonth: day,
+                                    onTap: {
+                                        // 画像がある場合のみ遷移
+                                        if let coordinateImageURL = viewModel.coordinateListResponses[i][day - 1].coodinate_image_path {
+                                            let year = viewModel.months[i].year
+                                            let month = viewModel.months[i].monthOfTheYear
+                                            let targetDateString = String(format: "%04d-%02d-%02d", year, month, day)
+                                            let params: ViewType.CoordinateDetailParams = .init(uid: viewModel.uid, targetDateString: targetDateString, coordinateImageURL: coordinateImageURL)
+                                            path.append(.coordinateDetail(params))
+                                        }
                                     }
-                                }
-                            )
-                            .onAppear {
-                                print("🐶 \(viewModel.coordinateListResponses)")
+                                )
                             }
                         }
                     }
@@ -83,11 +82,8 @@ struct CalendarView: View {
         }
         .navigationBarHidden(true)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            Task {
-                print("🐶 \(viewModel.coordinateListResponses)")
-                await viewModel.onAppear()
-            }
+        .task {
+            await viewModel.onAppear()
         }
     }
 
