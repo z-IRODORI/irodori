@@ -32,7 +32,7 @@ struct RecommendCoordinateView: View {
                                             .resizable()
                                             .frame(width: 50, height: 50)
                                             .clipShape(Circle())
-                                        SpeechBubbleView(text: "おすすめのコーデを3件選んできたよ")
+                                        SpeechBubbleView(text: "おすすめコーデを3つ選んだよ")
                                     }
                                     Text(recommendReasons)
                                 }
