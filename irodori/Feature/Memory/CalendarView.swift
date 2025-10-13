@@ -9,8 +9,10 @@ import Foundation
 import SwiftUI
 
 struct CalendarView: View {
+    @State var viewModel: CalendarViewModel
+    @Binding var path: [ViewType]
+
     @Environment(\.presentationMode) var mode
-    
     private let columns = [
         GridItem.init(.flexible(), alignment: .center),
         GridItem.init(.flexible(), alignment: .center),
@@ -21,10 +23,7 @@ struct CalendarView: View {
         GridItem.init(.flexible(), alignment: .center)
     ]
 
-    @State var viewModel: CalendarViewModel = .init(apiClient: CoordinateListClient())
-
     var body: some View {
-
         ZStack(alignment: .top) {
             ScrollView(showsIndicators: false) {
 
@@ -60,16 +59,18 @@ struct CalendarView: View {
                                 dayOfMonth: day,
                                 onTap: {
                                     // 画像がある場合のみ遷移
-                                    if viewModel.coordinateListResponses[i][day - 1].coodinate_image_path != nil {
+                                    if let coordinateImageURL = viewModel.coordinateListResponses[i][day - 1].coodinate_image_path {
                                         let year = viewModel.months[i].year
                                         let month = viewModel.months[i].monthOfTheYear
-                                        let targetDate = String(format: "%04d-%02d-%02d", year, month, day)
-                                        Task {
-                                            await viewModel.fetchCoordinateDetail(targetDate: targetDate)
-                                        }
+                                        let targetDateString = String(format: "%04d-%02d-%02d", year, month, day)
+                                        let params: ViewType.CoordinateDetailParams = .init(uid: viewModel.uid, targetDateString: targetDateString, coordinateImageURL: coordinateImageURL)
+                                        path.append(.coordinateDetail(params))
                                     }
                                 }
                             )
+                            .onAppear {
+                                print("🐶 \(viewModel.coordinateListResponses)")
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -82,8 +83,11 @@ struct CalendarView: View {
         }
         .navigationBarHidden(true)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task {
-            await viewModel.onAppear()
+        .onAppear {
+            Task {
+                print("🐶 \(viewModel.coordinateListResponses)")
+                await viewModel.onAppear()
+            }
         }
     }
 
@@ -107,5 +111,5 @@ struct CalendarView: View {
 }
 
 #Preview {
-    CalendarView()
+    CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: .constant([]))
 }

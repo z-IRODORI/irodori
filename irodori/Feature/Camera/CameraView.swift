@@ -98,12 +98,19 @@ struct CameraView: View {
             .navigationDestination(for: ViewType.self) { viewType in
                 switch viewType {
                 case .coordinateReview:
-                    CoordinateReviewView(viewModel: .init(
-                        coordinateImage: cameraViewModel.capturedImage!.correctOrientation,
-                        apiClient: FashionReviewClient()
-                    ), path: $path)
+                    CoordinateReviewView(
+                        viewModel: .init(
+                            coordinateImage: cameraViewModel.capturedImage!.correctOrientation,
+                            apiClient: FashionReviewClient()
+                        ),
+                        path: $path
+                    )
                 case .calendar:
-                    CalendarView()
+                    CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
+                case .coordinateDetail(let params):
+                    CoordinateDetailView(
+                        viewModel: .init(uid: params.uid, targetDateString: params.targetDateString, coordinateImageURL: params.coordinateImageURL, coordinateDetailClient: CoordinateDetailClient())
+                    )
                 case .camera:
                     EmptyView()
                 }

@@ -19,7 +19,7 @@ struct FashionReviewResponse: Decodable, Hashable {
         var date: String
         var coodinate_image_path: String
     }
-    struct RecentCoordinate: Decodable, Hashable {
+    struct RecentCoordinate: Decodable, Hashable, Equatable {
         var id: String
         var date: String
         var coodinate_image_path: String

@@ -15,18 +15,36 @@ final class CalendarViewModel {
     let daysOfTheWeek: [Week] = Week.allCases
     var coordinateListResponses: [[CoordinateListResponse]] = []
     let uid: String
-    var coordinateDetail: CoordinateDetailResponse?
-    var isLoadingDetail = false
 
     let apiClient: CoordinateListClientProtocol
-    let coordinateDetailClient: CoordinateDetailClientProtocol
-    init(apiClient: CoordinateListClientProtocol, coordinateDetailClient: CoordinateDetailClientProtocol = CoordinateDetailClient(), repository: SignUpDateRepositoryProtocol = SignUpDateRepository()) {
+    init(apiClient: CoordinateListClientProtocol) {
         self.apiClient = apiClient
-        self.coordinateDetailClient = coordinateDetailClient
         self.uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue)!
+        setupMonths()
+    }
+
+    func onAppear() async {
+        setupMonths()
+        coordinateListResponses = []
+        do {
+            for month in months {
+                let result = try await apiClient.get(uid: uid, year: month.year, month: month.monthOfTheYear)
+                switch result {
+                case .success(let response):
+                    coordinateListResponses.append(response)
+                case .failure(let error):
+                    print(error)
+                }
+            }
+        } catch {
+            print("Error in onAppear: \(error)")
+        }
+    }
+
+    private func setupMonths(repository: SignUpDateRepositoryProtocol = SignUpDateRepository()) {
+        self.months = []
         let calendar = Calendar(identifier: .gregorian)
         let today = Date()
-
         // 年月を一意にするために最初の日に合わせる
         guard let signupDate = repository.load(),
               let startDate = calendar.date(from: calendar.dateComponents([.year, .month], from: signupDate)),
@@ -51,41 +69,6 @@ final class CalendarViewModel {
             date = calendar.date(byAdding: .month, value: 1, to: date)!
         }
         self.months = monthList
-    }
-
-    func onAppear() async {
-        do {
-            for month in months {
-                let result = try await apiClient.get(uid: uid, year: month.year, month: month.monthOfTheYear)
-                switch result {
-                case .success(let response):
-                    coordinateListResponses.append(response)
-                case .failure(let error):
-                    print(error)
-                }
-            }
-        } catch {
-
-        }
-    }
-    
-    func fetchCoordinateDetail(targetDate: String) async {
-        isLoadingDetail = true
-        defer { isLoadingDetail = false }
-        
-        do {
-            let result = try await coordinateDetailClient.get(uid: uid, targetDate: targetDate)
-            switch result {
-            case .success(let response):
-                if let firstDetail = response.first {
-                    coordinateDetail = firstDetail
-                }
-            case .failure(let error):
-                print("Failed to fetch coordinate detail: \(error)")
-            }
-        } catch {
-            print("Error fetching coordinate detail: \(error)")
-        }
     }
 }
 
