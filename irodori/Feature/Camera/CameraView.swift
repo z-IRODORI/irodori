@@ -40,7 +40,7 @@ struct CameraView: View {
                         CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
                             .aspectRatio(3/4, contentMode: .fit)
                             .clipShape(RoundedRectangle(cornerRadius: 24))
-                        PartnerComment(image: .wolf, text: "最近黒の​服着てるね。​かっこいいよ\nオレンジで​差し色するとより​良さそう〜！​")
+                        PartnerComment(image: .wolf, text: Comment.selectedTips())
                             .padding(.horizontal, 12)
                             .padding(.top, -80)
 
