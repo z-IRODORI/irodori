@@ -31,8 +31,14 @@ struct CoordinateReviewView: View {
                             aiCatchphrase: viewModel.fashionReview!.ai_catchphrase
                         )
                         RecentCoordinates()   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
-                        ReviewText(aiReviewComment: viewModel.fashionReview!.ai_review_comment)
-                            .padding(.horizontal, 24)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Image(.wolf)
+                                .resizable()
+                                .frame(width: 50, height: 50)
+                                .clipShape(Circle())
+                            ReviewText(aiReviewComment: viewModel.fashionReview!.ai_review_comment)
+                        }
+                        .padding(.horizontal, 24)
                         CoordinateItems()
                             .padding(.horizontal, 24)
                             .padding(.bottom, 50 + 12 + 12)   // ButtonHeight + ButtonBottomPadding + BottomPadding

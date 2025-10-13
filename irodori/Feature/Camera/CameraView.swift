@@ -40,6 +40,9 @@ struct CameraView: View {
                         CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
                             .aspectRatio(3/4, contentMode: .fit)
                             .clipShape(RoundedRectangle(cornerRadius: 24))
+                        PartnerComment(image: .wolf, text: "最近黒の​服着てるね。​かっこいいよ\nオレンジで​差し色するとより​良さそう〜！​")
+                            .padding(.horizontal, 12)
+                            .padding(.top, -80)
 
                         ZStack(alignment: .center) {
                             PhotoLibraryButton()
@@ -50,8 +53,29 @@ struct CameraView: View {
                     }
                     .frame(maxHeight: .infinity, alignment: .top)
 
+                // .connectedDevice との差分はキャプチャ領域がピンク色背景になるだけ
                 case .noDevice, .error:
-                    Color.red.opacity(0.6)
+                    Color.white
+                    VStack(spacing: 32) {
+                        Header()
+                            .padding(.top, 80)
+                            .padding(.horizontal, 24)
+
+                        Color.pink
+                            .aspectRatio(3/4, contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 24))
+                        PartnerComment(image: .wolf, text: Comment.selectedTips())
+                            .padding(.horizontal, 12)
+                            .padding(.top, -80)
+
+                        ZStack(alignment: .center) {
+                            PhotoLibraryButton()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.leading, 24)
+                            CaptureButton()
+                        }
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
                 }
             }
             .navigationBarBackButtonHidden()
@@ -150,6 +174,17 @@ struct CameraView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 30)
+    }
+
+    private func PartnerComment(image: ImageResource, text: String) -> some View {
+        HStack(spacing: 0) {
+            Image(.wolf)
+                .resizable()
+                .frame(width: 50, height: 50)
+                .clipShape(Circle())
+
+            SpeechBubbleView(text: text)
+        }
     }
 }
 
