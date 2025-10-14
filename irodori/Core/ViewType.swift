@@ -5,10 +5,17 @@
 //  Created by yuki.hamada on 2025/07/15.
 //
 
-import Foundation
+import UIKit
 
-enum ViewType {
+enum ViewType: Hashable {
     case camera
     case calendar
     case coordinateReview
+    case coordinateDetail(CoordinateDetailParams)
+
+    struct CoordinateDetailParams: Hashable {
+        let uid: String
+        let targetDateString: String
+        let coordinateImageURL: String
+    }
 }

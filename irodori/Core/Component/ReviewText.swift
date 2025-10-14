@@ -19,10 +19,6 @@ struct ReviewText: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("AIのコーデコメント")
-                .font(.system(size: 20, weight: .bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             if isShowFullReview {
                 Text(.init(aiReviewComment))
                     .font(.system(size: 16, weight: .regular))

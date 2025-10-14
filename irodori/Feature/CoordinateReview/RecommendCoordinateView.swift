@@ -26,9 +26,17 @@ struct RecommendCoordinateView: View {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 24) {
                             if let recommendReasons = recommendCoordinates.recommend_reasons {
-                                Text(recommendReasons)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 24)
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack(spacing: 6) {
+                                        Image(.wolf)
+                                            .resizable()
+                                            .frame(width: 50, height: 50)
+                                            .clipShape(Circle())
+                                        SpeechBubbleView(text: "おすすめコーデを3つ選んだよ")
+                                    }
+                                    Text(recommendReasons)
+                                }
+                                .padding(.horizontal, 24)
                             }
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {

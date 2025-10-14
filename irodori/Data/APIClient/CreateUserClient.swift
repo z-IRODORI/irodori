@@ -26,7 +26,6 @@ final class CreateUserClient {
             print(data)
             // JSONレスポンスをデコード
             let response = try JSONDecoder().decode(CreateUserResponse.self, from: data)
-            print(response)
             return .success(response)
         } catch {
             // TODO: エラーハンドリング
