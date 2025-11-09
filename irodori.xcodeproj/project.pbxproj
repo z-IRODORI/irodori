@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		490E163F2EC0CC8500EFCE15 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 490E163E2EC0CC8500EFCE15 /* FirebaseAnalytics */; };
+		490E16412EC0CC8500EFCE15 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = 490E16402EC0CC8500EFCE15 /* FirebaseAnalyticsCore */; };
+		490E16432EC0CC8500EFCE15 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 490E16422EC0CC8500EFCE15 /* FirebaseCore */; };
+		490E16452EC0CC8500EFCE15 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 490E16442EC0CC8500EFCE15 /* FirebaseCrashlytics */; };
+		490E16472EC0CC8500EFCE15 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 490E16462EC0CC8500EFCE15 /* FirebaseFirestore */; };
 		49CBE94B2D9E94E800383A64 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 49CBE94A2D9E94E800383A64 /* Kingfisher */; };
 /* End PBXBuildFile section */
 
@@ -69,7 +74,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				490E163F2EC0CC8500EFCE15 /* FirebaseAnalytics in Frameworks */,
+				490E16412EC0CC8500EFCE15 /* FirebaseAnalyticsCore in Frameworks */,
+				490E16452EC0CC8500EFCE15 /* FirebaseCrashlytics in Frameworks */,
+				490E16432EC0CC8500EFCE15 /* FirebaseCore in Frameworks */,
 				49CBE94B2D9E94E800383A64 /* Kingfisher in Frameworks */,
+				490E16472EC0CC8500EFCE15 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -139,6 +149,11 @@
 			name = irodori;
 			packageProductDependencies = (
 				49CBE94A2D9E94E800383A64 /* Kingfisher */,
+				490E163E2EC0CC8500EFCE15 /* FirebaseAnalytics */,
+				490E16402EC0CC8500EFCE15 /* FirebaseAnalyticsCore */,
+				490E16422EC0CC8500EFCE15 /* FirebaseCore */,
+				490E16442EC0CC8500EFCE15 /* FirebaseCrashlytics */,
+				490E16462EC0CC8500EFCE15 /* FirebaseFirestore */,
 			);
 			productName = irodori;
 			productReference = D4C87F5C2D8AA64600FA8A08 /* irodori.app */;
@@ -224,6 +239,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				49CBE9482D9E943200383A64 /* XCRemoteSwiftPackageReference "Kingfisher" */,
+				490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D4C87F5D2D8AA64600FA8A08 /* Products */;
@@ -602,6 +618,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.5.0;
+			};
+		};
 		49CBE9482D9E943200383A64 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
@@ -613,6 +637,31 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		490E163E2EC0CC8500EFCE15 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		490E16402EC0CC8500EFCE15 /* FirebaseAnalyticsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsCore;
+		};
+		490E16422EC0CC8500EFCE15 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		490E16442EC0CC8500EFCE15 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		490E16462EC0CC8500EFCE15 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
 		49CBE94A2D9E94E800383A64 /* Kingfisher */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 49CBE9482D9E943200383A64 /* XCRemoteSwiftPackageReference "Kingfisher" */;
