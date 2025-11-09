@@ -14,7 +14,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         FirebaseApp.configure()
         
         // アプリ起動時のログを送信
-        AnalyticsLogger.shared.log(event: .appLaunch)
+        AnalyticsLogger.shared.log(screen: .appLaunch)
 
         return true
     }

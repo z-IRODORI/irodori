@@ -18,7 +18,7 @@ struct irodoriApp: App {
         WindowGroup {
             SplashView()
                 .onAppear {
-                    AnalyticsLogger.shared.log(event: .splashScreenView)
+                    AnalyticsLogger.shared.log(screen: .splashScreenView)
                 }
 
 //            CameraView()

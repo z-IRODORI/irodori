@@ -40,6 +40,9 @@ struct OnboardingView: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .padding(.top, 32)
+        .onAppear {
+            AnalyticsLogger.shared.log(screen: .onboardingScreenView)
+        }
     }
 
     private func OnboardingCardView(onbordingInfo: OnboardingInfo) -> some View {
@@ -69,8 +72,15 @@ struct OnboardingView: View {
     private func NextButton() -> some View {
         Button(action: {
             if selectedOnbordingIndex < onbordingInfos.count - 1 {
+                AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
+                    "action": GAEventAction.nextPage.rawValue,
+                    "page_index": selectedOnbordingIndex + 1
+                ])
                 selectedOnbordingIndex += 1
             } else {
+                AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
+                    "action": GAEventAction.closeOnboarding.rawValue
+                ])
                 closeButtonTapped()
             }
         }) {

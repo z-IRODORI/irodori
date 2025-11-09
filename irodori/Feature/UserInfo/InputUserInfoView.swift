@@ -157,6 +157,10 @@ struct InputUserInfoView: View {
             
             // 完了ボタン
             Button(action: {
+                AnalyticsLogger.shared.log(action: .userInfoSubmitted, parameters: [
+                    "gender": viewModel.selectedGender.rawValue,
+                    "username_length": viewModel.username.count
+                ])
                 Task {
                     await viewModel.okButtonTapped()
                     finishedInputUserInfo()
@@ -178,6 +182,9 @@ struct InputUserInfoView: View {
         .ignoresSafeArea()
         .onTapGesture {
             focusedField = nil
+        }
+        .onAppear {
+            AnalyticsLogger.shared.log(screen: .userInfoScreenView)
         }
     }
 }

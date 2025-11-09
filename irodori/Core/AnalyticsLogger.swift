@@ -13,8 +13,16 @@ final class AnalyticsLogger {
 
     private init() {}
 
-    func log(event: GAEvent, parameters: [String: Any]? = nil) {
-        Analytics.logEvent(event.rawValue, parameters: parameters)
+    func log(screen: GAEventScreen, parameters: [String: Any]? = nil) {
+        Analytics.logEvent(screen.rawValue, parameters: parameters)
+    }
+    
+    func log(action: GAEventAction, parameters: [String: Any]? = nil) {
+        Analytics.logEvent(action.rawValue, parameters: parameters)
+    }
+    
+    func log(error: GAEventError, parameters: [String: Any]? = nil) {
+        Analytics.logEvent(error.rawValue, parameters: parameters)
     }
 
     // MARK: - User Identification
