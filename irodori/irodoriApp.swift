@@ -11,10 +11,15 @@ import Vision
 
 @main
 struct irodoriApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+
     @State private var path: [ViewType] = []
     var body: some Scene {
         WindowGroup {
             SplashView()
+                .onAppear {
+                    AnalyticsLogger.shared.log(event: .splashScreenView)
+                }
 
 //            CameraView()
 
