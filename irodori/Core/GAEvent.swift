@@ -49,6 +49,12 @@ enum GAEventAction: String {
     // Content Sources
     case coordinateReview = "coordinate_review"
     case coordinateDetail = "coordinate_detail"
+    
+    // App Lifecycle
+    case appBackground = "app_background"
+    case appTerminate = "app_terminate"
+    case appWillResignActive = "app_will_resign_active"
+    case appDidBecomeActive = "app_did_become_active"
 }
 
 enum GAEventError: String {

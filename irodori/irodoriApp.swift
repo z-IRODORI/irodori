@@ -12,6 +12,7 @@ import Vision
 @main
 struct irodoriApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @Environment(\.scenePhase) var scenePhase
 
     @State private var path: [ViewType] = []
     var body: some Scene {
@@ -19,6 +20,18 @@ struct irodoriApp: App {
             SplashView()
                 .onAppear {
                     AnalyticsLogger.shared.log(screen: .splashScreenView)
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    switch newPhase {
+                    case .background:
+                        AnalyticsLogger.shared.log(action: .appBackground)
+                    case .inactive:
+                        AnalyticsLogger.shared.log(action: .appWillResignActive)
+                    case .active:
+                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
+                    @unknown default:
+                        break
+                    }
                 }
 
 //            CameraView()

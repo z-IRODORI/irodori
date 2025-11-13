@@ -18,4 +18,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
         return true
     }
+    
+    func applicationWillTerminate(_ application: UIApplication) {
+        // アプリが終了する前にログを送信
+        AnalyticsLogger.shared.log(action: .appTerminate)
+    }
 }
