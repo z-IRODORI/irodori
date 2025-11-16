@@ -100,6 +100,7 @@ struct RecommendCoordinateView: View {
             }
         }
         .task {
+            AnalyticsLogger.shared.log(screen: .recommendCoordinateScreenView)
             await viewModel.onAppear()
         }
         .sheet(isPresented: $viewModel.isShowingWebView) {

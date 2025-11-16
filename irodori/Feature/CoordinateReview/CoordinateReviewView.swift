@@ -48,6 +48,9 @@ struct CoordinateReviewView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(action: {
+                            AnalyticsLogger.shared.log(action: .coordinateReviewed, parameters: [
+                                "action": GAEventAction.goHome.rawValue
+                            ])
                             path.removeAll()
                         }, label: {
                             Text("ホームへ")
@@ -56,6 +59,9 @@ struct CoordinateReviewView: View {
                 }
                 .overlay(alignment: .bottom) {
                     Button(action: {
+                        AnalyticsLogger.shared.log(action: .recommendationRequested, parameters: [
+                            "source": GAEventAction.coordinateReview.rawValue
+                        ])
                         viewModel.tappedRecommendCoordinateButton()
                     }) {
                         Text("おすすめのコーデ/アイテムを見る")
@@ -101,6 +107,7 @@ struct CoordinateReviewView: View {
             }
         }
         .task {
+            AnalyticsLogger.shared.log(screen: .coordinateReviewScreenView)
             await viewModel.onAppear()
         }
     }

@@ -61,6 +61,9 @@ struct SplashView: View {
                     .foregroundStyle(.white)
                     .font(.system(size: 12, weight: .regular))
                 Button(action: {
+                    AnalyticsLogger.shared.log(action: .termsAccepted, parameters: [
+                        "action": GAEventAction.viewTerms.rawValue
+                    ])
                     isPresentedTermsOfService = true
                 }) {
                     Text("利用規約")
@@ -70,6 +73,9 @@ struct SplashView: View {
                 .padding(.bottom, 24)
 
                 Button(action: {
+                    AnalyticsLogger.shared.log(action: .termsAccepted, parameters: [
+                        "action": GAEventAction.startService.rawValue
+                    ])
                     viewModel.nextButtonTapped()
                 }) {
                     Text("次へ")
