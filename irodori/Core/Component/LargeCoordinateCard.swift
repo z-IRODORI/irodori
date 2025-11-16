@@ -11,7 +11,7 @@ struct LargeCoordinateCard: View {
     let coordinateImage: UIImage
     let currentSchedule: String
     let aiCatchphrase: String
-
+    let tags: [String]?
 
     var body: some View {
         ZStack {
@@ -47,12 +47,21 @@ struct LargeCoordinateCard: View {
                 .foregroundStyle(.white)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .padding(.top, 12)
-            Text("\(aiCatchphrase)")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
+
+            VStack(spacing: 12) {
+                Text("\(aiCatchphrase)")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .padding(.horizontal, 24)
+
+                if let tags = tags, !tags.isEmpty {
+                    TagsView(tags: tags)
+                        .padding(.horizontal, 24)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(.bottom, 24)
         }
     }
 }
@@ -115,5 +124,10 @@ struct LargeCoordinateCardWithURL: View {
 }
 
 #Preview {
-    LargeCoordinateCard(coordinateImage: .init(resource: .coordinate5), currentSchedule: "2000/01/01", aiCatchphrase: "aiCatchphrase")
+    LargeCoordinateCard(
+        coordinateImage: .init(resource: .coordinate5),
+        currentSchedule: "2000/01/01",
+        aiCatchphrase: "aiCatchphrase",
+        tags: ["tag1", "tag2", "tag3tag3tag3", "tag4tag4"]
+    )
 }
