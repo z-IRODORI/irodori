@@ -72,6 +72,7 @@ final class CoordinateReviewViewModel {
             switch fashionReviewResponse {
             case .success(let fashionReview):
                 self.fashionReview = fashionReview
+                print(fashionReview)
                 isFinishedRequest = true
             case .failure(let error):
                 handleAPIError(error)
