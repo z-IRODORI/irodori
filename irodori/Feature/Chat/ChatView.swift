@@ -7,10 +7,43 @@
 
 import SwiftUI
 
-struct ChatMessage: Identifiable {
-    let id = UUID()
+struct ChatMessage: Identifiable, Codable {
+    let id: String
     let text: String
     let isUser: Bool
+    let timestamp: Date
+    
+    init(text: String, isUser: Bool) {
+        self.id = UUID().uuidString
+        self.text = text
+        self.isUser = isUser
+        self.timestamp = Date()
+    }
+    
+    init(id: String, text: String, isUser: Bool, timestamp: Date) {
+        self.id = id
+        self.text = text
+        self.isUser = isUser
+        self.timestamp = timestamp
+    }
+}
+
+struct CoordinateChat: Identifiable, Codable {
+    let id: String
+    let coordinateId: String
+    let coordinateImageName: String
+    var messages: [ChatMessage]
+    let createdAt: Date
+    var lastUpdated: Date
+    
+    init(coordinateId: String, coordinateImageName: String) {
+        self.id = UUID().uuidString
+        self.coordinateId = coordinateId
+        self.coordinateImageName = coordinateImageName
+        self.messages = []
+        self.createdAt = Date()
+        self.lastUpdated = Date()
+    }
 }
 
 // MARK: - SuggestedQuestionsView
@@ -141,29 +174,25 @@ struct ChatBubbleView: View {
 // MARK: - ChatView
 
 struct ChatView: View {
-    @State private var messages: [ChatMessage] = [
-        ChatMessage(text: "こんにちは！今日のコーディネートはどうですか？", isUser: false),
-        ChatMessage(text: "とても素敵だと思います！", isUser: true),
-        ChatMessage(text: "ありがとうございます。このトップスとボトムスの組み合わせは、カジュアルながらも上品さを演出していますね。", isUser: false),
-        ChatMessage(text: "色のバランスも考えてみました", isUser: true),
-        ChatMessage(text: "素晴らしい！配色のセンスが光っていますね。全体的に統一感があって、とてもおしゃれです。", isUser: false)
-    ]
+    let coordinateId: String
+    let coordinateImageName: String
     
+    @State private var coordinateChat: CoordinateChat?
     @State private var inputText: String = ""
-    @State private var suggestedQuestions: [String] = [
-        "この色の組み合わせはどう？",
-        "もっとカジュアルにするには？",
-        "他のアイテムを追加するなら？",
-        "季節に合ってる？",
-        "どんな場面で着れる？"
-    ]
+    @State private var suggestedQuestions: [String] = ["この色の組み合わせはどう？", "もっとカジュアルにするには？", "他のアイテムを追加するなら？", "季節に合ってる？", "どんな場面で着れる？"]
+    
+    private let repository: CoordinateChatRepositoryProtocol = CoordinateChatRepository()
+    
+    private var messages: [ChatMessage] {
+        coordinateChat?.messages ?? []
+    }
     
     var body: some View {
         ScrollViewReader { scrollViewProxy in
             ScrollView {
                 VStack(spacing: 0) {
                     // コーデ画像
-                    Image("coordinate-1")
+                    Image(coordinateImageName)
                         .resizable()
                         .aspectRatio(3/4, contentMode: .fit)
                         .frame(maxWidth: 200)
@@ -239,14 +268,22 @@ struct ChatView: View {
             .background(.ultraThinMaterial)
         }
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            loadCoordinateChat()
+        }
     }
     
     private func sendMessage() {
-        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              var currentCoordinateChat = coordinateChat else { return }
         
         // ユーザーメッセージを追加
         let userMessage = ChatMessage(text: inputText, isUser: true)
-        messages.append(userMessage)
+        currentCoordinateChat.messages.append(userMessage)
+        currentCoordinateChat.lastUpdated = Date()
+        
+        coordinateChat = currentCoordinateChat
+        repository.addMessageToCoordinate(coordinateId: coordinateId, message: userMessage)
         
         // 入力をクリア
         inputText = ""
@@ -257,13 +294,34 @@ struct ChatView: View {
                 text: "なるほど、いいアイデアですね！そのアプローチでコーディネートをより魅力的にできると思います。",
                 isUser: false
             )
-            messages.append(aiResponse)
+            
+            var updatedCoordinateChat = currentCoordinateChat
+            updatedCoordinateChat.messages.append(aiResponse)
+            updatedCoordinateChat.lastUpdated = Date()
+            
+            coordinateChat = updatedCoordinateChat
+            repository.addMessageToCoordinate(coordinateId: coordinateId, message: aiResponse)
+        }
+    }
+    
+    private func loadCoordinateChat() {
+        if let existingChat = repository.loadCoordinateChat(coordinateId: coordinateId) {
+            coordinateChat = existingChat
+        } else {
+            // 新しいコーディネートチャットを作成
+            coordinateChat = repository.createCoordinateChat(
+                coordinateId: coordinateId,
+                coordinateImageName: coordinateImageName
+            )
         }
     }
 }
 
 #Preview {
     NavigationStack {
-        ChatView()
+        ChatView(
+            coordinateId: "preview-coordinate",
+            coordinateImageName: "coordinate-1"
+        )
     }
 }

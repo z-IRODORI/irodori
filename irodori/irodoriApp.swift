@@ -34,7 +34,10 @@ struct irodoriApp: App {
 //                    }
 //                }
 
-            ChatView()
+            ChatView(
+                coordinateId: "preview-coordinate",
+                coordinateImageName: "coordinate-1"
+            )
 
 //            CameraView()
 
