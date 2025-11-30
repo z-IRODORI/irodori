@@ -189,6 +189,31 @@ struct ChatView: View {
                     scrollViewProxy.scrollTo("bottom", anchor: .bottom)
                 }
             }
+            .overlay(
+                // 下へスクロールボタン
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                scrollViewProxy.scrollTo("bottom", anchor: .bottom)
+                            }
+                        }) {
+                            Image(systemName: "arrow.down")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                                .frame(width: 44, height: 44)
+                                .background(Color.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 20) // 質問候補の上に配置
+                    }
+                }, 
+                alignment: .bottomTrailing
+            )
         }
         .safeAreaInset(edge: .bottom) {
             // 下部固定エリア（キーボード対応）
