@@ -14,9 +14,12 @@ struct HomeView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 40) {
                 Header()
+                // TODO: 直近のコーデが存在しない場合のUIを考える
+                // 直近のコーデが存在しない場合、コーデだけではなく分析やタグを表示できないので、それも踏まえてUIを考える
                 RecentCoordinates(recentCoordinates: viewModel.homeResponse.recent_coordinates)
                     .padding(.horizontal, -24)
 
+                // コーデの分析
                 VStack(spacing: 12) {
                     HStack(spacing: 6) {
                         Image(.wolf)
@@ -29,6 +32,7 @@ struct HomeView: View {
                         .font(.system(size: 14, weight: .regular))
                 }
 
+                // これまでのタグ
                 VStack(spacing: 12) {
                     Text("これまでのタグ")
                         .font(.system(size: 20, weight: .bold))
