@@ -40,6 +40,8 @@ struct HomeView: View {
                         Text("タグが存在しません")
                     }
                 }
+
+                Spacer().frame(height: 60)
             }
             .padding(.horizontal, 24)
         }
@@ -75,7 +77,9 @@ struct HomeView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                 })
             }
+            .padding(.top, 16)
             .padding(.horizontal, 24)
+            .background(.white)
         }
     }
 
