@@ -166,8 +166,10 @@ struct ChatView: View {
                     Image("coordinate-1")
                         .resizable()
                         .aspectRatio(3/4, contentMode: .fit)
-                        .frame(maxWidth: .infinity)
-                    
+                        .frame(maxWidth: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.bottom, 24)
+
                     // チャットメッセージ
                     VStack(spacing: 8) {
                         ForEach(messages) { message in
