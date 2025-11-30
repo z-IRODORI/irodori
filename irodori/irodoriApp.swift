@@ -38,7 +38,7 @@ struct irodoriApp: App {
 
 //            CoordinateReviewView(viewModel: .init(
 //                coordinateImage: UIImage(resource: .coordinate2),
-//                apiClient: MockFashionReviewClient()
+//                apiClient: FashionReviewClient()   //MockFashionReviewClient()
 //            ), path: .constant([]))
 
 //            RecommendCoordinateView(

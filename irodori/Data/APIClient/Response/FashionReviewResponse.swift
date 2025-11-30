@@ -13,6 +13,7 @@ struct FashionReviewResponse: Decodable, Hashable {
     var items: [Item]
     var ai_catchphrase: String
     var ai_review_comment: String
+    var tags: [String]?
 
     struct CurrentCoordinate: Decodable, Hashable {
         var id: String
@@ -59,7 +60,8 @@ extension FashionReviewResponse {
 
             **改善点, 伸ばせば良いポイント**
             黒パンツと靴の落ち着いたトーンが全体を引き締めていますが、バッグの素材感や色味に少し遊びを加えるとより個性が際立ちます。アクセサリーでさりげない光沢や色を取り入れるのも効果的です。
-            """
+            """,
+            tags: ["レザージャケットコーデ", "ブラックコーデ", "大人カジュアル", "赤バッグを差す勇気", "クールな眼差しの正体", "静と動を纏う人", "金曜日の夜に出かけたい"]
         )
     }
 }

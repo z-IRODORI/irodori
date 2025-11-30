@@ -23,7 +23,7 @@ struct ReviewText: View {
                 Text(.init(aiReviewComment))
                     .font(.system(size: 16, weight: .regular))
             } else {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text(.init("\(aiReviewComment.prefix(shortTextCriterion)) ..."))
                         .font(.system(size: 16, weight: .regular))
                     Button(action: {
@@ -33,7 +33,7 @@ struct ReviewText: View {
                             .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(.blue)
                     }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }

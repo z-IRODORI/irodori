@@ -28,8 +28,14 @@ struct CoordinateReviewView: View {
                         LargeCoordinateCard(
                             coordinateImage: viewModel.coordinateImage,
                             currentSchedule: viewModel.currentDateString,
-                            aiCatchphrase: viewModel.fashionReview!.ai_catchphrase
+                            aiCatchphrase: viewModel.fashionReview!.ai_catchphrase,
+                            tags: viewModel.fashionReview?.tags   // タグ非表示
                         )
+//                        if let tags = viewModel.fashionReview?.tags, !tags.isEmpty {
+//                            TagsView(tags: tags, backgroundMaterial: .thinMaterial, tagTextColor: .black, borderColor: .black)
+//                                .padding(.horizontal, 24)
+//                                .frame(maxWidth: .infinity, alignment: .leading)
+//                        }
                         RecentCoordinates(recentCoordinates: viewModel.fashionReview!.recent_coordinates)   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
                         VStack(alignment: .leading, spacing: 12) {
                             Image(.wolf)
