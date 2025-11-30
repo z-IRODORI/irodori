@@ -174,17 +174,19 @@ struct ChatBubbleView: View {
 // MARK: - ChatView
 
 struct ChatView: View {
-    let coordinateId: String
-    let coordinateImageName: String
+    @State var viewModel: ChatViewModel
+    @State private var isScrolledToBottom: Bool = true
     
-    @State private var coordinateChat: CoordinateChat?
-    @State private var inputText: String = ""
-    @State private var suggestedQuestions: [String] = ["この色の組み合わせはどう？", "もっとカジュアルにするには？", "他のアイテムを追加するなら？", "季節に合ってる？", "どんな場面で着れる？"]
+    private let suggestedQuestions: [String] = [
+        "この色の組み合わせはどう？", 
+        "もっとカジュアルにするには？", 
+        "他のアイテムを追加するなら？", 
+        "季節に合ってる？", 
+        "どんな場面で着れる？"
+    ]
     
-    private let repository: CoordinateChatRepositoryProtocol = CoordinateChatRepository()
-    
-    private var messages: [ChatMessage] {
-        coordinateChat?.messages ?? []
+    init(coordinateId: String, coordinateImageName: String) {
+        self.viewModel = .init(coordinateId: coordinateId, coordinateImageName: coordinateImageName)
     }
     
     var body: some View {
@@ -192,7 +194,7 @@ struct ChatView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     // コーデ画像
-                    Image(coordinateImageName)
+                    Image(viewModel.coordinateImageName)
                         .resizable()
                         .aspectRatio(3/4, contentMode: .fit)
                         .frame(maxWidth: 200)
@@ -201,13 +203,41 @@ struct ChatView: View {
 
                     // チャットメッセージ
                     VStack(spacing: 8) {
-                        ForEach(messages) { message in
+                        ForEach(viewModel.messages) { message in
                             ChatBubbleView(message: message)
                                 .id(message.id)
                         }
+
+                        if viewModel.isLoading {
+                            HStack {
+                                Image("wolf")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 40, height: 40)
+                                    .background(Circle().fill(Color.gray.opacity(0.1)))
+                                    .clipShape(Circle())
+
+                                HStack {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle())
+                                        .scaleEffect(0.8)
+                                    Text("考え中...")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color.gray.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 20))
+
+                                Spacer(minLength: 60)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 4)
+                        }
                     }
                     .padding(.vertical, 20)
-                    
+
                     // 下部スペースを確保（id "bottom"でスクロール位置の基準に）
                     Color.clear
                         .frame(height: 20)
@@ -215,7 +245,7 @@ struct ChatView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: messages.count) { _ in
+            .onChange(of: viewModel.messages.count) { _ in
                 withAnimation {
                     scrollViewProxy.scrollTo("bottom", anchor: .bottom)
                 }
@@ -242,7 +272,7 @@ struct ChatView: View {
                         .padding(.trailing, 20)
                         .padding(.bottom, 20) // 質問候補の上に配置
                     }
-                }, 
+                },
                 alignment: .bottomTrailing
             )
         }
@@ -250,69 +280,28 @@ struct ChatView: View {
             // 下部固定エリア（キーボード対応）
             VStack(spacing: 0) {
                 Divider()
-                
+
                 // 質問候補
                 SuggestedQuestionsView(
                     questions: suggestedQuestions,
                     onQuestionTapped: { question in
-                        inputText = question
+                        viewModel.addSuggestedQuestion(question)
                     }
                 )
-                
+
                 // テキスト入力フィールド
                 ChatInputView(
-                    text: $inputText,
-                    onSend: sendMessage
+                    text: $viewModel.inputText,
+                    onSend: {
+                        viewModel.sendMessage()
+                    }
                 )
             }
             .background(.ultraThinMaterial)
         }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            loadCoordinateChat()
-        }
-    }
-    
-    private func sendMessage() {
-        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              var currentCoordinateChat = coordinateChat else { return }
-        
-        // ユーザーメッセージを追加
-        let userMessage = ChatMessage(text: inputText, isUser: true)
-        currentCoordinateChat.messages.append(userMessage)
-        currentCoordinateChat.lastUpdated = Date()
-        
-        coordinateChat = currentCoordinateChat
-        repository.addMessageToCoordinate(coordinateId: coordinateId, message: userMessage)
-        
-        // 入力をクリア
-        inputText = ""
-        
-        // ここでAIレスポンスを取得する処理を追加（実装例）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            let aiResponse = ChatMessage(
-                text: "なるほど、いいアイデアですね！そのアプローチでコーディネートをより魅力的にできると思います。",
-                isUser: false
-            )
-            
-            var updatedCoordinateChat = currentCoordinateChat
-            updatedCoordinateChat.messages.append(aiResponse)
-            updatedCoordinateChat.lastUpdated = Date()
-            
-            coordinateChat = updatedCoordinateChat
-            repository.addMessageToCoordinate(coordinateId: coordinateId, message: aiResponse)
-        }
-    }
-    
-    private func loadCoordinateChat() {
-        if let existingChat = repository.loadCoordinateChat(coordinateId: coordinateId) {
-            coordinateChat = existingChat
-        } else {
-            // 新しいコーディネートチャットを作成
-            coordinateChat = repository.createCoordinateChat(
-                coordinateId: coordinateId,
-                coordinateImageName: coordinateImageName
-            )
+            viewModel.loadCoordinateChat()
         }
     }
 }
