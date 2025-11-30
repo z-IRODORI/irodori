@@ -8,25 +8,13 @@
 import SwiftUI
 
 struct HomeView: View {
-    let client: FashionReviewClientProtocol = MockFashionReviewClient()   // TODO: 消す
-    @State private var recentCoordinates: [FashionReviewResponse.RecentCoordinate] = []
-    @State private var tags: [String] = [
-        "カジュアル",
-        "着回し力抜群",
-        "高見え",
-        "トレンド",
-        "購入品紹介",
-        "イエベ春",
-        "きれいめ",
-        "秋コーデ",
-        "身長160cm"
-    ]
+    let viewModel: HomeViewModel = .init(apiClient: MockHomeClient())
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 40) {
                 Header()
-                RecentCoordinates(recentCoordinates: recentCoordinates)
+                RecentCoordinates(recentCoordinates: viewModel.homeResponse.recent_coordinates)
                     .padding(.horizontal, -24)
 
                 VStack(spacing: 12) {
@@ -37,28 +25,27 @@ struct HomeView: View {
                             .clipShape(Circle())
                         SpeechBubbleView(text: "これまでのコーデを分析するよ")
                     }
-                    Text("hogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehoge")
+                    Text(.init(viewModel.homeResponse.coordinate_analyze))
+                        .font(.system(size: 14, weight: .regular))
                 }
 
                 VStack(spacing: 12) {
                     Text("これまでのタグ")
                         .font(.system(size: 20, weight: .bold))
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    TagsView(tags: tags, tagTextColor: .black, borderColor: .gray)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let tags = viewModel.homeResponse.tags {
+                        TagsView(tags: tags, tagTextColor: .black, borderColor: .gray, tagFont: .system(size: 14, weight: .regular))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Text("タグが存在しません")
+                    }
                 }
             }
             .padding(.horizontal, 24)
         }
         .onAppear {
             Task {
-                let result = try await client.post(uid: "", image: .init(), purposeNum: nil)
-                switch result {
-                case .success(let value):
-                    self.recentCoordinates = value.recent_coordinates
-                case .failure:
-                    break
-                }
+                await viewModel.onAppear()
             }
         }
         .background(.gray.opacity(0.08))

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct RecentCoordinates: View {
-    let recentCoordinates: [FashionReviewResponse.RecentCoordinate]
+    let recentCoordinates: [RecentCoordinate]
 
     var body: some View {
         VStack(spacing: 12) {
@@ -22,13 +22,13 @@ struct RecentCoordinates: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         Spacer().frame(width: 12)
-
                         ForEach(recentCoordinates, id: \.self) { fashionReview in
                             RecentCoordinateCard(
                                 imageURL: fashionReview.coodinate_image_path,
                                 text: fashionReview.date
                             )
                         }
+                        Spacer().frame(width: 12)
                     }
                 }
             }
