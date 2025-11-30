@@ -159,41 +159,39 @@ struct ChatView: View {
     ]
     
     var body: some View {
-        VStack(spacing: 0) {
-            // メインコンテンツ（スクロール可能）
-            ScrollViewReader { scrollViewProxy in
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // コーデ画像
-                        Image("coordinate-1")
-                            .resizable()
-                            .aspectRatio(3/4, contentMode: .fit)
-                            .frame(maxWidth: .infinity)
-                        
-                        // チャットメッセージ
-                        VStack(spacing: 8) {
-                            ForEach(messages) { message in
-                                ChatBubbleView(message: message)
-                                    .id(message.id)
-                            }
+        ScrollViewReader { scrollViewProxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    // コーデ画像
+                    Image("coordinate-1")
+                        .resizable()
+                        .aspectRatio(3/4, contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                    
+                    // チャットメッセージ
+                    VStack(spacing: 8) {
+                        ForEach(messages) { message in
+                            ChatBubbleView(message: message)
+                                .id(message.id)
                         }
-                        .padding(.vertical, 20)
-                        
-                        // 下部の入力エリアの高さ分のスペースを確保
-                        Color.clear
-                            .frame(height: 180)
-                            .id("bottom")
                     }
-                }
-                .scrollDismissesKeyboard(.interactively)
-                .onChange(of: messages.count) { _ in
-                    withAnimation {
-                        scrollViewProxy.scrollTo("bottom", anchor: .bottom)
-                    }
+                    .padding(.vertical, 20)
+                    
+                    // 下部スペースを確保（id "bottom"でスクロール位置の基準に）
+                    Color.clear
+                        .frame(height: 20)
+                        .id("bottom")
                 }
             }
-            
-            // 下部固定エリア
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: messages.count) { _ in
+                withAnimation {
+                    scrollViewProxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            // 下部固定エリア（キーボード対応）
             VStack(spacing: 0) {
                 Divider()
                 
@@ -210,12 +208,10 @@ struct ChatView: View {
                     text: $inputText,
                     onSend: sendMessage
                 )
-                .padding(.bottom, 20) // 下部の余白を追加
             }
-            .background(Color(UIColor.systemBackground))
+            .background(.ultraThinMaterial)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .ignoresSafeArea(edges: .bottom)
     }
     
     private func sendMessage() {
