@@ -39,6 +39,10 @@ struct CoordinateDetailView: View {
         }
         .overlay(alignment: .bottom) {
             Button(action: {
+                AnalyticsLogger.shared.log(action: .recommendationRequested, parameters: [
+                    "source": GAEventAction.coordinateDetail.rawValue,
+                    "date": viewModel.targetDateString
+                ])
                 viewModel.tappedRecommendCoordinateButton()
             }) {
                 Text("おすすめのコーデ/アイテムを見る")
@@ -57,6 +61,9 @@ struct CoordinateDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(.gray.opacity(0.08))
         .task {
+            AnalyticsLogger.shared.log(screen: .coordinateDetailScreenView, parameters: [
+                "date": viewModel.targetDateString
+            ])
             await viewModel.onAppear()
         }
     }

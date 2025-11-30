@@ -81,6 +81,7 @@ struct CameraView: View {
             .navigationBarBackButtonHidden()
             .ignoresSafeArea()
             .onAppear {
+                AnalyticsLogger.shared.log(screen: .cameraScreenView)
                 checkCameraPermission()   // カメラを初期化
             }
             .fullScreenCover(isPresented: $showCapturedImage) {
@@ -149,6 +150,9 @@ struct CameraView: View {
                 .foregroundStyle(.black)
             HStack(spacing: 24) {
                 Button(action: {
+                    AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+                        "source": GAEventAction.cameraHeaderButton.rawValue
+                    ])
                     path.append(.calendar)
                 }) {
                     Image(systemName: "calendar")
@@ -158,6 +162,9 @@ struct CameraView: View {
                 }
 
                 Button(action: {
+                    AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
+                        "source": GAEventAction.helpButton.rawValue
+                    ])
                     isShowOnboardingModal = true
                 }) {
                     Image(systemName: "questionmark.circle")
@@ -198,6 +205,9 @@ struct CameraView: View {
 extension CameraView {
     private func PhotoLibraryButton() -> some View {
         Button(action: {
+            AnalyticsLogger.shared.log(action: .photoSelected, parameters: [
+                "source": GAEventAction.photoLibrary.rawValue
+            ])
             cameraViewModel.checkPhotoLibraryPermission()
         }) {
             ZStack {
@@ -213,6 +223,10 @@ extension CameraView {
     
     private func CaptureButton() -> some View {
         Button(action: {
+            AnalyticsLogger.shared.log(action: .photoTaken, parameters: [
+                "source": GAEventAction.camera.rawValue,
+                "camera_state": "\(cameraViewModel.cameraState)"
+            ])
             cameraViewModel.capturePhoto()
             // キャプチャ成功後に画像表示
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {

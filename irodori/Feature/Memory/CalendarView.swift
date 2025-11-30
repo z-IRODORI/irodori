@@ -64,6 +64,12 @@ struct CalendarView: View {
                                             let year = viewModel.months[i].year
                                             let month = viewModel.months[i].monthOfTheYear
                                             let targetDateString = String(format: "%04d-%02d-%02d", year, month, day)
+                                            
+                                            AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+                                                "date": targetDateString,
+                                                "has_coordinate": true
+                                            ])
+                                            
                                             let params: ViewType.CoordinateDetailParams = .init(uid: viewModel.uid, targetDateString: targetDateString, coordinateImageURL: coordinateImageURL)
                                             path.append(.coordinateDetail(params))
                                         }
@@ -83,6 +89,7 @@ struct CalendarView: View {
         .navigationBarHidden(true)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
+            AnalyticsLogger.shared.log(screen: .memoryCalendarScreenView)
             await viewModel.onAppear()
         }
     }
@@ -94,6 +101,9 @@ struct CalendarView: View {
                 .padding(.top, 7)
 
             Button {
+                AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+                    "action": GAEventAction.backToCamera.rawValue
+                ])
                 mode.wrappedValue.dismiss()
             } label: {
                 Image(systemName: "arrow.backward")
