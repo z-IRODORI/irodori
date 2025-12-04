@@ -121,14 +121,14 @@ struct ChatBubbleView: View {
     let message: ChatMessage
     
     var body: some View {
-        HStack(alignment: .bottom, spacing: 12) {
+        HStack(alignment: .bottom, spacing: 6) {
             if message.isUser {
                 Spacer(minLength: 60)
             } else {
                 Image("wolf")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 30, height: 30)
+                    .frame(width: 40, height: 40)
                     .background(Circle().fill(Color.gray.opacity(0.1)))
                     .clipShape(Circle())
             }
@@ -145,10 +145,11 @@ struct ChatBubbleView: View {
                 .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
             
             if !message.isUser {
-                Spacer(minLength: 60)
+                Spacer(minLength: 30)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.trailing, 16)
+        .padding(.leading, 8)
         .padding(.vertical, 4)
     }
 }
