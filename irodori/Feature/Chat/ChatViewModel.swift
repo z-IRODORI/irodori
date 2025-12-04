@@ -8,29 +8,46 @@
 import Foundation
 import Observation
 
+struct CoordinateChat: Identifiable, Codable {
+    let id: String
+    let coordinateId: String
+    let coordinateImageName: String
+    var messages: [ChatMessage]
+    let createdAt: Date
+    var lastUpdated: Date
+
+    init(coordinateId: String, coordinateImageName: String) {
+        self.id = UUID().uuidString
+        self.coordinateId = coordinateId
+        self.coordinateImageName = coordinateImageName
+        self.messages = []
+        self.createdAt = Date()
+        self.lastUpdated = Date()
+    }
+}
+
 @MainActor
 @Observable
 final class ChatViewModel {
-    var coordinateChat: CoordinateChat?
+    var coordinateChat: CoordinateChat = .init(coordinateId: "", coordinateImageName: "")
     var inputText: String = ""
     var isLoading: Bool = false
     var errorMessage: String?
     
     let coordinateId: String
-    let coordinateImageName: String
+    let coordinateImageBase64: String
+    private let apiClient: HomeClientProtocol
     private let repository: CoordinateChatRepositoryProtocol
-    
-    var messages: [ChatMessage] {
-        coordinateChat?.messages ?? []
-    }
     
     init(
         coordinateId: String,
-        coordinateImageName: String,
-        repository: CoordinateChatRepositoryProtocol = CoordinateChatRepository()
+        coordinateImageBase64: String,
+        apiClient: HomeClientProtocol,
+        repository: CoordinateChatRepositoryProtocol
     ) {
         self.coordinateId = coordinateId
-        self.coordinateImageName = coordinateImageName
+        self.coordinateImageBase64 = coordinateImageBase64
+        self.apiClient = apiClient
         self.repository = repository
     }
     
@@ -41,86 +58,58 @@ final class ChatViewModel {
             // 新しいコーディネートチャットを作成
             coordinateChat = repository.createCoordinateChat(
                 coordinateId: coordinateId,
-                coordinateImageName: coordinateImageName
+                coordinateImageName: coordinateImageBase64
             )
         }
     }
     
-    func sendMessage() {
-        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              var currentCoordinateChat = coordinateChat else { return }
-        
+    func sendMessage() async {
+        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
         let messageText = inputText
         inputText = ""
         
         // ユーザーメッセージを追加
         let userMessage = ChatMessage(text: messageText, isUser: true)
-        addMessage(userMessage, to: &currentCoordinateChat)
-        
-        // AIレスポンスを生成（模擬実装）
-        generateAIResponse(for: messageText)
+        addMessage(userMessage)
+
+        await generateAIMessage(for: messageText)
     }
     
     func addSuggestedQuestion(_ question: String) {
         inputText = question
     }
     
-    private func addMessage(_ message: ChatMessage, to coordinateChat: inout CoordinateChat) {
+    private func addMessage(_ message: ChatMessage) {
         coordinateChat.messages.append(message)
         coordinateChat.lastUpdated = Date()
-        
-        self.coordinateChat = coordinateChat
         repository.addMessageToCoordinate(coordinateId: coordinateId, message: message)
     }
     
-    private func generateAIResponse(for userMessage: String) {
+    private func generateAIMessage(for userMessage: String) async {
         isLoading = true
-        
         // 実際の実装ではここでAI APIを呼び出す
-        Task {
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1秒待機
-            
-            await MainActor.run {
-                guard var currentCoordinateChat = coordinateChat else {
-                    isLoading = false
-                    return
-                }
-                
-                let aiResponse = ChatMessage(
-                    text: generateContextualResponse(for: userMessage),
-                    isUser: false
-                )
-                
-                addMessage(aiResponse, to: &currentCoordinateChat)
-                isLoading = false
+        let gender = UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue) ?? "other"
+        do {
+            let response = try await apiClient.post(homeRequest: .init(question: userMessage + "# 制約\n- 出力は300文字以内で", gender: gender, image_base64: coordinateImageBase64))
+            switch response {
+            case .success(let result):
+                let chatMessage = ChatMessage(text: result.answer, isUser: false)
+                addMessage(chatMessage)
+            case .failure(let error):
+                break
             }
+        } catch {
+            print(error.localizedDescription)
         }
-    }
-    
-    private func generateContextualResponse(for userMessage: String) -> String {
-        // 簡単なルールベースレスポンス生成
-        let message = userMessage.lowercased()
-        
-        if message.contains("色") || message.contains("カラー") {
-            return "色の組み合わせがとても素敵ですね！この配色は季節感も表現できていて、バランスが取れています。"
-        } else if message.contains("カジュアル") {
-            return "カジュアルなスタイルにするなら、アクセサリーを少し控えめにしたり、よりリラックスした素材のアイテムを取り入れてみてはいかがでしょうか。"
-        } else if message.contains("アイテム") || message.contains("追加") {
-            return "このコーディネートにはシンプルなアクセサリーや小物を追加すると、より洗練された印象になると思います。"
-        } else if message.contains("季節") {
-            return "季節にとてもよく合ったコーディネートですね！この時期にぴったりの装いだと思います。"
-        } else if message.contains("場面") || message.contains("シーン") {
-            return "このスタイルは様々な場面で活用できそうですね。カジュアルからセミフォーマルまで対応できる万能なコーディネートです。"
-        } else {
-            return "なるほど、いいアイデアですね！そのアプローチでコーディネートをより魅力的にできると思います。"
-        }
+        isLoading = false
     }
     
     func clearChat() {
         repository.clearCoordinateChat(coordinateId: coordinateId)
         coordinateChat = repository.createCoordinateChat(
             coordinateId: coordinateId,
-            coordinateImageName: coordinateImageName
+            coordinateImageName: coordinateImageBase64
         )
     }
 }

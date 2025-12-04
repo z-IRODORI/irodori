@@ -28,24 +28,6 @@ struct ChatMessage: Identifiable, Codable {
     }
 }
 
-struct CoordinateChat: Identifiable, Codable {
-    let id: String
-    let coordinateId: String
-    let coordinateImageName: String
-    var messages: [ChatMessage]
-    let createdAt: Date
-    var lastUpdated: Date
-    
-    init(coordinateId: String, coordinateImageName: String) {
-        self.id = UUID().uuidString
-        self.coordinateId = coordinateId
-        self.coordinateImageName = coordinateImageName
-        self.messages = []
-        self.createdAt = Date()
-        self.lastUpdated = Date()
-    }
-}
-
 // MARK: - SuggestedQuestionsView
 
 struct SuggestedQuestionsView: View {
@@ -146,13 +128,13 @@ struct ChatBubbleView: View {
                 Image("wolf")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 40, height: 40)
+                    .frame(width: 30, height: 30)
                     .background(Circle().fill(Color.gray.opacity(0.1)))
                     .clipShape(Circle())
             }
             
-            Text(message.text)
-                .font(.system(size: 16))
+            Text(.init(message.text))
+                .font(.system(size: 14))
                 .foregroundColor(message.isUser ? .white : .primary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -184,9 +166,12 @@ struct ChatView: View {
         "季節に合ってる？", 
         "どんな場面で着れる？"
     ]
-    
-    init(coordinateId: String, coordinateImageName: String) {
-        self.viewModel = .init(coordinateId: coordinateId, coordinateImageName: coordinateImageName)
+
+    let image: UIImage
+    init(coordinateId: String, image: UIImage) {
+        self.image = image
+        let imageData = image.jpegData(compressionQuality: 1.0)!
+        self.viewModel = .init(coordinateId: coordinateId, coordinateImageBase64: imageData.base64EncodedString(), apiClient: HomeClient(), repository: CoordinateChatRepository())
     }
     
     var body: some View {
@@ -194,7 +179,7 @@ struct ChatView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     // コーデ画像
-                    Image(viewModel.coordinateImageName)
+                    Image(uiImage: image)
                         .resizable()
                         .aspectRatio(3/4, contentMode: .fit)
                         .frame(maxWidth: 200)
@@ -203,7 +188,7 @@ struct ChatView: View {
 
                     // チャットメッセージ
                     VStack(spacing: 8) {
-                        ForEach(viewModel.messages) { message in
+                        ForEach(viewModel.coordinateChat.messages) { message in
                             ChatBubbleView(message: message)
                                 .id(message.id)
                         }
@@ -245,7 +230,7 @@ struct ChatView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: viewModel.messages.count) { _ in
+            .onChange(of: viewModel.coordinateChat.messages.count) { _ in
                 withAnimation {
                     scrollViewProxy.scrollTo("bottom", anchor: .bottom)
                 }
@@ -293,7 +278,9 @@ struct ChatView: View {
                 ChatInputView(
                     text: $viewModel.inputText,
                     onSend: {
-                        viewModel.sendMessage()
+                        Task {
+                            await viewModel.sendMessage()
+                        }
                     }
                 )
             }
@@ -310,7 +297,7 @@ struct ChatView: View {
     NavigationStack {
         ChatView(
             coordinateId: "preview-coordinate",
-            coordinateImageName: "coordinate-1"
+            image: UIImage(resource: .coordinate7)
         )
     }
 }

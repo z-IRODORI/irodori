@@ -36,7 +36,7 @@ struct irodoriApp: App {
 
             ChatView(
                 coordinateId: "preview-coordinate",
-                coordinateImageName: "coordinate-1"
+                image: UIImage(resource: .coordinate7)
             )
 
 //            CameraView()
