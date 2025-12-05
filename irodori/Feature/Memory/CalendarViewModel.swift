@@ -27,6 +27,7 @@ final class CalendarViewModel {
         setupMonths()
         coordinateListResponses = []
         do {
+            // monthsは既に反転されているので、そのまま順番に取得
             for month in months {
                 let result = try await apiClient.get(uid: uid, year: month.year, month: month.monthOfTheYear)
                 switch result {
@@ -68,7 +69,8 @@ final class CalendarViewModel {
             // 次の月へ進める
             date = calendar.date(byAdding: .month, value: 1, to: date)!
         }
-        self.months = monthList
+        // 新しい月を上に表示するために反転
+        self.months = monthList.reversed()
     }
 }
 
