@@ -12,14 +12,14 @@ struct ChatMessage: Identifiable, Codable {
     let text: String
     let isUser: Bool
     let timestamp: Date
-    
+
     init(text: String, isUser: Bool) {
         self.id = UUID().uuidString
         self.text = text
         self.isUser = isUser
         self.timestamp = Date()
     }
-    
+
     init(id: String, text: String, isUser: Bool, timestamp: Date) {
         self.id = id
         self.text = text
@@ -33,7 +33,7 @@ struct ChatMessage: Identifiable, Codable {
 struct SuggestedQuestionsView: View {
     let questions: [String]
     let onQuestionTapped: (String) -> Void
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // 質問候補のラベル
@@ -46,7 +46,7 @@ struct SuggestedQuestionsView: View {
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 16)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(questions, id: \.self) { question in
@@ -83,7 +83,7 @@ struct ChatInputView: View {
     @Binding var text: String
     let onSend: () -> Void
     @FocusState private var isFocused: Bool
-    
+
     var body: some View {
         HStack(spacing: 8) {
             HStack {
@@ -97,7 +97,7 @@ struct ChatInputView: View {
             .padding(.vertical, 12)
             .background(Color.gray.opacity(0.1))
             .cornerRadius(24)
-            
+
             Button(action: onSend) {
                 Image(systemName: "paperplane.fill")
                     .font(.system(size: 20))
@@ -119,7 +119,7 @@ struct ChatInputView: View {
 
 struct ChatBubbleView: View {
     let message: ChatMessage
-    
+
     var body: some View {
         HStack(alignment: .bottom, spacing: 6) {
             if message.isUser {
@@ -132,7 +132,7 @@ struct ChatBubbleView: View {
                     .background(Circle().fill(Color.gray.opacity(0.1)))
                     .clipShape(Circle())
             }
-            
+
             Text(.init(message.text))
                 .font(.system(size: 14))
                 .foregroundColor(message.isUser ? .white : .primary)
@@ -143,7 +143,7 @@ struct ChatBubbleView: View {
                         .fill(message.isUser ? Color.blue : Color.gray.opacity(0.1))
                 )
                 .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
-            
+
             if !message.isUser {
                 Spacer(minLength: 30)
             }
@@ -159,12 +159,14 @@ struct ChatBubbleView: View {
 struct ChatView: View {
     @State var viewModel: ChatViewModel
     @State private var isScrolledToBottom: Bool = true
-    
+    @State private var showMiniImage: Bool = false
+    @State private var showScrollConfirmation: Bool = false
+
     private let suggestedQuestions: [String] = [
-        "この色の組み合わせはどう？", 
-        "もっとカジュアルにするには？", 
-        "他のアイテムを追加するなら？", 
-        "季節に合ってる？", 
+        "この色の組み合わせはどう？",
+        "もっとカジュアルにするには？",
+        "他のアイテムを追加するなら？",
+        "季節に合ってる？",
         "どんな場面で着れる？"
     ]
 
@@ -174,93 +176,150 @@ struct ChatView: View {
         let imageData = image.jpegData(compressionQuality: 1.0)!
         self.viewModel = .init(coordinateId: coordinateId, coordinateImageBase64: imageData.base64EncodedString(), apiClient: HomeClient(), repository: CoordinateChatRepository())
     }
-    
+
     var body: some View {
-        ScrollViewReader { scrollViewProxy in
-            ScrollView {
-                VStack(spacing: 0) {
-                    // コーデ画像
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(3/4, contentMode: .fit)
-                        .frame(maxWidth: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .padding(.bottom, 24)
-
-                    // チャットメッセージ
-                    VStack(spacing: 8) {
-                        ForEach(viewModel.coordinateChat.messages) { message in
-                            ChatBubbleView(message: message)
-                                .id(message.id)
+        GeometryReader { geometry in
+            ScrollViewReader { scrollViewProxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // コーデ画像
+                        GeometryReader { imageGeometry in
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(3/4, contentMode: .fit)
+                                .frame(maxWidth: 200)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .padding(.bottom, 24)
+                                .frame(maxWidth: .infinity)
+                                .id("coordinateImage")
+                                .onAppear {
+                                    showMiniImage = false
+                                }
+                                .onChange(of: imageGeometry.frame(in: .global).maxY) { newValue in
+                                    showMiniImage = newValue < 0
+                                }
                         }
+                        .frame(height: 290)
 
-                        if viewModel.isLoading {
-                            HStack {
-                                Image("wolf")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 40, height: 40)
-                                    .background(Circle().fill(Color.gray.opacity(0.1)))
-                                    .clipShape(Circle())
+                        // チャットメッセージ
+                        VStack(spacing: 8) {
+                            ForEach(viewModel.coordinateChat.messages) { message in
+                                ChatBubbleView(message: message)
+                                    .id(message.id)
+                            }
 
+                            if viewModel.isLoading {
                                 HStack {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle())
-                                        .scaleEffect(0.8)
-                                    Text("考え中...")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.secondary)
+                                    Image("wolf")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 40, height: 40)
+                                        .background(Circle().fill(Color.gray.opacity(0.1)))
+                                        .clipShape(Circle())
+
+                                    HStack {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle())
+                                            .scaleEffect(0.8)
+                                        Text("考え中...")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Color.gray.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 20))
+
+                                    Spacer(minLength: 60)
                                 }
                                 .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(Color.gray.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 20))
-
-                                Spacer(minLength: 60)
+                                .padding(.vertical, 4)
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 4)
                         }
-                    }
-                    .padding(.vertical, 20)
+                        .padding(.vertical, 20)
 
-                    // 下部スペースを確保（id "bottom"でスクロール位置の基準に）
-                    Color.clear
-                        .frame(height: 20)
-                        .id("bottom")
+                        // 下部スペースを確保（id "bottom"でスクロール位置の基準に）
+                        Color.clear
+                            .frame(height: 20)
+                            .id("bottom")
+                    }
                 }
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .onChange(of: viewModel.coordinateChat.messages.count) { _ in
-                withAnimation {
-                    scrollViewProxy.scrollTo("bottom", anchor: .bottom)
+                .scrollDismissesKeyboard(.interactively)
+                .onTapGesture {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                 }
-            }
-            .overlay(
-                // 下へスクロールボタン
-                VStack {
-                    Spacer()
-                    HStack {
+                .onChange(of: viewModel.coordinateChat.messages.count) { _ in
+                    withAnimation {
+                        scrollViewProxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                }
+                .overlay(
+                    // 下へスクロールボタン
+                    VStack {
                         Spacer()
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.5)) {
-                                scrollViewProxy.scrollTo("bottom", anchor: .bottom)
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    scrollViewProxy.scrollTo("bottom", anchor: .bottom)
+                                }
+                            }) {
+                                Image(systemName: "arrow.down")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.primary)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color.white)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                             }
-                        }) {
-                            Image(systemName: "arrow.down")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.primary)
-                                .frame(width: 44, height: 44)
-                                .background(Color.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                            .padding(.trailing, 20)
+                            .padding(.bottom, 20) // 質問候補の上に配置
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 20) // 質問候補の上に配置
+                    },
+                    alignment: .bottomTrailing
+                )
+                .overlay(
+                    // ミニ画像オーバーレイ
+                    Group {
+                        if showMiniImage {
+                            VStack {
+                                HStack {
+                                    Button(action: {
+                                        showScrollConfirmation = true
+                                    }) {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .aspectRatio(3/4, contentMode: .fit)
+                                            .frame(width: 100)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                                    }
+                                    .padding(.leading, 16)
+                                    .padding(.top, 16)
+                                    .transition(.asymmetric(
+                                        insertion: .scale.combined(with: .opacity),
+                                        removal: .scale.combined(with: .opacity)
+                                    ))
+                                    .alert("画像まで移動しますか？", isPresented: $showScrollConfirmation) {
+                                        Button("キャンセル", role: .cancel) {}
+                                        Button("移動") {
+                                            withAnimation(.easeInOut(duration: 0.5)) {
+                                                scrollViewProxy.scrollTo("coordinateImage", anchor: .top)
+                                            }
+                                        }
+                                    } message: {
+                                        Text("コーディネート画像の位置まで戻りますか？")
+                                    }
+                                    Spacer()
+                                }
+                                Spacer()
+                            }
+                        }
                     }
-                },
-                alignment: .bottomTrailing
-            )
+                        .animation(.easeInOut(duration: 0.3), value: showMiniImage),
+                    alignment: .topLeading
+                )
+            }
         }
         .safeAreaInset(edge: .bottom) {
             // 下部固定エリア（キーボード対応）
