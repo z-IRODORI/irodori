@@ -90,7 +90,7 @@ struct SelectFirstTimePicView: View {
             tappedAction()
         }, label: {
             Text(.init(title))
-                .font(.system(size: 18, weight: .regular))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(textColor)
                 .frame(maxWidth: 200)
                 .frame(height: 50)
