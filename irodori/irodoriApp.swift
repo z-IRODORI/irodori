@@ -17,22 +17,22 @@ struct irodoriApp: App {
     @State private var path: [ViewType] = []
     var body: some Scene {
         WindowGroup {
-            SplashView()
-                .onAppear {
-                    AnalyticsLogger.shared.log(screen: .splashScreenView)
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    switch newPhase {
-                    case .background:
-                        AnalyticsLogger.shared.log(action: .appBackground)
-                    case .inactive:
-                        AnalyticsLogger.shared.log(action: .appWillResignActive)
-                    case .active:
-                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
-                    @unknown default:
-                        break
-                    }
-                }
+//            SplashView()
+//                .onAppear {
+//                    AnalyticsLogger.shared.log(screen: .splashScreenView)
+//                }
+//                .onChange(of: scenePhase) { _, newPhase in
+//                    switch newPhase {
+//                    case .background:
+//                        AnalyticsLogger.shared.log(action: .appBackground)
+//                    case .inactive:
+//                        AnalyticsLogger.shared.log(action: .appWillResignActive)
+//                    case .active:
+//                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
+//                    @unknown default:
+//                        break
+//                    }
+//                }
 
 //            ChatView(
 //                coordinateId: "preview-coordinate",
@@ -40,6 +40,8 @@ struct irodoriApp: App {
 //            )
 
 //            CameraView()
+
+            SelectFirstTimePicView()
 
 //            CoordinateReviewView(viewModel: .init(
 //                coordinateImage: UIImage(resource: .coordinate2),
