@@ -14,7 +14,11 @@ struct SelectFirstTimePicView: View {
     @State private var showCameraView = false
     @State private var showPhotoPicker = false
     @State private var selectedImage: UIImage?
-    
+    @State private var showConfirmationView = false
+    @State private var isLoading = false
+
+    private let fashionReviewClient = FashionReviewClient()
+
     var body: some View {
         ScrollView(.vertical) {
             VStack(spacing: 32) {
@@ -54,7 +58,7 @@ struct SelectFirstTimePicView: View {
                 // 相棒についての説明
                 WhatIsPartner()
                     .padding(.vertical, 24)
-//                    .background(.yellow.opacity(0.1))
+                //                    .background(.yellow.opacity(0.1))
                     .padding(.horizontal, -24)
 
                 Spacer().frame(height: 60)
@@ -75,7 +79,21 @@ struct SelectFirstTimePicView: View {
         .sheet(isPresented: $showPhotoPicker) {
             PhotoPickerView(isPresented: $showPhotoPicker) { image in
                 selectedImage = image
-                // TODO: 選択された画像の処理
+                showConfirmationView = true
+            }
+        }
+        .fullScreenCover(isPresented: $showConfirmationView) {
+            if let image = selectedImage {
+                CapturedImageView(
+                    image: image,
+                    viewModel: .init(inputUIImage: image),
+                    isPresented: $showConfirmationView,
+                    okButtonTapped: {
+                        Task {
+                            await sendImageToAPI(image)
+                        }
+                    }
+                )
             }
         }
     }
@@ -117,7 +135,7 @@ struct SelectFirstTimePicView: View {
                 )
         })
     }
-    
+
     private func ExamplePics(title: String, textColor: Color, images: [ImageResource], scrollOffset: Binding<CGFloat>) -> some View {
         VStack(spacing: 12) {
             if !title.isEmpty {
@@ -166,7 +184,32 @@ struct SelectFirstTimePicView: View {
         timer?.invalidate()
         timer = nil
     }
+
+    private func sendImageToAPI(_ image: UIImage) async {
+        isLoading = true
+
+        guard let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else { return }
+        do {
+            let result = try await fashionReviewClient.post(uid: uid, image: image, purposeNum: nil)
+
+            switch result {
+            case .success(let response):
+                print("Success: \(response)")
+                // TODO: 成功時の処理
+                showConfirmationView = false
+                selectedImage = nil
+            case .failure(let error):
+                print("Error: \(error)")
+                // TODO: エラー処理
+            }
+        } catch {
+            print("Unexpected error: \(error)")
+        }
+
+        isLoading = false
+    }
 }
+
 
 #Preview {
     SelectFirstTimePicView()
