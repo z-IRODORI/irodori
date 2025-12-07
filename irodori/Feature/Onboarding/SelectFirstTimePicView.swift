@@ -11,6 +11,9 @@ struct SelectFirstTimePicView: View {
     private let okExampleImages: [ImageResource] = Array(repeating: [.coordinate1, .coordinate2, .coordinate3, .coordinate4, .coordinate5], count: 10).flatMap { $0 }
     @State private var scrollOffset: CGFloat = 0
     @State private var timer: Timer?
+    @State private var showCameraView = false
+    @State private var showPhotoPicker = false
+    @State private var selectedImage: UIImage?
     
     var body: some View {
         ScrollView(.vertical) {
@@ -38,8 +41,12 @@ struct SelectFirstTimePicView: View {
 
                 // 画像選択方法
                 HStack(spacing: 12) {
-                    CustomButton(title: "カメラを起動", textColor: .gray, backgroundColor: .white, tappedAction: {})
-                    CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .green, tappedAction: {})
+                    CustomButton(title: "カメラを起動", textColor: .gray, backgroundColor: .white, tappedAction: {
+                        showCameraView = true
+                    })
+                    CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .green, tappedAction: {
+                        showPhotoPicker = true
+                    })
                 }
 
                 Divider().frame(maxWidth: .infinity).frame(height: 2)
@@ -61,6 +68,15 @@ struct SelectFirstTimePicView: View {
                 .padding(.vertical, 24)
                 .foregroundStyle(.black)
                 .background(.white)
+        }
+        .fullScreenCover(isPresented: $showCameraView) {
+            CameraView()
+        }
+        .sheet(isPresented: $showPhotoPicker) {
+            PhotoPickerView(isPresented: $showPhotoPicker) { image in
+                selectedImage = image
+                // TODO: 選択された画像の処理
+            }
         }
     }
 
