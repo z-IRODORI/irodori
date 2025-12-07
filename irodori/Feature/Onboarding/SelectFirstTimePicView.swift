@@ -8,7 +8,8 @@
 import SwiftUI
 
 struct SelectFirstTimePicView: View {
-    private let okExampleImages: [ImageResource] = Array(repeating: [.coordinate1, .coordinate2, .coordinate3, .coordinate4, .coordinate5], count: 10).flatMap { $0 }
+    private let exampleImages1: [ImageResource] = Array(repeating: [.women1, .men1, .women2, .men2, .women3, .men3,.women4, .men4, .women5, .men5], count: 20).flatMap { $0 }
+    private let exampleImages2: [ImageResource] = Array(repeating: [.women6, .men6, .women7, .men7, .women8, .men8, .women9, .men9, .women10, .men10], count: 20).flatMap { $0 }
     @State private var scrollOffset: CGFloat = 0
     @State private var timer: Timer?
     @State var viewModel: SelectFirstTimePicViewModel = .init(fashionReviewClient: FashionReviewClient())
@@ -19,18 +20,22 @@ struct SelectFirstTimePicView: View {
                 Spacer().frame(height: 20)
 
                 // 撮影画像の例
-                ExamplePics(title: "", textColor: .blue, images: okExampleImages, scrollOffset: $scrollOffset)
-                    .padding(.horizontal, -24)
-                    .onAppear {
-                        startAutoScroll()
-                    }
-                    .onDisappear {
-                        stopAutoScroll()
-                    }
+                VStack(spacing: 6) {
+                    ExamplePics(title: "", textColor: .blue, images: exampleImages1, scrollOffset: $scrollOffset)
+                    ExamplePics(title: "", textColor: .blue, images: exampleImages2, scrollOffset: $scrollOffset)
+                }
+                .padding(.vertical, 24)
+                .padding(.horizontal, -24)
+                .onAppear {
+                    startAutoScroll()
+                }
+                .onDisappear {
+                    stopAutoScroll()
+                }
 
                 // コーデ分析を促す説明文
                 VStack(spacing: 12) {
-                    Text("最近のコーディネートを分析")
+                    Text("さあ、IRODORIを始めましょう")
                         .font(.system(size: 24, weight: .bold))
                     Text(.init("1枚コーデを​送ると​ **あなただけの​相棒** が​作られます。​\n今​後​この​相棒が​あなたの​コーデ分析を​サポートします。​"))
                         .foregroundStyle(.gray)
@@ -42,7 +47,7 @@ struct SelectFirstTimePicView: View {
                     CustomButton(title: "カメラを起動", textColor: .gray, backgroundColor: .white, tappedAction: {
                         viewModel.showCameraView = true
                     })
-                    CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .green, tappedAction: {
+                    CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .pink, tappedAction: {
                         viewModel.showPhotoPicker = true
                     })
                 }
@@ -124,7 +129,7 @@ struct SelectFirstTimePicView: View {
             tappedAction()
         }, label: {
             Text(.init(title))
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(textColor)
                 .frame(maxWidth: 200)
                 .frame(height: 50)
@@ -151,15 +156,15 @@ struct SelectFirstTimePicView: View {
                     ForEach(images, id: \.self) { image in
                         Image(image)
                             .resizable()
-                            .aspectRatio(3/4, contentMode: .fit)
-                            .frame(width: 170)
+                            .scaledToFill()
+//                            .aspectRatio(3/4, contentMode: .fill)
+                            .frame(width: 130, height: 130 * (4/3))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 .offset(x: -scrollOffset.wrappedValue)
             }
         }
-        .padding(.vertical, 24)
     }
 
     private func startAutoScroll() {
@@ -170,7 +175,7 @@ struct SelectFirstTimePicView: View {
                 // 画像の幅と間隔を考慮してリセット位置を計算
                 let imageWidth: CGFloat = 150
                 let spacing: CGFloat = 6
-                let totalWidth = CGFloat(okExampleImages.count) * (imageWidth + spacing)
+                let totalWidth = CGFloat(exampleImages1.count) * (imageWidth + spacing)
 
                 // スクロールが全ての画像を通過したらリセット
                 if scrollOffset > totalWidth {
