@@ -8,15 +8,24 @@
 import SwiftUI
 
 struct SelectFirstTimePicView: View {
-    private let okExampleImages: [ImageResource] = [.coordinate1, .coordinate2, .coordinate3, .coordinate4, .coordinate5]
+    private let okExampleImages: [ImageResource] = Array(repeating: [.coordinate1, .coordinate2, .coordinate3, .coordinate4, .coordinate5], count: 10).flatMap { $0 }
+    @State private var scrollOffset: CGFloat = 0
+    @State private var timer: Timer?
+    
     var body: some View {
         ScrollView(.vertical) {
             VStack(spacing: 32) {
                 Spacer().frame(height: 20)
 
                 // 撮影画像の例
-                ExamplePics(title: "", textColor: .blue, images: okExampleImages)
+                ExamplePics(title: "", textColor: .blue, images: okExampleImages, scrollOffset: $scrollOffset)
                     .padding(.horizontal, -24)
+                    .onAppear {
+                        startAutoScroll()
+                    }
+                    .onDisappear {
+                        stopAutoScroll()
+                    }
 
                 // コーデ分析を促す説明文
                 VStack(spacing: 12) {
@@ -88,8 +97,8 @@ struct SelectFirstTimePicView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 48))
         })
     }
-
-    private func ExamplePics(title: String, textColor: Color, images: [ImageResource]) -> some View {
+    
+    private func ExamplePics(title: String, textColor: Color, images: [ImageResource], scrollOffset: Binding<CGFloat>) -> some View {
         VStack(spacing: 12) {
             if !title.isEmpty {
                 Text(title)
@@ -101,19 +110,41 @@ struct SelectFirstTimePicView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    Spacer().frame(width: 12)
                     ForEach(images, id: \.self) { image in
                         Image(image)
                             .resizable()
                             .aspectRatio(3/4, contentMode: .fit)
-                            .frame(width: 150)
+                            .frame(width: 170)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    Spacer().frame(width: 24)
                 }
+                .offset(x: -scrollOffset.wrappedValue)
             }
         }
         .padding(.vertical, 24)
+    }
+
+    private func startAutoScroll() {
+        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+            withAnimation(.linear(duration: 0.05)) {
+                scrollOffset += 1
+
+                // 画像の幅と間隔を考慮してリセット位置を計算
+                let imageWidth: CGFloat = 150
+                let spacing: CGFloat = 6
+                let totalWidth = CGFloat(okExampleImages.count) * (imageWidth + spacing)
+
+                // スクロールが全ての画像を通過したらリセット
+                if scrollOffset > totalWidth {
+                    scrollOffset = 0
+                }
+            }
+        }
+    }
+
+    private func stopAutoScroll() {
+        timer?.invalidate()
+        timer = nil
     }
 }
 
