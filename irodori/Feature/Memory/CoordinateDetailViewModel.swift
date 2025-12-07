@@ -18,6 +18,7 @@ final class CoordinateDetailViewModel {
     var coordinateDetail: CoordinateDetailResponse? = nil
     var isLoadingDetail = false
     var willShowRecommendCoordinateView = false
+    var willShowChatView = false
 
     init(
         uid: String,
@@ -56,5 +57,9 @@ final class CoordinateDetailViewModel {
 
     func tappedRecommendCoordinateButton() {
         willShowRecommendCoordinateView.toggle()
+    }
+
+    func tappedWillShowChatView() {
+        willShowChatView.toggle()
     }
 }

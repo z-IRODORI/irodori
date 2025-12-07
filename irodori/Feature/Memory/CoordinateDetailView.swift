@@ -9,6 +9,7 @@ import SwiftUI
 
 struct CoordinateDetailView: View {
     @State var viewModel: CoordinateDetailViewModel
+    @State private var coordinateImage: UIImage?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -43,9 +44,11 @@ struct CoordinateDetailView: View {
                     "source": GAEventAction.coordinateDetail.rawValue,
                     "date": viewModel.targetDateString
                 ])
-                viewModel.tappedRecommendCoordinateButton()
+//                viewModel.tappedRecommendCoordinateButton()
+                viewModel.tappedWillShowChatView()
             }) {
-                Text("おすすめのコーデ/アイテムを見る")
+//                Text("おすすめのコーデ/アイテムを見る")
+                Text("質問する")
                     .foregroundStyle(.white)
                     .font(.system(size: 16, weight: .bold))
                     .frame(maxWidth: .infinity, maxHeight: 50)
@@ -58,6 +61,11 @@ struct CoordinateDetailView: View {
         .sheet(isPresented: $viewModel.willShowRecommendCoordinateView) {
             RecommendCoordinateView(viewModel: .init(recommendCoordinateClient: RecommendCoordinateClient()))
         }
+        .navigationDestination(isPresented: $viewModel.willShowChatView) {
+            if let image = coordinateImage {
+                ChatView(coordinateId: viewModel.coordinateDetail?.current_coordinate.id ?? UUID().uuidString, image: image)
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(.gray.opacity(0.08))
         .task {
@@ -65,6 +73,22 @@ struct CoordinateDetailView: View {
                 "date": viewModel.targetDateString
             ])
             await viewModel.onAppear()
+            await loadCoordinateImage()
+        }
+    }
+    
+    private func loadCoordinateImage() async {
+        guard let url = URL(string: viewModel.coordinateImageURL) else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    self.coordinateImage = image
+                }
+            }
+        } catch {
+            print("Failed to load coordinate image: \(error)")
         }
     }
 }
