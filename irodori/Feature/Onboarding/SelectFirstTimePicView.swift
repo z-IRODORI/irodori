@@ -32,13 +32,14 @@ struct SelectFirstTimePicView: View {
                     Text("最近のコーディネートを分析")
                         .font(.system(size: 24, weight: .bold))
                     Text(.init("1枚コーデを​送ると​ **あなただけの​相棒** が​作られます。​\n今​後​この​相棒が​あなたの​コーデ分析を​サポートします。​"))
+                        .foregroundStyle(.gray)
                         .font(.system(size: 14, weight: .regular))
                 }
 
                 // 画像選択方法
                 HStack(spacing: 12) {
+                    CustomButton(title: "カメラを起動", textColor: .gray, backgroundColor: .white, tappedAction: {})
                     CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .green, tappedAction: {})
-                    CustomButton(title: "カメラを起動", textColor: .white, backgroundColor: .green, tappedAction: {})
                 }
 
                 Divider().frame(maxWidth: .infinity).frame(height: 2)
@@ -91,10 +92,13 @@ struct SelectFirstTimePicView: View {
             Text(.init(title))
                 .font(.system(size: 18, weight: .regular))
                 .foregroundStyle(textColor)
-                .frame(maxWidth: 150)
+                .frame(maxWidth: 200)
                 .frame(height: 50)
-                .background(backgroundColor)
-                .clipShape(RoundedRectangle(cornerRadius: 48))
+                .background(
+                    RoundedRectangle(cornerRadius: 32)
+                        .fill(backgroundColor)
+                        .shadow(color: .black, radius: 2, x: 0, y: 2)
+                )
         })
     }
     
