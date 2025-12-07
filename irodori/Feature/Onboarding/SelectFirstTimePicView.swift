@@ -11,13 +11,7 @@ struct SelectFirstTimePicView: View {
     private let okExampleImages: [ImageResource] = Array(repeating: [.coordinate1, .coordinate2, .coordinate3, .coordinate4, .coordinate5], count: 10).flatMap { $0 }
     @State private var scrollOffset: CGFloat = 0
     @State private var timer: Timer?
-    @State private var showCameraView = false
-    @State private var showPhotoPicker = false
-    @State private var selectedImage: UIImage?
-    @State private var showConfirmationView = false
-    @State private var isLoading = false
-
-    private let fashionReviewClient = FashionReviewClient()
+    @State var viewModel: SelectFirstTimePicViewModel = .init(fashionReviewClient: FashionReviewClient())
 
     var body: some View {
         ScrollView(.vertical) {
@@ -46,10 +40,10 @@ struct SelectFirstTimePicView: View {
                 // 画像選択方法
                 HStack(spacing: 12) {
                     CustomButton(title: "カメラを起動", textColor: .gray, backgroundColor: .white, tappedAction: {
-                        showCameraView = true
+                        viewModel.showCameraView = true
                     })
                     CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .green, tappedAction: {
-                        showPhotoPicker = true
+                        viewModel.showPhotoPicker = true
                     })
                 }
 
@@ -73,28 +67,34 @@ struct SelectFirstTimePicView: View {
                 .foregroundStyle(.black)
                 .background(.white)
         }
-        .fullScreenCover(isPresented: $showCameraView) {
+        .fullScreenCover(isPresented: $viewModel.showCameraView) {
             CameraView()
         }
-        .sheet(isPresented: $showPhotoPicker) {
-            PhotoPickerView(isPresented: $showPhotoPicker) { image in
-                selectedImage = image
-                showConfirmationView = true
+        .sheet(isPresented: $viewModel.showPhotoPicker) {
+            PhotoPickerView(isPresented: $viewModel.showPhotoPicker) { image in
+                viewModel.handleImageSelection(image)
             }
         }
-        .fullScreenCover(isPresented: $showConfirmationView) {
-            if let image = selectedImage {
+        .fullScreenCover(isPresented: $viewModel.showConfirmationView) {
+            if let image = viewModel.selectedImage {
                 CapturedImageView(
                     image: image,
                     viewModel: .init(inputUIImage: image),
-                    isPresented: $showConfirmationView,
+                    isPresented: $viewModel.showConfirmationView,
                     okButtonTapped: {
                         Task {
-                            await sendImageToAPI(image)
+                            await viewModel.sendImageToAPI()
                         }
                     }
                 )
             }
+        }
+        .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            Text(viewModel.errorMessage ?? "")
         }
     }
 
@@ -183,30 +183,6 @@ struct SelectFirstTimePicView: View {
     private func stopAutoScroll() {
         timer?.invalidate()
         timer = nil
-    }
-
-    private func sendImageToAPI(_ image: UIImage) async {
-        isLoading = true
-
-        guard let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else { return }
-        do {
-            let result = try await fashionReviewClient.post(uid: uid, image: image, purposeNum: nil)
-
-            switch result {
-            case .success(let response):
-                print("Success: \(response)")
-                // TODO: 成功時の処理
-                showConfirmationView = false
-                selectedImage = nil
-            case .failure(let error):
-                print("Error: \(error)")
-                // TODO: エラー処理
-            }
-        } catch {
-            print("Unexpected error: \(error)")
-        }
-
-        isLoading = false
     }
 }
 
