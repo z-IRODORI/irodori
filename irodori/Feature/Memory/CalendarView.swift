@@ -58,7 +58,7 @@ struct CalendarView: View {
                                         let params: ViewType.CoordinateDetailParams = .init(uid: viewModel.uid, targetDateString: targetDateString, coordinateImageURL: coordinateImageURL)
                                         path.append(.coordinateDetail(params))
                                     }) {
-                                        Card(coordinateImageURL: coordinateImageURL)
+                                        Card(coordinateImageURL: coordinateImageURL, month: viewModel.months[i].monthOfTheYear, day: day)
                                     }
                                 }
                             }
@@ -101,24 +101,32 @@ struct CalendarView: View {
         }
     }
 
-    private func Card(coordinateImageURL: String) -> some View {
-        CachedAsyncImage(url: URL(string: coordinateImageURL)!) { phase in
-            if let image = phase.image {
-                image.resizable()
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.gray.opacity(0.5))
-                        .aspectRatio(3/4, contentMode: .fit)
-                        .frame(maxWidth: .infinity)
-                    ProgressView()
+    private func Card(coordinateImageURL: String, month: Int, day: Int) -> some View {
+        ZStack(alignment: .topLeading) {
+            CachedAsyncImage(url: URL(string: coordinateImageURL)!) { phase in
+                if let image = phase.image {
+                    image.resizable()
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.5))
+                            .aspectRatio(3/4, contentMode: .fit)
+                            .frame(maxWidth: .infinity)
+                        ProgressView()
+                    }
                 }
             }
+            .scaledToFill()
+            .aspectRatio(3/4, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            Text("\(month)/\(day)")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.top, 12)
+                .padding(.leading, 12)
         }
-        .scaledToFill()
-        .aspectRatio(3/4, contentMode: .fit)
-        .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
