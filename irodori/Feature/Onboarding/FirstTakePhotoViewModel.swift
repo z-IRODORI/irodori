@@ -11,7 +11,9 @@ import Combine
 
 @MainActor
 @Observable
-final class SelectFirstTimePicViewModel {
+final class FirstTakePhotoViewModel {
+    private let userDefaults = UserDefaults.standard
+
     var showCameraView = false
     var showPhotoPicker = false
     var selectedImage: UIImage?
@@ -63,5 +65,14 @@ final class SelectFirstTimePicViewModel {
         }
         
         isLoading = false
+    }
+
+    func setupFirstTakePhotoIfNeeded() {
+        // 初回撮影済みの場合何もせずreturn
+        if userDefaults.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
+            return
+        }
+        // 初回撮影の時はfinishedFirstTakePhotoにtrueを設定する
+        userDefaults.set(true, forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue)
     }
 }

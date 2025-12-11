@@ -15,21 +15,30 @@ final class SplashViewModel {
         case userInfo
         case home
         case onboarding
+        case firstTakePhoto
     }
     var state: State = .termsOfService
 
     /// 画面の切り替え
     func updateState() {
+        // 利用規約
         if !UserDefaults.standard.bool(forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue) {
             state = .termsOfService
             return
         }
+        // ユーザー情報設定
         if UserDefaults.standard.object(forKey: UserDefaultsKey.userInfo.rawValue) == nil {
             state = .userInfo
             return
         }
+        // オンボーディング
         if !UserDefaults.standard.bool(forKey: UserDefaultsKey.hasOnboarding.rawValue) {
             state = .onboarding
+            return
+        }
+        // 初回撮影画面
+        if UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
+            state = .firstTakePhoto
             return
         }
         state = .home

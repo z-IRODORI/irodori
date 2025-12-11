@@ -11,135 +11,116 @@ import Photos
 
 // メインカメラView
 struct CameraView: View {
-    @StateObject private var cameraViewModel: CameraViewModel = .init()
+    @State var cameraViewModel: CameraViewModel
+    @Binding var path: [ViewType]
     @State private var showCapturedImage = false
-    @State private var path: [ViewType] = []
     @State private var isShowOnboardingModal: Bool = false
 
     var body: some View {
-        NavigationStack(path: $path) {
-            ZStack {
-                switch cameraViewModel.cameraState {
-                case .initial:
-                    VStack(spacing: 24) {
-                        Text("カメラ準備中...")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.pink)
-                        Image(.splash03)
-                            .resizable()
-                            .frame(width: 200, height: 300)
-                    }
-
-                case .connectedDevice:
-                    Color.white
-
-                    VStack(spacing: 32) {
-                        Header()
-                            .padding(.top, 80)
-                            .padding(.horizontal, 24)
-                        CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
-                            .aspectRatio(3/4, contentMode: .fit)
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                        PartnerComment(image: .wolf, text: Comment.selectedTips())
-                            .padding(.horizontal, 12)
-                            .padding(.top, -80)
-
-                        ZStack(alignment: .center) {
-                            PhotoLibraryButton()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.leading, 24)
-                            CaptureButton()
-                        }
-                    }
-                    .frame(maxHeight: .infinity, alignment: .top)
-
-                // .connectedDevice との差分はキャプチャ領域がピンク色背景になるだけ
-                case .noDevice, .error:
-                    Color.white
-                    VStack(spacing: 32) {
-                        Header()
-                            .padding(.top, 80)
-                            .padding(.horizontal, 24)
-
-                        Color.pink
-                            .aspectRatio(3/4, contentMode: .fit)
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                        PartnerComment(image: .wolf, text: Comment.selectedTips())
-                            .padding(.horizontal, 12)
-                            .padding(.top, -80)
-
-                        ZStack(alignment: .center) {
-                            PhotoLibraryButton()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.leading, 24)
-                            CaptureButton()
-                        }
-                    }
-                    .frame(maxHeight: .infinity, alignment: .top)
+        ZStack {
+            switch cameraViewModel.cameraState {
+            case .initial:
+                VStack(spacing: 24) {
+                    Text("カメラ準備中...")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.pink)
+                    Image(.splash03)
+                        .resizable()
+                        .frame(width: 200, height: 300)
                 }
-            }
-            .navigationBarBackButtonHidden()
-            .ignoresSafeArea()
-            .onAppear {
-                AnalyticsLogger.shared.log(screen: .cameraScreenView)
-                checkCameraPermission()   // カメラを初期化
-            }
-            .fullScreenCover(isPresented: $showCapturedImage) {
-                if let image = cameraViewModel.capturedImage {
-                    CapturedImageView(
-                        image: image,
-                        viewModel: .init(inputUIImage: image),
-                        isPresented: $showCapturedImage,
-                        okButtonTapped: {
-                            path.append(.coordinateReview)
-                        }
-                    )   // キャプチャした画像表示画面
-                }
-            }
-            .navigationDestination(for: ViewType.self) { viewType in
-                switch viewType {
-                case .coordinateReview:
-                    CoordinateReviewView(
-                        viewModel: .init(
-                            coordinateImage: cameraViewModel.capturedImage!.correctOrientation,
-                            apiClient: FashionReviewClient()
-                        ),
-                        path: $path
-                    )
-                case .calendar:
-                    CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
-                case .coordinateDetail(let params):
-                    CoordinateDetailView(
-                        viewModel: .init(uid: params.uid, targetDateString: params.targetDateString, coordinateImageURL: params.coordinateImageURL, coordinateDetailClient: CoordinateDetailClient())
-                    )
-                case .camera:
-                    EmptyView()
-                }
-            }
-            .sheet(isPresented: $isShowOnboardingModal) {
-                OnboardingView(closeButtonTapped: {
-                    isShowOnboardingModal = false
-                })
-                .interactiveDismissDisabled()
-            }
-            .sheet(isPresented: $cameraViewModel.showImagePicker) {
-                PhotoPickerView(isPresented: $cameraViewModel.showImagePicker) { image in
-                    cameraViewModel.processPickedImage(image)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        showCapturedImage = true
+
+            case .connectedDevice:
+                Color.white
+
+                VStack(spacing: 32) {
+                    Header()
+                        .padding(.top, 80)
+                        .padding(.horizontal, 24)
+                    CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
+                        .aspectRatio(3/4, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
+//                    if UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
+//                        PartnerComment(image: .wolf, text: Comment.selectedTips())
+//                            .padding(.horizontal, 12)
+//                            .padding(.top, -80)
+//                    }
+
+                    ZStack(alignment: .center) {
+                        PhotoLibraryButton()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 24)
+                        CaptureButton()
                     }
                 }
-            }
-            .alert("フォトライブラリへのアクセス", isPresented: $cameraViewModel.showPhotoLibraryPermissionAlert) {
-                Button("設定") {
-                    if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(settingsUrl)
+                .frame(maxHeight: .infinity, alignment: .top)
+
+            // .connectedDevice との差分はキャプチャ領域がピンク色背景になるだけ
+            case .noDevice, .error:
+                Color.white
+                VStack(spacing: 32) {
+                    Header()
+                        .padding(.top, 80)
+                        .padding(.horizontal, 24)
+
+                    Color.pink
+                        .aspectRatio(3/4, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
+                    PartnerComment(image: .wolf, text: Comment.selectedTips())
+                        .padding(.horizontal, 12)
+                        .padding(.top, -80)
+
+                    ZStack(alignment: .center) {
+                        PhotoLibraryButton()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 24)
+                        CaptureButton()
                     }
                 }
-                Button("キャンセル", role: .cancel) {}
-            } message: {
-                Text("写真を選択するには、設定でフォトライブラリへのアクセスを許可してください。")
+                .frame(maxHeight: .infinity, alignment: .top)
             }
+        }
+        .navigationBarBackButtonHidden()
+        .ignoresSafeArea()
+        .onAppear {
+            AnalyticsLogger.shared.log(screen: .cameraScreenView)
+            checkCameraPermission()   // カメラを初期化
+        }
+        .fullScreenCover(isPresented: $showCapturedImage) {
+            if let image = cameraViewModel.capturedImage {
+                CapturedImageView(
+                    image: image,
+                    viewModel: .init(inputUIImage: image),
+                    isPresented: $showCapturedImage,
+                    okButtonTapped: {
+                        cameraViewModel.setupFirstTakePhotoIfNeeded()
+                        path.append(.coordinateReview(cameraViewModel.capturedImage!))
+                    }
+                )   // キャプチャした画像表示画面
+            }
+        }
+        .sheet(isPresented: $isShowOnboardingModal) {
+            OnboardingView(closeButtonTapped: {
+                isShowOnboardingModal = false
+            })
+            .interactiveDismissDisabled()
+        }
+        .sheet(isPresented: $cameraViewModel.showImagePicker) {
+            PhotoPickerView(isPresented: $cameraViewModel.showImagePicker) { image in
+                cameraViewModel.processPickedImage(image)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showCapturedImage = true
+                }
+            }
+        }
+        .alert("フォトライブラリへのアクセス", isPresented: $cameraViewModel.showPhotoLibraryPermissionAlert) {
+            Button("設定") {
+                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsUrl)
+                }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("写真を選択するには、設定でフォトライブラリへのアクセスを許可してください。")
         }
     }
 
@@ -271,6 +252,6 @@ extension CameraView {
 
 
 #Preview {
-    CameraView()
+    CameraView(cameraViewModel: .init(), path: .constant([]))
 }
 

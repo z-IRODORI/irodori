@@ -7,12 +7,13 @@
 
 import SwiftUI
 
-struct SelectFirstTimePicView: View {
+struct FirstTakePhotoView: View {
     private let exampleImages1: [ImageResource] = Array(repeating: [.women1, .men1, .women2, .men2, .women3, .men3,.women4, .men4, .women5, .men5], count: 20).flatMap { $0 }
     private let exampleImages2: [ImageResource] = Array(repeating: [.women6, .men6, .women7, .men7, .women8, .men8, .women9, .men9, .women10, .men10], count: 20).flatMap { $0 }
+    @Binding var path: [ViewType]
     @State private var scrollOffset: CGFloat = 0
     @State private var timer: Timer?
-    @State var viewModel: SelectFirstTimePicViewModel = .init(fashionReviewClient: FashionReviewClient())
+    @State var viewModel: FirstTakePhotoViewModel = .init(fashionReviewClient: FashionReviewClient())
 
     var body: some View {
         ScrollView(.vertical) {
@@ -47,7 +48,7 @@ struct SelectFirstTimePicView: View {
                     CustomButton(title: "カメラを起動", textColor: .gray, backgroundColor: .white, tappedAction: {
                         viewModel.showCameraView = true
                     })
-                    CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .pink, tappedAction: {
+                    CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .black, tappedAction: {
                         viewModel.showPhotoPicker = true
                     })
                 }
@@ -73,10 +74,12 @@ struct SelectFirstTimePicView: View {
                 .background(.white)
         }
         .fullScreenCover(isPresented: $viewModel.showCameraView) {
-            CameraView()
+            CameraView(cameraViewModel: .init(), path: $path)
         }
         .sheet(isPresented: $viewModel.showPhotoPicker) {
             PhotoPickerView(isPresented: $viewModel.showPhotoPicker) { image in
+                // メソッド内で showConfirmationView が切り替わる
+                // CapturedImageView を呼びだす
                 viewModel.handleImageSelection(image)
             }
         }
@@ -87,9 +90,8 @@ struct SelectFirstTimePicView: View {
                     viewModel: .init(inputUIImage: image),
                     isPresented: $viewModel.showConfirmationView,
                     okButtonTapped: {
-                        Task {
-                            await viewModel.sendImageToAPI()
-                        }
+//                        viewModel.setupFirstTakePhotoIfNeeded()
+                        path.append(.coordinateReview(image))
                     }
                 )
             }
@@ -193,5 +195,5 @@ struct SelectFirstTimePicView: View {
 
 
 #Preview {
-    SelectFirstTimePicView()
+    FirstTakePhotoView(path: .constant([]))
 }

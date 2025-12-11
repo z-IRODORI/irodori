@@ -19,7 +19,6 @@ struct CoordinateReviewView: View {
     @State private var tappedAffiliateProduct: AffiliateProduct?
     @Binding var path: [ViewType]
 
-
     var body: some View {
         ZStack {
             if let fashionReview = viewModel.fashionReview {
@@ -85,7 +84,7 @@ struct CoordinateReviewView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .navigationDestination(isPresented: $isPresentedCameraView) {
-                    CameraView()
+                    CameraView(cameraViewModel: .init(), path: $path)
                 }
                 .background(.gray.opacity(0.08))
                 .navigationBarBackButtonHidden()
