@@ -39,11 +39,11 @@ struct CameraView: View {
                     CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
                         .aspectRatio(3/4, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
-//                    if UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
-//                        PartnerComment(image: .wolf, text: Comment.selectedTips())
-//                            .padding(.horizontal, 12)
-//                            .padding(.top, -80)
-//                    }
+                    if UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
+                        PartnerComment(image: .wolf, text: Comment.selectedTips())
+                            .padding(.horizontal, 12)
+                            .padding(.top, -80)
+                    }
 
                     ZStack(alignment: .center) {
                         PhotoLibraryButton()

@@ -37,7 +37,7 @@ final class SplashViewModel {
             return
         }
         // 初回撮影画面
-        if UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
+        if !UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
             state = .firstTakePhoto
             return
         }

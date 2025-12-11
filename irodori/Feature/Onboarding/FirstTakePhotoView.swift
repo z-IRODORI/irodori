@@ -14,6 +14,7 @@ struct FirstTakePhotoView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var timer: Timer?
     @State var viewModel: FirstTakePhotoViewModel = .init(fashionReviewClient: FashionReviewClient())
+    let okButtonTapped: (() -> ())
 
     var body: some View {
         ScrollView(.vertical) {
@@ -90,7 +91,8 @@ struct FirstTakePhotoView: View {
                     viewModel: .init(inputUIImage: image),
                     isPresented: $viewModel.showConfirmationView,
                     okButtonTapped: {
-//                        viewModel.setupFirstTakePhotoIfNeeded()
+                        viewModel.setupFirstTakePhotoIfNeeded()
+                        okButtonTapped()
                         path.append(.coordinateReview(image))
                     }
                 )
@@ -195,5 +197,5 @@ struct FirstTakePhotoView: View {
 
 
 #Preview {
-    FirstTakePhotoView(path: .constant([]))
+    FirstTakePhotoView(path: .constant([]), okButtonTapped: {})
 }
