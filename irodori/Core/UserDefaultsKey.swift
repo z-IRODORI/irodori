@@ -16,4 +16,5 @@ enum UserDefaultsKey: String {
     case signUpDate
     case hasOnboarding
     case coordinateChats
+    case finishedFirstTakePhoto
 }

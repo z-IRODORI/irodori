@@ -48,7 +48,7 @@ struct CoordinateDetailView: View {
                 viewModel.tappedWillShowChatView()
             }) {
 //                Text("おすすめのコーデ/アイテムを見る")
-                Text("質問する")
+                Text("💬 質問する")
                     .foregroundStyle(.white)
                     .font(.system(size: 16, weight: .bold))
                     .frame(maxWidth: .infinity, maxHeight: 50)

@@ -10,7 +10,7 @@ import UIKit
 enum ViewType: Hashable {
     case camera
     case calendar
-    case coordinateReview
+    case coordinateReview(UIImage)
     case coordinateDetail(CoordinateDetailParams)
 
     struct CoordinateDetailParams: Hashable {

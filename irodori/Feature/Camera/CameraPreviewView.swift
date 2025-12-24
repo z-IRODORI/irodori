@@ -11,7 +11,7 @@ import AVFoundation
 // MARK: - Representable
 
 struct CameraPreviewViewRepresentable: UIViewRepresentable {
-    @ObservedObject var cameraViewModel: CameraViewModel
+    @State var cameraViewModel: CameraViewModel
 
     func makeUIView(context: Context) -> UIView {
         return CameraPreviewView(cameraViewModel: cameraViewModel)

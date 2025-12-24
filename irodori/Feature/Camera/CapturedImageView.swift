@@ -50,8 +50,8 @@ struct CapturedImageView: View {
     //                    .padding()
 
                         Button("送信") {
-                            okButtonTapped()
                             isPresented = false
+                            okButtonTapped()
                         }
                         .foregroundColor(.white)
                         .padding()

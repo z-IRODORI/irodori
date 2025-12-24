@@ -10,6 +10,7 @@ import SwiftUI
 struct CoordinateReviewView: View {
     @State var viewModel: CoordinateReviewViewModel
 
+    let fromFirstTakePhotoView = false
     private let shortTextCriterion = 50
     @State private var currentSchedule = ""   // YYYY/MM/DD
     @State private var reviewText = ""
@@ -18,7 +19,6 @@ struct CoordinateReviewView: View {
     @State private var isPresentedCameraView = false
     @State private var tappedAffiliateProduct: AffiliateProduct?
     @Binding var path: [ViewType]
-
 
     var body: some View {
         ZStack {
@@ -58,6 +58,9 @@ struct CoordinateReviewView: View {
                                 "action": GAEventAction.goHome.rawValue
                             ])
                             path.removeAll()
+                            if fromFirstTakePhotoView {
+                                path.append(.camera)
+                            }
                         }, label: {
                             Text("ホームへ")
                         })
@@ -85,7 +88,7 @@ struct CoordinateReviewView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .navigationDestination(isPresented: $isPresentedCameraView) {
-                    CameraView()
+                    CameraView(cameraViewModel: .init(), path: $path)
                 }
                 .background(.gray.opacity(0.08))
                 .navigationBarBackButtonHidden()

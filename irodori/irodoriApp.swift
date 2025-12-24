@@ -14,7 +14,6 @@ struct irodoriApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @Environment(\.scenePhase) var scenePhase
 
-    @State private var path: [ViewType] = []
     var body: some Scene {
         WindowGroup {
             SplashView()
@@ -40,6 +39,8 @@ struct irodoriApp: App {
 //            )
 
 //            CameraView()
+
+//            SelectFirstTimePicView()
 
 //            CoordinateReviewView(viewModel: .init(
 //                coordinateImage: UIImage(resource: .coordinate2),
