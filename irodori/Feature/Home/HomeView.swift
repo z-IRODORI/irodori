@@ -26,10 +26,10 @@ struct HomeView: View {
                             .resizable()
                             .frame(width: 50, height: 50)
                             .clipShape(Circle())
-                        SpeechBubbleView(text: "これまでのコーデを分析するよ")
+                        SpeechBubbleView(text: "これまでのコーデを分析しました")
                     }
                     Text(.init(viewModel.homeResponse.coordinate_analyze))
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.system(size: 16, weight: .regular))
                 }
 
                 // これまでのタグ
@@ -81,7 +81,7 @@ struct HomeView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                 })
             }
-            .padding(.top, 16)
+            .padding(.top, 24)
             .padding(.horizontal, 24)
             .background(.white)
         }
@@ -89,8 +89,8 @@ struct HomeView: View {
 
     private func Header() -> some View {
         ZStack {
-            Text("IRODORI")
-                .font(.system(size: 24, weight: .bold))
+            Text("ホーム")
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(.black)
             HStack(spacing: 24) {
                 Button(action: {
