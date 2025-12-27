@@ -28,8 +28,15 @@ struct HomeView: View {
                             .clipShape(Circle())
                         SpeechBubbleView(text: "これまでのコーデを分析しました")
                     }
-                    Text(.init(viewModel.homeResponse.coordinate_analyze))
-                        .font(.system(size: 16, weight: .regular))
+                    if !viewModel.homeResponse.coordinate_analyze.isEmpty {
+                        Text(.init(viewModel.homeResponse.coordinate_analyze))
+                            .font(.system(size: 16, weight: .regular))
+                    } else {
+                        Text("コーデが存在しないため分析できませんでした")
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
 
                 // これまでのタグ
@@ -42,6 +49,8 @@ struct HomeView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         Text("タグが存在しません")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 

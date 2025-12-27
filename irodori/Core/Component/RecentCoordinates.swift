@@ -18,6 +18,9 @@ struct RecentCoordinates: View {
                 .padding(.horizontal, 24)
             if recentCoordinates.isEmpty {
                 Text("コーデが存在しません...")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 24)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
