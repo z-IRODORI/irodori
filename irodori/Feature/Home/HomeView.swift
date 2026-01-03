@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    let viewModel: HomeViewModel = .init(apiClient: MockHomeClient())
+    @State var viewModel: HomeViewModel = .init(apiClient: MockHomeClient())
     @State private var plannerViewModel: PlannerViewModel = .init()
 
     var body: some View {
