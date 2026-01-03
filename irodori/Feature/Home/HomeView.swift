@@ -9,6 +9,7 @@ import SwiftUI
 
 struct HomeView: View {
     let viewModel: HomeViewModel = .init(apiClient: MockHomeClient())
+    @State private var plannerViewModel: PlannerViewModel = .init()
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -18,6 +19,20 @@ struct HomeView: View {
                 // 直近のコーデが存在しない場合、コーデだけではなく分析やタグを表示できないので、それも踏まえてUIを考える
                 RecentCoordinates(recentCoordinates: viewModel.homeResponse.recent_coordinates)
                     .padding(.horizontal, -24)
+
+                VStack(spacing: 12) {
+                    Text("コーデ提案")
+                        .font(.system(size: 20, weight: .bold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    WeeklyPlannerContent(
+                        calendarList: plannerViewModel.calendarList,
+                        selectedDateID: $plannerViewModel.selectedDateID,
+                        relativeDateText: plannerViewModel.relativeDateText,
+                        onSelectDate: { id in plannerViewModel.selectDate(id: id) },
+                        isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) }
+                    )
+                    .padding(.horizontal, -24)
+                }
 
                 // コーデの分析
                 VStack(spacing: 12) {

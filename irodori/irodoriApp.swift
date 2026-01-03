@@ -34,8 +34,8 @@ struct irodoriApp: App {
 //                    }
 //                }
 
-//            HomeView()
-            PlannerView()
+            HomeView()
+//            PlannerView()
 
 //            CameraView()
 
