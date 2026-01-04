@@ -22,7 +22,7 @@ struct WeeklyPlannerContent: View {
     private let cardSpacing: CGFloat = 16
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 12) {
             // カレンダー部分
             HStack(spacing: 0) {
                 ForEach(calendarList) { item in
@@ -46,12 +46,11 @@ struct WeeklyPlannerContent: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.vertical, 16)
 
             // 相対日付テキスト
-            Text(relativeDateText)
-                .font(.system(size: 18, weight: .bold))
-                .padding(.top, 20)
+//            Text(relativeDateText)
+//                .font(.system(size: 18, weight: .bold))
+//                .padding(.top, 20)
 
             // カルーセル部分
             GeometryReader { proxy in
@@ -69,7 +68,6 @@ struct WeeklyPlannerContent: View {
                 .scrollTargetBehavior(.viewAligned)
             }
             .frame(height: 520)
-            .padding(.vertical, 20)
         }
     }
 

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @StateObject private var viewModel = MainTabViewModel()
+    @State private var viewModel: MainTabViewModel = .init()
     @State private var isSheetPresented = false // モーダル管理用フラグ
 
     var body: some View {
@@ -13,7 +13,7 @@ struct MainTabView: View {
                 PlannerView()
                     .opacity(viewModel.selectedTab == .planner ? 1 : 0)
 
-                Text("プロフィール画面")
+                ProfileView()
                     .opacity(viewModel.selectedTab == .profile ? 1 : 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -24,7 +24,7 @@ struct MainTabView: View {
         // モーダルの実装
         .sheet(isPresented: $isSheetPresented) {
             AddContentModalView()
-                .presentationDetents([.height(300), .medium]) // ハーフモーダルの高さ調整
+                .presentationDetents([.height(300)]) // ハーフモーダルの高さ調整
                 .presentationDragIndicator(.visible)
         }
     }
@@ -81,9 +81,10 @@ struct MainTabView: View {
     }
 }
 
-// 状態管理用のViewModel
-class MainTabViewModel: ObservableObject {
-    @Published var selectedTab: Tab = .home
+@Observable
+@MainActor
+final class MainTabViewModel {
+    var selectedTab: Tab = .home
 
     enum Tab {
         case home, planner, profile
