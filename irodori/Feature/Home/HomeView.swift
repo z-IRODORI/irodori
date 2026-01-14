@@ -24,7 +24,16 @@ struct HomeView: View {
                     Text("コーデ提案")
                         .font(.system(size: 20, weight: .bold))
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    WeeklyPlannerContent(
+//                    WeeklyPlannerContent(
+//                        calendarList: plannerViewModel.calendarList,
+//                        selectedDateID: $plannerViewModel.selectedDateID,
+//                        relativeDateText: plannerViewModel.relativeDateText,
+//                        onSelectDate: { id in plannerViewModel.selectDate(id: id) },
+//                        isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) }
+//                    )
+//                    .padding(.horizontal, -24)
+                    
+                    ThreeDaysPlanner(
                         calendarList: plannerViewModel.calendarList,
                         selectedDateID: $plannerViewModel.selectedDateID,
                         relativeDateText: plannerViewModel.relativeDateText,

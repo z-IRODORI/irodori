@@ -15,22 +15,18 @@ class PlannerViewModel {
         setInitialSelection()
     }
 
-    // 現在の週（月〜日）を生成
+    // 今日から3日間（今日、明日、明後日）を生成
     private func generateCalendar() {
         let today = calendar.startOfDay(for: Date())
-        let weekday = calendar.component(.weekday, from: today)
-        let daysFromMonday = (weekday + 5) % 7
-        let monday = calendar.date(byAdding: .day, value: -daysFromMonday, to: today)!
 
-        self.calendarList = (0..<7).map { i in
-            CalendarData(id: i, date: calendar.date(byAdding: .day, value: i, to: monday)!)
+        self.calendarList = (0..<3).map { i in
+            CalendarData(id: i, date: calendar.date(byAdding: .day, value: i, to: today)!)
         }
     }
 
     // 初期選択を「今日」にセット
     private func setInitialSelection() {
-        let weekday = calendar.component(.weekday, from: Date())
-        self.selectedDateID = (weekday + 5) % 7
+        self.selectedDateID = 0
     }
 
     // 相対表示テキストの計算

@@ -34,17 +34,18 @@ struct irodoriApp: App {
 //                    }
 //                }
 
+//            MainTabView()
+
 //            HomeView()
-            MainTabView()
 //            PlannerView()
 //            ProfileView()
 
 //            CameraView()
 
-//            CoordinateReviewView(viewModel: .init(
-//                coordinateImage: UIImage(resource: .coordinate2),
-//                apiClient: FashionReviewClient()   //MockFashionReviewClient()
-//            ), path: .constant([]))
+            CoordinateReviewView(viewModel: .init(
+                coordinateImage: UIImage(resource: .coordinate5),
+                apiClient: FashionReviewClient()   //MockFashionReviewClient()
+            ), path: .constant([]))
 
 //            RecommendCoordinateView(
 //                viewModel: .init(recommendCoordinateClient: MockRecommendCoordinateClient())

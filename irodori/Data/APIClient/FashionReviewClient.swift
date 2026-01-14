@@ -13,7 +13,7 @@ protocol FashionReviewClientProtocol {
 
 final class FashionReviewClient: FashionReviewClientProtocol {
     func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError> {
-        let baseURL = "https://irodori.click"
+        let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "api/fashion_review"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 
