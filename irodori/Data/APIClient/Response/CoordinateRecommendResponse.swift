@@ -21,6 +21,18 @@ struct CoordinateRecommend: Codable, Hashable {
     let bottoms: String
     let shoes: String
     let accessories: String
+
+    // 画像URLを取得（モックの場合はプレースホルダー画像を返す）
+    var imageURLs: [String] {
+        // 本番環境では coordinate_image を使用してAPIから画像URLを取得
+        // 現在はモックとして4つのプレースホルダー画像を返す
+        return [
+            "https://picsum.photos/200/200?random=\(coordinate_image)1",
+            "https://picsum.photos/200/200?random=\(coordinate_image)2",
+            "https://picsum.photos/200/200?random=\(coordinate_image)3",
+            "https://picsum.photos/200/200?random=\(coordinate_image)4"
+        ]
+    }
 }
 
 extension CoordinateRecommendResponse {

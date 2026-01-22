@@ -75,39 +75,50 @@ struct WeeklyPlannerContent: View {
     }
 
     private func coordinateCard(for item: CalendarData) -> some View {
-        let hasCoordinate = coordinateForItem(item) != nil
+        let coordinate = coordinateForItem(item)
 
         return VStack(spacing: 0) {
             // 上半分: コーデ画像エリア
-            VStack {
-                Spacer()
+            VStack(spacing: 8) {
                 Text("\(item.dayString)日のコーディネート")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
-                    .padding(.bottom, 8)
+                    .padding(.top, 16)
 
                 if isLoading {
-                    ProgressView()
-                        .padding()
-                } else if !hasCoordinate {
-                    Button {
-                        onAddCoordinate()
-                    } label: {
-                        Label("コーデを追加", systemImage: "plus")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 16)
-                            .background(.black)
-                            .clipShape(Capsule())
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if let coordinate = coordinate {
+                    imageGridView(imageURLs: coordinate.imageURLs)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                } else {
+                    VStack {
+                        Spacer()
+                        Button {
+                            onAddCoordinate()
+                        } label: {
+                            Label("コーデを追加", systemImage: "plus")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 16)
+                                .background(.black)
+                                .clipShape(Capsule())
+                        }
+                        Spacer()
                     }
                 }
-                Spacer()
             }
-            .frame(height: hasCoordinate ? 250 : 500)
+            .frame(height: 250)
 
             // 下半分: アイテムリスト
-            if let coordinate = coordinateForItem(item) {
+            if let coordinate = coordinate {
+                Divider()
+                    .padding(.horizontal, 16)
                 coordinateItemsList(coordinate: coordinate)
                     .frame(height: 250)
             }
@@ -117,6 +128,45 @@ struct WeeklyPlannerContent: View {
         .cornerRadius(32)
         .overlay(RoundedRectangle(cornerRadius: 32).stroke(.gray.opacity(0.15), lineWidth: 1))
         .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 4)
+    }
+
+    @ViewBuilder
+    private func imageGridView(imageURLs: [String]) -> some View {
+        let gridItems = [
+            GridItem(.flexible(), spacing: 4),
+            GridItem(.flexible(), spacing: 4)
+        ]
+
+        LazyVGrid(columns: gridItems, spacing: 4) {
+            ForEach(0..<min(4, imageURLs.count), id: \.self) { index in
+                AsyncImage(url: URL(string: imageURLs[index])) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .aspectRatio(1, contentMode: .fit)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .aspectRatio(1, contentMode: .fit)
+                            .clipped()
+                    case .failure:
+                        Image(systemName: "photo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .foregroundStyle(.gray)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .aspectRatio(1, contentMode: .fit)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                .background(Color.gray.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
     }
 
     private func coordinateForItem(_ item: CalendarData) -> CoordinateRecommend? {
