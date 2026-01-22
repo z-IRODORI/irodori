@@ -11,8 +11,8 @@ import Foundation
 @Observable
 final class HomeViewModel {
     var homeResponse: HomeResponse = .init(recent_coordinates: [], coordinate_analyze: "", tags: nil)
-    var coordinateRecommendResponse: CoordinateRecommendResponse?
-    var isLoadingCoordinateRecommend: Bool = false
+    var coordinatesByDate: [Int: CoordinateRecommend] = [:]
+    var loadingDateIDs: Set<Int> = []
 
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
@@ -42,9 +42,9 @@ final class HomeViewModel {
         }
     }
 
-    func addCoordinate() async {
-        isLoadingCoordinateRecommend = true
-        defer { isLoadingCoordinateRecommend = false }
+    func addCoordinate(for dateID: Int) async {
+        loadingDateIDs.insert(dateID)
+        defer { loadingDateIDs.remove(dateID) }
 
         do {
             let result = try await coordinateRecommendClient.post(
@@ -58,8 +58,11 @@ final class HomeViewModel {
 
             switch result {
             case .success(let response):
-                self.coordinateRecommendResponse = response
-                print("コーデ追加成功: \(response.recommend_coordinates.count)件")
+                // APIから複数のコーディネートが返ってくるが、最初の1つを使用
+                if let firstCoordinate = response.recommend_coordinates.first {
+                    self.coordinatesByDate[dateID] = firstCoordinate
+                    print("コーデ追加成功: dateID=\(dateID)")
+                }
             case .failure(let error):
                 print("コーデ追加エラー: \(error)")
                 // エラーハンドリング
@@ -68,5 +71,13 @@ final class HomeViewModel {
             print("コーデ追加例外: \(error)")
             // エラーハンドリング
         }
+    }
+
+    func isLoading(for dateID: Int) -> Bool {
+        return loadingDateIDs.contains(dateID)
+    }
+
+    func coordinate(for dateID: Int) -> CoordinateRecommend? {
+        return coordinatesByDate[dateID]
     }
 }

@@ -17,22 +17,42 @@ struct CoordinateRecommendResponse: Codable {
 
 struct CoordinateRecommend: Codable, Hashable {
     let coordinate_image: String
-    let outer: String
-    let bottoms: String
-    let shoes: String
-    let accessories: String
+    let outer: ItemDetail
+    let bottoms: ItemDetail
+    let shoes: ItemDetail
+    let accessories: ItemDetail
 
-    // 画像URLを取得（モックの場合はプレースホルダー画像を返す）
-    var imageURLs: [String] {
-        // 本番環境では coordinate_image を使用してAPIから画像URLを取得
-        // 現在はモックとして4つのプレースホルダー画像を返す
-        return [
-            "https://picsum.photos/200/200?random=\(coordinate_image)1",
-            "https://picsum.photos/200/200?random=\(coordinate_image)2",
-            "https://picsum.photos/200/200?random=\(coordinate_image)3",
-            "https://picsum.photos/200/200?random=\(coordinate_image)4"
-        ]
+    // 画像パスを取得（2x2グリッド用に4枚取得）
+    var imagePaths: [String] {
+        var paths: [String] = []
+
+        // outer, bottoms, shoes, accessories の順で画像を追加
+        // 各アイテムから最初の画像を取得（存在する場合）
+        if let firstOuterImage = outer.image_paths.first, !outer.name.isEmpty {
+            paths.append(firstOuterImage)
+        }
+        if let firstBottomsImage = bottoms.image_paths.first {
+            paths.append(firstBottomsImage)
+        }
+        if let firstShoesImage = shoes.image_paths.first {
+            paths.append(firstShoesImage)
+        }
+        if let firstAccessoryImage = accessories.image_paths.first {
+            paths.append(firstAccessoryImage)
+        }
+
+        // 4枚に満たない場合は空文字で埋める（表示側でプレースホルダー表示）
+        while paths.count < 4 {
+            paths.append("")
+        }
+
+        return Array(paths.prefix(4))
     }
+}
+
+struct ItemDetail: Codable, Hashable {
+    let name: String
+    let image_paths: [String]
 }
 
 extension CoordinateRecommendResponse {
@@ -41,24 +61,94 @@ extension CoordinateRecommendResponse {
             recommend_coordinates: [
                 CoordinateRecommend(
                     coordinate_image: "071248eb61c5083d4537f4e973652b0d",
-                    outer: "",
-                    bottoms: "ボトムス_ワイドパンツ_ブラック",
-                    shoes: "シューズ_サンダル_ブラック",
-                    accessories: "アクセサリー_ネックレス_ゴールド アクセサリー_メガネ_ブラック アクセサリー_腕時計_シルバー"
+                    outer: ItemDetail(name: "", image_paths: []),
+                    bottoms: ItemDetail(
+                        name: "ワイドパンツ",
+                        image_paths: [
+                            "items/ワイドパンツ/00.png",
+                            "items/ワイドパンツ/01.png",
+                            "items/ワイドパンツ/02.png"
+                        ]
+                    ),
+                    shoes: ItemDetail(
+                        name: "サンダル",
+                        image_paths: [
+                            "items/サンダル/00.png",
+                            "items/サンダル/01.png",
+                            "items/サンダル/02.png"
+                        ]
+                    ),
+                    accessories: ItemDetail(
+                        name: "ネックレス",
+                        image_paths: [
+                            "items/ネックレス/00.png",
+                            "items/ネックレス/01.png",
+                            "items/ネックレス/02.png"
+                        ]
+                    )
                 ),
                 CoordinateRecommend(
                     coordinate_image: "146099eb0a01e021db9853286b9e5825",
-                    outer: "アウター_ミリタリーコート_カーキ",
-                    bottoms: "ボトムス_ワイドパンツ_ブラック",
-                    shoes: "シューズ_厚底シューズ_ブラック",
-                    accessories: "アクセサリー_サングラス_ベージュ アクセサリー_サングラス_イエロー アクセサリー_ショルダーバッグ_シルバー"
+                    outer: ItemDetail(
+                        name: "ミリタリーコート",
+                        image_paths: [
+                            "items/ミリタリーコート/00.png",
+                            "items/ミリタリーコート/01.png",
+                            "items/ミリタリーコート/02.png"
+                        ]
+                    ),
+                    bottoms: ItemDetail(
+                        name: "ワイドパンツ",
+                        image_paths: [
+                            "items/ワイドパンツ/00.png",
+                            "items/ワイドパンツ/01.png",
+                            "items/ワイドパンツ/02.png"
+                        ]
+                    ),
+                    shoes: ItemDetail(
+                        name: "厚底シューズ",
+                        image_paths: [
+                            "items/厚底シューズ/00.png",
+                            "items/厚底シューズ/01.png",
+                            "items/厚底シューズ/02.png"
+                        ]
+                    ),
+                    accessories: ItemDetail(
+                        name: "サングラス",
+                        image_paths: [
+                            "items/サングラス/00.png",
+                            "items/サングラス/01.png",
+                            "items/サングラス/02.png"
+                        ]
+                    )
                 ),
                 CoordinateRecommend(
                     coordinate_image: "14bccd39640e64629b4d9bf32d20874a",
-                    outer: "",
-                    bottoms: "ボトムス_ジーンズ_ブルー",
-                    shoes: "シューズ_サンダル_ホワイト",
-                    accessories: "アクセサリー_ハンドバッグ_ブラウン アクセサリー_メガネ_ゴールド アクセサリー_ネックレス_ホワイト"
+                    outer: ItemDetail(name: "", image_paths: []),
+                    bottoms: ItemDetail(
+                        name: "ジーンズ",
+                        image_paths: [
+                            "items/ジーンズ/00.png",
+                            "items/ジーンズ/01.png",
+                            "items/ジーンズ/02.png"
+                        ]
+                    ),
+                    shoes: ItemDetail(
+                        name: "サンダル",
+                        image_paths: [
+                            "items/サンダル/00.png",
+                            "items/サンダル/01.png",
+                            "items/サンダル/02.png"
+                        ]
+                    ),
+                    accessories: ItemDetail(
+                        name: "ハンドバッグ",
+                        image_paths: [
+                            "items/ハンドバッグ/00.png",
+                            "items/ハンドバッグ/01.png",
+                            "items/ハンドバッグ/02.png"
+                        ]
+                    )
                 )
             ],
             outer_list: [

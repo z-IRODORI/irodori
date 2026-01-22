@@ -13,9 +13,9 @@ struct ThreeDaysPlanner: View {
     let relativeDateText: String
     let onSelectDate: (Int) -> Void
     let isCurrentMonth: (Date) -> Bool
-    let recommendedCoordinates: [CoordinateRecommend]
-    let isLoading: Bool
-    let onAddCoordinate: () -> Void
+    let coordinateForDate: (Int) -> CoordinateRecommend?
+    let isLoadingForDate: (Int) -> Bool
+    let onAddCoordinate: (Int) -> Void
 
     // アニメーション用
     @Namespace private var calendarAnimation
@@ -56,7 +56,8 @@ struct ThreeDaysPlanner: View {
     }
 
     private func coordinateCard(for item: CalendarData) -> some View {
-        let coordinate = coordinateForItem(item)
+        let coordinate = coordinateForDate(item.id)
+        let isLoading = isLoadingForDate(item.id)
 
         return VStack(spacing: 0) {
             // 上半分: コーデ画像エリア
@@ -73,14 +74,14 @@ struct ThreeDaysPlanner: View {
                         Spacer()
                     }
                 } else if let coordinate = coordinate {
-                    imageGridView(imageURLs: coordinate.imageURLs)
+                    imageGridView(imagePaths: coordinate.imagePaths)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
                 } else {
                     VStack {
                         Spacer()
                         Button {
-                            onAddCoordinate()
+                            onAddCoordinate(item.id)
                         } label: {
                             Label("コーデを追加", systemImage: "plus")
                                 .font(.system(size: 18, weight: .bold))
@@ -113,47 +114,35 @@ struct ThreeDaysPlanner: View {
     }
 
     @ViewBuilder
-    private func imageGridView(imageURLs: [String]) -> some View {
+    private func imageGridView(imagePaths: [String]) -> some View {
         let gridItems = [
             GridItem(.flexible(), spacing: 4),
             GridItem(.flexible(), spacing: 4)
         ]
 
         LazyVGrid(columns: gridItems, spacing: 4) {
-            ForEach(0..<min(4, imageURLs.count), id: \.self) { index in
-                AsyncImage(url: URL(string: imageURLs[index])) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .aspectRatio(1, contentMode: .fit)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .aspectRatio(1, contentMode: .fit)
-                            .clipped()
-                    case .failure:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .foregroundStyle(.gray)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .aspectRatio(1, contentMode: .fit)
-                    @unknown default:
-                        EmptyView()
-                    }
+            ForEach(0..<min(4, imagePaths.count), id: \.self) { index in
+                let path = imagePaths[index]
+                if !path.isEmpty {
+                    FirebaseStorageImage(path: path)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .aspectRatio(1, contentMode: .fit)
+                        .clipped()
+                        .background(Color.gray.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    // プレースホルダー
+                    Image(systemName: "photo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundStyle(.gray)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .aspectRatio(1, contentMode: .fit)
+                        .background(Color.gray.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                .background(Color.gray.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
-    }
-
-    private func coordinateForItem(_ item: CalendarData) -> CoordinateRecommend? {
-        guard item.id < recommendedCoordinates.count else { return nil }
-        return recommendedCoordinates[item.id]
     }
 
     @ViewBuilder
@@ -184,17 +173,16 @@ struct ThreeDaysPlanner: View {
     private func buildItemList(coordinate: CoordinateRecommend) -> [String] {
         var items: [String] = []
 
-        if !coordinate.outer.isEmpty {
-            items.append(coordinate.outer)
+        if !coordinate.outer.name.isEmpty {
+            items.append(coordinate.outer.name)
         }
 
         items.append("トップス")
-        items.append(coordinate.bottoms)
-        items.append(coordinate.shoes)
+        items.append(coordinate.bottoms.name)
+        items.append(coordinate.shoes.name)
 
-        if !coordinate.accessories.isEmpty {
-            let accessoryList = coordinate.accessories.split(separator: " ").map { String($0) }
-            items.append(contentsOf: accessoryList)
+        if !coordinate.accessories.name.isEmpty {
+            items.append(coordinate.accessories.name)
         }
 
         return items

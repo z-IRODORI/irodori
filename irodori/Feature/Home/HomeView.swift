@@ -39,11 +39,11 @@ struct HomeView: View {
                         relativeDateText: plannerViewModel.relativeDateText,
                         onSelectDate: { id in plannerViewModel.selectDate(id: id) },
                         isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) },
-                        recommendedCoordinates: viewModel.coordinateRecommendResponse?.recommend_coordinates ?? [],
-                        isLoading: viewModel.isLoadingCoordinateRecommend,
-                        onAddCoordinate: {
+                        coordinateForDate: { dateID in viewModel.coordinate(for: dateID) },
+                        isLoadingForDate: { dateID in viewModel.isLoading(for: dateID) },
+                        onAddCoordinate: { dateID in
                             Task {
-                                await viewModel.addCoordinate()
+                                await viewModel.addCoordinate(for: dateID)
                             }
                         }
                     )

@@ -15,11 +15,11 @@ struct PlannerView: View {
                     relativeDateText: viewModel.relativeDateText,
                     onSelectDate: { id in viewModel.selectDate(id: id) },
                     isCurrentMonth: { date in viewModel.isCurrentMonth(date: date) },
-                    recommendedCoordinates: homeViewModel.coordinateRecommendResponse?.recommend_coordinates ?? [],
-                    isLoading: homeViewModel.isLoadingCoordinateRecommend,
-                    onAddCoordinate: {
+                    coordinateForDate: { dateID in homeViewModel.coordinate(for: dateID) },
+                    isLoadingForDate: { dateID in homeViewModel.isLoading(for: dateID) },
+                    onAddCoordinate: { dateID in
                         Task {
-                            await homeViewModel.addCoordinate()
+                            await homeViewModel.addCoordinate(for: dateID)
                         }
                     }
                 )
