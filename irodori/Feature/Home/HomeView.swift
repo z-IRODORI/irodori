@@ -38,7 +38,14 @@ struct HomeView: View {
                         selectedDateID: $plannerViewModel.selectedDateID,
                         relativeDateText: plannerViewModel.relativeDateText,
                         onSelectDate: { id in plannerViewModel.selectDate(id: id) },
-                        isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) }
+                        isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) },
+                        recommendedCoordinates: viewModel.coordinateRecommendResponse?.recommend_coordinates ?? [],
+                        isLoading: viewModel.isLoadingCoordinateRecommend,
+                        onAddCoordinate: {
+                            Task {
+                                await viewModel.addCoordinate()
+                            }
+                        }
                     )
                     .padding(.horizontal, -24)
                 }

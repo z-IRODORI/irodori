@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlannerView: View {
     @State private var viewModel = PlannerViewModel()
+    @State private var homeViewModel: HomeViewModel = .init(apiClient: MockHomeClient())
 
     var body: some View {
         VStack(spacing: 0) {
@@ -13,7 +14,14 @@ struct PlannerView: View {
                     selectedDateID: $viewModel.selectedDateID,
                     relativeDateText: viewModel.relativeDateText,
                     onSelectDate: { id in viewModel.selectDate(id: id) },
-                    isCurrentMonth: { date in viewModel.isCurrentMonth(date: date) }
+                    isCurrentMonth: { date in viewModel.isCurrentMonth(date: date) },
+                    recommendedCoordinates: homeViewModel.coordinateRecommendResponse?.recommend_coordinates ?? [],
+                    isLoading: homeViewModel.isLoadingCoordinateRecommend,
+                    onAddCoordinate: {
+                        Task {
+                            await homeViewModel.addCoordinate()
+                        }
+                    }
                 )
             }
         }

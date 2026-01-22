@@ -11,10 +11,18 @@ import Foundation
 @Observable
 final class HomeViewModel {
     var homeResponse: HomeResponse = .init(recent_coordinates: [], coordinate_analyze: "", tags: nil)
+    var coordinateRecommendResponse: CoordinateRecommendResponse?
+    var isLoadingCoordinateRecommend: Bool = false
 
     let apiClient: HomeClientProtocol
-    init(apiClient: HomeClientProtocol = MockHomeClient()) {
+    let coordinateRecommendClient: CoordinateRecommendClientProtocol
+
+    init(
+        apiClient: HomeClientProtocol = MockHomeClient(),
+        coordinateRecommendClient: CoordinateRecommendClientProtocol = MockCoordinateRecommendClient()
+    ) {
         self.apiClient = apiClient
+        self.coordinateRecommendClient = coordinateRecommendClient
     }
 
     func onAppear() async {
@@ -30,6 +38,34 @@ final class HomeViewModel {
                 break
             }
         } catch {
+            // エラーハンドリング
+        }
+    }
+
+    func addCoordinate() async {
+        isLoadingCoordinateRecommend = true
+        defer { isLoadingCoordinateRecommend = false }
+
+        do {
+            let result = try await coordinateRecommendClient.post(
+                gender: "women",
+                inputType: "トップス",
+                category: "Tシャツ",
+                text: "春",
+                numOutfits: 3,
+                numCandidates: 5
+            )
+
+            switch result {
+            case .success(let response):
+                self.coordinateRecommendResponse = response
+                print("コーデ追加成功: \(response.recommend_coordinates.count)件")
+            case .failure(let error):
+                print("コーデ追加エラー: \(error)")
+                // エラーハンドリング
+            }
+        } catch {
+            print("コーデ追加例外: \(error)")
             // エラーハンドリング
         }
     }
