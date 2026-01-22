@@ -34,7 +34,7 @@ struct irodoriApp: App {
 //                    }
 //                }
 
-//            MainTabView()
+            MainTabView()
 
 //            HomeView()
 //            PlannerView()
@@ -42,10 +42,10 @@ struct irodoriApp: App {
 
 //            CameraView()
 
-            CoordinateReviewView(viewModel: .init(
-                coordinateImage: UIImage(resource: .coordinate5),
-                apiClient: FashionReviewClient()   //MockFashionReviewClient()
-            ), path: .constant([]))
+//            CoordinateReviewView(viewModel: .init(
+//                coordinateImage: UIImage(resource: .coordinate5),
+//                apiClient: FashionReviewClient()   //MockFashionReviewClient()
+//            ), path: .constant([]))
 
 //            RecommendCoordinateView(
 //                viewModel: .init(recommendCoordinateClient: MockRecommendCoordinateClient())
