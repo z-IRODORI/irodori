@@ -15,6 +15,7 @@ struct irodoriApp: App {
     @Environment(\.scenePhase) var scenePhase
 
     @State private var path: [ViewType] = []
+
     var body: some Scene {
         WindowGroup {
 //            SplashView()
@@ -35,6 +36,7 @@ struct irodoriApp: App {
 //                }
 
             MainTabView()
+                .environment(AuthManager.shared)
 
 //            HomeView()
 //            PlannerView()

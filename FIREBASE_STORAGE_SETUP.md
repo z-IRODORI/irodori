@@ -7,7 +7,6 @@ coordinate-recommend APIから取得した画像パスをFirebase Storageから�
 ### 1. FirebaseStorageClient.swift
 Firebase Storageから画像URLを取得するクライアント
 - `getDownloadURL(for path: String)`: 画像パスからダウンロードURLを取得
-- `MockFirebaseStorageClient`: テスト用モッククライアント
 
 ### 2. FirebaseStorageImage.swift
 Firebase Storageから画像を取得して表示するSwiftUIコンポーネント
@@ -81,41 +80,17 @@ items/
 
 ## 使用方法
 
-### モック環境での動作確認
-
-現在、`MockFirebaseStorageClient`を使用しているため、Firebase Storageの設定なしでも動作確認が可能です。
-プレースホルダー画像（Lorem Picsum）が表示されます。
-
-### 本番環境への切り替え
-
-`FirebaseStorageImage.swift` の初期化を以下のように変更：
+`FirebaseStorageImage` は自動的に Firebase Storage から画像を取得します。
 
 ```swift
-// 現在（モック）
-FirebaseStorageImage(path: path)
-
-// 本番環境
-FirebaseStorageImage(path: path, storageClient: FirebaseStorageClient())
-```
-
-または、環境に応じて自動切り替え：
-
-```swift
-init(path: String) {
-    self.path = path
-    #if DEBUG
-    self.storageClient = MockFirebaseStorageClient()
-    #else
-    self.storageClient = FirebaseStorageClient()
-    #endif
-}
+FirebaseStorageImage(path: "items/ボトムス_ワイドパンツ_ブラック/00.png")
 ```
 
 ## データフロー
 
 1. ユーザーが「コーデを追加」ボタンをタップ
 2. `coordinate-recommend` APIを呼び出し
-3. レスポンスから画像パスを取得（例: `items/ワイドパンツ/00.png`）
+3. レスポンスから画像パスを取得（例: `items/ボトムス_ワイドパンツ_ブラック/00.png`）
 4. `FirebaseStorageImage` コンポーネントが画像パスを受け取る
 5. `FirebaseStorageClient` がFirebase StorageからダウンロードURLを取得
 6. `AsyncImage` でダウンロードURLから画像を表示

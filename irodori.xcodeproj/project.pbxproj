@@ -12,6 +12,9 @@
 		490E16432EC0CC8500EFCE15 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 490E16422EC0CC8500EFCE15 /* FirebaseCore */; };
 		490E16452EC0CC8500EFCE15 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 490E16442EC0CC8500EFCE15 /* FirebaseCrashlytics */; };
 		490E16472EC0CC8500EFCE15 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 490E16462EC0CC8500EFCE15 /* FirebaseFirestore */; };
+		4979DE932F22A0920071B837 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4979DE922F22A0920071B837 /* FirebaseAuth */; };
+		4979DE952F22A0920071B837 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 4979DE942F22A0920071B837 /* FirebaseFunctions */; };
+		4979DE972F22A0920071B837 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 4979DE962F22A0920071B837 /* FirebaseStorage */; };
 		49CBE94B2D9E94E800383A64 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 49CBE94A2D9E94E800383A64 /* Kingfisher */; };
 /* End PBXBuildFile section */
 
@@ -76,9 +79,12 @@
 			files = (
 				490E163F2EC0CC8500EFCE15 /* FirebaseAnalytics in Frameworks */,
 				490E16412EC0CC8500EFCE15 /* FirebaseAnalyticsCore in Frameworks */,
+				4979DE972F22A0920071B837 /* FirebaseStorage in Frameworks */,
 				490E16452EC0CC8500EFCE15 /* FirebaseCrashlytics in Frameworks */,
+				4979DE952F22A0920071B837 /* FirebaseFunctions in Frameworks */,
 				490E16432EC0CC8500EFCE15 /* FirebaseCore in Frameworks */,
 				49CBE94B2D9E94E800383A64 /* Kingfisher in Frameworks */,
+				4979DE932F22A0920071B837 /* FirebaseAuth in Frameworks */,
 				490E16472EC0CC8500EFCE15 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -154,6 +160,9 @@
 				490E16422EC0CC8500EFCE15 /* FirebaseCore */,
 				490E16442EC0CC8500EFCE15 /* FirebaseCrashlytics */,
 				490E16462EC0CC8500EFCE15 /* FirebaseFirestore */,
+				4979DE922F22A0920071B837 /* FirebaseAuth */,
+				4979DE942F22A0920071B837 /* FirebaseFunctions */,
+				4979DE962F22A0920071B837 /* FirebaseStorage */,
 			);
 			productName = irodori;
 			productReference = D4C87F5C2D8AA64600FA8A08 /* irodori.app */;
@@ -661,6 +670,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
+		};
+		4979DE922F22A0920071B837 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		4979DE942F22A0920071B837 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+		4979DE962F22A0920071B837 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 490E163D2EC0CC8500EFCE15 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 		49CBE94A2D9E94E800383A64 /* Kingfisher */ = {
 			isa = XCSwiftPackageProductDependency;

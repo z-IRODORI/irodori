@@ -55,7 +55,6 @@ final class CoordinateRecommendClient: CoordinateRecommendClientProtocol {
 
             if let httpResponse = urlResponse as? HTTPURLResponse {
                 let statusCode = httpResponse.statusCode
-                print("CoordinateRecommend API Status Code: \(statusCode)")
                 if statusCode >= 400 {
                     return .failure(HTTPError.fromStatusCode(statusCode))
                 }
@@ -65,11 +64,9 @@ final class CoordinateRecommendClient: CoordinateRecommendClientProtocol {
                 let response = try JSONDecoder().decode(CoordinateRecommendResponse.self, from: data)
                 return .success(response)
             } catch {
-                print("Decode error: \(error)")
                 return .failure(.decodeError)
             }
         } catch {
-            print("Response error: \(error)")
             return .failure(.responseError)
         }
     }

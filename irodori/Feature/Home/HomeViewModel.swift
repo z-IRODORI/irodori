@@ -19,7 +19,7 @@ final class HomeViewModel {
 
     init(
         apiClient: HomeClientProtocol = MockHomeClient(),
-        coordinateRecommendClient: CoordinateRecommendClientProtocol = MockCoordinateRecommendClient()
+        coordinateRecommendClient: CoordinateRecommendClientProtocol = CoordinateRecommendClient()//MockCoordinateRecommendClient()
     ) {
         self.apiClient = apiClient
         self.coordinateRecommendClient = coordinateRecommendClient
@@ -48,10 +48,10 @@ final class HomeViewModel {
 
         do {
             let result = try await coordinateRecommendClient.post(
-                gender: "women",
-                inputType: "トップス",
-                category: "Tシャツ",
-                text: "春",
+                gender: "men",
+                inputType: "アクセサリー",
+                category: "バングル",
+                text: "シルバーのバングル, ティファニー",
                 numOutfits: 3,
                 numCandidates: 5
             )
@@ -61,14 +61,12 @@ final class HomeViewModel {
                 // APIから複数のコーディネートが返ってくるが、最初の1つを使用
                 if let firstCoordinate = response.recommend_coordinates.first {
                     self.coordinatesByDate[dateID] = firstCoordinate
-                    print("コーデ追加成功: dateID=\(dateID)")
                 }
-            case .failure(let error):
-                print("コーデ追加エラー: \(error)")
+            case .failure:
                 // エラーハンドリング
+                break
             }
         } catch {
-            print("コーデ追加例外: \(error)")
             // エラーハンドリング
         }
     }

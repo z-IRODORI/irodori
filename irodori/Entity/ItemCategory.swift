@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum ItemCategory {
+enum ItemCategory: Hashable, Equatable {
     case outer(OuterType)
     case tops(TopsType)
     case bottoms(BottomsType)

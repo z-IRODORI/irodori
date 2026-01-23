@@ -17,27 +17,27 @@ final class FirebaseStorageClient: FirebaseStorageClientProtocol {
 
     func getDownloadURL(for path: String) async throws -> URL {
         let storageRef = storage.reference()
-        let fileRef = storageRef.child(path)
+
+        // NFD形式で試行
+        let nfdPath = path.decomposedStringWithCanonicalMapping
+        let cleanNfdPath = nfdPath.hasPrefix("/") ? String(nfdPath.dropFirst()) : nfdPath
 
         do {
+            let fileRef = storageRef.child(cleanNfdPath)
             let url = try await fileRef.downloadURL()
             return url
-        } catch {
-            print("Firebase Storage error for path \(path): \(error.localizedDescription)")
-            throw error
-        }
-    }
-}
+        } catch let nfdError as NSError {
+            // NFDで失敗した場合、NFC形式でリトライ
+            if nfdError.code == -13010 {
+                let nfcPath = path.precomposedStringWithCanonicalMapping
+                let cleanNfcPath = nfcPath.hasPrefix("/") ? String(nfcPath.dropFirst()) : nfcPath
 
-// MARK: - Mock
-
-final class MockFirebaseStorageClient: FirebaseStorageClientProtocol {
-    func getDownloadURL(for path: String) async throws -> URL {
-        // モック用: プレースホルダー画像を返す
-        let urlString = "https://picsum.photos/200/200?random=\(path.hashValue)"
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
+                let fileRef = storageRef.child(cleanNfcPath)
+                let url = try await fileRef.downloadURL()
+                return url
+            } else {
+                throw nfdError
+            }
         }
-        return url
     }
 }

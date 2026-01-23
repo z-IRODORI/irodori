@@ -93,7 +93,7 @@ struct WeeklyPlannerContent: View {
                         Spacer()
                     }
                 } else if let coordinate = coordinate {
-                    imageGridView(imagePaths: coordinate.imagePaths)
+                    imageGridView(gridItems: coordinate.gridItems)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
                 } else {
@@ -132,22 +132,34 @@ struct WeeklyPlannerContent: View {
     }
 
     @ViewBuilder
-    private func imageGridView(imagePaths: [String]) -> some View {
-        let gridItems = [
+    private func imageGridView(gridItems: [GridItemInfo]) -> some View {
+        let columns = [
             GridItem(.flexible(), spacing: 4),
             GridItem(.flexible(), spacing: 4)
         ]
 
-        LazyVGrid(columns: gridItems, spacing: 4) {
-            ForEach(0..<min(4, imagePaths.count), id: \.self) { index in
-                let path = imagePaths[index]
-                if !path.isEmpty {
-                    FirebaseStorageImage(path: path)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .aspectRatio(1, contentMode: .fit)
-                        .clipped()
-                        .background(Color.gray.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+        LazyVGrid(columns: columns, spacing: 4) {
+            ForEach(0..<min(4, gridItems.count), id: \.self) { index in
+                let item = gridItems[index]
+                if !item.imagePath.isEmpty {
+                    ZStack(alignment: .topLeading) {
+                        // 背景画像
+                        FirebaseStorageImage(path: item.imagePath)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .aspectRatio(1, contentMode: .fit)
+                            .clipped()
+                            .background(Color.gray.opacity(0.1))
+
+                        // 左上のアイコン
+                        Image(systemName: item.iconName)
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
+                            .padding(6)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                            .padding(8)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
                     // プレースホルダー
                     Image(systemName: "photo")
@@ -191,16 +203,24 @@ struct WeeklyPlannerContent: View {
     private func buildItemList(coordinate: CoordinateRecommend) -> [String] {
         var items: [String] = []
 
-        if !coordinate.outer.name.isEmpty {
-            items.append(coordinate.outer.name)
+        if let outer = coordinate.outer, !outer.name.isEmpty {
+            items.append(outer.name)
         }
 
-        items.append("トップス")
-        items.append(coordinate.bottoms.name)
-        items.append(coordinate.shoes.name)
+        if let tops = coordinate.tops, !tops.name.isEmpty {
+            items.append(tops.name)
+        }
 
-        if !coordinate.accessories.name.isEmpty {
-            items.append(coordinate.accessories.name)
+        if let bottoms = coordinate.bottoms, !bottoms.name.isEmpty {
+            items.append(bottoms.name)
+        }
+
+        if let shoes = coordinate.shoes, !shoes.name.isEmpty {
+            items.append(shoes.name)
+        }
+
+        if let accessories = coordinate.accessories, !accessories.name.isEmpty {
+            items.append(accessories.name)
         }
 
         return items
