@@ -178,25 +178,17 @@ private struct CoordinateCardView: View {
 
     @ViewBuilder
     private func coordinateItemsList(coordinate: CoordinateRecommend) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("アイテム")
-                .font(.system(size: 16, weight: .semibold))
-                .padding(.top, 16)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    let items = buildItemList(coordinate: coordinate)
-                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                        coordinateItemRow(category: item)
-                        if index < items.count - 1 {
-                            Divider().padding(.leading, 48)
-                        }
+        ScrollView {
+            VStack(spacing: 0) {
+                let items = buildItemList(coordinate: coordinate)
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    coordinateItemRow(category: item)
+                    if index < items.count - 1 {
+                        Divider().padding(.leading, 48)
                     }
                 }
-                .padding(.horizontal, 16)
             }
+            .padding(.horizontal, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
