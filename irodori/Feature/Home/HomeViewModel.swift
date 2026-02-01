@@ -49,9 +49,9 @@ final class HomeViewModel {
         do {
             let result = try await coordinateRecommendClient.post(
                 gender: "men",
-                inputType: "アクセサリー",
-                category: "バングル",
-                text: "シルバーのバングル, ティファニー",
+                inputType: "アウター",
+                category: "ジーンズジャケット",
+                text: "ダメージジーンズのジャケット",
                 numOutfits: 3,
                 numCandidates: 5
             )

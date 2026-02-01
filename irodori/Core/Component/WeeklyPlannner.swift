@@ -75,60 +75,126 @@ struct WeeklyPlannerContent: View {
     }
 
     private func coordinateCard(for item: CalendarData) -> some View {
-        let coordinate = coordinateForDate(item.id)
-        let isLoading = isLoadingForDate(item.id)
+        WeeklyCoordinateCardView(
+            dayString: item.dayString,
+            coordinate: coordinateForDate(item.id),
+            isLoading: isLoadingForDate(item.id),
+            onAddCoordinate: { onAddCoordinate(item.id) }
+        )
+    }
+}
 
-        return VStack(spacing: 0) {
-            // 上半分: コーデ画像エリア
-            VStack(spacing: 8) {
-                Text("\(item.dayString)日のコーディネート")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 16)
+// MARK: - Coordinate Card with Flip Animation
 
-                if isLoading {
-                    VStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
+private struct WeeklyCoordinateCardView: View {
+    let dayString: String
+    let coordinate: CoordinateRecommend?
+    let isLoading: Bool
+    let onAddCoordinate: () -> Void
+
+    @State private var isFlipped = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            // 裏面: 既存のレイアウト（グリッド + アイテムリスト）
+            if let coordinate = coordinate {
+                VStack(spacing: 0) {
+                    // 上半分: アイテムグリッド
+                    VStack(spacing: 8) {
+                        Text("\(dayString)日のコーディネート")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 16)
+
+                        imageGridView(gridItems: coordinate.gridItems)
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 16)
                     }
-                } else if let coordinate = coordinate {
-                    imageGridView(gridItems: coordinate.gridItems)
+                    .frame(height: 250)
+
+                    // 下半分: アイテムリスト
+                    Divider()
                         .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                } else {
-                    VStack {
-                        Spacer()
-                        Button {
-                            onAddCoordinate(item.id)
-                        } label: {
-                            Label("コーデを追加", systemImage: "plus")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 16)
-                                .background(.black)
-                                .clipShape(Capsule())
-                        }
-                        Spacer()
-                    }
+                    coordinateItemsList(coordinate: coordinate)
+                        .frame(height: 250)
+                }
+                .rotation3DEffect(
+                    .degrees(isFlipped ? 360 : 180),
+                    axis: (x: 0, y: 1, z: 0)
+                )
+                .opacity(isFlipped ? 1 : 0)
+            }
+
+            // 表面: コーディネート全体画像
+            if let coordinate = coordinate {
+                coordinateImageView(path: coordinate.coordinate_image_path)
+                    .padding(20)
+                    .rotation3DEffect(
+                        .degrees(isFlipped ? 180 : 0),
+                        axis: (x: 0, y: 1, z: 0)
+                    )
+                    .opacity(isFlipped ? 0 : 1)
+            }
+
+            // ローディング状態
+            if isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
                 }
             }
-            .frame(height: 250)
 
-            // 下半分: アイテムリスト
-            if let coordinate = coordinate {
-                Divider()
-                    .padding(.horizontal, 16)
-                coordinateItemsList(coordinate: coordinate)
-                    .frame(height: 250)
+            // コーデ未追加状態
+            if coordinate == nil && !isLoading {
+                VStack {
+                    Spacer()
+                    Button {
+                        onAddCoordinate()
+                    } label: {
+                        Label("コーデを追加", systemImage: "plus")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 16)
+                            .background(.black)
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                }
+            }
+
+            // 反転ボタン（常に最前面）
+            if coordinate != nil {
+                Button {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                        isFlipped.toggle()
+                    }
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Circle())
+                }
+                .padding(16)
             }
         }
-        .frame(width: cardWidth, height: 500)
+        .frame(width: 280, height: 500)
         .background(.white)
         .cornerRadius(32)
         .overlay(RoundedRectangle(cornerRadius: 32).stroke(.gray.opacity(0.15), lineWidth: 1))
         .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 4)
+    }
+
+    @ViewBuilder
+    private func coordinateImageView(path: String) -> some View {
+        FirebaseStorageImage(path: path)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .aspectRatio(contentMode: .fit)
+            .background(Color.gray.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     @ViewBuilder
@@ -244,3 +310,7 @@ struct WeeklyPlannerContent: View {
         .padding(.vertical, 8)
     }
 }
+
+// MARK: - Helper Views for WeeklyPlannerContent
+
+extension WeeklyPlannerContent {}

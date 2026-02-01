@@ -68,7 +68,7 @@ struct FirebaseStorageImage: View {
         Image(systemName: "photo")
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .foregroundStyle(.gray)
+//            .foregroundStyle(.gray)
             .padding()
     }
 

@@ -56,103 +56,122 @@ struct ThreeDaysPlanner: View {
     }
 
     private func coordinateCard(for item: CalendarData) -> some View {
-        let coordinate = coordinateForDate(item.id)
-        let isLoading = isLoadingForDate(item.id)
+        CoordinateCardView(
+            dayString: item.dayString,
+            coordinate: coordinateForDate(item.id),
+            isLoading: isLoadingForDate(item.id),
+            onAddCoordinate: { onAddCoordinate(item.id) }
+        )
+    }
+}
 
-        return VStack(spacing: 0) {
-            // 上半分: コーデ画像エリア
-            VStack(spacing: 8) {
-                Text("\(item.dayString)日のコーディネート")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 16)
+// MARK: - Coordinate Card with Flip Animation
 
-                if isLoading {
-                    VStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                } else if let coordinate = coordinate {
+private struct CoordinateCardView: View {
+    let dayString: String
+    let coordinate: CoordinateRecommend?
+    let isLoading: Bool
+    let onAddCoordinate: () -> Void
+
+    @State private var isFlipped = false
+
+    var body: some View {
+        ZStack {
+            // 裏面
+            // 既存のレイアウト（グリッド + アイテムリスト）
+            if let coordinate = coordinate {
+                VStack(spacing: 12) {
+                    Spacer().frame(height: 80)   // 上部に空白空けられなかったので暫定対応, TODO: 削除する
+                    Text("アイテム")
+                        .fontWeight(.bold)
+
+                    // アイテム画像
                     imageGridView(gridItems: coordinate.gridItems)
+                        .padding(.horizontal, 24)
+
+                    Divider()
                         .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                } else {
-                    VStack {
-                        Spacer()
-                        Button {
-                            onAddCoordinate(item.id)
-                        } label: {
-                            Label("コーデを追加", systemImage: "plus")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 16)
-                                .background(.black)
-                                .clipShape(Capsule())
-                        }
-                        Spacer()
-                    }
+
+                    // アイテム文字列
+                    coordinateItemsList(coordinate: coordinate)
+                        .frame(height: 250)
+                }
+                .rotation3DEffect(
+                    .degrees(isFlipped ? 360 : 180),
+                    axis: (x: 0, y: 1, z: 0)
+                )
+                .opacity(isFlipped ? 1 : 0)   // 裏表で表示の有無を切り替える
+                .frame(maxHeight: .infinity, alignment: .top)
+            }
+
+            // 表面
+            // コーディネート全体画像
+            if let coordinate = coordinate {
+                VStack(spacing: 12) {
+                    Spacer().frame(height: 80)   // 上部に空白空けられなかったので暫定対応, TODO: 削除する
+                    Text("コーディネート")
+                        .fontWeight(.bold)
+
+                    coordinateImageView(path: coordinate.coordinate_image_path)
+                        .padding(20)
+                }
+                .rotation3DEffect(
+                    .degrees(isFlipped ? 180 : 0),
+                    axis: (x: 0, y: 1, z: 0)
+                )
+                .opacity(isFlipped ? 0 : 1)   // 裏表で表示の有無を切り替える
+                .frame(maxHeight: .infinity, alignment: .top)
+            }
+
+            // ローディング状態
+            if isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
                 }
             }
-            .frame(height: 250)
 
-            // 下半分: アイテムリスト
-            if let coordinate = coordinate {
-                Divider()
-                    .padding(.horizontal, 16)
-                    .padding(.top, 24)
-                coordinateItemsList(coordinate: coordinate)
-                    .frame(height: 250)
+            // コーデ未追加状態
+            if coordinate == nil && !isLoading {
+                VStack {
+                    Spacer()
+                    Button {
+                        onAddCoordinate()
+                    } label: {
+                        Label("コーデを追加", systemImage: "plus")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 16)
+                            .background(.black)
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                }
             }
         }
-        .frame(width: cardWidth, height: 500)
+        .frame(width: 280, height: 500)
         .background(.white)
         .cornerRadius(32)
         .overlay(RoundedRectangle(cornerRadius: 32).stroke(.gray.opacity(0.15), lineWidth: 1))
         .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 4)
-    }
-
-    @ViewBuilder
-    private func imageGridView(gridItems: [GridItemInfo]) -> some View {
-        let columns = [
-            GridItem(.flexible(), spacing: 4),
-            GridItem(.flexible(), spacing: 4)
-        ]
-
-        LazyVGrid(columns: columns, spacing: 4) {
-            ForEach(0..<min(4, gridItems.count), id: \.self) { index in
-                let item = gridItems[index]
-                if !item.imagePath.isEmpty {
-                    ZStack(alignment: .topLeading) {
-                        // 背景画像
-                        FirebaseStorageImage(path: item.imagePath)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .aspectRatio(1, contentMode: .fit)
-                            .clipped()
-                            .background(Color.gray.opacity(0.1))
-
-                        // 左上のアイコン
-                        Image(systemName: item.iconName)
-                            .font(.system(size: 16))
-                            .foregroundStyle(.white)
-                            .padding(6)
-                            .background(Color.black.opacity(0.6))
-                            .clipShape(Circle())
-                            .padding(8)
+        .overlay(alignment: .topTrailing) {
+            // 反転ボタン（常に最前面）
+            if coordinate != nil {
+                Button {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                        isFlipped.toggle()
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    // プレースホルダー
-                    Image(systemName: "photo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .foregroundStyle(.gray)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .aspectRatio(1, contentMode: .fit)
-                        .background(Color.gray.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Circle())
                 }
+                .padding(16)
             }
         }
     }
@@ -226,6 +245,62 @@ struct ThreeDaysPlanner: View {
         .padding(.vertical, 8)
     }
 
+    @ViewBuilder
+    private func coordinateImageView(path: String) -> some View {
+        FirebaseStorageImage(path: path)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .aspectRatio(contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private func imageGridView(gridItems: [GridItemInfo]) -> some View {
+        let columns = [
+            GridItem(.flexible(), spacing: 4),
+            GridItem(.flexible(), spacing: 4)
+        ]
+
+        LazyVGrid(columns: columns, spacing: 4) {
+            ForEach(0..<min(4, gridItems.count), id: \.self) { index in
+                let item = gridItems[index]
+                if !item.imagePath.isEmpty {
+                    ZStack(alignment: .topLeading) {
+                        // 背景画像
+                        FirebaseStorageImage(path: item.imagePath)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .aspectRatio(1, contentMode: .fit)
+                            .clipped()
+                            .background(Color.gray.opacity(0.1))
+
+                        // 左上のアイコン
+                        Image(systemName: item.iconName)
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
+                            .padding(6)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                            .padding(8)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    // プレースホルダー
+                    Image(systemName: "photo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundStyle(.gray)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .aspectRatio(1, contentMode: .fit)
+                        .background(Color.gray.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Helper Views for ThreeDaysPlanner
+
+extension ThreeDaysPlanner {
     private func relativeDateString(for item: CalendarData) -> String {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
