@@ -14,7 +14,6 @@ struct CameraView: View {
     @State var cameraViewModel: CameraViewModel
     @Binding var path: [ViewType]
     @State private var showCapturedImage = false
-    @Binding var path: [ViewType]
     @State private var isShowOnboardingModal: Bool = false
 
     var body: some View {
@@ -250,6 +249,6 @@ extension CameraView {
 
 
 #Preview {
-    CameraView(path: .constant([]))
+    CameraView(cameraViewModel: .init(), path: .constant([]))
 }
 

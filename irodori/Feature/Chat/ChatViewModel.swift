@@ -36,13 +36,13 @@ final class ChatViewModel {
     
     let coordinateId: String
     let coordinateImageBase64: String
-    private let apiClient: HomeClientProtocol
+    private let apiClient: ChatClientProtocol
     private let repository: CoordinateChatRepositoryProtocol
     
     init(
         coordinateId: String,
         coordinateImageBase64: String,
-        apiClient: HomeClientProtocol,
+        apiClient: ChatClientProtocol,
         repository: CoordinateChatRepositoryProtocol
     ) {
         self.coordinateId = coordinateId
@@ -91,7 +91,7 @@ final class ChatViewModel {
         // 実際の実装ではここでAI APIを呼び出す
         let gender = UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue) ?? "other"
         do {
-            let response = try await apiClient.post(homeRequest: .init(question: userMessage + "# 制約\n- 出力は300文字以内で", gender: gender, image_base64: coordinateImageBase64))
+            let response = try await apiClient.post(chatRequest: .init(question: userMessage + "# 制約\n- 出力は300文字以内で", gender: gender, image_base64: coordinateImageBase64))
             switch response {
             case .success(let result):
                 let chatMessage = ChatMessage(text: result.answer, isUser: false)

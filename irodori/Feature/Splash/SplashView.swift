@@ -47,20 +47,21 @@ struct SplashView: View {
                         }
                     )
                 case .home:
-                    CameraView(cameraViewModel: cameraViewModel, path: $path)
+                    MainTabView()
                 }
-        case .userInfo:
-            InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {
-                viewModel.setupSignUpDate()   // アプリインストールしてから一度しか呼ばれない想定
-                viewModel.updateState()
-            })
-        case .onboarding:
-            OnboardingView(closeButtonTapped: {
-                viewModel.viewedOnboarding()
-                viewModel.updateState()
-            })
-        case .home:
-            MainTabView()
+            }
+//        case .userInfo:
+//            InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {
+//                viewModel.setupSignUpDate()   // アプリインストールしてから一度しか呼ばれない想定
+//                viewModel.updateState()
+//            })
+//        case .onboarding:
+//            OnboardingView(closeButtonTapped: {
+//                viewModel.viewedOnboarding()
+//                viewModel.updateState()
+//            })
+//        case .home:
+//            MainTabView()
         }
     }
 

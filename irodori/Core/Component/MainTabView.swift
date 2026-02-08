@@ -48,7 +48,7 @@ struct MainTabView: View {
                         viewModel: .init(uid: params.uid, targetDateString: params.targetDateString, coordinateImageURL: params.coordinateImageURL, coordinateDetailClient: CoordinateDetailClient())
                     )
                 case .camera:
-                    CameraView(path: $path)
+                    CameraView(cameraViewModel: .init(), path: $path)
                 }
             }
         }

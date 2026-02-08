@@ -174,7 +174,7 @@ struct ChatView: View {
     init(coordinateId: String, image: UIImage) {
         self.image = image
         let imageData = image.jpegData(compressionQuality: 1.0)!
-        self.viewModel = .init(coordinateId: coordinateId, coordinateImageBase64: imageData.base64EncodedString(), apiClient: HomeClient(), repository: CoordinateChatRepository())
+        self.viewModel = .init(coordinateId: coordinateId, coordinateImageBase64: imageData.base64EncodedString(), apiClient: ChatClient(), repository: CoordinateChatRepository())
     }
 
     var body: some View {
