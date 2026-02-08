@@ -27,7 +27,7 @@ struct RecentCoordinates: View {
                         Spacer().frame(width: 12)
                         ForEach(recentCoordinates, id: \.self) { fashionReview in
                             RecentCoordinateCard(
-                                imageURL: fashionReview.coodinate_image_path,
+                                imageURL: fashionReview.image_url,
                                 text: fashionReview.date
                             )
                         }

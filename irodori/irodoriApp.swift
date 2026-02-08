@@ -35,10 +35,10 @@ struct irodoriApp: App {
 //                    }
 //                }
 
-//            MainTabView()
-//                .environment(AuthManager.shared)
+            MainTabView()
+                .environment(AuthManager.shared)
 
-            HomeView()
+//            HomeView()
 //            PlannerView()
 //            ProfileView()
 

@@ -10,7 +10,7 @@ import Foundation
 @MainActor
 @Observable
 final class HomeViewModel {
-    var homeResponse: HomeResponse = .init(recent_coordinates: [], coordinate_analyze: "", tags: nil)
+    var homeResponse: HomeResponse = .init(recent_coordinates: [], analysis_summary: "", tags: nil)
     var coordinatesByDate: [Int: CoordinateRecommend] = [:]
     var loadingDateIDs: Set<Int> = []
 

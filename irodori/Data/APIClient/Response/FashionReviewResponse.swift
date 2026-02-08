@@ -44,11 +44,11 @@ extension FashionReviewResponse {
                 coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/yMN071qf/1752555537_1000.jpg"
             ),
             recent_coordinates: [
-                .init(id: "1", date: "2025/01/01", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/iO87m45l/1751811504_1000.jpg"),
-                .init(id: "2", date: "2025/01/02", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/GSrtWHRb/1751733151_1000.jpg"),
-                .init(id: "3", date: "2025/01/03", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/NUZmuZyQ/1751726257_1000.jpg"),
-                .init(id: "4", date: "2025/01/04", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/iO87m45l/1751811504_1000.jpg"),
-                .init(id: "5", date: "2025/01/05", coodinate_image_path: "https://images.wear2.jp/coordinate/bBildLXx/augDFt7T/1751359316_1000.jpg"),
+                .init(id: "1", date: "2025/01/01", image_url: "https://images.wear2.jp/coordinate/bBildLXx/iO87m45l/1751811504_1000.jpg"),
+                .init(id: "2", date: "2025/01/02", image_url: "https://images.wear2.jp/coordinate/bBildLXx/GSrtWHRb/1751733151_1000.jpg"),
+                .init(id: "3", date: "2025/01/03", image_url: "https://images.wear2.jp/coordinate/bBildLXx/NUZmuZyQ/1751726257_1000.jpg"),
+                .init(id: "4", date: "2025/01/04", image_url: "https://images.wear2.jp/coordinate/bBildLXx/iO87m45l/1751811504_1000.jpg"),
+                .init(id: "5", date: "2025/01/05", image_url: "https://images.wear2.jp/coordinate/bBildLXx/augDFt7T/1751359316_1000.jpg"),
             ],
             items: [
                 .init(

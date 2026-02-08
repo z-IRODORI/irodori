@@ -60,8 +60,8 @@ struct HomeView: View {
                             .clipShape(Circle())
                         SpeechBubbleView(text: "これまでのコーデを分析しました")
                     }
-                    if !viewModel.homeResponse.coordinate_analyze.isEmpty {
-                        Text(.init(viewModel.homeResponse.coordinate_analyze))
+                    if !viewModel.homeResponse.analysis_summary.isEmpty {
+                        Text(.init(viewModel.homeResponse.analysis_summary))
                             .font(.system(size: 16, weight: .regular))
                     } else {
                         Text("コーデが存在しないため分析できませんでした")

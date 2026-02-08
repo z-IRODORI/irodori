@@ -15,7 +15,6 @@ struct CoordinateReviewView: View {
     @State private var reviewText = ""
     @State private var isShowFullReview = false
     @State private var tappedURL = ""
-    @State private var isPresentedCameraView = false
     @State private var tappedAffiliateProduct: AffiliateProduct?
     @Binding var path: [ViewType]
 
@@ -84,9 +83,6 @@ struct CoordinateReviewView: View {
                     RecommendCoordinateView(viewModel: .init(recommendCoordinateClient: RecommendCoordinateClient()))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .navigationDestination(isPresented: $isPresentedCameraView) {
-                    CameraView()
-                }
                 .background(.gray.opacity(0.08))
                 .navigationBarBackButtonHidden()
             } else {

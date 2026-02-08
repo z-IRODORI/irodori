@@ -1,31 +1,56 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @State private var path: [ViewType] = []
     @State private var viewModel: MainTabViewModel = .init()
     @State private var isSheetPresented = false // モーダル管理用フラグ
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ZStack {
-                HomeView()
-                    .opacity(viewModel.selectedTab == .home ? 1 : 0)
+        NavigationStack(path: $path) {
+            ZStack(alignment: .bottom) {
+                ZStack {
+                    HomeView()
+                        .opacity(viewModel.selectedTab == .home ? 1 : 0)
 
-                PlannerView()
-                    .opacity(viewModel.selectedTab == .planner ? 1 : 0)
+                    PlannerView()
+                        .opacity(viewModel.selectedTab == .planner ? 1 : 0)
 
-                ProfileView()
-                    .opacity(viewModel.selectedTab == .profile ? 1 : 0)
+                    ProfileView()
+                        .opacity(viewModel.selectedTab == .profile ? 1 : 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                customTabBar
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            customTabBar
-        }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
-        // モーダルの実装
-        .sheet(isPresented: $isSheetPresented) {
-            AddContentModalView()
-                .presentationDetents([.height(300)]) // ハーフモーダルの高さ調整
-                .presentationDragIndicator(.visible)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+            // モーダルの実装
+            .sheet(isPresented: $isSheetPresented) {
+                AddContentModalView(cameraButtonTapped: {
+                    path.append(.camera)
+                })
+                    .presentationDetents([.height(300)]) // ハーフモーダルの高さ調整
+                    .presentationDragIndicator(.visible)
+            }
+            .navigationDestination(for: ViewType.self) { viewType in
+                switch viewType {
+                case .coordinateReview(let capturedImage):
+                    CoordinateReviewView(
+                        viewModel: .init(
+                            coordinateImage: capturedImage!.correctOrientation,
+                            apiClient: FashionReviewClient()
+                        ),
+                        path: $path
+                    )
+                case .calendar:
+                    CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
+                case .coordinateDetail(let params):
+                    CoordinateDetailView(
+                        viewModel: .init(uid: params.uid, targetDateString: params.targetDateString, coordinateImageURL: params.coordinateImageURL, coordinateDetailClient: CoordinateDetailClient())
+                    )
+                case .camera:
+                    CameraView(path: $path)
+                }
+            }
         }
     }
 
@@ -96,6 +121,7 @@ final class MainTabViewModel {
 /// プラスボタンを押した時に表示するモーダル
 struct AddContentModalView: View {
     @Environment(\.dismiss) var dismiss
+    let cameraButtonTapped: (() -> Void)
 
     var body: some View {
         VStack(spacing: 12) {
@@ -106,6 +132,7 @@ struct AddContentModalView: View {
 
             modalButton(title: "アウトフィットを作成", icon: "figure.walk") {
                 // アクション
+                cameraButtonTapped()
                 dismiss()
             }
 

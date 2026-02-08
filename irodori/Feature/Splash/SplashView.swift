@@ -37,7 +37,7 @@ struct SplashView: View {
                 viewModel.updateState()
             })
         case .home:
-            CameraView()
+            MainTabView()
         }
     }
 

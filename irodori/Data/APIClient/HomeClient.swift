@@ -13,7 +13,7 @@ protocol HomeClientProtocol {
 
 final class HomeClient: HomeClientProtocol {
     func get(uid: String) async throws -> Result<HomeResponse, HTTPError> {
-        let baseURL = "https://irodori.click"
+        let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "api/home"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
         
