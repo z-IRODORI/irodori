@@ -51,7 +51,7 @@ final class RecommendCoordinateViewModel {
     private func fetchRecommendCoordinates() async {
         do {
             // 性別を取得（デフォルトは"other"）
-            let gender = UserDefaults.standard.string(forKey: "gender") ?? "men"
+            let gender = UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue) ?? "men"
 
             recommendCoordinatesState = .loading
             let result = try await recommendCoordinateClient.post(gender: gender)

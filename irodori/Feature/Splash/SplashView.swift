@@ -8,23 +8,46 @@
 import SwiftUI
 
 struct SplashView: View {
+    @State var path: [ViewType] = []
     @State private var isPresentedTermsOfService = false
     let viewModel: SplashViewModel = .init()
+    let cameraViewModel: CameraViewModel = .init()
 
     init() {
         viewModel.updateState()
     }
 
     var body: some View {
-        // TODO: - スプラッシュ画面を実装して、そこで画面遷移を実行
-        // 既存の実装では 利用規約を確認したこと や ユーザー情報を入力したこと を検知できないため画面遷移できない
-        switch viewModel.state {
-        case .termsOfService:
-            SplashView()
-                .sheet(isPresented: $isPresentedTermsOfService) {
-                    TermsOfServiceView(viewModel: .init(), hasAgreeToTermsOfService: {
+        NavigationStack(path: $path) {
+            Group {
+                switch viewModel.state {
+                case .termsOfService:
+                    SplashView()
+                        .sheet(isPresented: $isPresentedTermsOfService) {
+                            TermsOfServiceView(viewModel: .init(), hasAgreeToTermsOfService: {
+                                viewModel.updateState()
+                            })
+                        }
+                case .userInfo:
+                    InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {
+                        viewModel.setupSignUpDate()   // アプリインストールしてから一度しか呼ばれない想定
                         viewModel.updateState()
                     })
+                case .onboarding:
+                    OnboardingView(closeButtonTapped: {
+                        viewModel.viewedOnboarding()
+                        viewModel.updateState()
+                    })
+                case .firstTakePhoto:
+                    FirstTakePhotoView(
+                        path: $path,
+                        viewModel: .init(fashionReviewClient: FashionReviewClient()),
+                        okButtonTapped: {
+                            viewModel.updateState()
+                        }
+                    )
+                case .home:
+                    CameraView(cameraViewModel: cameraViewModel, path: $path)
                 }
         case .userInfo:
             InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {

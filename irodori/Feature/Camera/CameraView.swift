@@ -11,7 +11,8 @@ import Photos
 
 // メインカメラView
 struct CameraView: View {
-    @StateObject private var cameraViewModel: CameraViewModel = .init()
+    @State var cameraViewModel: CameraViewModel
+    @Binding var path: [ViewType]
     @State private var showCapturedImage = false
     @Binding var path: [ViewType]
     @State private var isShowOnboardingModal: Bool = false

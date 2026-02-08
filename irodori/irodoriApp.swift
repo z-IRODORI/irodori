@@ -42,7 +42,14 @@ struct irodoriApp: App {
 //            PlannerView()
 //            ProfileView()
 
+//            ChatView(
+//                coordinateId: "preview-coordinate",
+//                image: UIImage(resource: .coordinate7)
+//            )
+
 //            CameraView()
+
+//            SelectFirstTimePicView()
 
 //            CoordinateReviewView(viewModel: .init(
 //                coordinateImage: UIImage(resource: .coordinate5),

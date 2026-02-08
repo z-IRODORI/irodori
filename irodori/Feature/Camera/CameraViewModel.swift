@@ -9,6 +9,7 @@ import UIKit
 import AVFoundation
 import Photos
 import PhotosUI
+import Observation
 
 enum CameraState {
     case initial
@@ -17,14 +18,17 @@ enum CameraState {
     case error
 }
 
-class CameraViewModel: NSObject, ObservableObject {
-    @Published var capturedImage: UIImage?
-    @Published var session = AVCaptureSession()
-    @Published var output = AVCapturePhotoOutput()
-    @Published var isFlashOn = false
-    @Published var cameraState: CameraState = .initial
-    @Published var showPhotoLibraryPermissionAlert = false
-    @Published var showImagePicker = false
+@Observable
+class CameraViewModel: NSObject {
+    private let userDefaults: UserDefaults = UserDefaults.standard
+
+    var capturedImage: UIImage?
+    var session = AVCaptureSession()
+    var output = AVCapturePhotoOutput()
+    var isFlashOn = false
+    var cameraState: CameraState = .initial
+    var showPhotoLibraryPermissionAlert = false
+    var showImagePicker = false
 
     // カメラセットアップ
     func setupCamera() {
@@ -118,6 +122,15 @@ class CameraViewModel: NSObject, ObservableObject {
     // PHPickerから選択された画像を処理
     func processPickedImage(_ image: UIImage) {
         self.capturedImage = image
+    }
+
+    func setupFirstTakePhotoIfNeeded() {
+        // 初回撮影済みの場合何もせずreturn
+        if userDefaults.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
+            return
+        }
+        // 初回撮影の時はfinishedFirstTakePhotoにtrueを設定する
+        userDefaults.set(true, forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue)
     }
 }
 
