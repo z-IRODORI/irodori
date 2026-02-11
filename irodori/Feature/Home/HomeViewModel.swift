@@ -13,16 +13,20 @@ final class HomeViewModel {
     var homeResponse: HomeResponse = .init(recent_coordinates: [], analysis_summary: "", tags: nil)
     var coordinatesByDate: [Int: CoordinateRecommend] = [:]
     var loadingDateIDs: Set<Int> = []
+    var recentCoordinateAnalysis: String = ""
 
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
+    let analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol
 
     init(
         apiClient: HomeClientProtocol = MockHomeClient(),
-        coordinateRecommendClient: CoordinateRecommendClientProtocol = CoordinateRecommendClient()//MockCoordinateRecommendClient()
+        coordinateRecommendClient: CoordinateRecommendClientProtocol = CoordinateRecommendClient(),//MockCoordinateRecommendClient()
+        analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol = AnalyzeRecentCoordinateClient()
     ) {
         self.apiClient = apiClient
         self.coordinateRecommendClient = coordinateRecommendClient
+        self.analyzeRecentCoordinateClient = analyzeRecentCoordinateClient
     }
 
     func onAppear() async {
@@ -33,12 +37,31 @@ final class HomeViewModel {
             switch result {
             case .success(let response):
                 self.homeResponse = response
+                // home API のレスポンス後に analyze-recent-coordinate API を呼び出し
+                await fetchRecentCoordinateAnalysis(uid: uid)
             case .failure:
                 // エラーハンドリング
                 break
             }
         } catch {
             // エラーハンドリング
+        }
+    }
+
+    private func fetchRecentCoordinateAnalysis(uid: String) async {
+        do {
+            let result = try await analyzeRecentCoordinateClient.post(uid: uid, targetDays: 7)
+
+            switch result {
+            case .success(let response):
+                self.recentCoordinateAnalysis = response.analyze_recent_coordinate
+            case .failure:
+                // エラー時はデフォルトメッセージを表示
+                self.recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
+            }
+        } catch {
+            // エラー時はデフォルトメッセージを表示
+            self.recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
         }
     }
 
