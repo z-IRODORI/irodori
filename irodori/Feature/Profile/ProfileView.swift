@@ -3,6 +3,7 @@ import SwiftUI
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var selectedTab = 0
+    @State private var hasLoadedItems = false
 
     let itemSpacing: CGFloat = 4
     // グリッドのレイアウト設定 (3列)
@@ -35,6 +36,12 @@ struct ProfileView: View {
             }
         }
         .background(Color.white)
+        .task {
+            if !hasLoadedItems {
+                await viewModel.loadItems()
+                hasLoadedItems = true
+            }
+        }
     }
 
     // MARK: - 1. headerNavigationBar
@@ -180,7 +187,17 @@ struct ProfileView: View {
     // アイテムグリッド
     private var itemsGrid: some View {
         Group {
-            if viewModel.filteredItems.isEmpty {
+            if viewModel.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 24)
+            } else if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .font(.system(size: 16))
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 24)
+            } else if viewModel.filteredItems.isEmpty {
                 Text("アイテムが登録されていません")
                     .font(.system(size: 16))
                     .foregroundStyle(.gray)
@@ -189,12 +206,48 @@ struct ProfileView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: itemSpacing) {
                     ForEach(viewModel.filteredItems) { item in
-                        Image(item.image)
-                            .resizable()
-                            .scaledToFill() // まずは隙間なく埋める
-                            .frame(minWidth: 0, maxWidth: .infinity) // グリッドの幅に合わせる
-        //                    .aspectRatio(1, contentMode: .fill) // ここで強制的に正方形にする
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        if let imageUrl = item.image_url, let url = URL(string: imageUrl) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .empty:
+                                    ProgressView()
+                                        .frame(maxWidth: .infinity)
+                                        .aspectRatio(1, contentMode: .fit)
+                                        .background(Color.gray.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxWidth: .infinity)
+                                        .aspectRatio(1, contentMode: .fit)
+                                        .background(Color.gray.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                case .failure:
+                                    Image(systemName: "photo")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxWidth: .infinity)
+                                        .aspectRatio(1, contentMode: .fit)
+                                        .padding(30)
+                                        .foregroundStyle(.gray.opacity(0.5))
+                                        .background(Color.gray.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                @unknown default:
+                                    EmptyView()
+                                }
+                            }
+                        } else {
+                            Image(systemName: "photo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity)
+                                .aspectRatio(1, contentMode: .fit)
+                                .padding(30)
+                                .foregroundStyle(.gray.opacity(0.5))
+                                .background(Color.gray.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
                     }
                 }
             }

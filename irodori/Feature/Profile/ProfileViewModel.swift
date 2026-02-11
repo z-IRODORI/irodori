@@ -12,24 +12,53 @@ import Observation
 @Observable
 final class ProfileViewModel {
     var selectedCategory: ClothingCategory = .all
+    var closetItems: [ClosetItem] = []
+    var isLoading = false
+    var errorMessage: String?
 
-    // データリスト
-    private let allItems: [ClothingItem] = [
-        .init(name: "ダウン", category: .outer, image: .item1),
-        .init(name: "白T", category: .tops, image: .item2),
-        .init(name: "赤T", category: .tops, image: .item3),
-        .init(name: "緑T", category: .tops, image: .item4),
-        .init(name: "スウェット", category: .tops, image: .item5),
-        .init(name: "青シャツ", category: .tops, image: .item1),
-        .init(name: "キャップ", category: .outer, image: .item3),
-        .init(name: "スニーカー", category: .shoes, image: .item4),
-    ]
+    private let closetClient: ClosetClientProtocol
+
+    init(closetClient: ClosetClientProtocol = ClosetClient()) {
+        self.closetClient = closetClient
+    }
 
     // フィルタリング済みアイテム
-    var filteredItems: [ClothingItem] {
-        if selectedCategory == .all {
-            return allItems
+    var filteredItems: [ClosetItem] {
+        let itemsWithImage = closetItems.filter { item in
+            guard let imageUrl = item.image_url, !imageUrl.isEmpty else {
+                return false
+            }
+            return true
         }
-        return allItems.filter { $0.category == selectedCategory }
+
+        if selectedCategory == .all {
+            return itemsWithImage
+        }
+        return itemsWithImage.filter { $0.clothingCategory == selectedCategory }
+    }
+
+    func loadItems() async {
+        guard let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else {
+            errorMessage = "ユーザー情報が取得できませんでした"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let result = try await closetClient.get(uid: uid, itemType: nil)
+
+            switch result {
+            case .success(let response):
+                closetItems = response.items
+            case .failure(let error):
+                errorMessage = error.errorDescription
+            }
+        } catch {
+            errorMessage = "通信エラーが発生しました"
+        }
+
+        isLoading = false
     }
 }
