@@ -8,11 +8,11 @@
 import UIKit
 
 protocol FashionReviewClientProtocol {
-    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError>
+    func post(uid: String, image: UIImage, topsImage: UIImage?, bottomsImage: UIImage?, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError>
 }
 
 final class FashionReviewClient: FashionReviewClientProtocol {
-    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError> {
+    func post(uid: String, image: UIImage, topsImage: UIImage?, bottomsImage: UIImage?, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError> {
         let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "api/fashion_review"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
@@ -22,7 +22,11 @@ final class FashionReviewClient: FashionReviewClientProtocol {
             return .failure(.badRequest)
         }
 
-        let fashionReviewRequest = FashionReviewRequest(user_id: uid, user_token: uid, file: jpegData)
+        // tops_imageとbottoms_imageをData形式に変換
+        let topsData = topsImage?.jpegData(compressionQuality: 0.5)
+        let bottomsData = bottomsImage?.jpegData(compressionQuality: 0.5)
+
+        let fashionReviewRequest = FashionReviewRequest(user_id: uid, user_token: uid, file: jpegData, tops_image: topsData, bottoms_image: bottomsData)
         let requestParameters: [String: Any] = fashionReviewRequest.createParameters()
         let (headers, body) = HTTP.createMultiPartPost(parameters: requestParameters)
 
@@ -64,7 +68,7 @@ final class FashionReviewClient: FashionReviewClientProtocol {
 // MARK: - Mock
 
 final class MockFashionReviewClient: FashionReviewClientProtocol {
-    func post(uid: String, image: UIImage, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError> {
+    func post(uid: String, image: UIImage, topsImage: UIImage?, bottomsImage: UIImage?, purposeNum: Int?) async throws -> Result<FashionReviewResponse, HTTPError> {
         return .success(.mock())
     }
 }

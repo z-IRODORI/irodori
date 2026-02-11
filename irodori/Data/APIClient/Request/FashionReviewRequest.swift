@@ -11,6 +11,8 @@ struct FashionReviewRequest: Encodable {
     let user_id: String
     let user_token: String
     let file: Data   // 全身画像
+    let tops_image: Data?   // MLモデルで検出したトップス画像
+    let bottoms_image: Data?   // MLモデルで検出したボトムス画像
     let model: String? = "gemini-3-flash-preview"   // "gemini-2.5-flash" or "gemini-2.5-flash-lite" or "gemini-3-pro-preview"
 }
 
@@ -20,6 +22,12 @@ extension FashionReviewRequest {
         parameters["user_id"] = user_id
         parameters["user_token"] = user_token
         parameters["file"] = file
+        if let tops_image = tops_image {
+            parameters["tops_image"] = tops_image
+        }
+        if let bottoms_image = bottoms_image {
+            parameters["bottoms_image"] = bottoms_image
+        }
         parameters["model"] = model
         return parameters
     }

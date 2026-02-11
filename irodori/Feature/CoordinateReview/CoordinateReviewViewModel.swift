@@ -66,6 +66,8 @@ final class CoordinateReviewViewModel {
             let fashionReviewResponse: Result<FashionReviewResponse, HTTPError> = try await apiClient.post(
                 uid: uid,
                 image: coordinateImage.correctOrientation,
+                topsImage: topsUIImage,
+                bottomsImage: bottomsUIImage,
                 purposeNum: nil//tag.number
             )
 

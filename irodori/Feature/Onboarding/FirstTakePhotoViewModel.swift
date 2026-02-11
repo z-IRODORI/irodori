@@ -47,8 +47,8 @@ final class FirstTakePhotoViewModel {
         errorMessage = nil
         
         do {
-            let result = try await fashionReviewClient.post(uid: uid, image: image, purposeNum: nil)
-            
+            let result = try await fashionReviewClient.post(uid: uid, image: image, topsImage: nil, bottomsImage: nil, purposeNum: nil)
+
             switch result {
             case .success(let response):
                 print("Success: \(response)")
