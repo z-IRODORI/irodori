@@ -33,12 +33,13 @@ struct MainTabView: View {
             }
             .navigationDestination(for: ViewType.self) { viewType in
                 switch viewType {
-                case .coordinateReview(let capturedImage):
+                case .coordinateReview(let params):
                     CoordinateReviewView(
                         viewModel: .init(
-                            coordinateImage: capturedImage!.correctOrientation,
+                            coordinateImage: params.image!.correctOrientation,
                             apiClient: FashionReviewClient()
                         ),
+                        fromFirstTakePhotoView: params.fromFirstTakePhotoView,
                         path: $path
                     )
                 case .calendar:

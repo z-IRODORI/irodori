@@ -136,4 +136,13 @@ final class CoordinateReviewViewModel {
             errroMessage = .init(title: "通信エラー", description: "サーバーとの通信中にエラーが発生しました")
         }
     }
+
+    func setupFirstTakePhotoIfNeeded() {
+        // 初回撮影済みの場合何もせずreturn
+        if UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
+            return
+        }
+        // 初回撮影の時はfinishedFirstTakePhotoにtrueを設定する
+        UserDefaults.standard.set(true, forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue)
+    }
 }

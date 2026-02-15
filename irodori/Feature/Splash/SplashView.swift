@@ -48,6 +48,32 @@ struct SplashView: View {
                     )
                 case .home:
                     MainTabView()
+                        .environment(AuthManager.shared)
+                }
+            }
+            .navigationDestination(for: ViewType.self) { viewType in
+                switch viewType {
+                case .coordinateReview(let params):
+                    CoordinateReviewView(
+                        viewModel: .init(
+                            coordinateImage: params.image!.correctOrientation,
+                            apiClient: FashionReviewClient()
+                        ),
+                        fromFirstTakePhotoView: params.fromFirstTakePhotoView,
+                        path: $path
+                    )
+                case .camera:
+                    CameraView(cameraViewModel: .init(), path: $path)
+                case .calendar:
+                    EmptyView() // FirstTakePhotoView からは使用しない
+                case .coordinateDetail:
+                    EmptyView() // FirstTakePhotoView からは使用しない
+                }
+            }
+            .onChange(of: path) { oldValue, newValue in
+                // FirstTakePhotoView で分析が完了してホームに戻った時、自動的に .home に遷移
+                if viewModel.state == .firstTakePhoto && newValue.isEmpty {
+                    viewModel.updateState()
                 }
             }
 //        case .userInfo:

@@ -15,6 +15,7 @@ struct CameraView: View {
     @Binding var path: [ViewType]
     @State private var showCapturedImage = false
     @State private var isShowOnboardingModal: Bool = false
+    var onPhotoCaptured: ((UIImage) -> Void)? = nil
 
     var body: some View {
         ZStack {
@@ -39,9 +40,9 @@ struct CameraView: View {
                     CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
                         .aspectRatio(3/4, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
-                    PartnerComment(image: .wolf, text: Comment.selectedTips())
-                        .padding(.horizontal, 12)
-                        .padding(.top, -80)
+//                    PartnerComment(image: .wolf, text: Comment.selectedTips())
+//                        .padding(.horizontal, 12)
+//                        .padding(.top, -80)
 
                     ZStack(alignment: .center) {
                         PhotoLibraryButton()
@@ -63,9 +64,9 @@ struct CameraView: View {
                     Color.pink
                         .aspectRatio(3/4, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
-                    PartnerComment(image: .wolf, text: Comment.selectedTips())
-                        .padding(.horizontal, 12)
-                        .padding(.top, -80)
+//                    PartnerComment(image: .wolf, text: Comment.selectedTips())
+//                        .padding(.horizontal, 12)
+//                        .padding(.top, -80)
 
                     ZStack(alignment: .center) {
                         PhotoLibraryButton()
@@ -90,7 +91,13 @@ struct CameraView: View {
                     viewModel: .init(inputUIImage: image),
                     isPresented: $showCapturedImage,
                     okButtonTapped: {
-                        path.append(.coordinateReview(image))
+                        if let onPhotoCaptured = onPhotoCaptured {
+                            // FirstTakePhotoView から呼ばれた場合
+                            onPhotoCaptured(image)
+                        } else {
+                            // 通常のカメラから呼ばれた場合
+                            path.append(.coordinateReview(.init(image: image, fromFirstTakePhotoView: false)))
+                        }
                     }
                 )   // キャプチャした画像表示画面
             }

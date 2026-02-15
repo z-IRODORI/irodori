@@ -10,8 +10,13 @@ import UIKit
 enum ViewType: Hashable {
     case camera
     case calendar
-    case coordinateReview(UIImage?)
+    case coordinateReview(CoordinateReviewParams)
     case coordinateDetail(CoordinateDetailParams)
+
+    struct CoordinateReviewParams: Hashable {
+        let image: UIImage?
+        let fromFirstTakePhotoView: Bool
+    }
 
     struct CoordinateDetailParams: Hashable {
         let uid: String

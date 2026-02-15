@@ -123,15 +123,6 @@ class CameraViewModel: NSObject {
     func processPickedImage(_ image: UIImage) {
         self.capturedImage = image
     }
-
-    func setupFirstTakePhotoIfNeeded() {
-        // 初回撮影済みの場合何もせずreturn
-        if userDefaults.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
-            return
-        }
-        // 初回撮影の時はfinishedFirstTakePhotoにtrueを設定する
-        userDefaults.set(true, forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue)
-    }
 }
 
 // 写真キャプチャデリゲート

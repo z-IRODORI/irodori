@@ -20,6 +20,7 @@ final class FirstTakePhotoViewModel {
     var showConfirmationView = false
     var isLoading = false
     var errorMessage: String?
+    var capturedImageFromCamera: UIImage?
     
     private let fashionReviewClient: FashionReviewClientProtocol
     init(fashionReviewClient: FashionReviewClientProtocol) {
@@ -65,14 +66,5 @@ final class FirstTakePhotoViewModel {
         }
         
         isLoading = false
-    }
-
-    func setupFirstTakePhotoIfNeeded() {
-        // 初回撮影済みの場合何もせずreturn
-        if userDefaults.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
-            return
-        }
-        // 初回撮影の時はfinishedFirstTakePhotoにtrueを設定する
-        userDefaults.set(true, forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue)
     }
 }

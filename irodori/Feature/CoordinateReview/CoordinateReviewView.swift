@@ -10,13 +10,14 @@ import SwiftUI
 struct CoordinateReviewView: View {
     @State var viewModel: CoordinateReviewViewModel
 
-    let fromFirstTakePhotoView = false
+    let fromFirstTakePhotoView: Bool
     private let shortTextCriterion = 50
     @State private var currentSchedule = ""   // YYYY/MM/DD
     @State private var reviewText = ""
     @State private var isShowFullReview = false
     @State private var tappedURL = ""
     @State private var tappedAffiliateProduct: AffiliateProduct?
+    @State private var hasCalledSetupFirstTakePhoto = false
     @Binding var path: [ViewType]
 
     var body: some View {
@@ -57,9 +58,6 @@ struct CoordinateReviewView: View {
                                 "action": GAEventAction.goHome.rawValue
                             ])
                             path.removeAll()
-                            if fromFirstTakePhotoView {
-                                path.append(.camera)
-                            }
                         }, label: {
                             Text("ホームへ")
                         })
@@ -115,6 +113,13 @@ struct CoordinateReviewView: View {
             AnalyticsLogger.shared.log(screen: .coordinateReviewScreenView)
             await viewModel.onAppear()
         }
+        .onChange(of: viewModel.fashionReview) { _, newValue in
+            // 分析結果が表示されたタイミングで setupFirstTakePhotoIfNeeded を呼び出す
+            if fromFirstTakePhotoView && newValue != nil && !hasCalledSetupFirstTakePhoto {
+                viewModel.setupFirstTakePhotoIfNeeded()
+                hasCalledSetupFirstTakePhoto = true
+            }
+        }
     }
 
     private func RecommendCoordinateCard(imageURL: String) -> some View {
@@ -137,8 +142,12 @@ struct CoordinateReviewView: View {
 }
 
 #Preview {
-    CoordinateReviewView(viewModel: .init(
-        coordinateImage: UIImage(resource: .coordinate2),
-        apiClient: MockFashionReviewClient()
-    ), path: .constant([]))
+    CoordinateReviewView(
+        viewModel: .init(
+            coordinateImage: UIImage(resource: .coordinate2),
+            apiClient: MockFashionReviewClient()
+        ),
+        fromFirstTakePhotoView: false,
+        path: .constant([])
+    )
 }

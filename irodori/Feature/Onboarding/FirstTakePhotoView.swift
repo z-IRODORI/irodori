@@ -75,7 +75,14 @@ struct FirstTakePhotoView: View {
                 .background(.white)
         }
         .fullScreenCover(isPresented: $viewModel.showCameraView) {
-            CameraView(cameraViewModel: .init(), path: $path)
+            CameraView(
+                cameraViewModel: .init(),
+                path: $path,
+                onPhotoCaptured: { image in
+                    viewModel.capturedImageFromCamera = image
+                    viewModel.showCameraView = false
+                }
+            )
         }
         .sheet(isPresented: $viewModel.showPhotoPicker) {
             PhotoPickerView(isPresented: $viewModel.showPhotoPicker) { image in
@@ -85,17 +92,28 @@ struct FirstTakePhotoView: View {
             }
         }
         .fullScreenCover(isPresented: $viewModel.showConfirmationView) {
-            if let image = viewModel.selectedImage {
+            if let image = viewModel.selectedImage ?? viewModel.capturedImageFromCamera {
                 CapturedImageView(
                     image: image,
                     viewModel: .init(inputUIImage: image),
                     isPresented: $viewModel.showConfirmationView,
                     okButtonTapped: {
-                        viewModel.setupFirstTakePhotoIfNeeded()
                         okButtonTapped()
-                        path.append(.coordinateReview(image))
+                        path.append(.coordinateReview(.init(image: image, fromFirstTakePhotoView: true)))
                     }
                 )
+            }
+        }
+        .onChange(of: viewModel.capturedImageFromCamera) { _, newImage in
+            if newImage != nil {
+                viewModel.showConfirmationView = true
+            }
+        }
+        .onChange(of: viewModel.showConfirmationView) { _, isShowing in
+            if !isShowing {
+                // CapturedImageView が閉じられたら、キャプチャした画像をクリア
+                viewModel.capturedImageFromCamera = nil
+                viewModel.selectedImage = nil
             }
         }
         .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
