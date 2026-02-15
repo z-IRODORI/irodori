@@ -42,9 +42,14 @@ struct HomeView: View {
                         isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) },
                         coordinateForDate: { dateID in viewModel.coordinate(for: dateID) },
                         isLoadingForDate: { dateID in viewModel.isLoading(for: dateID) },
-                        onAddCoordinate: { dateID in
+                        onAddCoordinateRandom: { dateID in
                             Task {
-                                await viewModel.addCoordinate(for: dateID)
+                                await viewModel.addCoordinateRandom(for: dateID)
+                            }
+                        },
+                        onAddCoordinateByItem: { dateID in
+                            Task {
+                                await viewModel.addCoordinateByItem(for: dateID)
                             }
                         }
                     )

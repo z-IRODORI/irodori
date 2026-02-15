@@ -15,7 +15,8 @@ struct ThreeDaysPlanner: View {
     let isCurrentMonth: (Date) -> Bool
     let coordinateForDate: (Int) -> CoordinateRecommend?
     let isLoadingForDate: (Int) -> Bool
-    let onAddCoordinate: (Int) -> Void
+    let onAddCoordinateRandom: (Int) -> Void
+    let onAddCoordinateByItem: (Int) -> Void
 
     // アニメーション用
     @Namespace private var calendarAnimation
@@ -60,7 +61,8 @@ struct ThreeDaysPlanner: View {
             dayString: item.dayString,
             coordinate: coordinateForDate(item.id),
             isLoading: isLoadingForDate(item.id),
-            onAddCoordinate: { onAddCoordinate(item.id) }
+            onAddCoordinateRandom: { onAddCoordinateRandom(item.id) },
+            onAddCoordinateByItem: { onAddCoordinateByItem(item.id) }
         )
     }
 }
@@ -71,7 +73,8 @@ private struct CoordinateCardView: View {
     let dayString: String
     let coordinate: CoordinateRecommend?
     let isLoading: Bool
-    let onAddCoordinate: () -> Void
+    let onAddCoordinateRandom: () -> Void
+    let onAddCoordinateByItem: () -> Void
 
     @State private var isFlipped = false
 
@@ -134,20 +137,30 @@ private struct CoordinateCardView: View {
 
             // コーデ未追加状態
             if coordinate == nil && !isLoading {
-                VStack {
-                    Spacer()
+                VStack(spacing: 24) {
                     Button {
-                        onAddCoordinate()
+                        onAddCoordinateRandom()
                     } label: {
-                        Label("コーデを追加", systemImage: "plus")
-                            .font(.system(size: 18, weight: .bold))
+                        Label("ランダム", systemImage: "plus")
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 24)
                             .padding(.vertical, 16)
                             .background(.black)
                             .clipShape(Capsule())
                     }
-                    Spacer()
+
+                    Button {
+                        onAddCoordinateByItem()
+                    } label: {
+                        Label("アイテムから提案", systemImage: "plus")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 16)
+                            .background(.black)
+                            .clipShape(Capsule())
+                    }
                 }
             }
         }

@@ -65,7 +65,36 @@ final class HomeViewModel {
         }
     }
 
-    func addCoordinate(for dateID: Int) async {
+    func addCoordinateRandom(for dateID: Int) async {
+        loadingDateIDs.insert(dateID)
+        defer { loadingDateIDs.remove(dateID) }
+
+        do {
+            let result = try await coordinateRecommendClient.post(
+                gender: "men",
+                inputType: "アウター",
+                category: "ジーンズジャケット",
+                text: "ダメージジーンズのジャケット",
+                numOutfits: 3,
+                numCandidates: 5
+            )
+
+            switch result {
+            case .success(let response):
+                // APIから複数のコーディネートが返ってくるが、最初の1つを使用
+                if let firstCoordinate = response.recommend_coordinates.first {
+                    self.coordinatesByDate[dateID] = firstCoordinate
+                }
+            case .failure:
+                // エラーハンドリング
+                break
+            }
+        } catch {
+            // エラーハンドリング
+        }
+    }
+
+    func addCoordinateByItem(for dateID: Int) async {
         loadingDateIDs.insert(dateID)
         defer { loadingDateIDs.remove(dateID) }
 
