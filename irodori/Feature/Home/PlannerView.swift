@@ -19,7 +19,7 @@ struct PlannerView: View {
                     isLoadingForDate: { dateID in homeViewModel.isLoading(for: dateID) },
                     onAddCoordinate: { dateID in
                         Task {
-                            await homeViewModel.addCoordinate(for: dateID)
+                            await homeViewModel.addCoordinateByItem(for: dateID)
                         }
                     }
                 )

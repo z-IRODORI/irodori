@@ -84,20 +84,22 @@ private struct CoordinateCardView: View {
             // 既存のレイアウト（グリッド + アイテムリスト）
             if let coordinate = coordinate {
                 VStack(spacing: 12) {
-                    Spacer().frame(height: 80)   // 上部に空白空けられなかったので暫定対応, TODO: 削除する
+                    Spacer().frame(height: 120)   // 上部に空白空けられなかったので暫定対応, TODO: 削除する
                     Text("アイテム")
                         .fontWeight(.bold)
 
                     // アイテム画像
                     imageGridView(gridItems: coordinate.gridItems)
-                        .padding(.horizontal, 24)
+                        .padding(20)
 
                     Divider()
                         .padding(.horizontal, 16)
 
                     // アイテム文字列
-                    coordinateItemsList(coordinate: coordinate)
-                        .frame(height: 250)
+                    ScrollView {
+                        coordinateItemsList(coordinate: coordinate)
+                    }
+                    .frame(height: 250)
                 }
                 .rotation3DEffect(
                     .degrees(isFlipped ? 360 : 180),
@@ -105,13 +107,11 @@ private struct CoordinateCardView: View {
                 )
                 .opacity(isFlipped ? 1 : 0)   // 裏表で表示の有無を切り替える
                 .frame(maxHeight: .infinity, alignment: .top)
-            }
 
-            // 表面
-            // コーディネート全体画像
-            if let coordinate = coordinate {
+                // 表面
+                // コーディネート全体画像
                 VStack(spacing: 12) {
-                    Spacer().frame(height: 80)   // 上部に空白空けられなかったので暫定対応, TODO: 削除する
+                    Spacer().frame(height: 120)   // 上部に空白空けられなかったので暫定対応, TODO: 削除する
                     Text("コーディネート")
                         .fontWeight(.bold)
 
@@ -178,7 +178,7 @@ private struct CoordinateCardView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(12)
                         .background(Color.black.opacity(0.6))
