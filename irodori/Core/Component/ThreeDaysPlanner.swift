@@ -13,7 +13,7 @@ struct ThreeDaysPlanner: View {
     let relativeDateText: String
     let onSelectDate: (Int) -> Void
     let isCurrentMonth: (Date) -> Bool
-    let coordinateForDate: (Int) -> CoordinateRecommend?
+    let coordinatesForDate: (Int) -> [CoordinateRecommend]
     let isLoadingForDate: (Int) -> Bool
     let onAddCoordinateRandom: (Int) -> Void
     let onAddCoordinateByItem: (Int) -> Void
@@ -59,7 +59,7 @@ struct ThreeDaysPlanner: View {
     private func coordinateCard(for item: CalendarData) -> some View {
         CoordinateCardView(
             dayString: item.dayString,
-            coordinate: coordinateForDate(item.id),
+            coordinates: coordinatesForDate(item.id),
             isLoading: isLoadingForDate(item.id),
             onAddCoordinateRandom: { onAddCoordinateRandom(item.id) },
             onAddCoordinateByItem: { onAddCoordinateByItem(item.id) }
@@ -71,59 +71,36 @@ struct ThreeDaysPlanner: View {
 
 private struct CoordinateCardView: View {
     let dayString: String
-    let coordinate: CoordinateRecommend?
+    let coordinates: [CoordinateRecommend]
     let isLoading: Bool
     let onAddCoordinateRandom: () -> Void
     let onAddCoordinateByItem: () -> Void
 
     @State private var isFlipped = false
+    @State private var currentCoordinatePage = 0  // コーディネートのページ
+    @State private var currentItemPage = 0        // アイテムリストのページ
+
+    // 現在のコーディネート
+    private var currentCoordinate: CoordinateRecommend? {
+        guard !coordinates.isEmpty, currentCoordinatePage < coordinates.count else { return nil }
+        return coordinates[currentCoordinatePage]
+    }
+
+    // ページングの設定（アイテムリスト用）
+    private let itemsPerPage = 3
 
     var body: some View {
         ZStack {
-            // 裏面
-            // 既存のレイアウト（グリッド + アイテムリスト）
-            if let coordinate = coordinate {
-                VStack(spacing: 12) {
-                    Spacer().frame(height: 120)   // 上部に空白空けられなかったので暫定対応, TODO: 削除する
-                    Text("アイテム")
-                        .fontWeight(.bold)
-
-                    // アイテム画像
-                    imageGridView(gridItems: coordinate.gridItems)
-                        .padding(20)
-
-                    Divider()
-                        .padding(.horizontal, 16)
-
-                    // アイテム文字列
-                    ScrollView {
-                        coordinateItemsList(coordinate: coordinate)
-                    }
-                    .frame(height: 250)
+            if let coordinate = currentCoordinate {
+                VStack(spacing: 4) {
+                    // タイトル + ページングボタン
+                    pagingHeader(title: isFlipped ? "コーディネート" : "アイテム", coordinate: coordinate)
+                    // ページインジケーター
+                    pagingIndicator(coordinate: coordinate)
+                    coordinateBackView(coordinate: coordinate)
                 }
-                .rotation3DEffect(
-                    .degrees(isFlipped ? 360 : 180),
-                    axis: (x: 0, y: 1, z: 0)
-                )
-                .opacity(isFlipped ? 1 : 0)   // 裏表で表示の有無を切り替える
                 .frame(maxHeight: .infinity, alignment: .top)
-
-                // 表面
-                // コーディネート全体画像
-                VStack(spacing: 12) {
-                    Spacer().frame(height: 120)   // 上部に空白空けられなかったので暫定対応, TODO: 削除する
-                    Text("コーディネート")
-                        .fontWeight(.bold)
-
-                    coordinateImageView(path: coordinate.coordinate_image_path)
-                        .padding(20)
-                }
-                .rotation3DEffect(
-                    .degrees(isFlipped ? 180 : 0),
-                    axis: (x: 0, y: 1, z: 0)
-                )
-                .opacity(isFlipped ? 0 : 1)   // 裏表で表示の有無を切り替える
-                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, 24)
             }
 
             // ローディング状態
@@ -136,7 +113,7 @@ private struct CoordinateCardView: View {
             }
 
             // コーデ未追加状態
-            if coordinate == nil && !isLoading {
+            if currentCoordinate == nil && !isLoading {
                 VStack(spacing: 24) {
                     Button {
                         onAddCoordinateRandom()
@@ -169,9 +146,9 @@ private struct CoordinateCardView: View {
         .cornerRadius(32)
         .overlay(RoundedRectangle(cornerRadius: 32).stroke(.gray.opacity(0.15), lineWidth: 1))
         .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 4)
-        .overlay(alignment: .topTrailing) {
+        .overlay(alignment: .bottomTrailing) {
             // 反転ボタン（常に最前面）
-            if coordinate != nil {
+            if currentCoordinate != nil {
                 Button {
                     withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                         isFlipped.toggle()
@@ -187,23 +164,127 @@ private struct CoordinateCardView: View {
                 .padding(16)
             }
         }
+        .onChange(of: coordinates.count) { _, _ in
+            currentCoordinatePage = 0  // コーディネート配列が変わったらページをリセット
+            currentItemPage = 0
+        }
     }
 
     @ViewBuilder
-    private func coordinateItemsList(coordinate: CoordinateRecommend) -> some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                let items = buildItemList(coordinate: coordinate)
-                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                    coordinateItemRow(category: item)
-                    if index < items.count - 1 {
-                        Divider().padding(.leading, 48)
-                    }
+    private func coordinateBackView(coordinate: CoordinateRecommend) -> some View {
+        ZStack(alignment: .top) {
+            // 裏面の内容
+            VStack(spacing: 12) {
+                // アイテム画像
+                imageGridView(gridItems: coordinate.gridItems)
+                    .padding(20)
+
+                Divider()
+                    .padding(.horizontal, 16)
+
+                // アイテムリスト
+                ScrollView {
+                    itemsList(coordinate: coordinate)
+                }
+                .frame(maxHeight: 250)
+            }
+            .opacity(isFlipped ? 1 : 0)   // 裏表で表示の有無を切り替える
+
+            // 表面
+            // コーディネート全体画像
+            coordinateImageView(path: coordinate.coordinate_image_path)
+                .padding(20)
+                .opacity(isFlipped ? 0 : 1)   // 裏表で表示の有無を切り替える
+        }
+    }
+
+    // MARK: - 共通ペーシングUI
+
+    @ViewBuilder
+    private func pagingHeader(title: String, coordinate: CoordinateRecommend) -> some View {
+        HStack(spacing: 12) {
+            // 左ページングボタン
+            Button {
+                withAnimation {
+                    goToPreviousCoordinate()
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(canGoToPreviousCoordinate() ? .black : .gray.opacity(0.3))
+                    .frame(width: 28, height: 28)
+            }
+            .disabled(!canGoToPreviousCoordinate())
+
+            Text(title)
+                .fontWeight(.bold)
+
+            // 右ページングボタン
+            Button {
+                withAnimation {
+                    goToNextCoordinate()
+                }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(canGoToNextCoordinate() ? .black : .gray.opacity(0.3))
+                    .frame(width: 28, height: 28)
+            }
+            .disabled(!canGoToNextCoordinate())
+        }
+    }
+
+    @ViewBuilder
+    private func pagingIndicator(coordinate: CoordinateRecommend) -> some View {
+        let totalPages = coordinates.count
+
+        if totalPages > 1 {
+            HStack(spacing: 6) {
+                ForEach(0..<totalPages, id: \.self) { page in
+                    Circle()
+                        .fill(page == currentCoordinatePage ? Color.black : Color.gray.opacity(0.3))
+                        .frame(width: 6, height: 6)
                 }
             }
-            .padding(.horizontal, 16)
         }
+    }
+
+    @ViewBuilder
+    private func itemsList(coordinate: CoordinateRecommend) -> some View {
+        let items = buildItemList(coordinate: coordinate)
+
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                coordinateItemRow(category: item)
+                if index < items.count - 1 {
+                    Divider().padding(.leading, 48)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - ページング制御（コーディネート）
+
+    private func canGoToPreviousCoordinate() -> Bool {
+        return currentCoordinatePage > 0
+    }
+
+    private func canGoToNextCoordinate() -> Bool {
+        return currentCoordinatePage < coordinates.count - 1
+    }
+
+    private func goToPreviousCoordinate() {
+        if currentCoordinatePage > 0 {
+            currentCoordinatePage -= 1
+        }
+    }
+
+    private func goToNextCoordinate() {
+        if currentCoordinatePage < coordinates.count - 1 {
+            currentCoordinatePage += 1
+        }
     }
 
     private func buildItemList(coordinate: CoordinateRecommend) -> [String] {

@@ -11,7 +11,7 @@ import Foundation
 @Observable
 final class HomeViewModel {
     var homeResponse: HomeResponse = .init(recent_coordinates: [], analysis_summary: "", tags: nil)
-    var coordinatesByDate: [Int: CoordinateRecommend] = [:]
+    var coordinatesByDate: [Int: [CoordinateRecommend]] = [:]
     var loadingDateIDs: Set<Int> = []
     var recentCoordinateAnalysis: String = ""
 
@@ -72,19 +72,17 @@ final class HomeViewModel {
         do {
             let result = try await coordinateRecommendClient.post(
                 gender: "men",
-                inputType: "アウター",
-                category: "ジーンズジャケット",
-                text: "ダメージジーンズのジャケット",
+                inputType: "トップス",
+                category: "黒の長袖Tシャツ",
+                text: "黒の長袖Tシャツ",
                 numOutfits: 3,
                 numCandidates: 5
             )
 
             switch result {
             case .success(let response):
-                // APIから複数のコーディネートが返ってくるが、最初の1つを使用
-                if let firstCoordinate = response.recommend_coordinates.first {
-                    self.coordinatesByDate[dateID] = firstCoordinate
-                }
+                // APIから複数のコーディネートを全て保存
+                self.coordinatesByDate[dateID] = response.recommend_coordinates
             case .failure:
                 // エラーハンドリング
                 break
@@ -110,10 +108,8 @@ final class HomeViewModel {
 
             switch result {
             case .success(let response):
-                // APIから複数のコーディネートが返ってくるが、最初の1つを使用
-                if let firstCoordinate = response.recommend_coordinates.first {
-                    self.coordinatesByDate[dateID] = firstCoordinate
-                }
+                // APIから複数のコーディネートを全て保存
+                self.coordinatesByDate[dateID] = response.recommend_coordinates
             case .failure:
                 // エラーハンドリング
                 break
@@ -127,7 +123,7 @@ final class HomeViewModel {
         return loadingDateIDs.contains(dateID)
     }
 
-    func coordinate(for dateID: Int) -> CoordinateRecommend? {
-        return coordinatesByDate[dateID]
+    func coordinates(for dateID: Int) -> [CoordinateRecommend] {
+        return coordinatesByDate[dateID] ?? []
     }
 }

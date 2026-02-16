@@ -12,39 +12,28 @@ struct FirebaseStorageImage: View {
     let path: String
     let storageClient: FirebaseStorageClientProtocol
 
-    @State private var imageURL: URL?
-    @State private var isLoading = true
+    @State private var uiImage: UIImage?
+    @State private var isLoading = false
     @State private var error: Error?
     @State private var authRetryCount = 0
 
     init(path: String, storageClient: FirebaseStorageClientProtocol = FirebaseStorageClient()) {
         self.path = path
         self.storageClient = storageClient
+
+        // 初期化時に画像キャッシュをチェック
+        if let cachedImage = UIImageCache.shared.getImage(for: path) {
+            _uiImage = State(initialValue: cachedImage)
+            _isLoading = State(initialValue: false)
+        }
     }
 
     var body: some View {
         Group {
-            if let imageURL = imageURL {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure(let error):
-                        VStack {
-                            placeholderView
-                            Text("画像読み込みエラー")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
+            if let uiImage = uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
             } else if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -59,8 +48,8 @@ struct FirebaseStorageImage: View {
                 placeholderView
             }
         }
-        .task {
-            await loadImageURL()
+        .task(id: path) {
+            await loadImage()
         }
     }
 
@@ -72,7 +61,16 @@ struct FirebaseStorageImage: View {
             .padding()
     }
 
-    private func loadImageURL() async {
+    private func loadImage() async {
+        // 画像キャッシュチェック（同期的に実行）
+        if let cachedImage = UIImageCache.shared.getImage(for: path) {
+            self.uiImage = cachedImage
+            self.isLoading = false
+            self.error = nil
+            return
+        }
+
+        // キャッシュがない場合のみローディング表示
         isLoading = true
         defer { isLoading = false }
 
@@ -86,9 +84,25 @@ struct FirebaseStorageImage: View {
         }
 
         do {
-            let url = try await storageClient.getDownloadURL(for: path)
-            self.imageURL = url
-            self.error = nil
+            // URLキャッシュをチェック
+            let url: URL
+            if let cachedURL = ImageURLCache.shared.getURL(for: path) {
+                url = cachedURL
+            } else {
+                url = try await storageClient.getDownloadURL(for: path)
+                ImageURLCache.shared.setURL(url, for: path)
+            }
+
+            // 画像をダウンロード
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let downloadedImage = UIImage(data: data) {
+                self.uiImage = downloadedImage
+                self.error = nil
+                // 画像をキャッシュに保存
+                UIImageCache.shared.setImage(downloadedImage, for: path)
+            } else {
+                self.error = NSError(domain: "ImageError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to decode image"])
+            }
         } catch {
             self.error = error
         }

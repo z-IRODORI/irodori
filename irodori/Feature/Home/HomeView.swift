@@ -40,7 +40,7 @@ struct HomeView: View {
                         relativeDateText: plannerViewModel.relativeDateText,
                         onSelectDate: { id in plannerViewModel.selectDate(id: id) },
                         isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) },
-                        coordinateForDate: { dateID in viewModel.coordinate(for: dateID) },
+                        coordinatesForDate: { dateID in viewModel.coordinates(for: dateID) },
                         isLoadingForDate: { dateID in viewModel.isLoading(for: dateID) },
                         onAddCoordinateRandom: { dateID in
                             Task {

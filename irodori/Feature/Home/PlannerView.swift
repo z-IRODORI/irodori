@@ -15,7 +15,7 @@ struct PlannerView: View {
                     relativeDateText: viewModel.relativeDateText,
                     onSelectDate: { id in viewModel.selectDate(id: id) },
                     isCurrentMonth: { date in viewModel.isCurrentMonth(date: date) },
-                    coordinateForDate: { dateID in homeViewModel.coordinate(for: dateID) },
+                    coordinateForDate: { dateID in homeViewModel.coordinates(for: dateID).first },
                     isLoadingForDate: { dateID in homeViewModel.isLoading(for: dateID) },
                     onAddCoordinate: { dateID in
                         Task {
