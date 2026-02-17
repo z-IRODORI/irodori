@@ -34,32 +34,11 @@ struct HomeView: View {
 //                    )
 //                    .padding(.horizontal, -24)
 
-                    if let item = viewModel.selectCoordinateItem {
-                        Text("選択したアイテム")
-                            .font(.system(size: 20, weight: .bold))
-                        HStack(spacing: 12) {
-                            CachedAsyncImage(
-                                url: item.image_url.flatMap { URL(string: $0) }
-                            ) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            } placeholder: {
-                                Color.gray.opacity(0.2)
-                            }
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
-
-                            Text(item.category)
-                                .font(.system(size: 16))
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
                     ThreeDaysPlanner(
                         calendarList: plannerViewModel.calendarList,
                         selectedDateID: $plannerViewModel.selectedDateID,
                         relativeDateText: plannerViewModel.relativeDateText,
+                        selectCoordinateItem: viewModel.selectCoordinateItem,
                         onSelectDate: { id in plannerViewModel.selectDate(id: id) },
                         isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) },
                         coordinatesForDate: { dateID in viewModel.coordinates(for: dateID) },

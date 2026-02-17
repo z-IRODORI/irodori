@@ -11,6 +11,7 @@ struct ThreeDaysPlanner: View {
     let calendarList: [CalendarData]
     @Binding var selectedDateID: Int?
     let relativeDateText: String
+    let selectCoordinateItem: SelectCoordinateItem?
     let onSelectDate: (Int) -> Void
     let isCurrentMonth: (Date) -> Bool
     let coordinatesForDate: (Int) -> [CoordinateRecommend]
@@ -37,6 +38,30 @@ struct ThreeDaysPlanner: View {
             .pickerStyle(.segmented)
             .padding(.horizontal, 24)
 
+            if let item = selectCoordinateItem {
+                Text("選択したアイテム")
+                    .font(.system(size: 14, weight: .bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 24)
+                HStack(spacing: 12) {
+                    CachedAsyncImage(
+                        url: item.image_url.flatMap { URL(string: $0) }
+                    ) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Color.gray.opacity(0.2)
+                    }
+                    .frame(width: 40, height: 40)
+                    .clipShape(Circle())
+
+                    Text(item.category)
+                        .font(.system(size: 16))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+            }
 
 
             // カルーセル部分
