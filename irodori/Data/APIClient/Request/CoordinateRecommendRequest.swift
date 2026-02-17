@@ -12,6 +12,6 @@ struct CoordinateRecommendRequest: Encodable {
     let input_type: String
     let category: String
     let text: String
-    let num_outfits: Int
-    let num_candidates: Int
+    let num_outfits: Int = 10
+    let num_candidates: Int = 5
 }

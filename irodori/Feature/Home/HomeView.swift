@@ -33,7 +33,29 @@ struct HomeView: View {
 //                        isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) }
 //                    )
 //                    .padding(.horizontal, -24)
-                    
+
+                    if let item = viewModel.selectCoordinateItem {
+                        Text("選択したアイテム")
+                            .font(.system(size: 20, weight: .bold))
+                        HStack(spacing: 12) {
+                            CachedAsyncImage(
+                                url: item.image_url.flatMap { URL(string: $0) }
+                            ) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            } placeholder: {
+                                Color.gray.opacity(0.2)
+                            }
+                            .frame(width: 40, height: 40)
+                            .clipShape(Circle())
+
+                            Text(item.category)
+                                .font(.system(size: 16))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
                     ThreeDaysPlanner(
                         calendarList: plannerViewModel.calendarList,
                         selectedDateID: $plannerViewModel.selectedDateID,
@@ -95,6 +117,13 @@ struct HomeView: View {
             .padding(.horizontal, 24)
         }
         .onAppear {
+            viewModel.setCoordinateItem(
+                gender: "men",
+                input_type: "トップス",
+                category: "ホワイト_長袖Tシャツ",
+                text: "白色, ホワイト, 長袖Tシャツ",
+                image_url: "https://fashionsnap-assets.com/asset/format=auto,width=800/article/images/2023/11/zozotown-bobobo-bobo-bobo-collaboration-011.jpg"
+            )
             Task {
                 await viewModel.onAppear()
             }

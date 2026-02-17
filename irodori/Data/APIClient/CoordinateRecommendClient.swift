@@ -33,9 +33,9 @@ final class CoordinateRecommendClient: CoordinateRecommendClientProtocol {
             gender: gender,
             input_type: inputType,
             category: category,
-            text: text,
-            num_outfits: numOutfits,
-            num_candidates: numCandidates
+            text: text
+//            num_outfits: numOutfits,
+//            num_candidates: numCandidates
         )
 
         var request = URLRequest(url: url)

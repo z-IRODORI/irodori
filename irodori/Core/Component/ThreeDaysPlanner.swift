@@ -37,6 +37,8 @@ struct ThreeDaysPlanner: View {
             .pickerStyle(.segmented)
             .padding(.horizontal, 24)
 
+
+
             // カルーセル部分
             GeometryReader { proxy in
                 let margin = (proxy.size.width - cardWidth) / 2

@@ -7,6 +7,14 @@
 
 import Foundation
 
+struct SelectCoordinateItem {
+    let gender: String
+    let input_type: String
+    let category: String
+    let text: String
+    let image_url: String?
+}
+
 @MainActor
 @Observable
 final class HomeViewModel {
@@ -14,6 +22,7 @@ final class HomeViewModel {
     var coordinatesByDate: [Int: [CoordinateRecommend]] = [:]
     var loadingDateIDs: Set<Int> = []
     var recentCoordinateAnalysis: String = ""
+    var selectCoordinateItem: SelectCoordinateItem?
 
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
@@ -66,16 +75,17 @@ final class HomeViewModel {
     }
 
     func addCoordinateRandom(for dateID: Int) async {
+        guard let item = selectCoordinateItem else { return }
         loadingDateIDs.insert(dateID)
         defer { loadingDateIDs.remove(dateID) }
 
         do {
             let result = try await coordinateRecommendClient.post(
-                gender: "men",
-                inputType: "トップス",
-                category: "黒の長袖Tシャツ",
-                text: "黒の長袖Tシャツ",
-                numOutfits: 3,
+                gender: item.gender,
+                inputType: item.input_type,
+                category: item.category,
+                text: item.text,
+                numOutfits: 10,
                 numCandidates: 5
             )
 
@@ -125,5 +135,9 @@ final class HomeViewModel {
 
     func coordinates(for dateID: Int) -> [CoordinateRecommend] {
         return coordinatesByDate[dateID] ?? []
+    }
+
+    func setCoordinateItem(gender: String, input_type: String, category: String, text: String, image_url: String? = nil) {
+        selectCoordinateItem = .init(gender: gender, input_type: input_type, category: category, text: text, image_url: image_url)
     }
 }
