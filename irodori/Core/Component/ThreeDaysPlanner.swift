@@ -43,6 +43,7 @@ struct ThreeDaysPlanner: View {
                     .font(.system(size: 14, weight: .bold))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 24)
+                    .padding(.top, 12)
                 HStack(spacing: 12) {
                     CachedAsyncImage(
                         url: item.image_url.flatMap { URL(string: $0) }
@@ -409,13 +410,14 @@ private struct CoordinateCardView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
                     // プレースホルダー
-                    Image(systemName: "photo")
-                        .resizable()
+//                    Image(systemName: "photo")
+//                        .resizable()
+//                        .background(Color.gray.opacity(0.1))
+                    EmptyView()
                         .aspectRatio(contentMode: .fit)
                         .foregroundStyle(.gray)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .aspectRatio(1, contentMode: .fit)
-                        .background(Color.gray.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
