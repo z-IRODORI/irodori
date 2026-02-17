@@ -7,14 +7,6 @@
 
 import Foundation
 
-struct SelectCoordinateItem {
-    let gender: String
-    let input_type: String
-    let category: String
-    let text: String
-    let image_url: String?
-}
-
 @MainActor
 @Observable
 final class HomeViewModel {
@@ -24,18 +16,27 @@ final class HomeViewModel {
     var recentCoordinateAnalysis: String = ""
     var selectCoordinateItem: SelectCoordinateItem?
 
+    // クローゼットアイテムピッカー
+    var closetItems: [ClosetItem] = []
+    var isLoadingCloset = false
+    var showingItemPicker = false
+    private var pickerTargetDateID: Int? = nil
+
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
     let analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol
+    let closetClient: ClosetClientProtocol
 
     init(
         apiClient: HomeClientProtocol = MockHomeClient(),
         coordinateRecommendClient: CoordinateRecommendClientProtocol = CoordinateRecommendClient(),//MockCoordinateRecommendClient()
-        analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol = AnalyzeRecentCoordinateClient()
+        analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol = AnalyzeRecentCoordinateClient(),
+        closetClient: ClosetClientProtocol = ClosetClient()
     ) {
         self.apiClient = apiClient
         self.coordinateRecommendClient = coordinateRecommendClient
         self.analyzeRecentCoordinateClient = analyzeRecentCoordinateClient
+        self.closetClient = closetClient
     }
 
     func onAppear() async {
@@ -139,5 +140,45 @@ final class HomeViewModel {
 
     func setCoordinateItem(gender: String, input_type: String, category: String, text: String, image_url: String? = nil) {
         selectCoordinateItem = .init(gender: gender, input_type: input_type, category: category, text: text, image_url: image_url)
+    }
+
+    // MARK: - Closet Item Picker
+
+    func showItemPicker(for dateID: Int) {
+        pickerTargetDateID = dateID
+        showingItemPicker = true
+        Task {
+            await fetchClosetItems()
+        }
+    }
+
+    private func fetchClosetItems() async {
+        isLoadingCloset = true
+        defer { isLoadingCloset = false }
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        do {
+            let result = try await closetClient.get(uid: uid, itemType: nil)
+            switch result {
+            case .success(let response):
+                self.closetItems = response.items.filter {
+                    $0.item_type == "トップス" || $0.item_type == "ボトムス"
+                }
+            case .failure:
+                break
+            }
+        } catch {}
+    }
+
+    func selectAndRecommend(closetItem: ClosetItem) async {
+        guard let dateID = pickerTargetDateID else { return }
+        selectCoordinateItem = SelectCoordinateItem(
+            gender: selectCoordinateItem?.gender ?? "men",
+            input_type: closetItem.item_type,
+            category: closetItem.category ?? closetItem.item_type,
+            text: [closetItem.color, closetItem.category].compactMap { $0 }.joined(separator: ", "),
+            image_url: closetItem.image_url
+        )
+        await addCoordinateRandom(for: dateID)
     }
 }

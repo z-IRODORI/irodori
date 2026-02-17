@@ -44,9 +44,7 @@ struct HomeView: View {
                         coordinatesForDate: { dateID in viewModel.coordinates(for: dateID) },
                         isLoadingForDate: { dateID in viewModel.isLoading(for: dateID) },
                         onAddCoordinateRandom: { dateID in
-                            Task {
-                                await viewModel.addCoordinateRandom(for: dateID)
-                            }
+                            viewModel.showItemPicker(for: dateID)
                         },
                         onAddCoordinateByItem: { dateID in
                             Task {
@@ -106,6 +104,20 @@ struct HomeView: View {
             Task {
                 await viewModel.onAppear()
             }
+        }
+        .sheet(isPresented: Binding(
+            get: { viewModel.showingItemPicker },
+            set: { viewModel.showingItemPicker = $0 }
+        )) {
+            ClosetItemPickerView(
+                closetItems: viewModel.closetItems,
+                isLoading: viewModel.isLoadingCloset,
+                onSelect: { closetItem in
+                    Task {
+                        await viewModel.selectAndRecommend(closetItem: closetItem)
+                    }
+                }
+            )
         }
         .background(.gray.opacity(0.08))
         .overlay(alignment: .bottom) {
