@@ -79,6 +79,7 @@ private struct CoordinateCardView: View {
     @State private var isFlipped = false
     @State private var currentCoordinatePage = 0  // コーディネートのページ
     @State private var currentItemPage = 0        // アイテムリストのページ
+    @State private var isTransitioning = false    // コーディネート切り替え中のローディング
 
     // 現在のコーディネート
     private var currentCoordinate: CoordinateRecommend? {
@@ -277,12 +278,14 @@ private struct CoordinateCardView: View {
 
     private func goToPreviousCoordinate() {
         if currentCoordinatePage > 0 {
+            isTransitioning = true
             currentCoordinatePage -= 1
         }
     }
 
     private func goToNextCoordinate() {
         if currentCoordinatePage < coordinates.count - 1 {
+            isTransitioning = true
             currentCoordinatePage += 1
         }
     }
@@ -333,10 +336,19 @@ private struct CoordinateCardView: View {
 
     @ViewBuilder
     private func coordinateImageView(path: String) -> some View {
-        FirebaseStorageImage(path: path)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .aspectRatio(contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+        ZStack {
+            FirebaseStorageImage(path: path, onLoaded: { isTransitioning = false })
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .aspectRatio(contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            if isTransitioning {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
     }
 
     @ViewBuilder

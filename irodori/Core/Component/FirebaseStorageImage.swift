@@ -11,15 +11,17 @@ import FirebaseAuth
 struct FirebaseStorageImage: View {
     let path: String
     let storageClient: FirebaseStorageClientProtocol
+    var onLoaded: (() -> Void)? = nil
 
     @State private var uiImage: UIImage?
     @State private var isLoading = false
     @State private var error: Error?
     @State private var authRetryCount = 0
 
-    init(path: String, storageClient: FirebaseStorageClientProtocol = FirebaseStorageClient()) {
+    init(path: String, storageClient: FirebaseStorageClientProtocol = FirebaseStorageClient(), onLoaded: (() -> Void)? = nil) {
         self.path = path
         self.storageClient = storageClient
+        self.onLoaded = onLoaded
 
         // 初期化時に画像キャッシュをチェック
         if let cachedImage = UIImageCache.shared.getImage(for: path) {
@@ -67,6 +69,7 @@ struct FirebaseStorageImage: View {
             self.uiImage = cachedImage
             self.isLoading = false
             self.error = nil
+            onLoaded?()
             return
         }
 
@@ -100,6 +103,7 @@ struct FirebaseStorageImage: View {
                 self.error = nil
                 // 画像をキャッシュに保存
                 UIImageCache.shared.setImage(downloadedImage, for: path)
+                onLoaded?()
             } else {
                 self.error = NSError(domain: "ImageError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to decode image"])
             }
