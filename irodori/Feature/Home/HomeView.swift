@@ -11,6 +11,7 @@ struct HomeView: View {
 //    @State var viewModel: HomeViewModel = .init(apiClient: MockHomeClient())
     @State var viewModel: HomeViewModel = .init(apiClient: HomeClient())
     @State private var plannerViewModel: PlannerViewModel = .init()
+    @State private var showAllTags = false
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -86,11 +87,24 @@ struct HomeView: View {
 
                 // これまでのタグ
                 VStack(spacing: 12) {
-                    Text("これまでのタグ")
-                        .font(.system(size: 20, weight: .bold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 12) {
+                        Text("これまでのタグ")
+                            .font(.system(size: 20, weight: .bold))
+                        if let tags = viewModel.homeResponse.tags, tags.count > 8 {
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showAllTags.toggle()
+                                }
+                            }) {
+                                Text(showAllTags ? "閉じる" : "すべて見る")
+                                    .font(.system(size: 14, weight: .regular))
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     if let tags = viewModel.homeResponse.tags {
-                        TagsView(tags: tags, tagTextColor: .black, borderColor: .gray, tagFont: .system(size: 14, weight: .regular))
+                        let displayedTags = showAllTags ? tags : Array(tags.prefix(8))
+                        TagsView(tags: displayedTags, tagTextColor: .black, borderColor: .gray, tagFont: .system(size: 14, weight: .regular))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         Text("タグが存在しません")
