@@ -21,10 +21,15 @@ struct HomeView: View {
                 RecentCoordinates(recentCoordinates: viewModel.homeResponse.recent_coordinates)
                     .padding(.horizontal, -24)
 
-                VStack(spacing: 12) {
+                VStack(spacing: 24) {
                     Text("コーデ提案")
                         .font(.system(size: 20, weight: .bold))
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("3日間分のコーデを提案します。過去に登録したアイテムやコーデから提案します。")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(.gray)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, -18)
 //                    WeeklyPlannerContent(
 //                        calendarList: plannerViewModel.calendarList,
 //                        selectedDateID: $plannerViewModel.selectedDateID,
@@ -38,17 +43,22 @@ struct HomeView: View {
                         calendarList: plannerViewModel.calendarList,
                         selectedDateID: $plannerViewModel.selectedDateID,
                         relativeDateText: plannerViewModel.relativeDateText,
-                        selectCoordinateItem: viewModel.selectCoordinateItem,
+                        selectCoordinateItemForDate: { dateID in viewModel.selectCoordinateItem(for: dateID) },
                         onSelectDate: { id in plannerViewModel.selectDate(id: id) },
                         isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) },
                         coordinatesForDate: { dateID in viewModel.coordinates(for: dateID) },
                         isLoadingForDate: { dateID in viewModel.isLoading(for: dateID) },
                         onAddCoordinateRandom: { dateID in
-                            viewModel.showItemPicker(for: dateID)
-                        },
-                        onAddCoordinateByItem: { dateID in
                             Task {
                                 await viewModel.addCoordinateByItem(for: dateID)
+                            }
+                        },
+                        onAddCoordinateByItem: { dateID in
+                            viewModel.showItemPicker(for: dateID)
+                        },
+                        onChangeItem: {
+                            if let dateID = plannerViewModel.selectedDateID {
+                                viewModel.showItemPicker(for: dateID)
                             }
                         }
                     )
@@ -94,13 +104,6 @@ struct HomeView: View {
             .padding(.horizontal, 24)
         }
         .onAppear {
-            viewModel.setCoordinateItem(
-                gender: "men",
-                input_type: "トップス",
-                category: "ホワイト_長袖Tシャツ",
-                text: "白色, ホワイト, 長袖Tシャツ",
-                image_url: "https://fashionsnap-assets.com/asset/format=auto,width=800/article/images/2023/11/zozotown-bobobo-bobo-bobo-collaboration-011.jpg"
-            )
             Task {
                 await viewModel.onAppear()
             }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 @MainActor
 @Observable
@@ -14,7 +15,7 @@ final class HomeViewModel {
     var coordinatesByDate: [Int: [CoordinateRecommend]] = [:]
     var loadingDateIDs: Set<Int> = []
     var recentCoordinateAnalysis: String = ""
-    var selectCoordinateItem: SelectCoordinateItem?
+    var selectCoordinateItemsByDate: [Int: SelectCoordinateItem] = [:]
 
     // クローゼットアイテムピッカー
     var closetItems: [ClosetItem] = []
@@ -26,17 +27,21 @@ final class HomeViewModel {
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
     let analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol
     let closetClient: ClosetClientProtocol
+    private let plannerCacheRepository: HomePlannerCacheRepositoryProtocol
 
     init(
         apiClient: HomeClientProtocol = MockHomeClient(),
         coordinateRecommendClient: CoordinateRecommendClientProtocol = CoordinateRecommendClient(),//MockCoordinateRecommendClient()
         analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol = AnalyzeRecentCoordinateClient(),
-        closetClient: ClosetClientProtocol = ClosetClient()
+        closetClient: ClosetClientProtocol = ClosetClient(),
+        plannerCacheRepository: HomePlannerCacheRepositoryProtocol = HomePlannerCacheRepository()
     ) {
         self.apiClient = apiClient
         self.coordinateRecommendClient = coordinateRecommendClient
         self.analyzeRecentCoordinateClient = analyzeRecentCoordinateClient
         self.closetClient = closetClient
+        self.plannerCacheRepository = plannerCacheRepository
+        loadPlannerCache()
     }
 
     func onAppear() async {
@@ -75,8 +80,13 @@ final class HomeViewModel {
         }
     }
 
+    func selectCoordinateItem(for dateID: Int) -> SelectCoordinateItem? {
+        return selectCoordinateItemsByDate[dateID]
+    }
+
     func addCoordinateRandom(for dateID: Int) async {
-        guard let item = selectCoordinateItem else { return }
+        guard let item = selectCoordinateItemsByDate[dateID] else { return }
+        coordinatesByDate.removeValue(forKey: dateID)
         loadingDateIDs.insert(dateID)
         defer { loadingDateIDs.remove(dateID) }
 
@@ -94,6 +104,7 @@ final class HomeViewModel {
             case .success(let response):
                 // APIから複数のコーディネートを全て保存
                 self.coordinatesByDate[dateID] = response.recommend_coordinates
+                savePlannerCache(for: dateID)
             case .failure:
                 // エラーハンドリング
                 break
@@ -104,29 +115,22 @@ final class HomeViewModel {
     }
 
     func addCoordinateByItem(for dateID: Int) async {
+        let recentCoordinates = homeResponse.recent_coordinates
+        guard !recentCoordinates.isEmpty else { return }
+
+        coordinatesByDate.removeValue(forKey: dateID)
         loadingDateIDs.insert(dateID)
-        defer { loadingDateIDs.remove(dateID) }
 
-        do {
-            let result = try await coordinateRecommendClient.post(
-                gender: "men",
-                inputType: "アウター",
-                category: "ジーンズジャケット",
-                text: "ダメージジーンズのジャケット",
-                numOutfits: 3,
-                numCandidates: 5
-            )
+        // ランダム選択の演出のための待機
+        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5秒
 
-            switch result {
-            case .success(let response):
-                // APIから複数のコーディネートを全て保存
-                self.coordinatesByDate[dateID] = response.recommend_coordinates
-            case .failure:
-                // エラーハンドリング
-                break
+        loadingDateIDs.remove(dateID)
+
+        if let finalCoord = recentCoordinates.randomElement() {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                coordinatesByDate[dateID] = [CoordinateRecommend(fromRecent: finalCoord)]
             }
-        } catch {
-            // エラーハンドリング
+            savePlannerCache(for: dateID)
         }
     }
 
@@ -138,8 +142,29 @@ final class HomeViewModel {
         return coordinatesByDate[dateID] ?? []
     }
 
-    func setCoordinateItem(gender: String, input_type: String, category: String, text: String, image_url: String? = nil) {
-        selectCoordinateItem = .init(gender: gender, input_type: input_type, category: category, text: text, image_url: image_url)
+    // MARK: - Planner Cache
+
+    private func loadPlannerCache() {
+        for dateID in 0..<3 {
+            let dateString = HomePlannerCacheRepository.dateString(for: dateID)
+            guard let cache = plannerCacheRepository.load(dateString: dateString) else { continue }
+            if !cache.coordinates.isEmpty {
+                coordinatesByDate[dateID] = cache.coordinates
+            }
+            if let item = cache.selectedItem {
+                selectCoordinateItemsByDate[dateID] = item
+            }
+        }
+    }
+
+    private func savePlannerCache(for dateID: Int) {
+        let dateString = HomePlannerCacheRepository.dateString(for: dateID)
+        let cache = PlannerDayCache(
+            dateString: dateString,
+            coordinates: coordinatesByDate[dateID] ?? [],
+            selectedItem: selectCoordinateItemsByDate[dateID]
+        )
+        plannerCacheRepository.save(cache)
     }
 
     // MARK: - Closet Item Picker
@@ -172,8 +197,8 @@ final class HomeViewModel {
 
     func selectAndRecommend(closetItem: ClosetItem) async {
         guard let dateID = pickerTargetDateID else { return }
-        selectCoordinateItem = SelectCoordinateItem(
-            gender: selectCoordinateItem?.gender ?? "men",
+        selectCoordinateItemsByDate[dateID] = SelectCoordinateItem(
+            gender: selectCoordinateItemsByDate[dateID]?.gender ?? "men",
             input_type: closetItem.item_type,
             category: closetItem.category ?? closetItem.item_type,
             text: [closetItem.color, closetItem.category].compactMap { $0 }.joined(separator: ", "),

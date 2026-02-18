@@ -98,6 +98,17 @@ struct ItemDetail: Codable, Hashable {
     let image_paths: [String]
 }
 
+extension CoordinateRecommend {
+    init(fromRecent recentCoordinate: RecentCoordinate) {
+        self.coordinate_image_path = recentCoordinate.image_url
+        self.outer = nil
+        self.tops = nil
+        self.bottoms = nil
+        self.shoes = nil
+        self.accessories = nil
+    }
+}
+
 extension CoordinateRecommendResponse {
     static func mock() -> CoordinateRecommendResponse {
         return CoordinateRecommendResponse(

@@ -11,13 +11,14 @@ struct ThreeDaysPlanner: View {
     let calendarList: [CalendarData]
     @Binding var selectedDateID: Int?
     let relativeDateText: String
-    let selectCoordinateItem: SelectCoordinateItem?
+    let selectCoordinateItemForDate: (Int) -> SelectCoordinateItem?
     let onSelectDate: (Int) -> Void
     let isCurrentMonth: (Date) -> Bool
     let coordinatesForDate: (Int) -> [CoordinateRecommend]
     let isLoadingForDate: (Int) -> Bool
     let onAddCoordinateRandom: (Int) -> Void
     let onAddCoordinateByItem: (Int) -> Void
+    let onChangeItem: () -> Void
 
     // アニメーション用
     @Namespace private var calendarAnimation
@@ -38,12 +39,19 @@ struct ThreeDaysPlanner: View {
             .pickerStyle(.segmented)
             .padding(.horizontal, 24)
 
-            if let item = selectCoordinateItem {
-                Text("選択したアイテム")
-                    .font(.system(size: 14, weight: .bold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 12)
+            if let selectedID = selectedDateID, let item = selectCoordinateItemForDate(selectedID) {
+                HStack(spacing: 12) {
+                    Text("選択したアイテム")
+                        .font(.system(size: 14, weight: .bold))
+                    Button(action: onChangeItem) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 HStack(spacing: 12) {
                     CachedAsyncImage(
                         url: item.image_url.flatMap { URL(string: $0) }
@@ -108,6 +116,7 @@ private struct CoordinateCardView: View {
     @State private var currentCoordinatePage = 0  // コーディネートのページ
     @State private var currentItemPage = 0        // アイテムリストのページ
     @State private var isTransitioning = false    // コーディネート切り替え中のローディング
+    @State private var pulseScale: CGFloat = 1.0  // ローディングパルスアニメーション用
 
     // 現在のコーディネート
     private var currentCoordinate: CoordinateRecommend? {
@@ -123,7 +132,7 @@ private struct CoordinateCardView: View {
             if let coordinate = currentCoordinate {
                 VStack(spacing: 4) {
                     // タイトル + ページングボタン
-                    pagingHeader(title: isFlipped ? "コーディネート" : "アイテム", coordinate: coordinate)
+                    pagingHeader(title: isFlipped ? "アイテム" : "コーディネート", coordinate: coordinate)
                     // ページインジケーター
                     pagingIndicator(coordinate: coordinate)
                     coordinateBackView(coordinate: coordinate)
@@ -134,10 +143,24 @@ private struct CoordinateCardView: View {
 
             // ローディング状態
             if isLoading {
-                VStack {
+                VStack(spacing: 16) {
                     Spacer()
-                    ProgressView()
+                    Image(systemName: "rectangle.stack.fill")
+                        .font(.system(size: 52))
+                        .foregroundStyle(.gray.opacity(0.35))
+                        .scaleEffect(pulseScale)
+                    Text("コーデを選択中...")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
                     Spacer()
+                }
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                        pulseScale = 1.18
+                    }
+                }
+                .onDisappear {
+                    pulseScale = 1.0
                 }
             }
 
@@ -223,6 +246,8 @@ private struct CoordinateCardView: View {
             // コーディネート全体画像
             coordinateImageView(path: coordinate.coordinate_image_path)
                 .padding(20)
+                .id(coordinate.coordinate_image_path)
+                .transition(.scale(scale: 0.85).combined(with: .opacity))
                 .opacity(isFlipped ? 0 : 1)   // 裏表で表示の有無を切り替える
         }
     }
@@ -365,10 +390,23 @@ private struct CoordinateCardView: View {
     @ViewBuilder
     private func coordinateImageView(path: String) -> some View {
         ZStack {
-            FirebaseStorageImage(path: path, onLoaded: { isTransitioning = false })
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .aspectRatio(contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            Group {
+                if path.hasPrefix("http") {
+                    CachedAsyncImage(url: URL(string: path)) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        Color.gray.opacity(0.15)
+                    }
+                    .onAppear { isTransitioning = false }
+                } else {
+                    FirebaseStorageImage(path: path, onLoaded: { isTransitioning = false })
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .aspectRatio(contentMode: .fit)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
 
             if isTransitioning {
                 ProgressView()

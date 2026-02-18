@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct SelectCoordinateItem {
+struct SelectCoordinateItem: Codable {
     let gender: String
     let input_type: String
     let category: String
