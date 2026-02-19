@@ -19,6 +19,7 @@ struct ThreeDaysPlanner: View {
     let onAddCoordinateRandom: (Int) -> Void
     let onAddCoordinateByItem: (Int) -> Void
     let onChangeItem: () -> Void
+    let onReset: (Int) -> Void
 
     // アニメーション用
     @Namespace private var calendarAnimation
@@ -98,19 +99,21 @@ struct ThreeDaysPlanner: View {
             coordinates: coordinatesForDate(item.id),
             isLoading: isLoadingForDate(item.id),
             onAddCoordinateRandom: { onAddCoordinateRandom(item.id) },
-            onAddCoordinateByItem: { onAddCoordinateByItem(item.id) }
+            onAddCoordinateByItem: { onAddCoordinateByItem(item.id) },
+            onReset: { onReset(item.id) }
         )
     }
 }
 
 // MARK: - Coordinate Card with Flip Animation
 
-private struct CoordinateCardView: View {
+struct CoordinateCardView: View {
     let dayString: String
     let coordinates: [CoordinateRecommend]
     let isLoading: Bool
     let onAddCoordinateRandom: () -> Void
     let onAddCoordinateByItem: () -> Void
+    let onReset: () -> Void
 
     @State private var isFlipped = false
     @State private var currentCoordinatePage = 0  // コーディネートのページ
@@ -256,35 +259,51 @@ private struct CoordinateCardView: View {
 
     @ViewBuilder
     private func pagingHeader(title: String, coordinate: CoordinateRecommend) -> some View {
-        HStack(spacing: 12) {
-            // 左ページングボタン
+        ZStack {
+            // ページングコントロール（中央固定）
+            HStack(spacing: 12) {
+                // 左ページングボタン
+                Button {
+                    withAnimation {
+                        goToPreviousCoordinate()
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(canGoToPreviousCoordinate() ? .black : .gray.opacity(0.3))
+                        .frame(width: 28, height: 28)
+                }
+                .disabled(!canGoToPreviousCoordinate())
+
+                Text(title)
+                    .fontWeight(.bold)
+
+                // 右ページングボタン
+                Button {
+                    withAnimation {
+                        goToNextCoordinate()
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(canGoToNextCoordinate() ? .black : .gray.opacity(0.3))
+                        .frame(width: 28, height: 28)
+                }
+                .disabled(!canGoToNextCoordinate())
+            }
+
+            // リセットボタン（右端）
             Button {
-                withAnimation {
-                    goToPreviousCoordinate()
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    onReset()
                 }
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(canGoToPreviousCoordinate() ? .black : .gray.opacity(0.3))
-                    .frame(width: 28, height: 28)
+                Text("リセット")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.secondary)
             }
-            .disabled(!canGoToPreviousCoordinate())
-
-            Text(title)
-                .fontWeight(.bold)
-
-            // 右ページングボタン
-            Button {
-                withAnimation {
-                    goToNextCoordinate()
-                }
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(canGoToNextCoordinate() ? .black : .gray.opacity(0.3))
-                    .frame(width: 28, height: 28)
-            }
-            .disabled(!canGoToNextCoordinate())
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.trailing, 20)
         }
     }
 

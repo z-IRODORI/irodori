@@ -23,14 +23,14 @@ struct HomeView: View {
                     .padding(.horizontal, -24)
 
                 VStack(spacing: 24) {
-                    Text("コーデ提案")
-                        .font(.system(size: 20, weight: .bold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("3日間分のコーデを提案します。過去に登録したアイテムやコーデから提案します。")
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(.gray)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, -18)
+//                    Text("コーデ提案")
+//                        .font(.system(size: 20, weight: .bold))
+//                        .frame(maxWidth: .infinity, alignment: .leading)
+//                    Text("3日間分のコーデを提案します。過去に登録したアイテムやコーデから提案します。")
+//                        .font(.system(size: 14, weight: .regular))
+//                        .foregroundStyle(.gray)
+//                        .frame(maxWidth: .infinity, alignment: .leading)
+//                        .padding(.top, -18)
 //                    WeeklyPlannerContent(
 //                        calendarList: plannerViewModel.calendarList,
 //                        selectedDateID: $plannerViewModel.selectedDateID,
@@ -40,30 +40,36 @@ struct HomeView: View {
 //                    )
 //                    .padding(.horizontal, -24)
 
-                    ThreeDaysPlanner(
-                        calendarList: plannerViewModel.calendarList,
-                        selectedDateID: $plannerViewModel.selectedDateID,
-                        relativeDateText: plannerViewModel.relativeDateText,
-                        selectCoordinateItemForDate: { dateID in viewModel.selectCoordinateItem(for: dateID) },
-                        onSelectDate: { id in plannerViewModel.selectDate(id: id) },
-                        isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) },
-                        coordinatesForDate: { dateID in viewModel.coordinates(for: dateID) },
-                        isLoadingForDate: { dateID in viewModel.isLoading(for: dateID) },
-                        onAddCoordinateRandom: { dateID in
-                            Task {
-                                await viewModel.addCoordinateByItem(for: dateID)
-                            }
-                        },
-                        onAddCoordinateByItem: { dateID in
-                            viewModel.showItemPicker(for: dateID)
-                        },
-                        onChangeItem: {
-                            if let dateID = plannerViewModel.selectedDateID {
-                                viewModel.showItemPicker(for: dateID)
-                            }
-                        }
-                    )
-                    .padding(.horizontal, -24)
+//                    ThreeDaysPlanner(
+//                        calendarList: plannerViewModel.calendarList,
+//                        selectedDateID: $plannerViewModel.selectedDateID,
+//                        relativeDateText: plannerViewModel.relativeDateText,
+//                        selectCoordinateItemForDate: { dateID in viewModel.selectCoordinateItem(for: dateID) },
+//                        onSelectDate: { id in plannerViewModel.selectDate(id: id) },
+//                        isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) },
+//                        coordinatesForDate: { dateID in viewModel.coordinates(for: dateID) },
+//                        isLoadingForDate: { dateID in viewModel.isLoading(for: dateID) },
+//                        onAddCoordinateRandom: { dateID in
+//                            Task {
+//                                await viewModel.addCoordinateByItem(for: dateID)
+//                            }
+//                        },
+//                        onAddCoordinateByItem: { dateID in
+//                            viewModel.showItemPicker(for: dateID)
+//                        },
+//                        onChangeItem: {
+//                            if let dateID = plannerViewModel.selectedDateID {
+//                                viewModel.showItemPicker(for: dateID)
+//                            }
+//                        },
+//                        onReset: { dateID in
+//                            viewModel.resetCoordinate(for: dateID)
+//                        }
+//                    )
+//                    .padding(.horizontal, -24)
+
+                    TomorrowPlannerView()
+                        .padding(.horizontal, -24)
                 }
 
                 // コーデの分析

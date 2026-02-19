@@ -134,6 +134,12 @@ final class HomeViewModel {
         }
     }
 
+    func resetCoordinate(for dateID: Int) {
+        coordinatesByDate.removeValue(forKey: dateID)
+        selectCoordinateItemsByDate.removeValue(forKey: dateID)
+        savePlannerCache(for: dateID)
+    }
+
     func isLoading(for dateID: Int) -> Bool {
         return loadingDateIDs.contains(dateID)
     }
