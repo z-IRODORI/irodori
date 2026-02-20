@@ -259,52 +259,35 @@ struct CoordinateCardView: View {
 
     @ViewBuilder
     private func pagingHeader(title: String, coordinate: CoordinateRecommend) -> some View {
-        ZStack {
-            // ページングコントロール（中央固定）
-            HStack(spacing: 12) {
-                // 左ページングボタン
-                Button {
-                    withAnimation {
-                        goToPreviousCoordinate()
-                    }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(canGoToPreviousCoordinate() ? .black : .gray.opacity(0.3))
-                        .frame(width: 28, height: 28)
-                }
-                .disabled(!canGoToPreviousCoordinate())
+        // 左右に同幅の領域を置き、中央のページングコントロールを常に中央に固定する
+        let sideWidth: CGFloat = 60
 
-                Text(title)
-                    .fontWeight(.bold)
-
-                // 右ページングボタン
-                Button {
-                    withAnimation {
-                        goToNextCoordinate()
-                    }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(canGoToNextCoordinate() ? .black : .gray.opacity(0.3))
-                        .frame(width: 28, height: 28)
-                }
-                .disabled(!canGoToNextCoordinate())
-            }
-
-            // リセットボタン（右端）
+        // 中央：ページングコントロール
+        HStack(spacing: 12) {
             Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    onReset()
-                }
+                withAnimation { goToPreviousCoordinate() }
             } label: {
-                Text("リセット")
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(canGoToPreviousCoordinate() ? .black : .gray.opacity(0.3))
+                    .frame(width: 28, height: 28)
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.trailing, 20)
+            .disabled(!canGoToPreviousCoordinate())
+
+            Text(title)
+                .fontWeight(.bold)
+
+            Button {
+                withAnimation { goToNextCoordinate() }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(canGoToNextCoordinate() ? .black : .gray.opacity(0.3))
+                    .frame(width: 28, height: 28)
+            }
+            .disabled(!canGoToNextCoordinate())
         }
+        .padding(.horizontal, 16)
     }
 
     @ViewBuilder

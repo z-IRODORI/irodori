@@ -20,7 +20,7 @@ struct TomorrowPlannerView: View {
                     Text("明日のコーデ提案")
                         .font(.system(size: 20, weight: .bold))
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("明日のコーデを提案します。過去に登録したアイテムやコーデから提案します。")
+                    Text("過去に登録したアイテムやコーデから提案します。")
                         .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(.gray)
                         .frame(maxWidth: .infinity, alignment: .leading)

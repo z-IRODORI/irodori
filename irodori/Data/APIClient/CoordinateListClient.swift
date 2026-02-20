@@ -14,9 +14,9 @@ protocol CoordinateListClientProtocol {
 final class CoordinateListClient: CoordinateListClientProtocol {
     func get(uid: String, year: Int, month: Int) async throws -> Result<[CoordinateListResponse], Error> {
 //        let baseURL = "https://nfzoiluhpi.execute-api.ap-northeast-1.amazonaws.com/prod/"
-        let baseURL = "https://irodori.click"
+        let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "api/coordinate/list/\(uid)"
-        let url = URL(string: "\(baseURL)/\(endpoint)/?page=0&year=\(year)&month=\(month)")!
+        let url = URL(string: "\(baseURL)/\(endpoint)?year=\(year)&month=\(month)")!
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"

@@ -9,7 +9,7 @@ struct MainTabView: View {
         NavigationStack(path: $path) {
             ZStack(alignment: .bottom) {
                 ZStack {
-                    HomeView()
+                    HomeView(path: $path)
                         .opacity(viewModel.selectedTab == .home ? 1 : 0)
 
                     PlannerView()
