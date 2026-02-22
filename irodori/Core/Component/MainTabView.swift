@@ -15,7 +15,7 @@ struct MainTabView: View {
                     PlannerView()
                         .opacity(viewModel.selectedTab == .planner ? 1 : 0)
 
-                    ProfileView()
+                    ProfileView(path: $path)
                         .opacity(viewModel.selectedTab == .profile ? 1 : 0)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -109,7 +109,6 @@ struct CalendarView: View {
                 } else {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.5))
                             .aspectRatio(3/4, contentMode: .fit)
                             .frame(maxWidth: .infinity)
                         ProgressView()

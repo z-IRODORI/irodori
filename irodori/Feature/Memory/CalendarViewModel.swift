@@ -32,6 +32,7 @@ final class CalendarViewModel {
                 let result = try await apiClient.get(uid: uid, year: month.year, month: month.monthOfTheYear)
                 switch result {
                 case .success(let response):
+                    print(response)
                     coordinateListResponses.append(response)
                 case .failure(let error):
                     print(error)

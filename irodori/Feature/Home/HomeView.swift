@@ -128,6 +128,9 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 24)
             }
+            .refreshable {
+                await viewModel.onAppear()
+            }
         }
         .onAppear {
             Task {
@@ -191,9 +194,6 @@ struct HomeView: View {
                     path.append(.calendar)
                 }) {
                     Image(systemName: "calendar")
-                        .resizable()
-                        .frame(width: 25, height: 25)
-                        .foregroundStyle(.black)
                 }
 
                 Button(action: {
@@ -201,11 +201,10 @@ struct HomeView: View {
                     // オンボーディング画面表示
                 }) {
                     Image(systemName: "questionmark.circle")
-                        .resizable()
-                        .frame(width: 25, height: 25)
-                        .foregroundStyle(.black)
                 }
             }
+            .font(.system(size: 20))
+            .foregroundStyle(.black)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .frame(maxWidth: .infinity)

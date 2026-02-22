@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProfileView: View {
+    @Binding var path: [ViewType]
     @State private var viewModel = ProfileViewModel()
     @State private var selectedTab = 0
     @State private var hasLoadedItems = false
@@ -34,6 +35,9 @@ struct ProfileView: View {
                 }
                 .padding(.top, 10)
             }
+            .refreshable {
+                await viewModel.loadItems()
+            }
         }
         .background(Color.white)
         .task {
@@ -53,9 +57,13 @@ struct ProfileView: View {
             Spacer()
 
             HStack(spacing: 20) {
-                Button(action: {}) { Image(systemName: "calendar") }
-                Button(action: {}) { Image(systemName: "clock.arrow.circlepath") }
-                Button(action: {}) { Image(systemName: "line.3.horizontal") }
+                Button(action: {
+                    path.append(.calendar)
+                }) {
+                    Image(systemName: "calendar")
+                }
+//                Button(action: {}) { Image(systemName: "clock.arrow.circlepath") }
+//                Button(action: {}) { Image(systemName: "line.3.horizontal") }
             }
             .font(.system(size: 20))
             .foregroundStyle(.black)
