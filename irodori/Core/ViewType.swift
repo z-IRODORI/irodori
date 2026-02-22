@@ -12,6 +12,7 @@ enum ViewType: Hashable {
     case calendar
     case coordinateReview(CoordinateReviewParams)
     case coordinateDetail(CoordinateDetailParams)
+    case profileEdit
 
     struct CoordinateReviewParams: Hashable {
         let image: UIImage?

@@ -50,9 +50,62 @@ struct MainTabView: View {
                     )
                 case .camera:
                     CameraView(cameraViewModel: .init(), path: $path)
+                case .profileEdit:
+                    ProfileEditView(
+                        path: $path,
+                        profileInfo: getProfileInfo()
+                    )
                 }
             }
         }
+    }
+
+    private func getProfileInfo() -> ProfileInfo? {
+        // 既存のプロフィール情報を取得を試みる
+        if let data = UserDefaults.standard.data(forKey: UserDefaultsKey.profileInfo.rawValue) {
+            do {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                return try decoder.decode(ProfileInfo.self, from: data)
+            } catch {
+                print("Failed to decode profile info: \(error)")
+                // デコードエラーが発生した場合、古いデータを削除
+                UserDefaults.standard.removeObject(forKey: UserDefaultsKey.profileInfo.rawValue)
+            }
+        }
+
+        // プロフィール情報がない、またはデコードに失敗した場合、デフォルトプロフィールを作成
+        guard let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else {
+            return nil
+        }
+
+        // User情報からデフォルトプロフィールを作成
+        var username = uid
+        if let userData = UserDefaults.standard.data(forKey: UserDefaultsKey.userInfo.rawValue),
+           let user = try? JSONDecoder().decode(User.self, from: userData) {
+            username = user.username
+        }
+
+        let defaultProfile = ProfileInfo(
+            id: uid,
+            username: username,
+            displayName: username,
+            profileImageUrl: nil,
+            createdAt: Date(),
+            lastLoginAt: nil
+        )
+
+        // デフォルトプロフィールを保存
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(defaultProfile)
+            UserDefaults.standard.set(data, forKey: UserDefaultsKey.profileInfo.rawValue)
+        } catch {
+            print("Failed to save default profile info: \(error)")
+        }
+
+        return defaultProfile
     }
 
     private var customTabBar: some View {

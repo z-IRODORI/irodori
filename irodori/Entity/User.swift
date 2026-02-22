@@ -32,3 +32,36 @@ struct User: Codable {
     var birthday: BirthDay
     var gender: Gender
 }
+
+struct ProfileInfo: Codable, Identifiable {
+    var id: String
+    var username: String
+    var displayName: String
+    var profileImageUrl: String?
+    var createdAt: Date
+    var lastLoginAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case username
+        case displayName = "display_name"
+        case profileImageUrl = "profile_image_url"
+        case createdAt = "created_at"
+        case lastLoginAt = "last_login_at"
+    }
+
+    var formattedCreatedAt: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年MM月dd日"
+        formatter.locale = Locale(identifier: "ja_JP")
+        return formatter.string(from: createdAt)
+    }
+
+    var formattedLastLoginAt: String? {
+        guard let lastLoginAt = lastLoginAt else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年MM月dd日"
+        formatter.locale = Locale(identifier: "ja_JP")
+        return formatter.string(from: lastLoginAt)
+    }
+}

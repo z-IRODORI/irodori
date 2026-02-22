@@ -12,6 +12,7 @@ enum UserDefaultsKey: String {
     case userId
     case gender
     case userInfo
+    case profileInfo
     case hasCompletedUserInfo
     case signUpDate
     case hasOnboarding

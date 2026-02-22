@@ -86,7 +86,6 @@ struct TomorrowPlannerView: View {
                 .frame(height: 520)
             }
             .padding(.horizontal, 24)
-            .padding(.top, 24)
         }
         .navigationBarHidden(true)
         .task {

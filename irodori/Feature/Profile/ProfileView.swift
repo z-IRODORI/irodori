@@ -1,10 +1,12 @@
 import SwiftUI
+import PhotosUI
 
 struct ProfileView: View {
     @Binding var path: [ViewType]
     @State private var viewModel = ProfileViewModel()
     @State private var selectedTab = 0
     @State private var hasLoadedItems = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
 
     let itemSpacing: CGFloat = 4
     // グリッドのレイアウト設定 (3列)
@@ -24,7 +26,10 @@ struct ProfileView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 20) {
                     userProfileHeader
-                    actionButtons
+                    actionButton(title: "プロフィールを編集") {
+                        path.append(.profileEdit)
+                    }
+                    .padding(.horizontal, 20)
                     tabSegmentView
 
                     VStack(spacing: 16) {
@@ -46,12 +51,21 @@ struct ProfileView: View {
                 hasLoadedItems = true
             }
         }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            Task {
+                if let data = try? await newItem?.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    await viewModel.uploadProfileImage(uiImage)
+                }
+            }
+        }
+        .padding(.bottom, 100)
     }
 
     // MARK: - 1. headerNavigationBar
     private var headerNavigationBar: some View {
         HStack {
-            Text("dahama")
+            Text(viewModel.profileInfo?.username ?? "")
                 .font(.system(size: 24, weight: .bold))
 
             Spacer()
@@ -77,27 +91,58 @@ struct ProfileView: View {
         HStack(spacing: 20) {
             // プロフィール画像
             ZStack(alignment: .bottomTrailing) {
-                Image(.wolf) // Assets内の画像
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 80, height: 80)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.gray.opacity(0.1), lineWidth: 1))
+                Group {
+                    if let profileImageUrl = viewModel.profileInfo?.profileImageUrl,
+                       let url = URL(string: profileImageUrl) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            case .empty, .failure:
+                                Image(.wolf)
+                                    .resizable()
+                                    .scaledToFill()
+                            @unknown default:
+                                Image(.wolf)
+                                    .resizable()
+                                    .scaledToFill()
+                            }
+                        }
+                    } else {
+                        Image(.wolf)
+                            .resizable()
+                            .scaledToFill()
+                    }
+                }
+                .frame(width: 80, height: 80)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.gray.opacity(0.1), lineWidth: 1))
 
-                Image(systemName: "plus.circle.fill")
-                    .resizable()
-                    .frame(width: 22, height: 22)
-                    .background(Color.white.clipShape(Circle()))
-                    .foregroundStyle(.black)
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    Image(systemName: "plus.circle.fill")
+                        .resizable()
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.clipShape(Circle()))
+                        .foregroundStyle(.black)
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("だはま")
+                Text(viewModel.profileInfo?.displayName ?? "")
                     .font(.system(size: 18, weight: .bold))
 
-                HStack(spacing: 16) {
-                    statsColumn(value: "0", label: "フォロワー")
-                    statsColumn(value: "0", label: "フォロー中")
+                if let createdAt = viewModel.profileInfo?.formattedCreatedAt {
+                    Text("登録日: \(createdAt)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.gray)
+                }
+
+                if let lastLoginAt = viewModel.profileInfo?.formattedLastLoginAt {
+                    Text("最終ログイン: \(lastLoginAt)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.gray)
                 }
             }
             Spacer()
@@ -113,16 +158,18 @@ struct ProfileView: View {
     }
 
     // MARK: - 3. actionButtons
-    private var actionButtons: some View {
-        HStack(spacing: 12) {
-            actionButton(title: "プロフィールを編集")
-            actionButton(title: "プロフィールを共有")
-        }
-        .padding(.horizontal, 20)
-    }
+//    private var actionButtons: some View {
+//        HStack(spacing: 12) {
+//            actionButton(title: "プロフィールを編集")
+//            actionButton(title: "プロフィールを共有")
+//        }
+//        .padding(.horizontal, 20)
+//    }
 
-    private func actionButton(title: String) -> some View {
-        Button(action: {}) {
+    private func actionButton(title: String, action: @escaping () -> Void) -> some View {
+        Button(action: {
+            action()
+        }) {
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
                 .frame(maxWidth: .infinity)

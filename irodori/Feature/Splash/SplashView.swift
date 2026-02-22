@@ -68,6 +68,8 @@ struct SplashView: View {
                     EmptyView() // FirstTakePhotoView からは使用しない
                 case .coordinateDetail:
                     EmptyView() // FirstTakePhotoView からは使用しない
+                case .profileEdit:
+                    EmptyView() // FirstTakePhotoView からは使用しない
                 }
             }
             .onChange(of: path) { oldValue, newValue in
