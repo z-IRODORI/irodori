@@ -65,8 +65,11 @@ struct ProfileView: View {
     // MARK: - 1. headerNavigationBar
     private var headerNavigationBar: some View {
         HStack {
-            Text(viewModel.profileInfo?.username ?? "")
-                .font(.system(size: 24, weight: .bold))
+            Spacer()
+
+            Text("プロフィール")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.black)
 
             Spacer()
 

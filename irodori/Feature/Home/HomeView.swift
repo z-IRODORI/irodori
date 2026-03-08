@@ -26,6 +26,7 @@ struct HomeView: View {
                     // 直近のコーデが存在しない場合、コーデだけではなく分析やタグを表示できないので、それも踏まえてUIを考える
                     RecentCoordinates(recentCoordinates: viewModel.homeResponse.recent_coordinates)
                         .padding(.horizontal, -24)
+                        .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
 
                     VStack(spacing: 24) {
     //                    Text("コーデ提案")
@@ -84,12 +85,15 @@ struct HomeView: View {
                                 .resizable()
                                 .frame(width: 50, height: 50)
                                 .clipShape(Circle())
+                                .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
                             SpeechBubbleView(text: "これまでのコーデを分析しました")
+                                .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
                         }
                         if !viewModel.recentCoordinateAnalysis.isEmpty {
                             Text(.init(viewModel.recentCoordinateAnalysis))
                                 .font(.system(size: 16, weight: .regular))
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
                         } else {
                             ProgressView()
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -101,6 +105,7 @@ struct HomeView: View {
                         HStack(spacing: 12) {
                             Text("これまでのタグ")
                                 .font(.system(size: 20, weight: .bold))
+                                .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
                             if let tags = viewModel.homeResponse.tags, tags.count > 8 {
                                 Button(action: {
                                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -110,6 +115,7 @@ struct HomeView: View {
                                     Text(showAllTags ? "閉じる" : "すべて見る")
                                         .font(.system(size: 14, weight: .regular))
                                 }
+                                .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -117,10 +123,12 @@ struct HomeView: View {
                             let displayedTags = showAllTags ? tags : Array(tags.prefix(8))
                             TagsView(tags: displayedTags, tagTextColor: .black, borderColor: .gray, tagFont: .system(size: 14, weight: .regular))
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
                         } else {
                             Text("タグが存在しません")
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
                         }
                     }
 

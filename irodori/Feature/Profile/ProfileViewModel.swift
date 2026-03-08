@@ -20,6 +20,7 @@ final class ProfileViewModel {
     var isLoadingProfile = false
 
     private let closetClient: ClosetClientProtocol
+    private var loadTask: Task<Void, Never>?
 
     init(closetClient: ClosetClientProtocol = ClosetClient()) {
         self.closetClient = closetClient
@@ -42,28 +43,44 @@ final class ProfileViewModel {
     }
 
     func loadItems() async {
-        guard let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else {
-            errorMessage = "ユーザー情報が取得できませんでした"
-            return
-        }
+        // 前のタスクをキャンセル
+        loadTask?.cancel()
 
-        isLoading = true
-        errorMessage = nil
+        // 新しいタスクを作成
+        loadTask = Task {
+            // エラー状態をクリア
+            errorMessage = nil
 
-        do {
-            let result = try await closetClient.get(uid: uid, itemType: nil)
-
-            switch result {
-            case .success(let response):
-                closetItems = response.items
-            case .failure(let error):
-                errorMessage = error.errorDescription
+            guard let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else {
+                errorMessage = "ユーザー情報が取得できませんでした"
+                return
             }
-        } catch {
-            errorMessage = "通信エラーが発生しました"
+
+            isLoading = true
+
+            defer {
+                isLoading = false
+            }
+
+            do {
+                let result = try await closetClient.get(uid: uid, itemType: nil)
+
+                switch result {
+                case .success(let response):
+                    closetItems = response.items
+                    errorMessage = nil
+                case .failure(let error):
+                    errorMessage = error.errorDescription
+                }
+            } catch is CancellationError {
+                // タスクがキャンセルされた場合は何もしない（エラーメッセージを表示しない）
+                return
+            } catch {
+                errorMessage = "通信エラーが発生しました: \(error.localizedDescription)"
+            }
         }
 
-        isLoading = false
+        await loadTask?.value
     }
 
     // MARK: - Profile Management
@@ -80,7 +97,6 @@ final class ProfileViewModel {
             decoder.dateDecodingStrategy = .iso8601
             profileInfo = try decoder.decode(ProfileInfo.self, from: data)
         } catch {
-            print("Failed to decode profile info: \(error)")
             createDefaultProfile()
         }
     }
@@ -113,7 +129,7 @@ final class ProfileViewModel {
             UserDefaults.standard.set(data, forKey: UserDefaultsKey.profileInfo.rawValue)
             profileInfo = profile
         } catch {
-            print("Failed to save profile info: \(error)")
+            // エンコードエラー時は何もしない
         }
     }
 
@@ -162,7 +178,6 @@ final class ProfileViewModel {
             try data.write(to: fileURL)
             return fileURL
         } catch {
-            print("Failed to save image: \(error)")
             return nil
         }
     }

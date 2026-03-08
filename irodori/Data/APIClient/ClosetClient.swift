@@ -15,14 +15,18 @@ final class ClosetClient: ClosetClientProtocol {
     func get(uid: String, itemType: String?) async throws -> Result<ClosetResponse, HTTPError> {
         let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "api/closet"
-        let url = URL(string: "\(baseURL)/\(endpoint)")!
+        guard let url = URL(string: "\(baseURL)/\(endpoint)") else {
+            return .failure(.responseError)
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
         // クエリパラメータを追加
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return .failure(.responseError)
+        }
         var queryItems = [URLQueryItem(name: "user_id", value: uid)]
         if let itemType = itemType {
             queryItems.append(URLQueryItem(name: "item_type", value: itemType))
@@ -47,11 +51,13 @@ final class ClosetClient: ClosetClientProtocol {
                 let response = try JSONDecoder().decode(ClosetResponse.self, from: data)
                 return .success(response)
             } catch {
-                print("Decode error: \(error)")
                 return .failure(.decodeError)
             }
         } catch {
-            print(error.localizedDescription)
+            // キャンセルエラーの場合は特別に処理
+            if let urlError = error as? URLError, urlError.code == .cancelled {
+                throw CancellationError()
+            }
             return .failure(.responseError)
         }
     }

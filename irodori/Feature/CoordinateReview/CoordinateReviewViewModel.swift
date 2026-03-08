@@ -63,6 +63,7 @@ final class CoordinateReviewViewModel {
     private func coordinateReview() async {
         do {
             let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+            let startTime = CFAbsoluteTimeGetCurrent()
             let fashionReviewResponse: Result<FashionReviewResponse, HTTPError> = try await apiClient.post(
                 uid: uid,
                 image: coordinateImage.correctOrientation,
@@ -70,6 +71,9 @@ final class CoordinateReviewViewModel {
                 bottomsImage: bottomsUIImage,
                 purposeNum: nil//tag.number
             )
+            let endTime = CFAbsoluteTimeGetCurrent()
+            let elapsedTime = endTime - startTime
+            print("API処理時間: \(elapsedTime)秒")
 
             switch fashionReviewResponse {
             case .success(let fashionReview):

@@ -17,6 +17,10 @@ final class HomeViewModel {
     var recentCoordinateAnalysis: String = ""
     var selectCoordinateItemsByDate: [Int: SelectCoordinateItem] = [:]
 
+    // ローディング状態
+    var isLoadingHome: Bool = true
+    var isLoadingAnalysis: Bool = true
+
     // クローゼットアイテムピッカー
     var closetItems: [ClosetItem] = []
     var isLoadingCloset = false
@@ -45,6 +49,9 @@ final class HomeViewModel {
     }
 
     func onAppear() async {
+        isLoadingHome = true
+        defer { isLoadingHome = false }
+
         do {
             let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
             let result = try await apiClient.get(uid: uid)
@@ -64,6 +71,9 @@ final class HomeViewModel {
     }
 
     private func fetchRecentCoordinateAnalysis(uid: String) async {
+        isLoadingAnalysis = true
+        defer { isLoadingAnalysis = false }
+
         do {
             let result = try await analyzeRecentCoordinateClient.post(uid: uid, targetDays: 7)
 
