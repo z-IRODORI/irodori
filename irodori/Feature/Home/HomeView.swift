@@ -24,9 +24,18 @@ struct HomeView: View {
                 VStack(spacing: 40) {
                     // TODO: 直近のコーデが存在しない場合のUIを考える
                     // 直近のコーデが存在しない場合、コーデだけではなく分析やタグを表示できないので、それも踏まえてUIを考える
-                    RecentCoordinates(recentCoordinates: viewModel.homeResponse.recent_coordinates)
-                        .padding(.horizontal, -24)
-                        .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
+                    RecentCoordinates(
+                        recentCoordinates: viewModel.homeResponse.recent_coordinates,
+                        isEditMode: viewModel.isEditMode,
+                        onToggleEditMode: {
+                            viewModel.toggleEditMode()
+                        },
+                        onDeleteRequest: { coordinateId in
+                            viewModel.requestDelete(coordinateId: coordinateId)
+                        }
+                    )
+                    .padding(.horizontal, -24)
+                    .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
 
                     VStack(spacing: 24) {
     //                    Text("コーデ提案")
@@ -189,6 +198,27 @@ struct HomeView: View {
             .padding(.top, 24)
             .padding(.horizontal, 24)
             .background(.white)
+        }
+        .alert("コーディネートを削除", isPresented: $viewModel.showDeleteConfirmation) {
+            Button("キャンセル", role: .cancel) {
+                viewModel.coordinateToDelete = nil
+            }
+            Button("削除", role: .destructive) {
+                Task {
+                    await viewModel.deleteCoordinate()
+                }
+            }
+        } message: {
+            Text("このコーディネートを削除してもよろしいですか？")
+        }
+        .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+            }
         }
     }
 

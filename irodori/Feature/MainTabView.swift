@@ -118,6 +118,12 @@ struct MainTabView: View {
 
                 Spacer()
 
+                tabItem(image: "person", title: "相棒", isSelected: viewModel.selectedTab == .partner) {
+                    viewModel.selectedTab = .partner
+                }
+
+                Spacer()
+
                 // 中央プラスボタンの修正
                 plusButton {
                     isSheetPresented = true // タップでモーダルを表示
@@ -166,7 +172,10 @@ final class MainTabViewModel {
     var selectedTab: Tab = .home
 
     enum Tab {
-        case home, planner, profile
+        case home
+        case partner
+        case planner
+        case profile
     }
 }
 

@@ -36,7 +36,12 @@ struct CoordinateReviewView: View {
 //                                .padding(.horizontal, 24)
 //                                .frame(maxWidth: .infinity, alignment: .leading)
 //                        }
-                        RecentCoordinates(recentCoordinates: viewModel.fashionReview!.recent_coordinates)   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
+                        RecentCoordinates(
+                            recentCoordinates: viewModel.fashionReview!.recent_coordinates,
+                            isEditMode: false,
+                            onToggleEditMode: {},
+                            onDeleteRequest: { _ in }
+                        )
                         VStack(alignment: .leading, spacing: 12) {
                             Image(.wolf)
                                 .resizable()

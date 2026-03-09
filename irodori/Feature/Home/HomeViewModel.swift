@@ -27,10 +27,17 @@ final class HomeViewModel {
     var showingItemPicker = false
     private var pickerTargetDateID: Int? = nil
 
+    // 編集モード関連
+    var isEditMode: Bool = false
+    var showDeleteConfirmation: Bool = false
+    var coordinateToDelete: String? = nil
+    var errorMessage: String? = nil
+
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
     let analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol
     let closetClient: ClosetClientProtocol
+    let deleteCoordinateClient: DeleteCoordinateClientProtocol
     private let plannerCacheRepository: HomePlannerCacheRepositoryProtocol
 
     init(
@@ -38,12 +45,14 @@ final class HomeViewModel {
         coordinateRecommendClient: CoordinateRecommendClientProtocol = CoordinateRecommendClient(),//MockCoordinateRecommendClient()
         analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol = AnalyzeRecentCoordinateClient(),
         closetClient: ClosetClientProtocol = ClosetClient(),
+        deleteCoordinateClient: DeleteCoordinateClientProtocol = DeleteCoordinateClient(),
         plannerCacheRepository: HomePlannerCacheRepositoryProtocol = HomePlannerCacheRepository()
     ) {
         self.apiClient = apiClient
         self.coordinateRecommendClient = coordinateRecommendClient
         self.analyzeRecentCoordinateClient = analyzeRecentCoordinateClient
         self.closetClient = closetClient
+        self.deleteCoordinateClient = deleteCoordinateClient
         self.plannerCacheRepository = plannerCacheRepository
         loadPlannerCache()
     }
@@ -221,5 +230,53 @@ final class HomeViewModel {
             image_url: closetItem.image_url
         )
         await addCoordinateRandom(for: dateID)
+    }
+
+    // MARK: - Delete Coordinate
+
+    func toggleEditMode() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isEditMode.toggle()
+            if !isEditMode {
+                // 編集モード終了時、選択状態をクリア
+                coordinateToDelete = nil
+                showDeleteConfirmation = false
+            }
+        }
+    }
+
+    func requestDelete(coordinateId: String) {
+        coordinateToDelete = coordinateId
+        showDeleteConfirmation = true
+    }
+
+    func deleteCoordinate() async {
+        guard let coordinateId = coordinateToDelete else { return }
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+
+        do {
+            let result = try await deleteCoordinateClient.delete(uid: uid, coordinateId: coordinateId)
+
+            switch result {
+            case .success(let response):
+                if response.success {
+                    // 成功時、UIから削除
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        homeResponse.recent_coordinates.removeAll { $0.id == coordinateId }
+                    }
+                    showDeleteConfirmation = false
+                    coordinateToDelete = nil
+                    // 削除後、編集モードも終了
+                    isEditMode = false
+                } else {
+                    errorMessage = response.message
+                }
+            case .failure(let error):
+                errorMessage = error.errorDescription
+            }
+        } catch {
+            errorMessage = "削除に失敗しました"
+        }
     }
 }
