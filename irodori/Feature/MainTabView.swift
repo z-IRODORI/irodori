@@ -55,6 +55,8 @@ struct MainTabView: View {
                         path: $path,
                         profileInfo: getProfileInfo()
                     )
+                case .fashionType, .fashionTypeResult:
+                    EmptyView()
                 }
             }
         }

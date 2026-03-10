@@ -18,22 +18,30 @@ struct irodoriApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SplashView()
-                .onAppear {
-                    AnalyticsLogger.shared.log(screen: .splashScreenView)
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    switch newPhase {
-                    case .background:
-                        AnalyticsLogger.shared.log(action: .appBackground)
-                    case .inactive:
-                        AnalyticsLogger.shared.log(action: .appWillResignActive)
-                    case .active:
-                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
-                    @unknown default:
-                        break
-                    }
-                }
+//            SplashView()
+//                .onAppear {
+//                    AnalyticsLogger.shared.log(screen: .splashScreenView)
+//                }
+//                .onChange(of: scenePhase) { _, newPhase in
+//                    switch newPhase {
+//                    case .background:
+//                        AnalyticsLogger.shared.log(action: .appBackground)
+//                    case .inactive:
+//                        AnalyticsLogger.shared.log(action: .appWillResignActive)
+//                    case .active:
+//                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
+//                    @unknown default:
+//                        break
+//                    }
+//                }
+
+            FashionTypeView(
+                path: .constant([]),
+                viewModel: FashionTypeViewModel(
+                    apiClient: FashionTypeClient()
+                )
+            )
+            // 5, 2, 4, 1, 3, 4, 4, 5, 3, 4
 
 //            MainTabView()
 //                .environment(AuthManager.shared)

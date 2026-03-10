@@ -70,6 +70,8 @@ struct SplashView: View {
                     EmptyView() // FirstTakePhotoView からは使用しない
                 case .profileEdit:
                     EmptyView() // FirstTakePhotoView からは使用しない
+                case .fashionType, .fashionTypeResult:
+                    EmptyView()
                 }
             }
             .onChange(of: path) { oldValue, newValue in
