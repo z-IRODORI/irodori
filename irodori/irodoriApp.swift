@@ -61,7 +61,7 @@ struct irodoriApp: App {
                 result: .init(
                     diagnosis_id: "",
                     type_code: "",
-                    type_name: "",
+                    type_name: "アヴァンギャルド・スター",
                     trend_score: 2.0, self_score: 2.0, social_score: 2.0, function_score: 2.0, economy_score: 2.0,
                     created_at: ""
                 ),

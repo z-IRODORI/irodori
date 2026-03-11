@@ -15,6 +15,15 @@ struct FashionTypeResultView: View {
 
     @State private var showConfetti = false
 
+    // 画像名を取得（存在しない場合はデフォルト画像）
+    private var imageName: String {
+        if UIImage(named: result.type_name) != nil {
+            return result.type_name
+        } else {
+            return "アヴァンギャルド・スター"
+        }
+    }
+
     var body: some View {
         ZStack {
             ScrollView {
@@ -24,6 +33,14 @@ struct FashionTypeResultView: View {
                         Text("診断結果")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(.black)
+
+                        // ファッションタイプ画像
+                        Image(imageName)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 300)
+                            .cornerRadius(12)
+                            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
 
                         // タイプコード
                         Text(result.type_code)
