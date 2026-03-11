@@ -35,13 +35,38 @@ struct irodoriApp: App {
 //                    }
 //                }
 
-            FashionTypeView(
+//            // 動作確認用: FashionType -> ResultView
+//            NavigationStack(path: $path) {
+//                FashionTypeView(
+//                    path: $path,
+//                    viewModel: FashionTypeViewModel(
+//                        apiClient: FashionTypeClient()
+//                    )
+//                )
+//                .navigationDestination(for: ViewType.self) { viewType in
+//                    switch viewType {
+//                    case .fashionTypeResult(let response):
+//                        FashionTypeResultView(
+//                            path: $path,
+//                            result: response
+//                        )
+//                    default:
+//                        EmptyView()
+//                    }
+//                }
+//            }
+
+            FashionTypeResultView(
                 path: .constant([]),
-                viewModel: FashionTypeViewModel(
-                    apiClient: FashionTypeClient()
-                )
+                result: .init(
+                    diagnosis_id: "",
+                    type_code: "",
+                    type_name: "",
+                    trend_score: 2.0, self_score: 2.0, social_score: 2.0, function_score: 2.0, economy_score: 2.0,
+                    created_at: ""
+                ),
+                onComplete: {}
             )
-            // 5, 2, 4, 1, 3, 4, 4, 5, 3, 4
 
 //            MainTabView()
 //                .environment(AuthManager.shared)

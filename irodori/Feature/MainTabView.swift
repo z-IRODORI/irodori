@@ -55,8 +55,16 @@ struct MainTabView: View {
                         path: $path,
                         profileInfo: getProfileInfo()
                     )
-                case .fashionType, .fashionTypeResult:
-                    EmptyView()
+                case .fashionType:
+                    FashionTypeView(
+                        path: $path,
+                        viewModel: .init(apiClient: FashionTypeClient())
+                    )
+                case .fashionTypeResult(let response):
+                    FashionTypeResultView(
+                        path: $path,
+                        result: response
+                    )
                 }
             }
         }

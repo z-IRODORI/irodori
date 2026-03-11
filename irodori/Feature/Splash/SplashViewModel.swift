@@ -15,6 +15,7 @@ final class SplashViewModel {
         case userInfo
         case home
         case onboarding
+        case fashionType
         case firstTakePhoto
     }
     var state: State = .termsOfService
@@ -34,6 +35,11 @@ final class SplashViewModel {
         // オンボーディング
         if !UserDefaults.standard.bool(forKey: UserDefaultsKey.hasOnboarding.rawValue) {
             state = .onboarding
+            return
+        }
+        // ファッションタイプ診断
+        if !UserDefaults.standard.bool(forKey: UserDefaultsKey.hasFashionTypeDiagnosis.rawValue) {
+            state = .fashionType
             return
         }
         // 初回撮影画面

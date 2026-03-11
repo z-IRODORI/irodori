@@ -38,6 +38,28 @@ struct SplashView: View {
                         viewModel.viewedOnboarding()
                         viewModel.updateState()
                     })
+                case .fashionType:
+                    NavigationStack(path: $path) {
+                        FashionTypeView(
+                            path: $path,
+                            viewModel: .init(apiClient: FashionTypeClient())
+                        )
+                        .navigationDestination(for: ViewType.self) { viewType in
+                            switch viewType {
+                            case .fashionTypeResult(let response):
+                                FashionTypeResultView(
+                                    path: $path,
+                                    result: response,
+                                    onComplete: {
+                                        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasFashionTypeDiagnosis.rawValue)
+                                        viewModel.updateState()
+                                    }
+                                )
+                            default:
+                                EmptyView()
+                            }
+                        }
+                    }
                 case .firstTakePhoto:
                     FirstTakePhotoView(
                         path: $path,
@@ -70,8 +92,10 @@ struct SplashView: View {
                     EmptyView() // FirstTakePhotoView からは使用しない
                 case .profileEdit:
                     EmptyView() // FirstTakePhotoView からは使用しない
-                case .fashionType, .fashionTypeResult:
-                    EmptyView()
+                case .fashionType:
+                    EmptyView() // FashionType画面は.fashionType stateで直接表示
+                case .fashionTypeResult:
+                    EmptyView() // FashionType内のNavigationStackで処理
                 }
             }
             .onChange(of: path) { oldValue, newValue in
