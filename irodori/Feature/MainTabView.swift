@@ -131,7 +131,7 @@ struct MainTabView: View {
 
                 Spacer()
 
-                tabItem(image: "person", title: "相棒", isSelected: viewModel.selectedTab == .partner) {
+                partnerTabItem(title: "相棒", isSelected: viewModel.selectedTab == .partner) {
                     viewModel.selectedTab = .partner
                 }
 
@@ -171,6 +171,36 @@ struct MainTabView: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: image).font(.system(size: 20))
+                Text(title).font(.system(size: 12))
+            }
+            .foregroundStyle(isSelected ? .black : .gray.opacity(0.6))
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func partnerTabItem(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                // UserDefaultsからpartnerIconImageを取得
+                if let partnerIconImageName = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerIconImage.rawValue),
+                   UIImage(named: partnerIconImageName) != nil {
+                    Image(partnerIconImageName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 32, height: 32)
+                } else {
+                    // フォールバック：アヴァンギャルド・スター_icon
+                    if UIImage(named: "アヴァンギャルド・スター_icon") != nil {
+                        Image("アヴァンギャルド・スター_icon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 32, height: 32)
+                    } else {
+                        // さらにフォールバック：SF Symbol
+                        Image(systemName: "person")
+                            .font(.system(size: 28))
+                    }
+                }
                 Text(title).font(.system(size: 12))
             }
             .foregroundStyle(isSelected ? .black : .gray.opacity(0.6))

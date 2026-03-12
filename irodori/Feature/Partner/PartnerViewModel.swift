@@ -34,6 +34,15 @@ final class PartnerViewModel {
             case .success(let response):
                 if response.status == "success" {
                     self.userInsight = response
+
+                    // FashionTypeの画像情報をUserDefaultsに保存
+                    if let fashionType = response.fashion_type {
+                        let partnerImage = fashionType.type_name
+                        let partnerIconImage = "\(fashionType.type_name)_icon"
+
+                        UserDefaults.standard.set(partnerImage, forKey: UserDefaultsKey.partnerImage.rawValue)
+                        UserDefaults.standard.set(partnerIconImage, forKey: UserDefaultsKey.partnerIconImage.rawValue)
+                    }
                 } else {
                     // status: "no_data"の場合
                     errorMessage = response.insight

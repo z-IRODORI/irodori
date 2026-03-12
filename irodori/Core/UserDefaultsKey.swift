@@ -20,4 +20,6 @@ enum UserDefaultsKey: String {
     case coordinateChats
     case finishedFirstTakePhoto
     case homePlannerCache
+    case partnerImage
+    case partnerIconImage
 }

@@ -90,11 +90,24 @@ struct HomeView: View {
                     // コーデの分析
                     VStack(spacing: 12) {
                         HStack(spacing: 6) {
-                            Image(.wolf)
-                                .resizable()
-                                .frame(width: 50, height: 50)
-                                .clipShape(Circle())
-                                .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
+                            // UserDefaultsからpartnerIconImageを取得
+                            Group {
+                                if let partnerIconImageName = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerIconImage.rawValue),
+                                   UIImage(named: partnerIconImageName) != nil {
+                                    Image(partnerIconImageName)
+                                        .resizable()
+                                } else if UIImage(named: "アヴァンギャルド・スター_icon") != nil {
+                                    Image("アヴァンギャルド・スター_icon")
+                                        .resizable()
+                                } else {
+                                    Image(.wolf)
+                                        .resizable()
+                                }
+                            }
+                            .frame(width: 50, height: 50)
+                            .clipShape(Circle())
+                            .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
+
                             SpeechBubbleView(text: "これまでのコーデを分析しました")
                                 .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
                         }
