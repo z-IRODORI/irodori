@@ -15,6 +15,9 @@ struct MainTabView: View {
                     PlannerView()
                         .opacity(viewModel.selectedTab == .planner ? 1 : 0)
 
+                    PartnerView()
+                        .opacity(viewModel.selectedTab == .partner ? 1 : 0)
+
                     ProfileView(path: $path)
                         .opacity(viewModel.selectedTab == .profile ? 1 : 0)
                 }

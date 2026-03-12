@@ -90,7 +90,7 @@ struct FashionTypeResultView: View {
                             }
                         }
                     }) {
-                        Text("完了")
+                        Text(onComplete != nil ? "次へ" : "完了")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
