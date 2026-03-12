@@ -8,7 +8,6 @@
 import Foundation
 
 enum ClothingCategory: String, CaseIterable, Identifiable {
-    case all = "全て"
     case tops = "トップス"
     case bottoms = "ボトムス"
 //    case shoes = "靴"

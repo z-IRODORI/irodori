@@ -12,7 +12,7 @@ import UIKit
 @MainActor
 @Observable
 final class ProfileViewModel {
-    var selectedCategory: ClothingCategory = .all
+    var selectedCategory: ClothingCategory = .tops
     var closetItems: [ClosetItem] = []
     var isLoading = false
     var errorMessage: String?
@@ -36,9 +36,6 @@ final class ProfileViewModel {
             return true
         }
 
-        if selectedCategory == .all {
-            return itemsWithImage
-        }
         return itemsWithImage.filter { $0.clothingCategory == selectedCategory }
     }
 

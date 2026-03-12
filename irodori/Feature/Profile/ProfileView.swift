@@ -265,46 +265,101 @@ struct ProfileView: View {
                 LazyVGrid(columns: columns, spacing: itemSpacing) {
                     ForEach(viewModel.filteredItems) { item in
                         if let imageUrl = item.image_url, let url = URL(string: imageUrl) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .empty:
-                                    ProgressView()
-                                        .frame(maxWidth: .infinity)
-                                        .aspectRatio(1, contentMode: .fit)
-                                        .background(Color.gray.opacity(0.1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(maxWidth: .infinity)
-                                        .aspectRatio(1, contentMode: .fit)
-                                        .background(Color.gray.opacity(0.1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                case .failure:
-                                    Image(systemName: "photo")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(maxWidth: .infinity)
-                                        .aspectRatio(1, contentMode: .fit)
-                                        .padding(30)
-                                        .foregroundStyle(.gray.opacity(0.5))
-                                        .background(Color.gray.opacity(0.1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                @unknown default:
-                                    EmptyView()
+                            VStack(spacing: 6) {
+                                // 画像部分
+                                CachedAsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        ProgressView()
+                                            .frame(maxWidth: .infinity)
+                                            .aspectRatio(1, contentMode: .fit)
+                                            .background(Color.gray.opacity(0.1))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(maxWidth: .infinity)
+                                            .aspectRatio(1, contentMode: .fit)
+                                            .background(Color.gray.opacity(0.1))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            .clipped()
+                                    case .failure:
+                                        Image(systemName: "photo")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(maxWidth: .infinity)
+                                            .aspectRatio(1, contentMode: .fit)
+                                            .padding(30)
+                                            .foregroundStyle(.gray.opacity(0.5))
+                                            .background(Color.gray.opacity(0.1))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    @unknown default:
+                                        EmptyView()
+                                    }
                                 }
+
+                                // 情報部分（category & color）
+                                VStack(spacing: 2) {
+                                    if let category = item.category {
+                                        Text(category)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(.black)
+                                            .lineLimit(1)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    if let color = item.color {
+                                        Text(color)
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.gray)
+                                            .lineLimit(1)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
+                                .padding(.horizontal, 2)
                             }
+                            .padding(8)
+                            .background(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            )
                         } else {
-                            Image(systemName: "photo")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxWidth: .infinity)
-                                .aspectRatio(1, contentMode: .fit)
-                                .padding(30)
-                                .foregroundStyle(.gray.opacity(0.5))
-                                .background(Color.gray.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            VStack(spacing: 6) {
+                                Image(systemName: "photo")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: .infinity)
+                                    .aspectRatio(1, contentMode: .fit)
+                                    .padding(30)
+                                    .foregroundStyle(.gray.opacity(0.5))
+                                    .background(Color.gray.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                VStack(spacing: 2) {
+                                    if let category = item.category {
+                                        Text(category)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(.black)
+                                            .lineLimit(1)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    if let color = item.color {
+                                        Text(color)
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.gray)
+                                            .lineLimit(1)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
+                                .padding(.horizontal, 2)
+                            }
+                            .padding(8)
+                            .background(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            )
                         }
                     }
                 }
