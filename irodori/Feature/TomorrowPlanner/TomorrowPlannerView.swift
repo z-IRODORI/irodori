@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TomorrowPlannerView: View {
     @State private var viewModel: TomorrowPlannerViewModel = .init()
+    @State private var showResetDialog = false
 
     private let cardWidth: CGFloat = 280
 
@@ -16,14 +17,26 @@ struct TomorrowPlannerView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 24) {
                 // タイトル
-                VStack(spacing: 6) {
-                    Text("明日のコーデ提案")
-                        .font(.system(size: 20, weight: .bold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("過去に登録したアイテムやコーデから提案します。")
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(.gray)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                HStack {
+                    VStack(spacing: 6) {
+                        Text("明日のコーデ提案")
+                            .font(.system(size: 20, weight: .bold))
+                        Text("過去に登録したアイテムやコーデから提案します")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Spacer()
+
+                    // リセットボタン
+                    if !viewModel.coordinates.isEmpty {
+                        Button(action: { showResetDialog = true }) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.black)
+                        }
+                    }
                 }
 
                 // 選択アイテム表示
@@ -57,33 +70,52 @@ struct TomorrowPlannerView: View {
                     }
                 }
 
-                // コーディネートカード
-                GeometryReader { proxy in
-                    let margin = (proxy.size.width - cardWidth) / 2
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack {
-                            CoordinateCardView(
-                                dayString: tomorrowDayString(),
-                                coordinates: viewModel.coordinates,
-                                isLoading: viewModel.isLoading,
-                                onAddCoordinateRandom: {
-                                    Task { await viewModel.addCoordinateRandom() }
-                                },
-                                onAddCoordinateByItem: {
-                                    viewModel.showItemPicker()
-                                },
-                                onReset: {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        viewModel.reset()
-                                    }
-                                }
-                            )
-                        }
-                        .padding(.horizontal, margin)
+                // 表示モード切り替えタブ
+                if !viewModel.coordinates.isEmpty {
+                    Picker("", selection: $viewModel.displayMode) {
+                        Text("カード").tag(TomorrowPlannerViewModel.DisplayMode.card)
+                        Text("一覧").tag(TomorrowPlannerViewModel.DisplayMode.grid)
                     }
-                    .scrollDisabled(true)
+                    .pickerStyle(.segmented)
                 }
-                .frame(height: 520)
+
+                // コーディネートカード
+                if viewModel.displayMode == .card {
+                    GeometryReader { proxy in
+                        let margin = (proxy.size.width - cardWidth) / 2
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            LazyHStack {
+                                CoordinateCardView(
+                                    dayString: tomorrowDayString(),
+                                    coordinates: viewModel.coordinates,
+                                    isLoading: viewModel.isLoading,
+                                    initialPage: viewModel.selectedCoordinateIndex,
+                                    onAddCoordinateRandom: {
+                                        Task { await viewModel.addCoordinateRandom() }
+                                    },
+                                    onAddCoordinateByItem: {
+                                        viewModel.showItemPicker()
+                                    },
+                                    onReset: {
+                                        showResetDialog = true
+                                    }
+                                )
+                            }
+                            .padding(.horizontal, margin)
+                        }
+                        .scrollDisabled(true)
+                    }
+                    .frame(height: 520)
+                } else {
+                    CoordinateGridView(
+                        coordinates: viewModel.coordinates,
+                        onTapCoordinate: { index in
+                            withAnimation {
+                                viewModel.switchToCardMode(at: index)
+                            }
+                        }
+                    )
+                }
             }
             .padding(.horizontal, 24)
         }
@@ -104,6 +136,16 @@ struct TomorrowPlannerView: View {
                     }
                 }
             )
+        }
+        .confirmationDialog("リセット確認", isPresented: $showResetDialog) {
+            Button("リセットする", role: .destructive) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    viewModel.reset()
+                }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("コーデ提案と選択したアイテムをリセットしますか？")
         }
     }
 

@@ -111,9 +111,28 @@ struct CoordinateCardView: View {
     let dayString: String
     let coordinates: [CoordinateRecommend]
     let isLoading: Bool
+    let initialPage: Int
     let onAddCoordinateRandom: () -> Void
     let onAddCoordinateByItem: () -> Void
     let onReset: () -> Void
+
+    init(
+        dayString: String,
+        coordinates: [CoordinateRecommend],
+        isLoading: Bool,
+        initialPage: Int = 0,
+        onAddCoordinateRandom: @escaping () -> Void,
+        onAddCoordinateByItem: @escaping () -> Void,
+        onReset: @escaping () -> Void
+    ) {
+        self.dayString = dayString
+        self.coordinates = coordinates
+        self.isLoading = isLoading
+        self.initialPage = initialPage
+        self.onAddCoordinateRandom = onAddCoordinateRandom
+        self.onAddCoordinateByItem = onAddCoordinateByItem
+        self.onReset = onReset
+    }
 
     @State private var isFlipped = false
     @State private var currentCoordinatePage = 0  // コーディネートのページ
@@ -222,6 +241,11 @@ struct CoordinateCardView: View {
         .onChange(of: coordinates.count) { _, _ in
             currentCoordinatePage = 0  // コーディネート配列が変わったらページをリセット
             currentItemPage = 0
+        }
+        .onAppear {
+            if !coordinates.isEmpty {
+                currentCoordinatePage = min(initialPage, coordinates.count - 1)
+            }
         }
     }
 

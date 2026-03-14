@@ -11,12 +11,19 @@ import SwiftUI
 @MainActor
 @Observable
 final class TomorrowPlannerViewModel {
+    enum DisplayMode {
+        case card
+        case grid
+    }
+
     // 明日 = dateID 1（HomePlannerCacheRepository と共通）
     private let tomorrowDateID = 1
 
     var coordinates: [CoordinateRecommend] = []
     var isLoading = false
     var selectCoordinateItem: SelectCoordinateItem?
+    var displayMode: DisplayMode = .card
+    var selectedCoordinateIndex: Int = 0
 
     // クローゼットアイテムピッカー
     var closetItems: [ClosetItem] = []
@@ -104,7 +111,15 @@ final class TomorrowPlannerViewModel {
     func reset() {
         coordinates = []
         selectCoordinateItem = nil
+        displayMode = .card
         saveCache()
+    }
+
+    // MARK: - 表示モード切り替え
+
+    func switchToCardMode(at index: Int) {
+        displayMode = .card
+        selectedCoordinateIndex = index
     }
 
     // MARK: - アイテムピッカー
