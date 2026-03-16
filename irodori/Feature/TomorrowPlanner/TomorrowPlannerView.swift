@@ -38,6 +38,7 @@ struct TomorrowPlannerView: View {
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 // 選択アイテム表示
                 if let item = viewModel.selectCoordinateItem {
