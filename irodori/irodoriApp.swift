@@ -18,24 +18,24 @@ struct irodoriApp: App {
 
     var body: some Scene {
         WindowGroup {
-//            SplashView()
-//                .onAppear {
-//                    AnalyticsLogger.shared.log(screen: .splashScreenView)
-//                }
-//                .onChange(of: scenePhase) { _, newPhase in
-//                    switch newPhase {
-//                    case .background:
-//                        AnalyticsLogger.shared.log(action: .appBackground)
-//                    case .inactive:
-//                        AnalyticsLogger.shared.log(action: .appWillResignActive)
-//                    case .active:
-//                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
-//                    @unknown default:
-//                        break
-//                    }
-//                }
+            SplashView()
+                .onAppear {
+                    AnalyticsLogger.shared.log(screen: .splashScreenView)
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    switch newPhase {
+                    case .background:
+                        AnalyticsLogger.shared.log(action: .appBackground)
+                    case .inactive:
+                        AnalyticsLogger.shared.log(action: .appWillResignActive)
+                    case .active:
+                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
+                    @unknown default:
+                        break
+                    }
+                }
 
-            SelectStandardItemView()
+//            SelectStandardItemView()
 
 //            // 動作確認用: FashionType -> ResultView
 //            NavigationStack(path: $path) {

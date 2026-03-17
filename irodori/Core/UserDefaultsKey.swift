@@ -22,4 +22,5 @@ enum UserDefaultsKey: String {
     case homePlannerCache
     case partnerImage
     case partnerIconImage
+    case hasSelectedStandardItems
 }

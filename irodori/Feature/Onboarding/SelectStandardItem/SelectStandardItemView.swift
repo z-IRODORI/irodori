@@ -10,7 +10,10 @@ import SwiftUI
 struct SelectStandardItemView: View {
     @State private var viewModel = SelectStandardItemViewModel()
     @Environment(\.dismiss) var dismiss
+    @Binding var path: [ViewType]
     let onSelect: ((StandardItem) -> Void)?
+    let onComplete: (() -> Void)?
+    @State private var showRecommendationsSheet = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -18,13 +21,19 @@ struct SelectStandardItemView: View {
         GridItem(.flexible(), spacing: 12)
     ]
 
-    init(onSelect: ((StandardItem) -> Void)? = nil) {
+    init(
+        path: Binding<[ViewType]> = .constant([]),
+        onSelect: ((StandardItem) -> Void)? = nil,
+        onComplete: (() -> Void)? = nil
+    ) {
+        self._path = path
         self.onSelect = onSelect
+        self.onComplete = onComplete
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .bottom) {
+        print("🔍 [SelectStandardItemView] body called - isLoading: \(viewModel.isLoading), itemsCount: \(viewModel.items.count), onComplete: \(onComplete != nil)")
+        return ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
                     if viewModel.isLoading {
                         ProgressView()
@@ -117,25 +126,54 @@ struct SelectStandardItemView: View {
             }
             .navigationTitle("スタンダードアイテム")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(onComplete != nil)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") {
-                        dismiss()
+                    if onComplete != nil {
+                        Button("スキップ") {
+                            UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
+                            onComplete?()
+                        }
+                    } else {
+                        Button("閉じる") {
+                            dismiss()
+                        }
                     }
                 }
             }
             .task {
                 await viewModel.fetchItems()
             }
-            .sheet(isPresented: $viewModel.registrationSuccess) {
+            .onChange(of: viewModel.registrationSuccess) { _, success in
+                if success {
+                    if onComplete != nil {
+                        // オンボーディングモード: NavigationStack で push
+                        path.append(.recommendCoordinateByStandardItem(
+                            ViewType.RecommendCoordinateParams(
+                                results: viewModel.coordinateRecommendResults,
+                                selectedItems: viewModel.selectedItemsForRecommend
+                            )
+                        ))
+
+                        // UserDefaults にフラグを保存
+                        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
+                    } else {
+                        // 通常モード: sheet で表示（既存の動作）
+                        showRecommendationsSheet = true
+                    }
+
+                    viewModel.registrationSuccess = false  // リセット
+                }
+            }
+            .sheet(isPresented: $showRecommendationsSheet) {
                 NavigationStack {
                     RecommendCoordinateByStandardItemView(
                         results: viewModel.coordinateRecommendResults,
-                        selectedItems: viewModel.selectedItemsForRecommend
+                        selectedItems: viewModel.selectedItemsForRecommend,
+                        onComplete: nil
                     )
                 }
             }
-        }
     }
 
     private func itemCell(item: StandardItem) -> some View {

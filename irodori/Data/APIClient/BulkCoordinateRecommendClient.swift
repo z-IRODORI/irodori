@@ -25,7 +25,7 @@ struct BulkCoordinateRecommendRequest: Codable {
 
 // MARK: - Response Models
 
-struct CoordinateRecommendResult: Codable {
+struct CoordinateRecommendResult: Codable, Hashable {
     let item_id: String?
     let index: Int
     let status: String
@@ -39,6 +39,15 @@ struct CoordinateRecommendResult: Codable {
     let shoes_list: [String]?
     let accessories_list: [String]?
     let error: String?
+
+    static func == (lhs: CoordinateRecommendResult, rhs: CoordinateRecommendResult) -> Bool {
+        lhs.item_id == rhs.item_id && lhs.index == rhs.index
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(item_id)
+        hasher.combine(index)
+    }
 }
 
 struct BulkCoordinateRecommendResponse: Codable {

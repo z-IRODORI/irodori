@@ -10,6 +10,7 @@ import SwiftUI
 struct SplashView: View {
     @State var path: [ViewType] = []
     @State private var isPresentedTermsOfService = false
+    @State private var isStateChanging = false  // state 変更中フラグ
     let viewModel: SplashViewModel = .init()
     let cameraViewModel: CameraViewModel = .init()
 
@@ -60,6 +61,30 @@ struct SplashView: View {
                             }
                         }
                     }
+                case .selectStandardItem:
+                    NavigationStack(path: $path) {
+                        SelectStandardItemView(
+                            path: $path,
+                            onComplete: {
+                                UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
+                                viewModel.updateState()
+                            }
+                        )
+                        .navigationDestination(for: ViewType.self) { viewType in
+                            switch viewType {
+                            case .recommendCoordinateByStandardItem(let params):
+                                RecommendCoordinateByStandardItemView(
+                                    results: params.results,
+                                    selectedItems: params.selectedItems,
+                                    onComplete: {
+                                        viewModel.updateState()
+                                    }
+                                )
+                            default:
+                                EmptyView()
+                            }
+                        }
+                    }
                 case .firstTakePhoto:
                     FirstTakePhotoView(
                         path: $path,
@@ -96,12 +121,25 @@ struct SplashView: View {
                     EmptyView() // FashionType画面は.fashionType stateで直接表示
                 case .fashionTypeResult:
                     EmptyView() // FashionType内のNavigationStackで処理
+                case .recommendCoordinateByStandardItem(_):
+                    EmptyView()
                 }
             }
             .onChange(of: path) { oldValue, newValue in
                 // FirstTakePhotoView で分析が完了してホームに戻った時、自動的に .home に遷移
-                if viewModel.state == .firstTakePhoto && newValue.isEmpty {
+                // ただし、state 変更による path クリアの場合は無視
+                if !isStateChanging && viewModel.state == .firstTakePhoto && newValue.isEmpty {
                     viewModel.updateState()
+                }
+            }
+            .onChange(of: viewModel.state) { oldState, newState in
+                // state が変わったときに path をクリアして、古い NavigationStack の履歴を削除
+                print("🔍 [SplashView] State changed from \(oldState) to \(newState), clearing path")
+                isStateChanging = true
+                path.removeAll()
+                // フラグをリセット（次のフレームで）
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isStateChanging = false
                 }
             }
 //        case .userInfo:

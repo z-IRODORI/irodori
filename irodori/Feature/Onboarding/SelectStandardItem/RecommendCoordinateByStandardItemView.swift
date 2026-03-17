@@ -14,6 +14,17 @@ struct RecommendCoordinateByStandardItemView: View {
 
     let results: [CoordinateRecommendResult]
     let selectedItems: [StandardItem]
+    let onComplete: (() -> Void)?
+
+    init(
+        results: [CoordinateRecommendResult],
+        selectedItems: [StandardItem],
+        onComplete: (() -> Void)? = nil
+    ) {
+        self.results = results
+        self.selectedItems = selectedItems
+        self.onComplete = onComplete
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,14 +59,24 @@ struct RecommendCoordinateByStandardItemView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(onComplete != nil)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("コーデ提案")
                     .font(.system(size: 18, weight: .semibold))
             }
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if let onComplete = onComplete {
+                    // オンボーディングモード: 「次へ」ボタン
+                    Button("次へ") {
+                        onComplete()
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                } else {
+                    // 通常モード: 「閉じる」ボタン
+                    Button("閉じる") {
+                        dismiss()
+                    }
                 }
             }
         }

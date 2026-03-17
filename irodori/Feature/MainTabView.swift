@@ -68,6 +68,8 @@ struct MainTabView: View {
                         path: $path,
                         result: response
                     )
+                case .recommendCoordinateByStandardItem(_):
+                    EmptyView()
                 }
             }
         }

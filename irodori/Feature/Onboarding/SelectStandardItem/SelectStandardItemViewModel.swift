@@ -174,7 +174,6 @@ final class SelectStandardItemViewModel {
                 // Create metadata
                 let metadata = BulkItemMetadata(
                     index: index,
-                    is_standard: true,
                     gender: normalizedGender,
                     main_category: normalizedMainCategory,
                     sub_category: normalizedSubCategory,

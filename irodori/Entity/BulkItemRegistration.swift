@@ -9,7 +9,6 @@ import Foundation
 
 struct BulkItemMetadata: Codable {
     let index: Int
-    let is_standard: Bool
     let gender: String?
     let main_category: String?
     let sub_category: String?
@@ -22,13 +21,11 @@ struct BulkItemMetadata: Codable {
 struct RegisteredItem: Codable {
     let id: String
     let storage_url: String
-    let is_standard: Bool
-    // Standard item fields
+    // User closet item fields (standard item fields removed as they're now user items)
     let gender: String?
     let main_category: String?
     let sub_category: String?
     let color: String?
-    // User closet item fields
     let item_type: String?
     let category: String?
     let coordinate_id: String?

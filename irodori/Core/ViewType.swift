@@ -15,6 +15,7 @@ enum ViewType: Hashable {
     case profileEdit
     case fashionType
     case fashionTypeResult(FashionTypeResponse)
+    case recommendCoordinateByStandardItem(RecommendCoordinateParams)
 
     struct CoordinateReviewParams: Hashable {
         let image: UIImage?
@@ -25,5 +26,20 @@ enum ViewType: Hashable {
         let uid: String
         let targetDateString: String
         let coordinateImageURL: String
+    }
+
+    struct RecommendCoordinateParams: Hashable {
+        let results: [CoordinateRecommendResult]
+        let selectedItems: [StandardItem]
+
+        static func == (lhs: RecommendCoordinateParams, rhs: RecommendCoordinateParams) -> Bool {
+            lhs.results.map { $0.item_id } == rhs.results.map { $0.item_id } &&
+            lhs.selectedItems.map { $0.id } == rhs.selectedItems.map { $0.id }
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(results.map { $0.item_id })
+            hasher.combine(selectedItems.map { $0.id })
+        }
     }
 }

@@ -120,7 +120,6 @@ final class MockBulkItemRegisterClient: BulkItemRegisterClientProtocol {
             RegisteredItem(
                 id: "mock-\(index)",
                 storage_url: "https://example.com/image_\(index).jpg",
-                is_standard: item.metadata.is_standard,
                 gender: item.metadata.gender,
                 main_category: item.metadata.main_category,
                 sub_category: item.metadata.sub_category,
