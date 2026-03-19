@@ -17,7 +17,6 @@ final class SplashViewModel {
         case onboarding
         case fashionType
         case selectStandardItem
-        case firstTakePhoto
     }
     var state: State = .termsOfService
 
@@ -29,7 +28,6 @@ final class SplashViewModel {
         print("   - hasOnboarding: \(UserDefaults.standard.bool(forKey: UserDefaultsKey.hasOnboarding.rawValue))")
         print("   - hasFashionTypeDiagnosis: \(UserDefaults.standard.bool(forKey: UserDefaultsKey.hasFashionTypeDiagnosis.rawValue))")
         print("   - hasSelectedStandardItems: \(UserDefaults.standard.bool(forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue))")
-        print("   - finishedFirstTakePhoto: \(UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue))")
 
         // 利用規約
         if !UserDefaults.standard.bool(forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue) {
@@ -59,12 +57,6 @@ final class SplashViewModel {
         if !UserDefaults.standard.bool(forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue) {
             state = .selectStandardItem
             print("   → state = .selectStandardItem")
-            return
-        }
-        // 初回撮影画面
-        if !UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
-            state = .firstTakePhoto
-            print("   → state = .firstTakePhoto")
             return
         }
         state = .home

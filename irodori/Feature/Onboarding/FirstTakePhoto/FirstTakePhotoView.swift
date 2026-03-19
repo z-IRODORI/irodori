@@ -13,8 +13,24 @@ struct FirstTakePhotoView: View {
     @Binding var path: [ViewType]
     @State private var scrollOffset: CGFloat = 0
     @State private var timer: Timer?
-    @State var viewModel: FirstTakePhotoViewModel = .init(fashionReviewClient: FashionReviewClient())
-    let okButtonTapped: (() -> ())
+    @State var viewModel: FirstTakePhotoViewModel
+    let showCloseButton: Bool
+    let onClose: (() -> Void)?
+    let okButtonTapped: (() -> Void)?
+
+    init(
+        path: Binding<[ViewType]>,
+        viewModel: FirstTakePhotoViewModel,
+        showCloseButton: Bool = false,
+        onClose: (() -> Void)? = nil,
+        okButtonTapped: (() -> Void)? = nil
+    ) {
+        self._path = path
+        self._viewModel = State(initialValue: viewModel)
+        self.showCloseButton = showCloseButton
+        self.onClose = onClose
+        self.okButtonTapped = okButtonTapped
+    }
 
     var body: some View {
         ScrollView(.vertical) {
@@ -67,12 +83,32 @@ struct FirstTakePhotoView: View {
             .padding(.horizontal, 24)
         }
         .overlay(alignment: .top) {
-            Text("IRODORI")
-                .font(.system(size: 24, weight: .bold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
-                .foregroundStyle(.black)
-                .background(.white)
+            ZStack {
+                Text("IRODORI")
+                    .font(.system(size: 24, weight: .bold))
+                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(.black)
+
+                if showCloseButton {
+                    HStack {
+                        Button(action: {
+                            onClose?()
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.black)
+                                .frame(width: 32, height: 32)
+                                .background(Color.gray.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                        .padding(.leading, 16)
+
+                        Spacer()
+                    }
+                }
+            }
+            .padding(.vertical, 24)
+            .background(.white)
         }
         .fullScreenCover(isPresented: $viewModel.showCameraView) {
             CameraView(
@@ -98,7 +134,7 @@ struct FirstTakePhotoView: View {
                     viewModel: .init(inputUIImage: image),
                     isPresented: $viewModel.showConfirmationView,
                     okButtonTapped: {
-                        okButtonTapped()
+                        okButtonTapped?()
                         path.append(.coordinateReview(.init(image: image, fromFirstTakePhotoView: true)))
                     }
                 )
@@ -215,5 +251,8 @@ struct FirstTakePhotoView: View {
 
 
 #Preview {
-    FirstTakePhotoView(path: .constant([]), okButtonTapped: {})
+    FirstTakePhotoView(
+        path: .constant([]),
+        viewModel: .init(fashionReviewClient: FashionReviewClient())
+    )
 }

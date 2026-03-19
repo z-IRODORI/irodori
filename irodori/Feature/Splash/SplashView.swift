@@ -85,14 +85,6 @@ struct SplashView: View {
                             }
                         }
                     }
-                case .firstTakePhoto:
-                    FirstTakePhotoView(
-                        path: $path,
-                        viewModel: .init(fashionReviewClient: FashionReviewClient()),
-                        okButtonTapped: {
-                            viewModel.updateState()
-                        }
-                    )
                 case .home:
                     MainTabView()
                         .environment(AuthManager.shared)
@@ -125,13 +117,7 @@ struct SplashView: View {
                     EmptyView()
                 }
             }
-            .onChange(of: path) { oldValue, newValue in
-                // FirstTakePhotoView で分析が完了してホームに戻った時、自動的に .home に遷移
-                // ただし、state 変更による path クリアの場合は無視
-                if !isStateChanging && viewModel.state == .firstTakePhoto && newValue.isEmpty {
-                    viewModel.updateState()
-                }
-            }
+            // .onChange(of: path) は削除済み（FirstTakePhotoView がオンボーディングから削除されたため不要）
             .onChange(of: viewModel.state) { oldState, newState in
                 // state が変わったときに path をクリアして、古い NavigationStack の履歴を削除
                 print("🔍 [SplashView] State changed from \(oldState) to \(newState), clearing path")

@@ -13,6 +13,7 @@ struct HomeView: View {
     @State var viewModel: HomeViewModel = .init(apiClient: HomeClient())
     @State private var plannerViewModel: PlannerViewModel = .init()
     @State private var showAllTags = false
+    @State private var showFirstTakePhotoSheet = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -167,6 +168,15 @@ struct HomeView: View {
                 await viewModel.onAppear()
             }
         }
+        .onChange(of: viewModel.isLoadingHome) { oldValue, newValue in
+            // データロード完了時に、初回撮影未完了かつ直近のコーデが0件の場合、FirstTakePhotoViewを表示
+            if oldValue == true && newValue == false {
+                let hasFinishedFirstTakePhoto = UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue)
+                if !hasFinishedFirstTakePhoto && viewModel.homeResponse.recent_coordinates.isEmpty {
+                    showFirstTakePhotoSheet = true
+                }
+            }
+        }
         .sheet(isPresented: Binding(
             get: { viewModel.showingItemPicker },
             set: { viewModel.showingItemPicker = $0 }
@@ -179,6 +189,17 @@ struct HomeView: View {
                         await viewModel.selectAndRecommend(closetItem: closetItem)
                     }
                 }
+            )
+        }
+        .sheet(isPresented: $showFirstTakePhotoSheet) {
+            FirstTakePhotoView(
+                path: .constant([]),
+                viewModel: .init(fashionReviewClient: FashionReviewClient()),
+                showCloseButton: true,
+                onClose: {
+                    showFirstTakePhotoSheet = false
+                },
+                okButtonTapped: nil
             )
         }
         .background(.gray.opacity(0.08))
@@ -210,6 +231,7 @@ struct HomeView: View {
             }
             .padding(.top, 24)
             .padding(.horizontal, 24)
+            .padding(.bottom, 90)  // TabBar の高さ分のパディング
             .background(.white)
         }
         .alert("コーディネートを削除", isPresented: $viewModel.showDeleteConfirmation) {

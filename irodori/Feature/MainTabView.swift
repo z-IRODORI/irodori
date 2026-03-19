@@ -22,6 +22,7 @@ struct MainTabView: View {
                         .opacity(viewModel.selectedTab == .profile ? 1 : 0)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.white)
 
                 customTabBar
             }
@@ -139,13 +140,6 @@ struct MainTabView: View {
 
                 Spacer()
 
-                // 中央プラスボタンの修正
-                plusButton {
-                    isSheetPresented = true // タップでモーダルを表示
-                }
-
-                Spacer()
-
                 tabItem(image: "person.fill", title: "プロフィール", isSelected: viewModel.selectedTab == .profile) {
                     viewModel.selectedTab = .profile
                 }
@@ -166,7 +160,6 @@ struct MainTabView: View {
                 .clipShape(Circle())
                 .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
         }
-        .offset(y: -20)
     }
 
     private func tabItem(image: String, title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {

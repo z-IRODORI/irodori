@@ -13,7 +13,7 @@ struct BulkItemMetadata: Codable {
     let main_category: String?
     let sub_category: String?
     let color: String?
-    let item_type: String?
+    let item_type: String  // 必須フィールド（バックエンドの要求に合わせる）
     let category: String?
     let coordinate_id: String?
 }

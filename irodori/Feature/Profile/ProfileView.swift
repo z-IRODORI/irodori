@@ -39,6 +39,7 @@ struct ProfileView: View {
                     }
                 }
                 .padding(.top, 10)
+                .padding(.bottom, 90)  // TabBar の高さ分のパディング
             }
             .refreshable {
                 await viewModel.loadItems()
@@ -59,7 +60,6 @@ struct ProfileView: View {
                 }
             }
         }
-        .padding(.bottom, 100)
     }
 
     // MARK: - 1. headerNavigationBar

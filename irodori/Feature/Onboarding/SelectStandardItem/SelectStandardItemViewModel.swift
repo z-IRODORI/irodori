@@ -171,6 +171,10 @@ final class SelectStandardItemViewModel {
                 let normalizedSubCategory = normalizeString(item.sub_category)
                 let normalizedColor = normalizeString(item.color)
 
+                // item_type は main_category と sub_category を組み合わせて生成
+                // バックエンドの要求に合わせて必須フィールドとして設定
+                let itemType = "\(normalizedMainCategory)_\(normalizedSubCategory)"
+
                 // Create metadata
                 let metadata = BulkItemMetadata(
                     index: index,
@@ -178,8 +182,8 @@ final class SelectStandardItemViewModel {
                     main_category: normalizedMainCategory,
                     sub_category: normalizedSubCategory,
                     color: normalizedColor,
-                    item_type: nil,
-                    category: nil,
+                    item_type: itemType,  // 必須フィールド
+                    category: normalizedSubCategory,  // category にも sub_category を設定
                     coordinate_id: nil
                 )
 

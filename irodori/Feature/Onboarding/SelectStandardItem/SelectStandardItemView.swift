@@ -128,13 +128,9 @@ struct SelectStandardItemView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(onComplete != nil)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    if onComplete != nil {
-                        Button("スキップ") {
-                            UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
-                            onComplete?()
-                        }
-                    } else {
+                // 通常モード（onComplete が nil）の場合のみ「閉じる」ボタンを表示
+                if onComplete == nil {
+                    ToolbarItem(placement: .cancellationAction) {
                         Button("閉じる") {
                             dismiss()
                         }
