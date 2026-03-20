@@ -52,12 +52,16 @@ struct FirstTakePhotoView: View {
                 }
 
                 // コーデ分析を促す説明文
-                VStack(spacing: 12) {
+                VStack(spacing: 8) {
                     Text("さあ、IRODORIを始めましょう")
                         .font(.system(size: 24, weight: .bold))
-                    Text(.init("1枚コーデを​送ると​ **あなただけの​相棒** が​作られます。​\n今​後​この​相棒が​あなたの​コーデ分析を​サポートします。​"))
+                    Text(.init("まだ、あなたの**コーデ写真が登録されていません**..."))
+                        .foregroundStyle(.black)
+                        .font(.system(size: 14, weight: .light))
+                    Text(.init("コーデ写真を​送るたびに相棒はあなたを理解します。​\n自分だけの相棒を作ってみましょう！"))
                         .foregroundStyle(.gray)
                         .font(.system(size: 14, weight: .regular))
+                        .padding(.top, 12)
                 }
 
                 // 画像選択方法
@@ -167,6 +171,7 @@ struct FirstTakePhotoView: View {
                 .font(.system(size: 20, weight: .bold))
                 .padding(.leading, 24)
             Text("あなたのコーデをよく知り、コーデ選びがより楽しくなるようサポートしてくれるパートナーです")
+                .foregroundStyle(.gray)
                 .font(.system(size: 14, weight: .regular))
                 .padding(.leading, 24)
 

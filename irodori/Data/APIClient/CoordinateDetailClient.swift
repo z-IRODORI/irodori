@@ -13,7 +13,7 @@ protocol CoordinateDetailClientProtocol {
 
 final class CoordinateDetailClient: CoordinateDetailClientProtocol {
     func get(uid: String, targetDate: String) async throws -> Result<[CoordinateDetailResponse], Error> {
-        let baseURL = "https://irodori.click"
+        let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "api/coordinate/date/\(uid)/\(targetDate)"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 

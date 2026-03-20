@@ -177,10 +177,7 @@ struct CameraView: View {
 
     private func PartnerComment(image: ImageResource, text: String) -> some View {
         HStack(spacing: 0) {
-            Image(.wolf)
-                .resizable()
-                .frame(width: 50, height: 50)
-                .clipShape(Circle())
+            PartnerIconImage(size: 50)
 
             SpeechBubbleView(text: text)
         }

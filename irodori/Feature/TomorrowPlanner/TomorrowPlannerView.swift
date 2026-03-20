@@ -17,8 +17,8 @@ struct TomorrowPlannerView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 24) {
                 // タイトル
-                HStack {
-                    VStack(spacing: 6) {
+                HStack(spacing: 32) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("明日のコーデ提案")
                             .font(.system(size: 20, weight: .bold))
                         Text("過去に登録したアイテムやコーデから提案します")
@@ -26,8 +26,6 @@ struct TomorrowPlannerView: View {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Spacer()
 
                     // リセットボタン
                     if !viewModel.coordinates.isEmpty {

@@ -125,12 +125,7 @@ struct ChatBubbleView: View {
             if message.isUser {
                 Spacer(minLength: 60)
             } else {
-                Image("wolf")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Color.gray.opacity(0.1)))
-                    .clipShape(Circle())
+                PartnerIconImage(size: 40)
             }
 
             Text(.init(message.text))
@@ -210,12 +205,7 @@ struct ChatView: View {
 
                             if viewModel.isLoading {
                                 HStack {
-                                    Image("wolf")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 40, height: 40)
-                                        .background(Circle().fill(Color.gray.opacity(0.1)))
-                                        .clipShape(Circle())
+                                    PartnerIconImage(size: 40)
 
                                     HStack {
                                         ProgressView()

@@ -21,10 +21,7 @@ struct CoordinateDetailView: View {
                         aiCatchphrase: coordinateDetail.ai_catchphrase
                     )
                     VStack(alignment: .leading, spacing: 12) {
-                        Image(.wolf)
-                            .resizable()
-                            .frame(width: 50, height: 50)
-                            .clipShape(Circle())
+                        PartnerIconImage(size: 50)
                         ReviewText(aiReviewComment: coordinateDetail.ai_review_comment)
                     }
                     .padding(.horizontal, 24)
@@ -68,6 +65,14 @@ struct CoordinateDetailView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(.gray.opacity(0.08))
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(false)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(viewModel.targetDateString)
+                    .font(.system(size: 16, weight: .semibold))
+            }
+        }
         .task {
             AnalyticsLogger.shared.log(screen: .coordinateDetailScreenView, parameters: [
                 "date": viewModel.targetDateString

@@ -104,19 +104,13 @@ struct ProfileView: View {
                                     .resizable()
                                     .scaledToFill()
                             case .empty, .failure:
-                                Image(.wolf)
-                                    .resizable()
-                                    .scaledToFill()
+                                PartnerIconImage(size: 80)
                             @unknown default:
-                                Image(.wolf)
-                                    .resizable()
-                                    .scaledToFill()
+                                PartnerIconImage(size: 80)
                             }
                         }
                     } else {
-                        Image(.wolf)
-                            .resizable()
-                            .scaledToFill()
+                        PartnerIconImage(size: 80)
                     }
                 }
                 .frame(width: 80, height: 80)

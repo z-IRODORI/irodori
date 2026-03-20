@@ -28,10 +28,7 @@ struct RecommendCoordinateView: View {
                             if let recommendReasons = recommendCoordinates.recommend_reasons {
                                 VStack(alignment: .leading, spacing: 12) {
                                     HStack(spacing: 6) {
-                                        Image(.wolf)
-                                            .resizable()
-                                            .frame(width: 50, height: 50)
-                                            .clipShape(Circle())
+                                        PartnerIconImage(size: 50)
                                         SpeechBubbleView(text: "おすすめコーデを3つ選んだよ")
                                     }
                                     Text(recommendReasons)

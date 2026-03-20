@@ -91,23 +91,8 @@ struct HomeView: View {
                     // コーデの分析
                     VStack(spacing: 12) {
                         HStack(spacing: 6) {
-                            // UserDefaultsからpartnerIconImageを取得
-                            Group {
-                                if let partnerIconImageName = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerIconImage.rawValue),
-                                   UIImage(named: partnerIconImageName) != nil {
-                                    Image(partnerIconImageName)
-                                        .resizable()
-                                } else if UIImage(named: "アヴァンギャルド・スター_icon") != nil {
-                                    Image("アヴァンギャルド・スター_icon")
-                                        .resizable()
-                                } else {
-                                    Image(.wolf)
-                                        .resizable()
-                                }
-                            }
-                            .frame(width: 50, height: 50)
-                            .clipShape(Circle())
-                            .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
+                            PartnerIconImage(size: 50)
+                                .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
 
                             SpeechBubbleView(text: "これまでのコーデを分析しました")
                                 .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
@@ -203,37 +188,37 @@ struct HomeView: View {
             )
         }
         .background(.gray.opacity(0.08))
-        .overlay(alignment: .bottom) {
-            HStack(spacing: 12) {
-                Button(action: {
-                    // action
-                }, label: {
-                    Text("写真選択")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: 200)
-                        .frame(height: 50)
-                        .background(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                })
-
-                Button(action: {
-                    // action
-                }, label: {
-                    Text("カメラ")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: 200)
-                        .frame(height: 50)
-                        .background(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                })
-            }
-            .padding(.top, 24)
-            .padding(.horizontal, 24)
-            .padding(.bottom, 90)  // TabBar の高さ分のパディング
-            .background(.white)
-        }
+//        .overlay(alignment: .bottom) {
+//            HStack(spacing: 12) {
+//                Button(action: {
+//                    // action
+//                }, label: {
+//                    Text("写真選択")
+//                        .font(.system(size: 18, weight: .regular))
+//                        .foregroundStyle(.white)
+//                        .frame(maxWidth: 200)
+//                        .frame(height: 50)
+//                        .background(.black)
+//                        .clipShape(RoundedRectangle(cornerRadius: 20))
+//                })
+//
+//                Button(action: {
+//                    // action
+//                }, label: {
+//                    Text("カメラ")
+//                        .font(.system(size: 18, weight: .regular))
+//                        .foregroundStyle(.white)
+//                        .frame(maxWidth: 200)
+//                        .frame(height: 50)
+//                        .background(.black)
+//                        .clipShape(RoundedRectangle(cornerRadius: 20))
+//                })
+//            }
+//            .padding(.top, 24)
+//            .padding(.horizontal, 24)
+//            .padding(.bottom, 90)  // TabBar の高さ分のパディング
+//            .background(.white)
+//        }
         .alert("コーディネートを削除", isPresented: $viewModel.showDeleteConfirmation) {
             Button("キャンセル", role: .cancel) {
                 viewModel.coordinateToDelete = nil

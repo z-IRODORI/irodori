@@ -43,10 +43,7 @@ struct CoordinateReviewView: View {
                             onDeleteRequest: { _ in }
                         )
                         VStack(alignment: .leading, spacing: 12) {
-                            Image(.wolf)
-                                .resizable()
-                                .frame(width: 50, height: 50)
-                                .clipShape(Circle())
+                            PartnerIconImage(size: 50)
                             ReviewText(aiReviewComment: viewModel.fashionReview!.ai_review_comment)
                         }
                         .padding(.horizontal, 24)
