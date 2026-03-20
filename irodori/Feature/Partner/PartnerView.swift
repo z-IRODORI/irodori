@@ -114,10 +114,17 @@ struct PartnerView: View {
 
                 if insight.count > 100 {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(isInsightExpanded ? .init(insight) : .init(String(insight.prefix(100))) + "...")
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundColor(.black)
-                            .lineSpacing(4)
+                        if isInsightExpanded {
+                            Text(.init(insight))
+                                .font(.system(size: 13))
+                                .foregroundColor(.black)
+                                .lineSpacing(4)
+                        } else {
+                            Text(.init(String(insight.prefix(100)) + "..."))
+                                .font(.system(size: 13))
+                                .foregroundColor(.black)
+                                .lineSpacing(4)
+                        }
 
                         Button(action: {
                             withAnimation {

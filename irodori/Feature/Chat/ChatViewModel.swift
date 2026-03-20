@@ -88,8 +88,10 @@ final class ChatViewModel {
     
     private func generateAIMessage(for userMessage: String) async {
         isLoading = true
-        // 実際の実装ではここでAI APIを呼び出す
-        let gender = UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue) ?? "other"
+
+        let genderString = UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        let gender = Gender.fromWithDefault(genderString, default: .other)
+
         do {
             let response = try await apiClient.post(chatRequest: .init(question: userMessage + "# 制約\n- 出力は300文字以内で", gender: gender, image_base64: coordinateImageBase64))
             switch response {

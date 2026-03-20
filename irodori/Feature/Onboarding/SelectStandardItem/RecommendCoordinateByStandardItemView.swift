@@ -120,10 +120,17 @@ struct RecommendCoordinateByStandardItemView: View {
 
                     if insight.insight.count > 80 {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(isInsightExpanded ? .init(insight.insight) : .init(String(insight.insight.prefix(80))) + "...")
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundColor(.black)
-                                .lineSpacing(4)
+                            if isInsightExpanded {
+                                Text(.init(insight.insight))
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.black)
+                                    .lineSpacing(4)
+                            } else {
+                                Text(.init(String(insight.insight.prefix(80)) + "..."))
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.black)
+                                    .lineSpacing(4)
+                            }
 
                             Button(action: {
                                 withAnimation {
