@@ -18,7 +18,7 @@ struct OnboardingView: View {
     let onbordingInfos: [OnboardingInfo] = [
         // 必ず1つ目のidは0, TabView のタグに使われる
         .init(id: 0, title: "毎日のコーデを撮影", description: "家を出る前 や 明日のコーデを考える時\n 鏡に映る**全身写真**を撮影", imageName: "onboarding1"),
-        .init(id: 1, title: "AIがコーデをレビュー", description: "撮影したコーデをもとに\nAIが **あなただけ** のレビューをお届け", imageName: "onboarding2")
+        .init(id: 1, title: "相棒がコーデをレビュー", description: "撮影したコーデをもとに\n相棒が **あなただけ** のレビューをお届け", imageName: "onboarding2")
     ]
     @State private var selectedOnbordingIndex: Int = 0
     let closeButtonTapped: () -> Void

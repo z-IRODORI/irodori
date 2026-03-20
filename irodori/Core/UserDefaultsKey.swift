@@ -19,6 +19,7 @@ enum UserDefaultsKey: String {
     case hasFashionTypeDiagnosis
     case coordinateChats
     case finishedFirstTakePhoto
+    case lastDismissedFirstTakePhotoDate
     case homePlannerCache
     case partnerImage
     case partnerIconImage

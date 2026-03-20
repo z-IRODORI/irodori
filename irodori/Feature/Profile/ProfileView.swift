@@ -4,7 +4,7 @@ import PhotosUI
 struct ProfileView: View {
     @Binding var path: [ViewType]
     @State private var viewModel = ProfileViewModel()
-    @State private var selectedTab = 0
+//    @State private var selectedTab = 0  // コーデタブ未実装のためコメントアウト
     @State private var hasLoadedItems = false
     @State private var selectedPhotoItem: PhotosPickerItem?
 
@@ -30,7 +30,7 @@ struct ProfileView: View {
                         path.append(.profileEdit)
                     }
                     .padding(.horizontal, 20)
-                    tabSegmentView
+//                    tabSegmentView  // コーデタブ未実装のためコメントアウト
 
                     VStack(spacing: 16) {
                         categorySelector
@@ -51,6 +51,10 @@ struct ProfileView: View {
                 await viewModel.loadItems()
                 hasLoadedItems = true
             }
+        }
+        .onAppear {
+            // プロフィール編集から戻ってきたときに情報を再読み込み
+            viewModel.reloadProfile()
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             Task {
@@ -104,13 +108,19 @@ struct ProfileView: View {
                                     .resizable()
                                     .scaledToFill()
                             case .empty, .failure:
-                                PartnerIconImage(size: 80)
+                                Image(systemName: "person.circle.fill")
+                                    .resizable()
+                                    .foregroundStyle(.gray)
                             @unknown default:
-                                PartnerIconImage(size: 80)
+                                Image(systemName: "person.circle.fill")
+                                    .resizable()
+                                    .foregroundStyle(.gray)
                             }
                         }
                     } else {
-                        PartnerIconImage(size: 80)
+                        Image(systemName: "person.circle.fill")
+                            .resizable()
+                            .foregroundStyle(.gray)
                     }
                 }
                 .frame(width: 80, height: 80)
@@ -178,30 +188,31 @@ struct ProfileView: View {
     }
 
     // MARK: - 4. tabSegmentView
-    private var tabSegmentView: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                tabButton(title: "アイテム", index: 0)
-                tabButton(title: "コーデ", index: 1)
-            }
-            Divider()
-        }
-    }
-
-    private func tabButton(title: String, index: Int) -> some View {
-        Button(action: { selectedTab = index }) {
-            VStack(spacing: 12) {
-                Text(title)
-                    .font(.system(size: 15, weight: selectedTab == index ? .bold : .medium))
-                    .foregroundStyle(selectedTab == index ? .black : .gray)
-
-                Rectangle()
-                    .fill(selectedTab == index ? Color.black : Color.clear)
-                    .frame(height: 2)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
+    // コーデタブ未実装のためコメントアウト
+//    private var tabSegmentView: some View {
+//        VStack(spacing: 0) {
+//            HStack(spacing: 0) {
+//                tabButton(title: "アイテム", index: 0)
+//                tabButton(title: "コーデ", index: 1)
+//            }
+//            Divider()
+//        }
+//    }
+//
+//    private func tabButton(title: String, index: Int) -> some View {
+//        Button(action: { selectedTab = index }) {
+//            VStack(spacing: 12) {
+//                Text(title)
+//                    .font(.system(size: 15, weight: selectedTab == index ? .bold : .medium))
+//                    .foregroundStyle(selectedTab == index ? .black : .gray)
+//
+//                Rectangle()
+//                    .fill(selectedTab == index ? Color.black : Color.clear)
+//                    .frame(height: 2)
+//            }
+//        }
+//        .frame(maxWidth: .infinity)
+//    }
 
     private var categorySelector: some View {
         HStack(spacing: 8) {

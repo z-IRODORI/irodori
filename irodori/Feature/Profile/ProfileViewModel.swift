@@ -82,6 +82,10 @@ final class ProfileViewModel {
 
     // MARK: - Profile Management
 
+    func reloadProfile() {
+        loadProfileFromDefaults()
+    }
+
     private func loadProfileFromDefaults() {
         guard let data = UserDefaults.standard.data(forKey: UserDefaultsKey.profileInfo.rawValue) else {
             // プロフィール情報がない場合はデフォルト値を作成

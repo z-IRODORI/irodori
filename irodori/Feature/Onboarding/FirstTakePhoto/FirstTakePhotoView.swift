@@ -17,19 +17,22 @@ struct FirstTakePhotoView: View {
     let showCloseButton: Bool
     let onClose: (() -> Void)?
     let okButtonTapped: (() -> Void)?
+    let onDontShowAgain: (() -> Void)?
 
     init(
         path: Binding<[ViewType]>,
         viewModel: FirstTakePhotoViewModel,
         showCloseButton: Bool = false,
         onClose: (() -> Void)? = nil,
-        okButtonTapped: (() -> Void)? = nil
+        okButtonTapped: (() -> Void)? = nil,
+        onDontShowAgain: (() -> Void)? = nil
     ) {
         self._path = path
         self._viewModel = State(initialValue: viewModel)
         self.showCloseButton = showCloseButton
         self.onClose = onClose
         self.okButtonTapped = okButtonTapped
+        self.onDontShowAgain = onDontShowAgain
     }
 
     var body: some View {
@@ -108,6 +111,19 @@ struct FirstTakePhotoView: View {
                         .padding(.leading, 16)
 
                         Spacer()
+
+                        Button(action: {
+                            onDontShowAgain?()
+                        }) {
+                            Text("1時間表示しない")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.gray)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.gray.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                        .padding(.trailing, 16)
                     }
                 }
             }

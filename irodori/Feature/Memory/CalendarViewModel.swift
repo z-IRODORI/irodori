@@ -15,6 +15,8 @@ final class CalendarViewModel {
     let daysOfTheWeek: [Week] = Week.allCases
     var coordinateListResponses: [[CoordinateListResponse]] = []
     let uid: String
+    var isLoading = false
+    var hasLoaded = false
 
     let apiClient: CoordinateListClientProtocol
     init(apiClient: CoordinateListClientProtocol) {
@@ -24,8 +26,23 @@ final class CalendarViewModel {
         setupMonths()
     }
 
+    var hasAnyCoordinates: Bool {
+        coordinateListResponses.contains { responses in
+            responses.contains { $0.coodinate_image_path != nil }
+        }
+    }
+
     func onAppear() async {
         print("=== CalendarViewModel onAppear ===")
+
+        // 既にロード済みの場合はスキップ
+        if hasLoaded {
+            print("Already loaded, skipping...")
+            print("=================================")
+            return
+        }
+
+        isLoading = true
         setupMonths()
         print("months count: \(months.count)")
         print("months: \(months.map { "\($0.year)-\($0.monthOfTheYear)" })")
@@ -49,6 +66,9 @@ final class CalendarViewModel {
         } catch {
             print("Error in onAppear: \(error)")
         }
+
+        isLoading = false
+        hasLoaded = true
         print("=================================")
     }
 

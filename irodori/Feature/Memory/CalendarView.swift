@@ -12,6 +12,7 @@ import Kingfisher
 struct CalendarView: View {
     @State var viewModel: CalendarViewModel
     @Binding var path: [ViewType]
+    @State private var showFirstTakePhotoSheet = false
 
     @Environment(\.presentationMode) var mode
     private let columns7 = [
@@ -31,42 +32,51 @@ struct CalendarView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            ScrollView(showsIndicators: false) {
+            if viewModel.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !viewModel.hasAnyCoordinates {
+                // コーデが0件の場合の表示
+                EmptyStateView(path: $path)
+                    .padding(.top, 75)
+            } else {
+                ScrollView(showsIndicators: false) {
 
-                ForEach(0..<viewModel.coordinateListResponses.count, id: \.self) { i in
-                    Text("\(viewModel.months[i].title)  \(String(viewModel.months[i].year))")
-                        .font(.system(size: 14, weight: .bold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
-                        .padding(.top)
+                    ForEach(0..<viewModel.coordinateListResponses.count, id: \.self) { i in
+                        Text("\(viewModel.months[i].title)  \(String(viewModel.months[i].year))")
+                            .font(.system(size: 14, weight: .bold))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
+                            .padding(.top)
 
-                    LazyVGrid(columns: columns3, alignment: .center, pinnedViews: .sectionHeaders) {
-                        // Days in a month
-                        ForEach(1..<viewModel.months[i].amountOfDays + 1, id: \.self) { day in
-                            if !viewModel.coordinateListResponses.isEmpty {
-                                if let coordinateImageURL = viewModel.coordinateListResponses[i][day - 1].coodinate_image_path {
-                                    Button(action: {
-                                        let year = viewModel.months[i].year
-                                        let month = viewModel.months[i].monthOfTheYear
-                                        let targetDateString = String(format: "%04d-%02d-%02d", year, month, day)
+                        LazyVGrid(columns: columns3, alignment: .center, pinnedViews: .sectionHeaders) {
+                            // Days in a month
+                            ForEach(1..<viewModel.months[i].amountOfDays + 1, id: \.self) { day in
+                                if !viewModel.coordinateListResponses.isEmpty {
+                                    if let coordinateImageURL = viewModel.coordinateListResponses[i][day - 1].coodinate_image_path {
+                                        Button(action: {
+                                            let year = viewModel.months[i].year
+                                            let month = viewModel.months[i].monthOfTheYear
+                                            let targetDateString = String(format: "%04d-%02d-%02d", year, month, day)
 
-                                        AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
-                                            "date": targetDateString,
-                                            "has_coordinate": true
-                                        ])
+                                            AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+                                                "date": targetDateString,
+                                                "has_coordinate": true
+                                            ])
 
-                                        let params: ViewType.CoordinateDetailParams = .init(uid: viewModel.uid, targetDateString: targetDateString, coordinateImageURL: coordinateImageURL)
-                                        path.append(.coordinateDetail(params))
-                                    }) {
-                                        Card(coordinateImageURL: coordinateImageURL, month: viewModel.months[i].monthOfTheYear, day: day)
+                                            let params: ViewType.CoordinateDetailParams = .init(uid: viewModel.uid, targetDateString: targetDateString, coordinateImageURL: coordinateImageURL)
+                                            path.append(.coordinateDetail(params))
+                                        }) {
+                                            Card(coordinateImageURL: coordinateImageURL, month: viewModel.months[i].monthOfTheYear, day: day)
+                                        }
                                     }
                                 }
                             }
                         }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
+                    .padding(.top, 75)
                 }
-                .padding(.top, 75)
             }
 
             Header()
@@ -78,6 +88,71 @@ struct CalendarView: View {
             AnalyticsLogger.shared.log(screen: .memoryCalendarScreenView)
             await viewModel.onAppear()
         }
+        .sheet(isPresented: $showFirstTakePhotoSheet) {
+            FirstTakePhotoView(
+                path: $path,
+                viewModel: .init(fashionReviewClient: FashionReviewClient()),
+                showCloseButton: true,
+                onClose: {
+                    showFirstTakePhotoSheet = false
+                },
+                okButtonTapped: {
+                    showFirstTakePhotoSheet = false
+                },
+                onDontShowAgain: {
+                    // カレンダー画面から開いた場合は「1時間表示しない」設定をしない
+                    showFirstTakePhotoSheet = false
+                }
+            )
+        }
+        .onChange(of: path) { oldPath, newPath in
+            // CoordinateReviewViewから「ホームへ」ボタンでpathが空になったらカレンダーをリロード
+            if !oldPath.isEmpty && newPath.isEmpty {
+                Task {
+                    // リロードフラグをリセットして再読み込み
+                    viewModel.hasLoaded = false
+                    await viewModel.onAppear()
+                }
+            }
+        }
+    }
+
+    private func EmptyStateView(path: Binding<[ViewType]>) -> some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            VStack(spacing: 16) {
+                Image(systemName: "calendar.badge.exclamationmark")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.gray.opacity(0.5))
+
+                VStack(spacing: 8) {
+                    Text("コーデが登録されていません")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.black)
+
+                    Text("コーデを登録すると、\nカレンダーで振り返ることができます")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.gray)
+                        .multilineTextAlignment(.center)
+                }
+            }
+
+            Button(action: {
+                showFirstTakePhotoSheet = true
+            }) {
+                Text("コーデを登録する")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: 200)
+                    .padding(.vertical, 14)
+                    .background(Color.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func Header() -> some View {

@@ -53,7 +53,7 @@ final class PartnerViewModel {
                 showError = true
             }
         } catch {
-            errorMessage = "インサイトの取得に失敗しました"
+            errorMessage = "相棒コメントの取得に失敗しました"
             showError = true
         }
     }

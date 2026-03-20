@@ -21,13 +21,8 @@ struct PartnerIconImage: View {
                UIImage(named: partnerIconImageName) != nil {
                 Image(partnerIconImageName)
                     .resizable()
-            } else if UIImage(named: "アヴァンギャルド・スター_icon") != nil {
-                // デフォルト：アヴァンギャルド・スター_icon（灰色）
-                Image("アヴァンギャルド・スター_icon")
-                    .resizable()
-                    .opacity(0.6)  // 灰色効果
             } else {
-                // フォールバック：SF Symbol
+                // デフォルト：SF Symbol
                 Image(systemName: "person.circle.fill")
                     .resizable()
                     .foregroundStyle(.gray)

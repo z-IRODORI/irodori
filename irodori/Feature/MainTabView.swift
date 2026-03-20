@@ -140,7 +140,7 @@ struct MainTabView: View {
 
                 Spacer()
 
-                tabItem(image: "person.fill", title: "プロフィール", isSelected: viewModel.selectedTab == .profile) {
+                tabItem(image: "person.fill", title: "クローゼット", isSelected: viewModel.selectedTab == .profile) {
                     viewModel.selectedTab = .profile
                 }
             }
@@ -198,7 +198,7 @@ struct MainTabView: View {
                 }
                 Text(title).font(.system(size: 12))
             }
-            .foregroundStyle(isSelected ? .black : .gray.opacity(0.6))
+            .foregroundStyle(isSelected ? .black : .gray.opacity(0.3))
             .frame(maxWidth: .infinity)
         }
     }

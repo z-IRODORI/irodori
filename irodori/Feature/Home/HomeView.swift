@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var plannerViewModel: PlannerViewModel = .init()
     @State private var showAllTags = false
     @State private var showFirstTakePhotoSheet = false
+    @State private var showTutorialSheet = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -154,11 +155,21 @@ struct HomeView: View {
             }
         }
         .onChange(of: viewModel.isLoadingHome) { oldValue, newValue in
-            // データロード完了時に、初回撮影未完了かつ直近のコーデが0件の場合、FirstTakePhotoViewを表示
+            // データロード完了時に、直近のコーデが0件の場合、FirstTakePhotoViewを表示
+            // ただし、最後に「1時間表示しない」を押してから1時間以内は表示しない
             if oldValue == true && newValue == false {
-                let hasFinishedFirstTakePhoto = UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue)
-                if !hasFinishedFirstTakePhoto && viewModel.homeResponse.recent_coordinates.isEmpty {
-                    showFirstTakePhotoSheet = true
+                if viewModel.homeResponse.recent_coordinates.isEmpty {
+                    // 最後に非表示にした日時を取得
+                    if let lastDismissedDate = UserDefaults.standard.object(forKey: UserDefaultsKey.lastDismissedFirstTakePhotoDate.rawValue) as? Date {
+                        // 1時間（3600秒）経過しているかチェック
+                        let oneHour: TimeInterval = 3600
+                        if Date().timeIntervalSince(lastDismissedDate) >= oneHour {
+                            showFirstTakePhotoSheet = true
+                        }
+                    } else {
+                        // 初回は表示
+                        showFirstTakePhotoSheet = true
+                    }
                 }
             }
         }
@@ -186,8 +197,18 @@ struct HomeView: View {
                 },
                 okButtonTapped: {
                     showFirstTakePhotoSheet = false
+                },
+                onDontShowAgain: {
+                    // 「1時間表示しない」を押した日時をUserDefaultsに保存
+                    UserDefaults.standard.set(Date(), forKey: UserDefaultsKey.lastDismissedFirstTakePhotoDate.rawValue)
+                    showFirstTakePhotoSheet = false
                 }
             )
+        }
+        .sheet(isPresented: $showTutorialSheet) {
+            OnboardingView(closeButtonTapped: {
+                showTutorialSheet = false
+            })
         }
         .background(.gray.opacity(0.08))
 //        .overlay(alignment: .bottom) {
@@ -257,8 +278,7 @@ struct HomeView: View {
                 }
 
                 Button(action: {
-                    // ログ送信
-                    // オンボーディング画面表示
+                    showTutorialSheet = true
                 }) {
                     Image(systemName: "questionmark.circle")
                 }

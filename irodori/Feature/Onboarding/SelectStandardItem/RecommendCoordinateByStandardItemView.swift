@@ -114,7 +114,7 @@ struct RecommendCoordinateByStandardItemView: View {
 
                 // 右側: インサイト
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("インサイト")
+                    Text("相棒からあなたへ")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.black)
 
@@ -160,7 +160,7 @@ struct RecommendCoordinateByStandardItemView: View {
 
     private func insightOnlySection(insight: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("インサイト")
+            Text("相棒からあなたへ")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.black)
 
