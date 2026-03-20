@@ -168,7 +168,8 @@ struct ChatView: View {
     let image: UIImage
     init(coordinateId: String, image: UIImage) {
         self.image = image
-        let imageData = image.jpegData(compressionQuality: 1.0)!
+        // 画像サイズを削減するため、圧縮率を0.5に設定（バックエンドでさらに圧縮される）
+        let imageData = image.jpegData(compressionQuality: 0.5)!
         self.viewModel = .init(coordinateId: coordinateId, coordinateImageBase64: imageData.base64EncodedString(), apiClient: ChatClient(), repository: CoordinateChatRepository())
     }
 

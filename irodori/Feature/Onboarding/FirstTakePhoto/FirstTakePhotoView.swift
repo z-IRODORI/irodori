@@ -156,6 +156,12 @@ struct FirstTakePhotoView: View {
                 viewModel.selectedImage = nil
             }
         }
+        .onChange(of: path) { oldPath, newPath in
+            // CoordinateReviewViewから「ホームへ」ボタンでpathが空になったらsheetを閉じる
+            if !oldPath.isEmpty && newPath.isEmpty {
+                onClose?()
+            }
+        }
         .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
                 viewModel.errorMessage = nil

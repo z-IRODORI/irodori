@@ -178,13 +178,15 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showFirstTakePhotoSheet) {
             FirstTakePhotoView(
-                path: .constant([]),
+                path: $path,
                 viewModel: .init(fashionReviewClient: FashionReviewClient()),
                 showCloseButton: true,
                 onClose: {
                     showFirstTakePhotoSheet = false
                 },
-                okButtonTapped: nil
+                okButtonTapped: {
+                    showFirstTakePhotoSheet = false
+                }
             )
         }
         .background(.gray.opacity(0.08))

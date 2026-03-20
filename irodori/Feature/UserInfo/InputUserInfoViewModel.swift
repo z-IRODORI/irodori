@@ -54,6 +54,7 @@ final class InputUserInfoViewModel {
             let _ = try await createUserClient.post(createUserRequest: .init(id: uid, cognito_id: uid, user_name: username, year: Int(birthDay.year)!, month: Int(birthDay.month)!, day: Int(birthDay.day)!, gender: selectedGender.number))
             if let encoded = try? JSONEncoder().encode(user) {
                 userDefaults.set(encoded, forKey: UserDefaultsKey.userInfo.rawValue)
+                userDefaults.set(selectedGender.apiValue, forKey: UserDefaultsKey.gender.rawValue)  // API値を保存
                 userDefaults.set(true, forKey: UserDefaultsKey.hasCompletedUserInfo.rawValue)
             }
         } catch {

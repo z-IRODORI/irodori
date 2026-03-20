@@ -19,6 +19,39 @@ enum Gender: String, CaseIterable, Codable {
         case .other: return 2
         }
     }
+
+    /// バックエンドAPI用の値（"men", "women", "other"）
+    var apiValue: String {
+        switch self {
+        case .male: return "men"
+        case .female: return "women"
+        case .other: return "other"
+        }
+    }
+
+    /// API値からGenderを作成
+    static func fromApiValue(_ apiValue: String?) -> Gender? {
+        guard let apiValue = apiValue else { return nil }
+        switch apiValue {
+        case "men": return .male
+        case "women": return .female
+        case "other": return .other
+        default: return nil
+        }
+    }
+
+    /// UserDefaults等から取得した値をGenderに変換（デフォルト値付き）
+    static func fromWithDefault(_ value: String?, default defaultValue: Gender = .other) -> Gender {
+        // まずAPI値として試す
+        if let gender = fromApiValue(value) {
+            return gender
+        }
+        // rawValueとして試す
+        if let value = value, let gender = Gender(rawValue: value) {
+            return gender
+        }
+        return defaultValue
+    }
 }
 
 struct BirthDay: Codable {
