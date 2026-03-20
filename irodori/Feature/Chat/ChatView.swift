@@ -168,9 +168,25 @@ struct ChatView: View {
     let image: UIImage
     init(coordinateId: String, image: UIImage) {
         self.image = image
-        // 画像サイズを削減するため、圧縮率を0.5に設定（バックエンドでさらに圧縮される）
-        let imageData = image.jpegData(compressionQuality: 0.5)!
+        // 画像サイズを削減: リサイズ + 圧縮
+        let resizedImage = ChatView.resizeImage(image, targetWidth: 800)
+        // 圧縮率を0.3に設定（バックエンドでさらに0.5倍に圧縮される）
+        let imageData = resizedImage.jpegData(compressionQuality: 0.3)!
+        print("Chat image data size: \(imageData.count) bytes")
         self.viewModel = .init(coordinateId: coordinateId, coordinateImageBase64: imageData.base64EncodedString(), apiClient: ChatClient(), repository: CoordinateChatRepository())
+    }
+
+    private static func resizeImage(_ image: UIImage, targetWidth: CGFloat) -> UIImage {
+        let scale = targetWidth / image.size.width
+        let newHeight = image.size.height * scale
+        let newSize = CGSize(width: targetWidth, height: newHeight)
+
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+
+        return resizedImage ?? image
     }
 
     var body: some View {

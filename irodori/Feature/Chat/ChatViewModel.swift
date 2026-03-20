@@ -64,16 +64,26 @@ final class ChatViewModel {
     }
     
     func sendMessage() async {
-        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        print("=== sendMessage called ===")
+        print("inputText: \(inputText)")
+        print("isLoading: \(isLoading)")
+
+        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print("Input text is empty, returning")
+            return
+        }
 
         let messageText = inputText
         inputText = ""
-        
+
         // ユーザーメッセージを追加
         let userMessage = ChatMessage(text: messageText, isUser: true)
         addMessage(userMessage)
+        print("Added user message: \(messageText)")
 
         await generateAIMessage(for: messageText)
+        print("generateAIMessage completed")
+        print("=========================")
     }
     
     func addSuggestedQuestion(_ question: String) {
