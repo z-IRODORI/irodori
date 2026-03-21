@@ -10,7 +10,9 @@ import SwiftUI
 struct FirstTakePhotoView: View {
     private let exampleImages1: [ImageResource] = Array(repeating: [.women1, .men1, .women2, .men2, .women3, .men3,.women4, .men4, .women5, .men5], count: 20).flatMap { $0 }
     private let exampleImages2: [ImageResource] = Array(repeating: [.women6, .men6, .women7, .men7, .women8, .men8, .women9, .men9, .women10, .men10], count: 20).flatMap { $0 }
-    @Binding var path: [ViewType]
+    @Binding var path: [ViewType]  // 親から受け取るが使用しない（後方互換性のため）
+    @State private var navigationPath: [ViewType] = []  // FirstTakePhotoView独自のNavigationStackパス
+    @State private var cameraPath: [ViewType] = []  // CameraView専用のpath（使用されないが必要）
     @State private var scrollOffset: CGFloat = 0
     @State private var timer: Timer?
     @State var viewModel: FirstTakePhotoViewModel
@@ -18,6 +20,7 @@ struct FirstTakePhotoView: View {
     let onClose: (() -> Void)?
     let okButtonTapped: (() -> Void)?
     let onDontShowAgain: (() -> Void)?
+    let onCameraButtonTapped: (() -> Void)?
 
     init(
         path: Binding<[ViewType]>,
@@ -25,7 +28,8 @@ struct FirstTakePhotoView: View {
         showCloseButton: Bool = false,
         onClose: (() -> Void)? = nil,
         okButtonTapped: (() -> Void)? = nil,
-        onDontShowAgain: (() -> Void)? = nil
+        onDontShowAgain: (() -> Void)? = nil,
+        onCameraButtonTapped: (() -> Void)? = nil
     ) {
         self._path = path
         self._viewModel = State(initialValue: viewModel)
@@ -33,157 +37,181 @@ struct FirstTakePhotoView: View {
         self.onClose = onClose
         self.okButtonTapped = okButtonTapped
         self.onDontShowAgain = onDontShowAgain
+        self.onCameraButtonTapped = onCameraButtonTapped
     }
 
     var body: some View {
-        ScrollView(.vertical) {
-            VStack(spacing: 32) {
-                Spacer().frame(height: 20)
+        NavigationStack(path: $navigationPath) {
+            ScrollView(.vertical) {
+                VStack(spacing: 32) {
+                    Spacer().frame(height: 20)
 
-                // 撮影画像の例
-                VStack(spacing: 6) {
-                    ExamplePics(title: "", textColor: .blue, images: exampleImages1, scrollOffset: $scrollOffset)
-                    ExamplePics(title: "", textColor: .blue, images: exampleImages2, scrollOffset: $scrollOffset)
-                }
-                .padding(.vertical, 24)
-                .padding(.horizontal, -24)
-                .onAppear {
-                    startAutoScroll()
-                }
-                .onDisappear {
-                    stopAutoScroll()
-                }
-
-                // コーデ分析を促す説明文
-                VStack(spacing: 8) {
-                    Text("さあ、IRODORIを始めましょう")
-                        .font(.system(size: 24, weight: .bold))
-                    Text(.init("まだ、あなたの**コーデ写真が登録されていません**..."))
-                        .foregroundStyle(.black)
-                        .font(.system(size: 14, weight: .light))
-                    Text(.init("コーデ写真を​送るたびに相棒はあなたを理解します。​\n自分だけの相棒を作ってみましょう！"))
-                        .foregroundStyle(.gray)
-                        .font(.system(size: 14, weight: .regular))
-                        .padding(.top, 12)
-                }
-
-                // 画像選択方法
-                HStack(spacing: 12) {
-                    CustomButton(title: "カメラを起動", textColor: .gray, backgroundColor: .white, tappedAction: {
-                        viewModel.showCameraView = true
-                    })
-                    CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .black, tappedAction: {
-                        viewModel.showPhotoPicker = true
-                    })
-                }
-
-                Divider().frame(maxWidth: .infinity).frame(height: 2)
-
-                // 相棒についての説明
-                WhatIsPartner()
+                    // 撮影画像の例
+                    VStack(spacing: 6) {
+                        ExamplePics(title: "", textColor: .blue, images: exampleImages1, scrollOffset: $scrollOffset)
+                        ExamplePics(title: "", textColor: .blue, images: exampleImages2, scrollOffset: $scrollOffset)
+                    }
                     .padding(.vertical, 24)
-                //                    .background(.yellow.opacity(0.1))
                     .padding(.horizontal, -24)
+                    .onAppear {
+                        startAutoScroll()
+                    }
+                    .onDisappear {
+                        stopAutoScroll()
+                    }
 
-                Spacer().frame(height: 60)
+                    // コーデ分析を促す説明文
+                    VStack(spacing: 8) {
+                        Text("さあ、IRODORIを始めましょう")
+                            .font(.system(size: 24, weight: .bold))
+                        Text(.init("まだ、あなたの**コーデ写真が登録されていません**..."))
+                            .foregroundStyle(.black)
+                            .font(.system(size: 14, weight: .light))
+                        Text(.init("コーデ写真を​送るたびに相棒はあなたを理解します。​\n自分だけの相棒を作ってみましょう！"))
+                            .foregroundStyle(.gray)
+                            .font(.system(size: 14, weight: .regular))
+                            .padding(.top, 12)
+                    }
+
+                    // 画像選択方法
+                    HStack(spacing: 12) {
+                        CustomButton(title: "カメラを起動", textColor: .gray, backgroundColor: .white, tappedAction: {
+                            if let onCameraButtonTapped = onCameraButtonTapped {
+                                // HomeViewから呼ばれた場合: コールバック実行（sheet閉じてNavigation遷移）
+                                onCameraButtonTapped()
+                            } else {
+                                // それ以外の場合: 従来通りfullScreenCoverで表示（後方互換性）
+                                viewModel.showCameraView = true
+                            }
+                        })
+                        CustomButton(title: "写真を選ぶ", textColor: .white, backgroundColor: .black, tappedAction: {
+                            viewModel.showPhotoPicker = true
+                        })
+                    }
+
+                    Divider().frame(maxWidth: .infinity).frame(height: 2)
+
+                    // 相棒についての説明
+                    WhatIsPartner()
+                        .padding(.vertical, 24)
+                    //                    .background(.yellow.opacity(0.1))
+                        .padding(.horizontal, -24)
+
+                    Spacer().frame(height: 60)
+                }
+                .padding(.horizontal, 24)
             }
-            .padding(.horizontal, 24)
-        }
-        .overlay(alignment: .top) {
-            ZStack {
-                Text("IRODORI")
-                    .font(.system(size: 24, weight: .bold))
-                    .frame(maxWidth: .infinity)
-                    .foregroundStyle(.black)
+            .overlay(alignment: .top) {
+                ZStack {
+                    Text("IRODORI")
+                        .font(.system(size: 24, weight: .bold))
+                        .frame(maxWidth: .infinity)
+                        .foregroundStyle(.black)
 
-                if showCloseButton {
-                    HStack {
-                        Button(action: {
-                            onClose?()
-                        }) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(.black)
-                                .frame(width: 32, height: 32)
-                                .background(Color.gray.opacity(0.1))
-                                .clipShape(Circle())
+                    if showCloseButton {
+                        HStack {
+                            Button(action: {
+                                onClose?()
+                            }) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.black)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color.gray.opacity(0.1))
+                                    .clipShape(Circle())
+                            }
+                            .padding(.leading, 16)
+
+                            Spacer()
+
+                            Button(action: {
+                                onDontShowAgain?()
+                            }) {
+                                Text("1時間表示しない")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.gray)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.gray.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                            }
+                            .padding(.trailing, 16)
                         }
-                        .padding(.leading, 16)
-
-                        Spacer()
-
-                        Button(action: {
-                            onDontShowAgain?()
-                        }) {
-                            Text("1時間表示しない")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.gray)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.gray.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                        }
-                        .padding(.trailing, 16)
                     }
                 }
+                .padding(.vertical, 24)
+                .background(.white)
             }
-            .padding(.vertical, 24)
-            .background(.white)
-        }
-        .fullScreenCover(isPresented: $viewModel.showCameraView) {
-            CameraView(
-                cameraViewModel: .init(),
-                path: $path,
-                onPhotoCaptured: { image in
-                    viewModel.capturedImageFromCamera = image
-                    viewModel.showCameraView = false
-                }
-            )
-        }
-        .sheet(isPresented: $viewModel.showPhotoPicker) {
-            PhotoPickerView(isPresented: $viewModel.showPhotoPicker) { image in
-                // メソッド内で showConfirmationView が切り替わる
-                // CapturedImageView を呼びだす
-                viewModel.handleImageSelection(image)
-            }
-        }
-        .fullScreenCover(isPresented: $viewModel.showConfirmationView) {
-            if let image = viewModel.selectedImage ?? viewModel.capturedImageFromCamera {
-                CapturedImageView(
-                    image: image,
-                    viewModel: .init(inputUIImage: image),
-                    isPresented: $viewModel.showConfirmationView,
-                    okButtonTapped: {
-                        okButtonTapped?()
-                        path.append(.coordinateReview(.init(image: image, fromFirstTakePhotoView: true)))
+            .fullScreenCover(isPresented: $viewModel.showCameraView) {
+                CameraView(
+                    cameraViewModel: .init(),
+                    path: $cameraPath,
+                    onPhotoCaptured: { image in
+                        viewModel.capturedImageFromCamera = image
+                        viewModel.showCameraView = false
                     }
                 )
             }
-        }
-        .onChange(of: viewModel.capturedImageFromCamera) { _, newImage in
-            if newImage != nil {
-                viewModel.showConfirmationView = true
+            .sheet(isPresented: $viewModel.showPhotoPicker) {
+                PhotoPickerView(isPresented: $viewModel.showPhotoPicker) { image in
+                    // メソッド内で showConfirmationView が切り替わる
+                    // CapturedImageView を呼びだす
+                    viewModel.handleImageSelection(image)
+                }
             }
-        }
-        .onChange(of: viewModel.showConfirmationView) { _, isShowing in
-            if !isShowing {
-                // CapturedImageView が閉じられたら、キャプチャした画像をクリア
-                viewModel.capturedImageFromCamera = nil
-                viewModel.selectedImage = nil
+            .fullScreenCover(isPresented: $viewModel.showConfirmationView) {
+                if let image = viewModel.selectedImage ?? viewModel.capturedImageFromCamera {
+                    CapturedImageView(
+                        image: image,
+                        viewModel: .init(inputUIImage: image),
+                        isPresented: $viewModel.showConfirmationView,
+                        okButtonTapped: {
+                            okButtonTapped?()
+                            navigationPath.append(.coordinateReview(.init(image: image, fromFirstTakePhotoView: true)))
+                        }
+                    )
+                }
             }
-        }
-        .onChange(of: path) { oldPath, newPath in
-            // CoordinateReviewViewから「ホームへ」ボタンでpathが空になったらsheetを閉じる
-            if !oldPath.isEmpty && newPath.isEmpty {
-                onClose?()
+            .onChange(of: viewModel.capturedImageFromCamera) { _, newImage in
+                if newImage != nil {
+                    viewModel.showConfirmationView = true
+                }
             }
-        }
-        .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.errorMessage = nil
+            .onChange(of: viewModel.showConfirmationView) { _, isShowing in
+                if !isShowing {
+                    // CapturedImageView が閉じられたら、キャプチャした画像をクリア
+                    viewModel.capturedImageFromCamera = nil
+                    viewModel.selectedImage = nil
+                }
             }
-        } message: {
-            Text(viewModel.errorMessage ?? "")
+            .onChange(of: navigationPath) { oldPath, newPath in
+                // CoordinateReviewViewから「ホームへ」ボタンでnavigationPathが空になったらsheetを閉じる
+                if !oldPath.isEmpty && newPath.isEmpty {
+                    onClose?()
+                }
+            }
+            .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
+            .navigationDestination(for: ViewType.self) { viewType in
+                switch viewType {
+                case .coordinateReview(let params):
+                    CoordinateReviewView(
+                        viewModel: .init(
+                            coordinateImage: params.image!.correctOrientation,
+                            apiClient: FashionReviewClient()
+                        ),
+                        fromFirstTakePhotoView: params.fromFirstTakePhotoView,
+                        path: $navigationPath
+                    )
+                default:
+                    EmptyView()
+                }
+            }
         }
     }
 
@@ -242,7 +270,7 @@ struct FirstTakePhotoView: View {
                         Image(image)
                             .resizable()
                             .scaledToFill()
-//                            .aspectRatio(3/4, contentMode: .fill)
+                        //                            .aspectRatio(3/4, contentMode: .fill)
                             .frame(width: 130, height: 130 * (4/3))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }

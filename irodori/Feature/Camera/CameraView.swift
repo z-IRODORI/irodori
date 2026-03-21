@@ -109,12 +109,22 @@ struct CameraView: View {
             .interactiveDismissDisabled()
         }
         .sheet(isPresented: $cameraViewModel.showImagePicker) {
-            PhotoPickerView(isPresented: $cameraViewModel.showImagePicker) { image in
-                cameraViewModel.processPickedImage(image)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    showCapturedImage = true
+            PhotoPickerView(
+                isPresented: $cameraViewModel.showImagePicker,
+                onImageSelected: { image in
+                    cameraViewModel.processPickedImage(image)
+                    // 画像ロード完了後、短い遅延でCapturedImageViewを表示
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showCapturedImage = true
+                    }
+                },
+                onLoadingStateChanged: { isLoading in
+                    cameraViewModel.setImageLoadingState(isLoading)
+                },
+                onError: { errorMessage in
+                    cameraViewModel.setImageLoadError(errorMessage)
                 }
-            }
+            )
         }
         .alert("フォトライブラリへのアクセス", isPresented: $cameraViewModel.showPhotoLibraryPermissionAlert) {
             Button("設定") {
@@ -125,6 +135,37 @@ struct CameraView: View {
             Button("キャンセル", role: .cancel) {}
         } message: {
             Text("写真を選択するには、設定でフォトライブラリへのアクセスを許可してください。")
+        }
+        .alert("エラー", isPresented: .constant(cameraViewModel.imageLoadError != nil)) {
+            Button("OK") {
+                cameraViewModel.imageLoadError = nil
+            }
+        } message: {
+            if let errorMessage = cameraViewModel.imageLoadError {
+                Text(errorMessage)
+            }
+        }
+        .overlay {
+            if cameraViewModel.isLoadingPickedImage {
+                ZStack {
+                    Color.black.opacity(0.5)
+                        .ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        Text("画像を読み込んでいます...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+        }
+        .onChange(of: showCapturedImage) { _, isShowing in
+            if !isShowing {
+                // CapturedImageViewが閉じられたら画像をクリア
+                cameraViewModel.capturedImage = nil
+            }
         }
     }
 

@@ -12,7 +12,7 @@ import Kingfisher
 struct CalendarView: View {
     @State var viewModel: CalendarViewModel
     @Binding var path: [ViewType]
-    @State private var showFirstTakePhotoSheet = false
+    @Environment(MainTabViewModel.self) private var tabViewModel
 
     @Environment(\.presentationMode) var mode
     private let columns7 = [
@@ -88,23 +88,6 @@ struct CalendarView: View {
             AnalyticsLogger.shared.log(screen: .memoryCalendarScreenView)
             await viewModel.onAppear()
         }
-        .sheet(isPresented: $showFirstTakePhotoSheet) {
-            FirstTakePhotoView(
-                path: $path,
-                viewModel: .init(fashionReviewClient: FashionReviewClient()),
-                showCloseButton: true,
-                onClose: {
-                    showFirstTakePhotoSheet = false
-                },
-                okButtonTapped: {
-                    showFirstTakePhotoSheet = false
-                },
-                onDontShowAgain: {
-                    // カレンダー画面から開いた場合は「1時間表示しない」設定をしない
-                    showFirstTakePhotoSheet = false
-                }
-            )
-        }
         .onChange(of: path) { oldPath, newPath in
             // CoordinateReviewViewから「ホームへ」ボタンでpathが空になったらカレンダーをリロード
             if !oldPath.isEmpty && newPath.isEmpty {
@@ -139,7 +122,10 @@ struct CalendarView: View {
             }
 
             Button(action: {
-                showFirstTakePhotoSheet = true
+                // ホームタブに切り替えて、FirstTakePhotoViewを表示
+                tabViewModel.shouldShowFirstTakePhotoOnHome = true
+                tabViewModel.selectedTab = .home
+                mode.wrappedValue.dismiss()  // カレンダー画面を閉じる
             }) {
                 Text("コーデを登録する")
                     .font(.system(size: 16, weight: .semibold))

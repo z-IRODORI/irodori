@@ -15,6 +15,7 @@ struct HomeView: View {
     @State private var showAllTags = false
     @State private var showFirstTakePhotoSheet = false
     @State private var showTutorialSheet = false
+    @Environment(MainTabViewModel.self) private var tabViewModel
 
     var body: some View {
         VStack(spacing: 12) {
@@ -173,6 +174,13 @@ struct HomeView: View {
                 }
             }
         }
+        .onChange(of: tabViewModel.shouldShowFirstTakePhotoOnHome) { _, newValue in
+            // カレンダー画面から「コーデを登録する」ボタンでホームに戻ってきた場合
+            if newValue {
+                showFirstTakePhotoSheet = true
+                tabViewModel.shouldShowFirstTakePhotoOnHome = false
+            }
+        }
         .sheet(isPresented: Binding(
             get: { viewModel.showingItemPicker },
             set: { viewModel.showingItemPicker = $0 }
@@ -202,6 +210,16 @@ struct HomeView: View {
                     // 「1時間表示しない」を押した日時をUserDefaultsに保存
                     UserDefaults.standard.set(Date(), forKey: UserDefaultsKey.lastDismissedFirstTakePhotoDate.rawValue)
                     showFirstTakePhotoSheet = false
+                },
+                onCameraButtonTapped: {
+                    // 1. sheetを閉じる
+                    showFirstTakePhotoSheet = false
+
+                    // 2. sheetのdismissアニメーション完了を待つ（0.3秒）
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        // 3. CameraViewへNavigationStack経由で遷移
+                        path.append(.camera)
+                    }
                 }
             )
         }

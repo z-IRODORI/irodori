@@ -102,7 +102,7 @@ struct SelectStandardItemView: View {
                                         Text("登録中...")
                                             .font(.system(size: 16, weight: .semibold))
                                     } else {
-                                        Text("コーデ提案")
+                                        Text("登録")
                                             .font(.system(size: 16, weight: .semibold))
                                     }
                                 }

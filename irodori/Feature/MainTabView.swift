@@ -11,6 +11,7 @@ struct MainTabView: View {
                 ZStack {
                     HomeView(path: $path)
                         .opacity(viewModel.selectedTab == .home ? 1 : 0)
+                        .environment(viewModel)
 
                     PlannerView()
                         .opacity(viewModel.selectedTab == .planner ? 1 : 0)
@@ -48,6 +49,7 @@ struct MainTabView: View {
                     )
                 case .calendar:
                     CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
+                        .environment(viewModel)
                 case .coordinateDetail(let params):
                     CoordinateDetailView(
                         viewModel: .init(uid: params.uid, targetDateString: params.targetDateString, coordinateImageURL: params.coordinateImageURL, coordinateDetailClient: CoordinateDetailClient())
@@ -208,6 +210,7 @@ struct MainTabView: View {
 @MainActor
 final class MainTabViewModel {
     var selectedTab: Tab = .home
+    var shouldShowFirstTakePhotoOnHome: Bool = false
 
     enum Tab {
         case home
