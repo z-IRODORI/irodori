@@ -99,8 +99,7 @@ struct ProfileView: View {
             // プロフィール画像
             ZStack(alignment: .bottomTrailing) {
                 Group {
-                    if let profileImageUrl = viewModel.profileInfo?.profileImageUrl,
-                       let url = URL(string: profileImageUrl) {
+                    if let url = viewModel.getProfileImageURL() {
                         AsyncImage(url: url) { phase in
                             switch phase {
                             case .success(let image):

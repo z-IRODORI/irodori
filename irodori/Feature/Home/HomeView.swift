@@ -152,7 +152,10 @@ struct HomeView: View {
         }
         .onAppear {
             Task {
-                await viewModel.onAppear()
+                // 既にデータがある場合は読み込まない
+                if viewModel.homeResponse.recent_coordinates.isEmpty {
+                    await viewModel.onAppear()
+                }
             }
         }
         .onChange(of: viewModel.isLoadingHome) { oldValue, newValue in
@@ -279,6 +282,27 @@ struct HomeView: View {
         } message: {
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
+            }
+        }
+        .overlay {
+            if viewModel.isDeletingCoordinate {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+
+                        Text("削除中...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(32)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(16)
+                }
             }
         }
     }

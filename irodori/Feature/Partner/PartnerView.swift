@@ -60,7 +60,10 @@ struct PartnerView: View {
             ScoreDetailView(detail: detail)
         }
         .task {
-            await viewModel.fetchUserInsight()
+            // 既にデータがある場合は読み込まない
+            if viewModel.userInsight == nil {
+                await viewModel.fetchUserInsight()
+            }
         }
     }
 

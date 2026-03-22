@@ -159,9 +159,15 @@ final class ProfileViewModel {
 
         // ダミー実装: 画像をアプリのドキュメントディレクトリに保存
         if let data = image.jpegData(compressionQuality: 0.8) {
-            let filename = "profile_\(UUID().uuidString).jpg"
+            // 固定ファイル名を使用（毎回上書き）
+            let filename = "profile_image.jpg"
+
+            // 古いプロフィール画像を削除
+            deleteOldProfileImage()
+
             if let url = saveImageToDocuments(data: data, filename: filename) {
-                updateProfileImage(url: url.absoluteString)
+                // ファイル名のみを保存（フルパスではなく）
+                updateProfileImage(url: filename)
             }
         }
 
@@ -181,5 +187,40 @@ final class ProfileViewModel {
         } catch {
             return nil
         }
+    }
+
+    private func deleteOldProfileImage() {
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+
+        // profile_で始まるファイルをすべて削除
+        do {
+            let fileURLs = try FileManager.default.contentsOfDirectory(at: documentsDirectory, includingPropertiesForKeys: nil)
+            for fileURL in fileURLs {
+                if fileURL.lastPathComponent.hasPrefix("profile_") {
+                    try? FileManager.default.removeItem(at: fileURL)
+                }
+            }
+        } catch {
+            // エラーは無視
+        }
+    }
+
+    // プロフィール画像の実際のURLを取得するヘルパーメソッド
+    func getProfileImageURL() -> URL? {
+        guard let filename = profileInfo?.profileImageUrl else { return nil }
+
+        // file://で始まる場合は古い形式（フルパス）なので、そのまま返す
+        if filename.hasPrefix("file://") {
+            return URL(string: filename)
+        }
+
+        // ファイル名のみの場合は、ドキュメントディレクトリのパスを構築
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+
+        return documentsDirectory.appendingPathComponent(filename)
     }
 }

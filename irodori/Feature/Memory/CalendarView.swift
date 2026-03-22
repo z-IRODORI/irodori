@@ -13,8 +13,7 @@ struct CalendarView: View {
     @State var viewModel: CalendarViewModel
     @Binding var path: [ViewType]
     @Environment(MainTabViewModel.self) private var tabViewModel
-
-    @Environment(\.presentationMode) var mode
+    @Environment(\.dismiss) private var dismiss
     private let columns7 = [
         GridItem.init(.flexible(), alignment: .center),
         GridItem.init(.flexible(), alignment: .center),
@@ -31,17 +30,15 @@ struct CalendarView: View {
     ]
 
     var body: some View {
-        ZStack(alignment: .top) {
+        Group {
             if viewModel.isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !viewModel.hasAnyCoordinates {
                 // コーデが0件の場合の表示
                 EmptyStateView(path: $path)
-                    .padding(.top, 75)
             } else {
                 ScrollView(showsIndicators: false) {
-
                     ForEach(0..<viewModel.coordinateListResponses.count, id: \.self) { i in
                         Text("\(viewModel.months[i].title)  \(String(viewModel.months[i].year))")
                             .font(.system(size: 14, weight: .bold))
@@ -64,7 +61,7 @@ struct CalendarView: View {
                                                 "has_coordinate": true
                                             ])
 
-                                            let params: ViewType.CoordinateDetailParams = .init(uid: viewModel.uid, targetDateString: targetDateString, coordinateImageURL: coordinateImageURL)
+                                            let params: ViewType.CoordinateDetailParams = .init(uid: viewModel.uid, targetDateString: targetDateString, coordinateImageURL: coordinateImageURL, showHeader: false)
                                             path.append(.coordinateDetail(params))
                                         }) {
                                             Card(coordinateImageURL: coordinateImageURL, month: viewModel.months[i].monthOfTheYear, day: day)
@@ -75,18 +72,22 @@ struct CalendarView: View {
                         }
                         .padding(.horizontal)
                     }
-                    .padding(.top, 75)
+                    .padding(.top, 16)
                 }
             }
-
-            Header()
-                .padding(.horizontal, 12)
         }
-        .navigationBarHidden(true)
+        .navigationTitle("カレンダー")
+        .navigationBarTitleDisplayMode(.inline)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             AnalyticsLogger.shared.log(screen: .memoryCalendarScreenView)
             await viewModel.onAppear()
+        }
+        .onDisappear {
+            // 画面を離れる際にアナリティクスを記録
+            AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+                "action": GAEventAction.backToCamera.rawValue
+            ])
         }
         .onChange(of: path) { oldPath, newPath in
             // CoordinateReviewViewから「ホームへ」ボタンでpathが空になったらカレンダーをリロード
@@ -125,7 +126,7 @@ struct CalendarView: View {
                 // ホームタブに切り替えて、FirstTakePhotoViewを表示
                 tabViewModel.shouldShowFirstTakePhotoOnHome = true
                 tabViewModel.selectedTab = .home
-                mode.wrappedValue.dismiss()  // カレンダー画面を閉じる
+                dismiss()  // カレンダー画面を閉じる
             }) {
                 Text("コーデを登録する")
                     .font(.system(size: 16, weight: .semibold))
@@ -141,26 +142,27 @@ struct CalendarView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func Header() -> some View {
-        ZStack {
-            Text("カレンダー")
-                .font(.headline)
-                .padding(.top, 7)
-
-            Button {
-                AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
-                    "action": GAEventAction.backToCamera.rawValue
-                ])
-                mode.wrappedValue.dismiss()
-            } label: {
-                Image(systemName: "arrow.backward")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .frame(maxWidth: 30, maxHeight: 30)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
+    // 標準ナビゲーションバーを使用するため、カスタムHeaderは不要
+//    private func Header() -> some View {
+//        ZStack {
+//            Text("カレンダー")
+//                .font(.headline)
+//                .padding(.top, 7)
+//
+//            Button {
+//                AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+//                    "action": GAEventAction.backToCamera.rawValue
+//                ])
+//                mode.wrappedValue.dismiss()
+//            } label: {
+//                Image(systemName: "arrow.backward")
+//                    .font(.headline)
+//                    .foregroundColor(.primary)
+//                    .frame(maxWidth: 30, maxHeight: 30)
+//            }
+//            .frame(maxWidth: .infinity, alignment: .leading)
+//        }
+//    }
 
     private func Card(coordinateImageURL: String, month: Int, day: Int) -> some View {
         ZStack(alignment: .topLeading) {

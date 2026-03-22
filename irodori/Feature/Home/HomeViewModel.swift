@@ -32,6 +32,7 @@ final class HomeViewModel {
     var showDeleteConfirmation: Bool = false
     var coordinateToDelete: String? = nil
     var errorMessage: String? = nil
+    var isDeletingCoordinate: Bool = false
 
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
@@ -252,6 +253,9 @@ final class HomeViewModel {
 
     func deleteCoordinate() async {
         guard let coordinateId = coordinateToDelete else { return }
+
+        isDeletingCoordinate = true
+        defer { isDeletingCoordinate = false }
 
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
 

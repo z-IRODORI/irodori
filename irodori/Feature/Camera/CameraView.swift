@@ -174,43 +174,43 @@ struct CameraView: View {
             Text("IRODORI")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(.black)
-            HStack(spacing: 24) {
-                Button(action: {
-                    AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
-                        "source": GAEventAction.cameraHeaderButton.rawValue
-                    ])
-                    path.append(.calendar)
-                }) {
-                    Image(systemName: "calendar")
-                        .resizable()
-                        .frame(width: 25, height: 25)
-                        .foregroundStyle(.black)
-                }
-
-                Button(action: {
-                    AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
-                        "source": GAEventAction.helpButton.rawValue
-                    ])
-                    isShowOnboardingModal = true
-                }) {
-                    Image(systemName: "questionmark.circle")
-                        .resizable()
-                        .frame(width: 25, height: 25)
-                        .foregroundStyle(.black)
-                }
-
-                // TODO: リリース時は削除
+//            HStack(spacing: 24) {
 //                Button(action: {
-//                    cameraViewModel.earserButtonTapped()
-//                    exit(0)
+//                    AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+//                        "source": GAEventAction.cameraHeaderButton.rawValue
+//                    ])
+//                    path.append(.calendar)
 //                }) {
-//                    Image(systemName: "eraser")
+//                    Image(systemName: "calendar")
 //                        .resizable()
-//                        .frame(width: 20, height: 20)
+//                        .frame(width: 25, height: 25)
 //                        .foregroundStyle(.black)
 //                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+//
+//                Button(action: {
+//                    AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
+//                        "source": GAEventAction.helpButton.rawValue
+//                    ])
+//                    isShowOnboardingModal = true
+//                }) {
+//                    Image(systemName: "questionmark.circle")
+//                        .resizable()
+//                        .frame(width: 25, height: 25)
+//                        .foregroundStyle(.black)
+//                }
+//
+//                // TODO: リリース時は削除
+////                Button(action: {
+////                    cameraViewModel.earserButtonTapped()
+////                    exit(0)
+////                }) {
+////                    Image(systemName: "eraser")
+////                        .resizable()
+////                        .frame(width: 20, height: 20)
+////                        .foregroundStyle(.black)
+////                }
+//            }
+//            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 30)

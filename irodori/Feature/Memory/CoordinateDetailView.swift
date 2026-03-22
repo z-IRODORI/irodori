@@ -10,6 +10,7 @@ import SwiftUI
 struct CoordinateDetailView: View {
     @State var viewModel: CoordinateDetailViewModel
     @State private var coordinateImage: UIImage?
+    let showHeader: Bool
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -68,9 +69,11 @@ struct CoordinateDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(false)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(viewModel.targetDateString)
-                    .font(.system(size: 16, weight: .semibold))
+            if showHeader {
+                ToolbarItem(placement: .principal) {
+                    Text(viewModel.targetDateString)
+                        .font(.system(size: 16, weight: .semibold))
+                }
             }
         }
         .task {

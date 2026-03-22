@@ -39,6 +39,8 @@ final class CalendarViewModel {
         if hasLoaded {
             print("Already loaded, skipping...")
             print("=================================")
+            // 念のため、isLoadingをfalseに設定（前回のロードで残っている可能性があるため）
+            isLoading = false
             return
         }
 
