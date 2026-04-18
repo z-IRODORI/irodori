@@ -16,6 +16,7 @@
 		4979DE952F22A0920071B837 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 4979DE942F22A0920071B837 /* FirebaseFunctions */; };
 		4979DE972F22A0920071B837 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 4979DE962F22A0920071B837 /* FirebaseStorage */; };
 		49CBE94B2D9E94E800383A64 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 49CBE94A2D9E94E800383A64 /* Kingfisher */; };
+		D43CABC52F8C082100743261 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D43CABC42F8C082100743261 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,6 +37,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D43CABC42F8C082100743261 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		D4C87F5C2D8AA64600FA8A08 /* irodori.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = irodori.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D4C87F6C2D8AA64900FA8A08 /* irodoriTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = irodoriTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D4C87F762D8AA64A00FA8A08 /* irodoriUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = irodoriUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -121,6 +123,7 @@
 				D4C87F792D8AA64A00FA8A08 /* irodoriUITests */,
 				49CBE9492D9E94E800383A64 /* Frameworks */,
 				D4C87F5D2D8AA64600FA8A08 /* Products */,
+				D43CABC42F8C082100743261 /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -267,6 +270,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D43CABC52F8C082100743261 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
