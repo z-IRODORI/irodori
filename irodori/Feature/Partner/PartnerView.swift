@@ -11,6 +11,7 @@ struct PartnerView: View {
     @State var viewModel = PartnerViewModel()
     @State private var isInsightExpanded = false
     @State private var selectedScoreDetail: ScoreDetail?
+    @State private var showFashionTypeDetail = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,6 +59,12 @@ struct PartnerView: View {
         }
         .sheet(item: $selectedScoreDetail) { detail in
             ScoreDetailView(detail: detail)
+        }
+        .sheet(isPresented: $showFashionTypeDetail) {
+            if let fashionType = viewModel.userInsight?.fashion_type,
+               let description = FashionTypeDescription.find(by: fashionType.type_name) {
+                FashionTypeDetailSheet(description: description)
+            }
         }
         .task {
             // 既にデータがある場合は読み込まない
@@ -109,6 +116,19 @@ struct PartnerView: View {
                         .font(.system(size: 12, weight: .regular))
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
+
+                    Button(action: {
+                        showFashionTypeDetail = true
+                    }) {
+                        Text("詳細を見る")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.black)
+                            .cornerRadius(12)
+                    }
+                    .padding(.top, 4)
                 }
             }
             .frame(width: 110)
@@ -323,6 +343,54 @@ struct PartnerView: View {
                 .padding(.horizontal, 40)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - FashionTypeDetailSheet
+
+struct FashionTypeDetailSheet: View {
+    let description: FashionTypeDescription
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(description.typeCode)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.black)
+
+                        Text(description.typeName)
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.black)
+
+                        Text(description.coreStance)
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundColor(.gray)
+                            .lineSpacing(4)
+                    }
+
+                    Divider()
+
+                    Text(description.detail)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundColor(.black)
+                        .lineSpacing(8)
+                }
+                .padding(24)
+            }
+            .navigationTitle("タイプ詳細")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("閉じる") {
+                        dismiss()
+                    }
+                    .foregroundColor(.black)
+                }
+            }
+        }
     }
 }
 

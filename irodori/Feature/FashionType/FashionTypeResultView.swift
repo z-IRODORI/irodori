@@ -141,6 +141,11 @@ struct FashionTypeResultView: View {
                     }
                     .padding(.horizontal, 24)
 
+                    // タイプ詳細
+                    if let description = FashionTypeDescription.find(by: result.type_name) {
+                        fashionTypeDetailSection(description: description)
+                    }
+
                     // 完了ボタン
                     Button(action: {
                         if let onComplete = onComplete {
@@ -200,6 +205,28 @@ struct FashionTypeResultView: View {
                 ConfettiView()
             }
         }
+    }
+
+    private func fashionTypeDetailSection(description: FashionTypeDescription) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("タイプ詳細")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.black)
+
+            Text(description.coreStance)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.gray)
+
+            Text(description.detail)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundColor(.black)
+                .lineSpacing(6)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(Color.gray.opacity(0.05))
+        .cornerRadius(16)
+        .padding(.horizontal, 24)
     }
 
     private func triggerCelebration() {
