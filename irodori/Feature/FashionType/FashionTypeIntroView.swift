@@ -12,7 +12,11 @@ struct FashionTypeIntroView: View {
         "アヴァンギャルド・スター",
         "ソーシャル・アイコン",
         "クリーン・スタンダード",
-        "ヴィンテージ・ミニマリスト"
+        "ヴィンテージ・ミニマリスト",
+        "トレンド・エディター",
+        "モテ・プランナー",
+        "オーセンティック・アーティスト",
+        "ロイヤル・クラシック"
     ]
 
     var body: some View {
@@ -32,27 +36,29 @@ struct FashionTypeIntroView: View {
     // MARK: - Image Collage
 
     private var imageCollage: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 4), GridItem(.flexible(), spacing: 4)], spacing: 4) {
+        let imageHeight = UIScreen.main.bounds.height * 0.25
+        return ZStack(alignment: .bottom) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
                     ForEach(previewImages, id: \.self) { name in
                         Image(name)
                             .resizable()
                             .scaledToFill()
-                            .frame(width: (geometry.size.width - 4) / 2, height: geometry.size.width * 0.55)
+                            .frame(width: imageHeight * 0.75, height: imageHeight)
                             .clipped()
                     }
                 }
-
-                LinearGradient(
-                    colors: [Color.clear, Color.white],
-                    startPoint: .center,
-                    endPoint: .bottom
-                )
-                .frame(height: geometry.size.width * 0.55)
             }
+            .disabled(true)
+
+            LinearGradient(
+                colors: [Color.clear, Color.white],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+            .frame(height: imageHeight * 0.5)
         }
-        .frame(height: UIScreen.main.bounds.width * 1.1 + 4)
+        .frame(height: imageHeight)
     }
 
     // MARK: - Content
@@ -69,10 +75,10 @@ struct FashionTypeIntroView: View {
         VStack(spacing: 12) {
             Text("ファッションタイプ診断")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.pink)
+                .foregroundColor(.white)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
-                .background(Color.pink.opacity(0.1))
+                .background(Color.black)
                 .clipShape(Capsule())
 
             Text("あなただけのスタイルを\n発見しよう")
@@ -143,11 +149,11 @@ private struct FeatureCard: View {
         HStack(alignment: .top, spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(iconColor.opacity(0.12))
+                    .fill(Color.black)
                     .frame(width: 44, height: 44)
                 Image(systemName: iconName)
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(iconColor)
+                    .foregroundColor(.white)
             }
 
             VStack(alignment: .leading, spacing: 4) {
