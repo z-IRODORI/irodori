@@ -19,6 +19,7 @@ enum CameraState {
 }
 
 @Observable
+@MainActor
 class CameraViewModel: NSObject {
     private let userDefaults: UserDefaults = UserDefaults.standard
 
@@ -129,7 +130,7 @@ class CameraViewModel: NSObject {
         self.isLoadingPickedImage = isLoading
     }
 
-    func setImageLoadError(_ errorMessage: String) {
+    @MainActor func setImageLoadError(_ errorMessage: String) {
         ToastManager.shared.show(errorMessage)
         self.isLoadingPickedImage = false
     }
