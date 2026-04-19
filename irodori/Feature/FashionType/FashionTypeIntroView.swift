@@ -43,33 +43,37 @@ struct FashionTypeIntroView: View {
         let totalWidth = CGFloat(previewImages.count) * (imageWidth + spacing)
         let loopedImages = previewImages + previewImages
 
-        return ZStack(alignment: .bottom) {
-            HStack(spacing: spacing) {
-                ForEach(Array(loopedImages.enumerated()), id: \.offset) { _, name in
-                    Image(name)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: imageWidth, height: imageHeight)
-                        .clipped()
+        // Color.clear で幅をスクリーン幅に固定し、HStack をオーバーレイすることで
+        // 巨大な HStack がレイアウト幅を押し広げないようにする
+        return Color.clear
+            .frame(height: imageHeight)
+            .overlay(alignment: .leading) {
+                HStack(spacing: spacing) {
+                    ForEach(Array(loopedImages.enumerated()), id: \.offset) { _, name in
+                        Image(name)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: imageWidth, height: imageHeight)
+                            .clipped()
+                    }
                 }
+                .offset(x: isScrolling ? -totalWidth : 0)
+                .animation(
+                    .linear(duration: Double(previewImages.count) * 2)
+                    .repeatForever(autoreverses: false),
+                    value: isScrolling
+                )
+                .onAppear { isScrolling = true }
             }
-            .offset(x: isScrolling ? -totalWidth : 0)
-            .animation(
-                .linear(duration: Double(previewImages.count) * 2)
-                .repeatForever(autoreverses: false),
-                value: isScrolling
-            )
-            .onAppear { isScrolling = true }
-
-            LinearGradient(
-                colors: [Color.clear, Color.white],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-            .frame(height: imageHeight * 0.5)
-        }
-        .frame(height: imageHeight)
-        .clipped()
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    colors: [Color.clear, Color.white],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                .frame(height: imageHeight * 0.5)
+            }
+            .clipped()
     }
 
     // MARK: - Content
