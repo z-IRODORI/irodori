@@ -7,6 +7,7 @@ import SwiftUI
 
 struct FashionTypeIntroView: View {
     @Binding var path: [ViewType]
+    @State private var isScrolling = false
 
     private let previewImages = [
         "アヴァンギャルド・スター",
@@ -37,19 +38,28 @@ struct FashionTypeIntroView: View {
 
     private var imageCollage: some View {
         let imageHeight = UIScreen.main.bounds.height * 0.25
+        let imageWidth = imageHeight * 0.75
+        let spacing: CGFloat = 4
+        let totalWidth = CGFloat(previewImages.count) * (imageWidth + spacing)
+        let loopedImages = previewImages + previewImages
+
         return ZStack(alignment: .bottom) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(previewImages, id: \.self) { name in
-                        Image(name)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: imageHeight * 0.75, height: imageHeight)
-                            .clipped()
-                    }
+            HStack(spacing: spacing) {
+                ForEach(Array(loopedImages.enumerated()), id: \.offset) { _, name in
+                    Image(name)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: imageWidth, height: imageHeight)
+                        .clipped()
                 }
             }
-            .disabled(true)
+            .offset(x: isScrolling ? -totalWidth : 0)
+            .animation(
+                .linear(duration: Double(previewImages.count) * 2)
+                .repeatForever(autoreverses: false),
+                value: isScrolling
+            )
+            .onAppear { isScrolling = true }
 
             LinearGradient(
                 colors: [Color.clear, Color.white],
@@ -59,6 +69,7 @@ struct FashionTypeIntroView: View {
             .frame(height: imageHeight * 0.5)
         }
         .frame(height: imageHeight)
+        .clipped()
     }
 
     // MARK: - Content
