@@ -38,7 +38,6 @@ struct HomeView: View {
                         }
                     )
                     .padding(.horizontal, -24)
-                    .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
 
                     VStack(spacing: 24) {
     //                    Text("コーデ提案")

@@ -46,11 +46,11 @@ struct CoordinateDetailView: View {
                 viewModel.tappedWillShowChatView()
             }) {
 //                Text("おすすめのコーデ/アイテムを見る")
-                Text("💬 質問する")
+                Text("💬 相棒に質問する")
                     .foregroundStyle(.white)
                     .font(.system(size: 16, weight: .bold))
                     .frame(maxWidth: .infinity, maxHeight: 50)
-                    .background(.pink)
+                    .background(.black)
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 12)

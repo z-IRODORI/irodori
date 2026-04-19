@@ -3,38 +3,54 @@ import SwiftUI
 struct MainTabView: View {
     @State private var path: [ViewType] = []
     @State private var viewModel: MainTabViewModel = .init()
-    @State private var isSheetPresented = false // モーダル管理用フラグ
+    @State private var isSheetPresented = false
+    @State private var previousTab: MainTabViewModel.Tab = .home
 
     var body: some View {
+        @Bindable var vm = viewModel
         NavigationStack(path: $path) {
-            ZStack(alignment: .bottom) {
-                ZStack {
+            TabView(selection: $vm.selectedTab) {
+                // ホーム
+                Tab("ホーム", systemImage: "house", value: MainTabViewModel.Tab.home) {
                     HomeView(path: $path)
-                        .opacity(viewModel.selectedTab == .home ? 1 : 0)
-                        .environment(viewModel)
-
-                    PlannerView()
-                        .opacity(viewModel.selectedTab == .planner ? 1 : 0)
-
-                    PartnerView()
-                        .opacity(viewModel.selectedTab == .partner ? 1 : 0)
-
-                    ProfileView(path: $path)
-                        .opacity(viewModel.selectedTab == .profile ? 1 : 0)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.white)
 
-                customTabBar
+                // 相棒
+                Tab(value: MainTabViewModel.Tab.partner) {
+                    PartnerView()
+                } label: {
+                    Label {
+                        Text("相棒")
+                    } icon: {
+                        Image(uiImage: partnerIcon)
+                    }
+                }
+
+                // クローゼット
+                Tab("クローゼット", systemImage: "person.fill", value: MainTabViewModel.Tab.profile) {
+                    ProfileView(path: $path)
+                }
+
+                // コーデ追加
+                Tab("", systemImage: "plus.circle.fill", value: MainTabViewModel.Tab.plus) {
+                    EmptyView()
+                }
             }
-            .ignoresSafeArea(.keyboard, edges: .bottom)
-            // モーダルの実装
+            .environment(viewModel)
+            .onChange(of: viewModel.selectedTab) { oldTab, newTab in
+                if newTab == .plus {
+                    isSheetPresented = true
+                    viewModel.selectedTab = previousTab
+                } else {
+                    previousTab = newTab
+                }
+            }
             .sheet(isPresented: $isSheetPresented) {
                 AddContentModalView(cameraButtonTapped: {
                     path.append(.camera)
                 })
-                    .presentationDetents([.height(300)]) // ハーフモーダルの高さ調整
-                    .presentationDragIndicator(.visible)
+                .presentationDetents([.height(200)])
+                .presentationDragIndicator(.visible)
             }
             .navigationDestination(for: ViewType.self) { viewType in
                 switch viewType {
@@ -79,8 +95,23 @@ struct MainTabView: View {
         }
     }
 
+    private var partnerIcon: UIImage {
+        let size = CGSize(width: 30, height: 30)
+        let source: UIImage? = {
+            if let name = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerIconImage.rawValue),
+               let img = UIImage(named: name) { return img }
+            if let img = UIImage(named: "アヴァンギャルド・スター_icon") { return img }
+            return nil
+        }()
+        guard let source else {
+            return UIImage(systemName: "person") ?? UIImage()
+        }
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            source.draw(in: CGRect(origin: .zero, size: size))
+        }.withRenderingMode(.alwaysOriginal)
+    }
+
     private func getProfileInfo() -> ProfileInfo? {
-        // 既存のプロフィール情報を取得を試みる
         if let data = UserDefaults.standard.data(forKey: UserDefaultsKey.profileInfo.rawValue) {
             do {
                 let decoder = JSONDecoder()
@@ -88,17 +119,14 @@ struct MainTabView: View {
                 return try decoder.decode(ProfileInfo.self, from: data)
             } catch {
                 print("Failed to decode profile info: \(error)")
-                // デコードエラーが発生した場合、古いデータを削除
                 UserDefaults.standard.removeObject(forKey: UserDefaultsKey.profileInfo.rawValue)
             }
         }
 
-        // プロフィール情報がない、またはデコードに失敗した場合、デフォルトプロフィールを作成
         guard let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else {
             return nil
         }
 
-        // User情報からデフォルトプロフィールを作成
         var username = uid
         if let userData = UserDefaults.standard.data(forKey: UserDefaultsKey.userInfo.rawValue),
            let user = try? JSONDecoder().decode(User.self, from: userData) {
@@ -114,7 +142,6 @@ struct MainTabView: View {
             lastLoginAt: nil
         )
 
-        // デフォルトプロフィールを保存
         do {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
@@ -125,85 +152,6 @@ struct MainTabView: View {
         }
 
         return defaultProfile
-    }
-
-    private var customTabBar: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(alignment: .center) {
-                tabItem(image: "house", title: "ホーム", isSelected: viewModel.selectedTab == .home) {
-                    viewModel.selectedTab = .home
-                }
-
-                Spacer()
-
-                partnerTabItem(title: "相棒", isSelected: viewModel.selectedTab == .partner) {
-                    viewModel.selectedTab = .partner
-                }
-
-                Spacer()
-
-                tabItem(image: "person.fill", title: "クローゼット", isSelected: viewModel.selectedTab == .profile) {
-                    viewModel.selectedTab = .profile
-                }
-            }
-            .padding(.horizontal, 40)
-            .padding(.top, 2)
-            .background(Color.white)
-        }
-    }
-
-    private func plusButton(action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: "plus")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 60, height: 60)
-                .background(Color.black)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
-        }
-    }
-
-    private func tabItem(image: String, title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: image).font(.system(size: 20))
-                Text(title).font(.system(size: 12))
-            }
-            .foregroundStyle(isSelected ? .black : .gray.opacity(0.6))
-            .frame(maxWidth: .infinity)
-        }
-    }
-
-    private func partnerTabItem(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                // UserDefaultsからpartnerIconImageを取得
-                if let partnerIconImageName = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerIconImage.rawValue),
-                   UIImage(named: partnerIconImageName) != nil {
-                    Image(partnerIconImageName)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 32, height: 32)
-                } else {
-                    // フォールバック：アヴァンギャルド・スター_icon
-                    if UIImage(named: "アヴァンギャルド・スター_icon") != nil {
-                        Image("アヴァンギャルド・スター_icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 32, height: 32)
-                    } else {
-                        // さらにフォールバック：SF Symbol
-                        Image(systemName: "person")
-                            .font(.system(size: 28))
-                    }
-                }
-                Text(title).font(.system(size: 12))
-            }
-            .foregroundStyle(isSelected ? .black : .gray.opacity(0.3))
-            .frame(maxWidth: .infinity)
-        }
     }
 }
 
@@ -218,33 +166,30 @@ final class MainTabViewModel {
         case partner
         case planner
         case profile
+        case plus
     }
 }
 
 // MARK: - AddContentModalView
 
-/// プラスボタンを押した時に表示するモーダル
 struct AddContentModalView: View {
     @Environment(\.dismiss) var dismiss
     let cameraButtonTapped: (() -> Void)
 
     var body: some View {
         VStack(spacing: 12) {
-            modalButton(title: "洋服を追加", icon: "tshirt") {
-                // アクション
-                dismiss()
-            }
-
-            modalButton(title: "アウトフィットを作成", icon: "figure.walk") {
-                // アクション
+            modalButton(title: "コーディネートを追加", icon: "figure") {
                 cameraButtonTapped()
                 dismiss()
             }
 
-            modalButton(title: "AIスタイリストとチャット", icon: "person.circle") {
-                // アクション
-                dismiss()
-            }
+//            modalButton(title: "アイテムを追加", icon: "tshirt") {
+//                dismiss()
+//            }
+
+//            modalButton(title: "AIスタイリストとチャット", icon: "person.circle") {
+//                dismiss()
+//            }
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
