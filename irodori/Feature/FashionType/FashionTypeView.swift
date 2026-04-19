@@ -54,15 +54,6 @@ struct FashionTypeView: View {
                 }
             }
         }
-        .alert("エラー", isPresented: $viewModel.showError) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-            }
-        }
     }
 
     // MARK: - Subviews

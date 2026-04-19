@@ -136,15 +136,6 @@ struct CameraView: View {
         } message: {
             Text("写真を選択するには、設定でフォトライブラリへのアクセスを許可してください。")
         }
-        .alert("エラー", isPresented: .constant(cameraViewModel.imageLoadError != nil)) {
-            Button("OK") {
-                cameraViewModel.imageLoadError = nil
-            }
-        } message: {
-            if let errorMessage = cameraViewModel.imageLoadError {
-                Text(errorMessage)
-            }
-        }
         .overlay {
             if cameraViewModel.isLoadingPickedImage {
                 ZStack {

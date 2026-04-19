@@ -253,12 +253,6 @@ struct ProfileView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity)
                     .padding(.top, 24)
-            } else if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 16))
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 24)
             } else if viewModel.filteredItems.isEmpty {
                 Text("アイテムが登録されていません")
                     .font(.system(size: 16))

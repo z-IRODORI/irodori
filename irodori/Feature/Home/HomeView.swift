@@ -274,15 +274,6 @@ struct HomeView: View {
         } message: {
             Text("このコーディネートを削除してもよろしいですか？")
         }
-        .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-            }
-        }
         .overlay {
             if viewModel.isDeletingCoordinate {
                 ZStack {

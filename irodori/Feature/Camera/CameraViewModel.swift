@@ -30,7 +30,6 @@ class CameraViewModel: NSObject {
     var showPhotoLibraryPermissionAlert = false
     var showImagePicker = false
     var isLoadingPickedImage = false
-    var imageLoadError: String?
 
     // カメラセットアップ
     func setupCamera() {
@@ -124,7 +123,6 @@ class CameraViewModel: NSObject {
     // PHPickerから選択された画像を処理
     func processPickedImage(_ image: UIImage) {
         self.capturedImage = image
-        self.imageLoadError = nil  // 成功時はエラーをクリア
     }
 
     func setImageLoadingState(_ isLoading: Bool) {
@@ -132,8 +130,8 @@ class CameraViewModel: NSObject {
     }
 
     func setImageLoadError(_ errorMessage: String) {
-        self.imageLoadError = errorMessage
-        self.isLoadingPickedImage = false  // エラー時はローディング終了
+        ToastManager.shared.show(errorMessage)
+        self.isLoadingPickedImage = false
     }
 }
 

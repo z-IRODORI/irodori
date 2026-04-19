@@ -190,13 +190,6 @@ struct FirstTakePhotoView: View {
                     onClose?()
                 }
             }
-            .alert("エラー", isPresented: .constant(viewModel.errorMessage != nil)) {
-                Button("OK") {
-                    viewModel.errorMessage = nil
-                }
-            } message: {
-                Text(viewModel.errorMessage ?? "")
-            }
             .navigationDestination(for: ViewType.self) { viewType in
                 switch viewType {
                 case .coordinateReview(let params):

@@ -13,6 +13,11 @@ struct SplashView: View {
     @State private var isStateChanging = false  // state 変更中フラグ
     let viewModel: SplashViewModel = .init()
     let cameraViewModel: CameraViewModel = .init()
+    private let toastManager = ToastManager.shared
+    private var isHomeState: Bool {
+        if case .home = viewModel.state { return true }
+        return false
+    }
 
     init() {
         viewModel.updateState()
@@ -143,6 +148,18 @@ struct SplashView: View {
 //        case .home:
 //            MainTabView()
         }
+        .overlay(alignment: .top) {
+            if !isHomeState, let message = toastManager.message {
+                ToastView(message: message)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: toastManager.message)
     }
 
     private func SplashView() -> some View {

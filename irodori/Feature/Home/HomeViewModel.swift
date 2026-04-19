@@ -31,7 +31,6 @@ final class HomeViewModel {
     var isEditMode: Bool = false
     var showDeleteConfirmation: Bool = false
     var coordinateToDelete: String? = nil
-    var errorMessage: String? = nil
     var isDeletingCoordinate: Bool = false
 
     let apiClient: HomeClientProtocol
@@ -274,13 +273,13 @@ final class HomeViewModel {
                     // 削除後、編集モードも終了
                     isEditMode = false
                 } else {
-                    errorMessage = response.message
+                    ToastManager.shared.show(response.message ?? "削除に失敗しました")
                 }
             case .failure(let error):
-                errorMessage = error.errorDescription
+                ToastManager.shared.show(error.errorDescription ?? "削除に失敗しました")
             }
         } catch {
-            errorMessage = "削除に失敗しました"
+            ToastManager.shared.show("削除に失敗しました")
         }
     }
 }

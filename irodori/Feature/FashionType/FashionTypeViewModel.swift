@@ -17,8 +17,6 @@ final class FashionTypeViewModel {
     var currentQuestionIndex: Int = 0
     var answers: [Int: Int] = [:]  // [questionId: score]
     var isLoading: Bool = false
-    var errorMessage: String? = nil
-    var showError: Bool = false
 
     // 依存性注入
     private let apiClient: FashionTypeClientProtocol
@@ -103,8 +101,7 @@ final class FashionTypeViewModel {
     /// 完了ボタンタップ
     func complete() async -> FashionTypeResponse? {
         guard answers.count == FashionTypeQuestion.questions.count else {
-            errorMessage = "すべての質問に回答してください"
-            showError = true
+            ToastManager.shared.show("すべての質問に回答してください")
             return nil
         }
 
@@ -134,13 +131,11 @@ final class FashionTypeViewModel {
             case .success(let response):
                 return response
             case .failure(let error):
-                errorMessage = error.errorDescription
-                showError = true
+                ToastManager.shared.show(error.errorDescription ?? "エラーが発生しました")
                 return nil
             }
         } catch {
-            errorMessage = "診断結果の送信に失敗しました"
-            showError = true
+            ToastManager.shared.show("診断結果の送信に失敗しました")
             return nil
         }
     }
