@@ -125,12 +125,7 @@ struct ChatBubbleView: View {
             if message.isUser {
                 Spacer(minLength: 60)
             } else {
-                Image("wolf")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Color.gray.opacity(0.1)))
-                    .clipShape(Circle())
+                PartnerIconImage(size: 40)
             }
 
             Text(.init(message.text))
@@ -173,8 +168,25 @@ struct ChatView: View {
     let image: UIImage
     init(coordinateId: String, image: UIImage) {
         self.image = image
-        let imageData = image.jpegData(compressionQuality: 1.0)!
-        self.viewModel = .init(coordinateId: coordinateId, coordinateImageBase64: imageData.base64EncodedString(), apiClient: HomeClient(), repository: CoordinateChatRepository())
+        // 画像サイズを削減: リサイズ + 圧縮
+        let resizedImage = ChatView.resizeImage(image, targetWidth: 800)
+        // 圧縮率を0.3に設定（バックエンドでさらに0.5倍に圧縮される）
+        let imageData = resizedImage.jpegData(compressionQuality: 0.3)!
+        print("Chat image data size: \(imageData.count) bytes")
+        self.viewModel = .init(coordinateId: coordinateId, coordinateImageBase64: imageData.base64EncodedString(), apiClient: ChatClient(), repository: CoordinateChatRepository())
+    }
+
+    private static func resizeImage(_ image: UIImage, targetWidth: CGFloat) -> UIImage {
+        let scale = targetWidth / image.size.width
+        let newHeight = image.size.height * scale
+        let newSize = CGSize(width: targetWidth, height: newHeight)
+
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+
+        return resizedImage ?? image
     }
 
     var body: some View {
@@ -210,12 +222,7 @@ struct ChatView: View {
 
                             if viewModel.isLoading {
                                 HStack {
-                                    Image("wolf")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 40, height: 40)
-                                        .background(Circle().fill(Color.gray.opacity(0.1)))
-                                        .clipShape(Circle())
+                                    PartnerIconImage(size: 40)
 
                                     HStack {
                                         ProgressView()

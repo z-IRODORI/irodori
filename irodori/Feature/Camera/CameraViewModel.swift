@@ -29,6 +29,8 @@ class CameraViewModel: NSObject {
     var cameraState: CameraState = .initial
     var showPhotoLibraryPermissionAlert = false
     var showImagePicker = false
+    var isLoadingPickedImage = false
+    var imageLoadError: String?
 
     // カメラセットアップ
     func setupCamera() {
@@ -122,15 +124,16 @@ class CameraViewModel: NSObject {
     // PHPickerから選択された画像を処理
     func processPickedImage(_ image: UIImage) {
         self.capturedImage = image
+        self.imageLoadError = nil  // 成功時はエラーをクリア
     }
 
-    func setupFirstTakePhotoIfNeeded() {
-        // 初回撮影済みの場合何もせずreturn
-        if userDefaults.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
-            return
-        }
-        // 初回撮影の時はfinishedFirstTakePhotoにtrueを設定する
-        userDefaults.set(true, forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue)
+    func setImageLoadingState(_ isLoading: Bool) {
+        self.isLoadingPickedImage = isLoading
+    }
+
+    func setImageLoadError(_ errorMessage: String) {
+        self.imageLoadError = errorMessage
+        self.isLoadingPickedImage = false  // エラー時はローディング終了
     }
 }
 

@@ -2,29 +2,36 @@
 //  HomeClient.swift
 //  irodori
 //
-//  Created by yuki.hamada on 2025/12/04.
+//  Created by yuki.hamada on 2025/11/30.
 //
 
 import Foundation
 
 protocol HomeClientProtocol {
-    func post(homeRequest: HomeRequest) async throws -> Result<HomeResponse, HTTPError>
+    func get(uid: String) async throws -> Result<HomeResponse, HTTPError>
 }
 
 final class HomeClient: HomeClientProtocol {
-    func post(homeRequest: HomeRequest) async throws -> Result<HomeResponse, HTTPError> {
+    func get(uid: String) async throws -> Result<HomeResponse, HTTPError> {
         let baseURL = "https://irodori-api.onrender.com"
-        let endpoint = "chat"
+        let endpoint = "api/home"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
-
+        
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(homeRequest)
-
+        request.httpMethod = "GET"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // クエリパラメータとしてuidを追加
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: uid)
+        ]
+        request.url = components.url
+        
         do {
+            // URLSessionでリクエストを送信
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
-
+            
             // ステータスコードをチェック
             if let httpResponse = urlResponse as? HTTPURLResponse {
                 let statusCode = httpResponse.statusCode
@@ -32,12 +39,10 @@ final class HomeClient: HomeClientProtocol {
                     return .failure(HTTPError.fromStatusCode(statusCode))
                 }
             }
-
-            print(data)
+            
             // JSONレスポンスをデコード
             do {
                 let response = try JSONDecoder().decode(HomeResponse.self, from: data)
-                print(response.answer)
                 return .success(response)
             } catch {
                 return .failure(.decodeError)
@@ -52,8 +57,7 @@ final class HomeClient: HomeClientProtocol {
 // MARK: - Mock
 
 final class MockHomeClient: HomeClientProtocol {
-    func post(homeRequest: HomeRequest) async throws -> Result<HomeResponse, HTTPError> {
+    func get(uid: String) async throws -> Result<HomeResponse, HTTPError> {
         return .success(.mock())
     }
 }
-

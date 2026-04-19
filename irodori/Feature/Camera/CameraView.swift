@@ -15,6 +15,7 @@ struct CameraView: View {
     @Binding var path: [ViewType]
     @State private var showCapturedImage = false
     @State private var isShowOnboardingModal: Bool = false
+    var onPhotoCaptured: ((UIImage) -> Void)? = nil
 
     var body: some View {
         ZStack {
@@ -39,11 +40,9 @@ struct CameraView: View {
                     CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
                         .aspectRatio(3/4, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
-                    if UserDefaults.standard.bool(forKey: UserDefaultsKey.finishedFirstTakePhoto.rawValue) {
-                        PartnerComment(image: .wolf, text: Comment.selectedTips())
-                            .padding(.horizontal, 12)
-                            .padding(.top, -80)
-                    }
+//                    PartnerComment(image: .wolf, text: Comment.selectedTips())
+//                        .padding(.horizontal, 12)
+//                        .padding(.top, -80)
 
                     ZStack(alignment: .center) {
                         PhotoLibraryButton()
@@ -65,9 +64,9 @@ struct CameraView: View {
                     Color.pink
                         .aspectRatio(3/4, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
-                    PartnerComment(image: .wolf, text: Comment.selectedTips())
-                        .padding(.horizontal, 12)
-                        .padding(.top, -80)
+//                    PartnerComment(image: .wolf, text: Comment.selectedTips())
+//                        .padding(.horizontal, 12)
+//                        .padding(.top, -80)
 
                     ZStack(alignment: .center) {
                         PhotoLibraryButton()
@@ -79,7 +78,7 @@ struct CameraView: View {
                 .frame(maxHeight: .infinity, alignment: .top)
             }
         }
-        .navigationBarBackButtonHidden()
+//        .navigationBarBackButtonHidden()
         .ignoresSafeArea()
         .onAppear {
             AnalyticsLogger.shared.log(screen: .cameraScreenView)
@@ -92,8 +91,13 @@ struct CameraView: View {
                     viewModel: .init(inputUIImage: image),
                     isPresented: $showCapturedImage,
                     okButtonTapped: {
-                        cameraViewModel.setupFirstTakePhotoIfNeeded()
-                        path.append(.coordinateReview(cameraViewModel.capturedImage!))
+                        if let onPhotoCaptured = onPhotoCaptured {
+                            // FirstTakePhotoView から呼ばれた場合
+                            onPhotoCaptured(image)
+                        } else {
+                            // 通常のカメラから呼ばれた場合
+                            path.append(.coordinateReview(.init(image: image, fromFirstTakePhotoView: false)))
+                        }
                     }
                 )   // キャプチャした画像表示画面
             }
@@ -105,12 +109,22 @@ struct CameraView: View {
             .interactiveDismissDisabled()
         }
         .sheet(isPresented: $cameraViewModel.showImagePicker) {
-            PhotoPickerView(isPresented: $cameraViewModel.showImagePicker) { image in
-                cameraViewModel.processPickedImage(image)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    showCapturedImage = true
+            PhotoPickerView(
+                isPresented: $cameraViewModel.showImagePicker,
+                onImageSelected: { image in
+                    cameraViewModel.processPickedImage(image)
+                    // 画像ロード完了後、短い遅延でCapturedImageViewを表示
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showCapturedImage = true
+                    }
+                },
+                onLoadingStateChanged: { isLoading in
+                    cameraViewModel.setImageLoadingState(isLoading)
+                },
+                onError: { errorMessage in
+                    cameraViewModel.setImageLoadError(errorMessage)
                 }
-            }
+            )
         }
         .alert("フォトライブラリへのアクセス", isPresented: $cameraViewModel.showPhotoLibraryPermissionAlert) {
             Button("設定") {
@@ -122,6 +136,37 @@ struct CameraView: View {
         } message: {
             Text("写真を選択するには、設定でフォトライブラリへのアクセスを許可してください。")
         }
+        .alert("エラー", isPresented: .constant(cameraViewModel.imageLoadError != nil)) {
+            Button("OK") {
+                cameraViewModel.imageLoadError = nil
+            }
+        } message: {
+            if let errorMessage = cameraViewModel.imageLoadError {
+                Text(errorMessage)
+            }
+        }
+        .overlay {
+            if cameraViewModel.isLoadingPickedImage {
+                ZStack {
+                    Color.black.opacity(0.5)
+                        .ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        Text("画像を読み込んでいます...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+        }
+        .onChange(of: showCapturedImage) { _, isShowing in
+            if !isShowing {
+                // CapturedImageViewが閉じられたら画像をクリア
+                cameraViewModel.capturedImage = nil
+            }
+        }
     }
 
     private func Header() -> some View {
@@ -129,43 +174,43 @@ struct CameraView: View {
             Text("IRODORI")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(.black)
-            HStack(spacing: 24) {
-                Button(action: {
-                    AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
-                        "source": GAEventAction.cameraHeaderButton.rawValue
-                    ])
-                    path.append(.calendar)
-                }) {
-                    Image(systemName: "calendar")
-                        .resizable()
-                        .frame(width: 25, height: 25)
-                        .foregroundStyle(.black)
-                }
-
-                Button(action: {
-                    AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
-                        "source": GAEventAction.helpButton.rawValue
-                    ])
-                    isShowOnboardingModal = true
-                }) {
-                    Image(systemName: "questionmark.circle")
-                        .resizable()
-                        .frame(width: 25, height: 25)
-                        .foregroundStyle(.black)
-                }
-
-                // TODO: リリース時は削除
+//            HStack(spacing: 24) {
 //                Button(action: {
-//                    cameraViewModel.earserButtonTapped()
-//                    exit(0)
+//                    AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+//                        "source": GAEventAction.cameraHeaderButton.rawValue
+//                    ])
+//                    path.append(.calendar)
 //                }) {
-//                    Image(systemName: "eraser")
+//                    Image(systemName: "calendar")
 //                        .resizable()
-//                        .frame(width: 20, height: 20)
+//                        .frame(width: 25, height: 25)
 //                        .foregroundStyle(.black)
 //                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+//
+//                Button(action: {
+//                    AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
+//                        "source": GAEventAction.helpButton.rawValue
+//                    ])
+//                    isShowOnboardingModal = true
+//                }) {
+//                    Image(systemName: "questionmark.circle")
+//                        .resizable()
+//                        .frame(width: 25, height: 25)
+//                        .foregroundStyle(.black)
+//                }
+//
+//                // TODO: リリース時は削除
+////                Button(action: {
+////                    cameraViewModel.earserButtonTapped()
+////                    exit(0)
+////                }) {
+////                    Image(systemName: "eraser")
+////                        .resizable()
+////                        .frame(width: 20, height: 20)
+////                        .foregroundStyle(.black)
+////                }
+//            }
+//            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 30)
@@ -173,10 +218,7 @@ struct CameraView: View {
 
     private func PartnerComment(image: ImageResource, text: String) -> some View {
         HStack(spacing: 0) {
-            Image(.wolf)
-                .resizable()
-                .frame(width: 50, height: 50)
-                .clipShape(Circle())
+            PartnerIconImage(size: 50)
 
             SpeechBubbleView(text: text)
         }

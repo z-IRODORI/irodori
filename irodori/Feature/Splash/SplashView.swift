@@ -10,6 +10,7 @@ import SwiftUI
 struct SplashView: View {
     @State var path: [ViewType] = []
     @State private var isPresentedTermsOfService = false
+    @State private var isStateChanging = false  // state 変更中フラグ
     let viewModel: SplashViewModel = .init()
     let cameraViewModel: CameraViewModel = .init()
 
@@ -38,38 +39,107 @@ struct SplashView: View {
                         viewModel.viewedOnboarding()
                         viewModel.updateState()
                     })
-                case .firstTakePhoto:
-                    FirstTakePhotoView(
-                        path: $path,
-                        viewModel: .init(fashionReviewClient: FashionReviewClient()),
-                        okButtonTapped: {
-                            viewModel.updateState()
+                case .fashionType:
+                    NavigationStack(path: $path) {
+                        FashionTypeView(
+                            path: $path,
+                            viewModel: .init(apiClient: FashionTypeClient())
+                        )
+                        .navigationDestination(for: ViewType.self) { viewType in
+                            switch viewType {
+                            case .fashionTypeResult(let response):
+                                FashionTypeResultView(
+                                    path: $path,
+                                    result: response,
+                                    onComplete: {
+                                        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasFashionTypeDiagnosis.rawValue)
+                                        viewModel.updateState()
+                                    }
+                                )
+                            default:
+                                EmptyView()
+                            }
                         }
-                    )
+                    }
+                case .selectStandardItem:
+                    NavigationStack(path: $path) {
+                        SelectStandardItemView(
+                            path: $path,
+                            onComplete: {
+                                UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
+                                viewModel.updateState()
+                            }
+                        )
+                        .navigationDestination(for: ViewType.self) { viewType in
+                            switch viewType {
+                            case .recommendCoordinateByStandardItem(let params):
+                                RecommendCoordinateByStandardItemView(
+                                    results: params.results,
+                                    selectedItems: params.selectedItems,
+                                    onComplete: {
+                                        viewModel.updateState()
+                                    }
+                                )
+                            default:
+                                EmptyView()
+                            }
+                        }
+                    }
                 case .home:
-                    CameraView(cameraViewModel: cameraViewModel, path: $path)
+                    MainTabView()
+                        .environment(AuthManager.shared)
                 }
             }
             .navigationDestination(for: ViewType.self) { viewType in
                 switch viewType {
-                case .coordinateReview(let uiImage):
+                case .coordinateReview(let params):
                     CoordinateReviewView(
                         viewModel: .init(
-                            coordinateImage: uiImage.correctOrientation,
+                            coordinateImage: params.image!.correctOrientation,
                             apiClient: FashionReviewClient()
                         ),
+                        fromFirstTakePhotoView: params.fromFirstTakePhotoView,
                         path: $path
                     )
-                case .calendar:
-                    CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
-                case .coordinateDetail(let params):
-                    CoordinateDetailView(
-                        viewModel: .init(uid: params.uid, targetDateString: params.targetDateString, coordinateImageURL: params.coordinateImageURL, coordinateDetailClient: CoordinateDetailClient())
-                    )
                 case .camera:
+                    CameraView(cameraViewModel: .init(), path: $path)
+                case .calendar:
+                    EmptyView() // FirstTakePhotoView からは使用しない
+                case .coordinateDetail:
+                    EmptyView() // FirstTakePhotoView からは使用しない
+                case .profileEdit:
+                    EmptyView() // FirstTakePhotoView からは使用しない
+                case .fashionType:
+                    EmptyView() // FashionType画面は.fashionType stateで直接表示
+                case .fashionTypeResult:
+                    EmptyView() // FashionType内のNavigationStackで処理
+                case .recommendCoordinateByStandardItem(_):
                     EmptyView()
                 }
             }
+            // .onChange(of: path) は削除済み（FirstTakePhotoView がオンボーディングから削除されたため不要）
+            .onChange(of: viewModel.state) { oldState, newState in
+                // state が変わったときに path をクリアして、古い NavigationStack の履歴を削除
+                print("🔍 [SplashView] State changed from \(oldState) to \(newState), clearing path")
+                isStateChanging = true
+                path.removeAll()
+                // フラグをリセット（次のフレームで）
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isStateChanging = false
+                }
+            }
+//        case .userInfo:
+//            InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {
+//                viewModel.setupSignUpDate()   // アプリインストールしてから一度しか呼ばれない想定
+//                viewModel.updateState()
+//            })
+//        case .onboarding:
+//            OnboardingView(closeButtonTapped: {
+//                viewModel.viewedOnboarding()
+//                viewModel.updateState()
+//            })
+//        case .home:
+//            MainTabView()
         }
     }
 

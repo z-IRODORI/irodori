@@ -10,14 +10,14 @@ import SwiftUI
 struct CoordinateReviewView: View {
     @State var viewModel: CoordinateReviewViewModel
 
-    let fromFirstTakePhotoView = false
+    let fromFirstTakePhotoView: Bool
     private let shortTextCriterion = 50
     @State private var currentSchedule = ""   // YYYY/MM/DD
     @State private var reviewText = ""
     @State private var isShowFullReview = false
     @State private var tappedURL = ""
-    @State private var isPresentedCameraView = false
     @State private var tappedAffiliateProduct: AffiliateProduct?
+    @State private var hasCalledSetupFirstTakePhoto = false
     @Binding var path: [ViewType]
 
     var body: some View {
@@ -36,12 +36,14 @@ struct CoordinateReviewView: View {
 //                                .padding(.horizontal, 24)
 //                                .frame(maxWidth: .infinity, alignment: .leading)
 //                        }
-                        RecentCoordinates(recentCoordinates: viewModel.fashionReview!.recent_coordinates)   // TODO: - 直近のコーデがない場合のUIを考える & 直近のコーデをVMで管理する
+                        RecentCoordinates(
+                            recentCoordinates: viewModel.fashionReview!.recent_coordinates,
+                            isEditMode: false,
+                            onToggleEditMode: {},
+                            onDeleteRequest: { _ in }
+                        )
                         VStack(alignment: .leading, spacing: 12) {
-                            Image(.wolf)
-                                .resizable()
-                                .frame(width: 50, height: 50)
-                                .clipShape(Circle())
+                            PartnerIconImage(size: 50)
                             ReviewText(aiReviewComment: viewModel.fashionReview!.ai_review_comment)
                         }
                         .padding(.horizontal, 24)
@@ -58,9 +60,6 @@ struct CoordinateReviewView: View {
                                 "action": GAEventAction.goHome.rawValue
                             ])
                             path.removeAll()
-                            if fromFirstTakePhotoView {
-                                path.append(.camera)
-                            }
                         }, label: {
                             Text("ホームへ")
                         })
@@ -87,9 +86,6 @@ struct CoordinateReviewView: View {
                     RecommendCoordinateView(viewModel: .init(recommendCoordinateClient: RecommendCoordinateClient()))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .navigationDestination(isPresented: $isPresentedCameraView) {
-                    CameraView(cameraViewModel: .init(), path: $path)
-                }
                 .background(.gray.opacity(0.08))
                 .navigationBarBackButtonHidden()
             } else {
@@ -119,6 +115,13 @@ struct CoordinateReviewView: View {
             AnalyticsLogger.shared.log(screen: .coordinateReviewScreenView)
             await viewModel.onAppear()
         }
+        .onChange(of: viewModel.fashionReview) { _, newValue in
+            // 分析結果が表示されたタイミングで setupFirstTakePhotoIfNeeded を呼び出す
+            if fromFirstTakePhotoView && newValue != nil && !hasCalledSetupFirstTakePhoto {
+                viewModel.setupFirstTakePhotoIfNeeded()
+                hasCalledSetupFirstTakePhoto = true
+            }
+        }
     }
 
     private func RecommendCoordinateCard(imageURL: String) -> some View {
@@ -141,8 +144,12 @@ struct CoordinateReviewView: View {
 }
 
 #Preview {
-    CoordinateReviewView(viewModel: .init(
-        coordinateImage: UIImage(resource: .coordinate2),
-        apiClient: MockFashionReviewClient()
-    ), path: .constant([]))
+    CoordinateReviewView(
+        viewModel: .init(
+            coordinateImage: UIImage(resource: .coordinate2),
+            apiClient: MockFashionReviewClient()
+        ),
+        fromFirstTakePhotoView: false,
+        path: .constant([])
+    )
 }

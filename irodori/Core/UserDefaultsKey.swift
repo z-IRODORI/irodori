@@ -12,9 +12,16 @@ enum UserDefaultsKey: String {
     case userId
     case gender
     case userInfo
+    case profileInfo
     case hasCompletedUserInfo
     case signUpDate
     case hasOnboarding
+    case hasFashionTypeDiagnosis
     case coordinateChats
     case finishedFirstTakePhoto
+    case lastDismissedFirstTakePhotoDate
+    case homePlannerCache
+    case partnerImage
+    case partnerIconImage
+    case hasSelectedStandardItems
 }

@@ -10,6 +10,7 @@ import SwiftUI
 struct CoordinateDetailView: View {
     @State var viewModel: CoordinateDetailViewModel
     @State private var coordinateImage: UIImage?
+    let showHeader: Bool
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -21,10 +22,7 @@ struct CoordinateDetailView: View {
                         aiCatchphrase: coordinateDetail.ai_catchphrase
                     )
                     VStack(alignment: .leading, spacing: 12) {
-                        Image(.wolf)
-                            .resizable()
-                            .frame(width: 50, height: 50)
-                            .clipShape(Circle())
+                        PartnerIconImage(size: 50)
                         ReviewText(aiReviewComment: coordinateDetail.ai_review_comment)
                     }
                     .padding(.horizontal, 24)
@@ -48,11 +46,11 @@ struct CoordinateDetailView: View {
                 viewModel.tappedWillShowChatView()
             }) {
 //                Text("おすすめのコーデ/アイテムを見る")
-                Text("💬 質問する")
+                Text("💬 相棒に質問する")
                     .foregroundStyle(.white)
                     .font(.system(size: 16, weight: .bold))
                     .frame(maxWidth: .infinity, maxHeight: 50)
-                    .background(.pink)
+                    .background(.black)
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 12)
@@ -68,6 +66,16 @@ struct CoordinateDetailView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(.gray.opacity(0.08))
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(false)
+        .toolbar {
+            if showHeader {
+                ToolbarItem(placement: .principal) {
+                    Text(viewModel.targetDateString)
+                        .font(.system(size: 16, weight: .semibold))
+                }
+            }
+        }
         .task {
             AnalyticsLogger.shared.log(screen: .coordinateDetailScreenView, parameters: [
                 "date": viewModel.targetDateString

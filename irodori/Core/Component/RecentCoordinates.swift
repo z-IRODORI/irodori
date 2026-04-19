@@ -8,57 +8,103 @@
 import SwiftUI
 
 struct RecentCoordinates: View {
-    let recentCoordinates: [FashionReviewResponse.RecentCoordinate]
+    let recentCoordinates: [RecentCoordinate]
+    let isEditMode: Bool
+    let onToggleEditMode: () -> Void
+    let onDeleteRequest: (String) -> Void
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("直近のコーデ")
-                .font(.system(size: 20, weight: .bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
+            HStack {
+                Text("直近のコーデ")
+                    .font(.system(size: 20, weight: .bold))
+
+                Spacer()
+
+                if !recentCoordinates.isEmpty {
+                    Button(action: onToggleEditMode) {
+                        Text(isEditMode ? "キャンセル" : "編集")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.blue)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+
             if recentCoordinates.isEmpty {
                 Text("コーデが存在しません...")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 24)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         Spacer().frame(width: 12)
-
-                        ForEach(recentCoordinates, id: \.self) { fashionReview in
+                        ForEach(recentCoordinates, id: \.self) { coordinate in
                             RecentCoordinateCard(
-                                imageURL: fashionReview.coodinate_image_path,
-                                text: fashionReview.date
+                                coordinate: coordinate,
+                                isEditMode: isEditMode,
+                                onDelete: {
+                                    onDeleteRequest(coordinate.id)
+                                }
                             )
                         }
+                        Spacer().frame(width: 12)
                     }
                 }
             }
         }
     }
 
-    private func RecentCoordinateCard(imageURL: String, text: String, _ textColor: Color = .secondary) -> some View {
-        VStack(spacing: 0) {
-            CachedAsyncImage(url: URL(string: imageURL)!) { phase in
-                if let image = phase.image {
-                    image.resizable()
-                } else if phase.error != nil {
-                    Color.red
-                } else {
-                    Color.gray.opacity(0.5)
+    private func RecentCoordinateCard(
+        coordinate: RecentCoordinate,
+        isEditMode: Bool,
+        onDelete: @escaping () -> Void
+    ) -> some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 0) {
+                CachedAsyncImage(url: URL(string: coordinate.image_url)!) { phase in
+                    if let image = phase.image {
+                        image.resizable()
+                    } else if phase.error != nil {
+                        Color.red
+                    } else {
+                        Color.gray.opacity(0.5)
+                    }
                 }
-            }
-            .aspectRatio(3/4, contentMode: .fit)
-            .frame(width: 110)
+                .aspectRatio(3/4, contentMode: .fit)
+                .frame(width: 110)
 
-            Text("\(text)")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(textColor)
-                .padding(.vertical, 10)
+                Text("\(coordinate.date)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 10)
+            }
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            // 削除ボタン（編集モード時のみ表示）
+            if isEditMode {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white)
+                        .background(Circle().fill(.red))
+                }
+                .offset(x: -4, y: 4)
+                .transition(.scale.combined(with: .opacity))
+            }
         }
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .animation(.easeInOut(duration: 0.2), value: isEditMode)
     }
 }
 
 #Preview {
-    RecentCoordinates(recentCoordinates: [])
+    RecentCoordinates(
+        recentCoordinates: [],
+        isEditMode: false,
+        onToggleEditMode: {},
+        onDeleteRequest: { _ in }
+    )
 }

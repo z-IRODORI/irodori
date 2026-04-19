@@ -19,6 +19,39 @@ enum Gender: String, CaseIterable, Codable {
         case .other: return 2
         }
     }
+
+    /// バックエンドAPI用の値（"men", "women", "other"）
+    var apiValue: String {
+        switch self {
+        case .male: return "men"
+        case .female: return "women"
+        case .other: return "other"
+        }
+    }
+
+    /// API値からGenderを作成
+    static func fromApiValue(_ apiValue: String?) -> Gender? {
+        guard let apiValue = apiValue else { return nil }
+        switch apiValue {
+        case "men": return .male
+        case "women": return .female
+        case "other": return .other
+        default: return nil
+        }
+    }
+
+    /// UserDefaults等から取得した値をGenderに変換（デフォルト値付き）
+    static func fromWithDefault(_ value: String?, default defaultValue: Gender = .other) -> Gender {
+        // まずAPI値として試す
+        if let gender = fromApiValue(value) {
+            return gender
+        }
+        // rawValueとして試す
+        if let value = value, let gender = Gender(rawValue: value) {
+            return gender
+        }
+        return defaultValue
+    }
 }
 
 struct BirthDay: Codable {
@@ -31,4 +64,37 @@ struct User: Codable {
     var username: String
     var birthday: BirthDay
     var gender: Gender
+}
+
+struct ProfileInfo: Codable, Identifiable {
+    var id: String
+    var username: String
+    var displayName: String
+    var profileImageUrl: String?
+    var createdAt: Date
+    var lastLoginAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case username
+        case displayName = "display_name"
+        case profileImageUrl = "profile_image_url"
+        case createdAt = "created_at"
+        case lastLoginAt = "last_login_at"
+    }
+
+    var formattedCreatedAt: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年MM月dd日"
+        formatter.locale = Locale(identifier: "ja_JP")
+        return formatter.string(from: createdAt)
+    }
+
+    var formattedLastLoginAt: String? {
+        guard let lastLoginAt = lastLoginAt else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年MM月dd日"
+        formatter.locale = Locale(identifier: "ja_JP")
+        return formatter.string(from: lastLoginAt)
+    }
 }

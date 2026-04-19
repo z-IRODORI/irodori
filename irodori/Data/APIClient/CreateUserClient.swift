@@ -9,7 +9,7 @@ import Foundation
 
 final class CreateUserClient {
     func post(createUserRequest: CreateUserRequest) async throws -> Result<CreateUserResponse, Error> {
-        let baseURL = "https://irodori.click"
+        let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "api/user"
         let url = URL(string: "\(baseURL)/\(endpoint)")!
 
