@@ -41,12 +41,14 @@ struct SplashView: View {
                     })
                 case .fashionType:
                     NavigationStack(path: $path) {
-                        FashionTypeView(
-                            path: $path,
-                            viewModel: .init(apiClient: FashionTypeClient())
-                        )
+                        FashionTypeIntroView(path: $path)
                         .navigationDestination(for: ViewType.self) { viewType in
                             switch viewType {
+                            case .fashionType:
+                                FashionTypeView(
+                                    path: $path,
+                                    viewModel: .init(apiClient: FashionTypeClient())
+                                )
                             case .fashionTypeResult(let response):
                                 FashionTypeResultView(
                                     path: $path,

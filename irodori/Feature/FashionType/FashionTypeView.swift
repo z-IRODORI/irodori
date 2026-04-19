@@ -285,3 +285,10 @@ struct ScoreButton: View {
         }
     }
 }
+
+#Preview {
+    @Previewable @State var path: [ViewType] = []
+    NavigationStack(path: $path) {
+        FashionTypeView(path: $path, viewModel: FashionTypeViewModel())
+    }
+}

@@ -245,3 +245,10 @@ struct FashionTypeResultView: View {
         showConfetti = true
     }
 }
+
+#Preview {
+    @Previewable @State var path: [ViewType] = []
+    NavigationStack(path: $path) {
+        FashionTypeResultView(path: $path, result: .mock())
+    }
+}
