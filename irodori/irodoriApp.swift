@@ -18,20 +18,32 @@ struct irodoriApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SplashView()
-                .onAppear {
-                    AnalyticsLogger.shared.log(screen: .splashScreenView)
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    switch newPhase {
-                    case .background:
-                        AnalyticsLogger.shared.log(action: .appBackground)
-                    case .inactive:
-                        AnalyticsLogger.shared.log(action: .appWillResignActive)
-                    case .active:
-                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
-                    @unknown default:
-                        break
+//            SplashView()
+//                .onAppear {
+//                    AnalyticsLogger.shared.log(screen: .splashScreenView)
+//                }
+//                .onChange(of: scenePhase) { _, newPhase in
+//                    switch newPhase {
+//                    case .background:
+//                        AnalyticsLogger.shared.log(action: .appBackground)
+//                    case .inactive:
+//                        AnalyticsLogger.shared.log(action: .appWillResignActive)
+//                    case .active:
+//                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
+//                    @unknown default:
+//                        break
+//                    }
+//                }
+
+            FashionTypeIntroView(path: $path)
+                .navigationDestination(for: ViewType.self) { viewType in
+                    switch viewType {
+                    case .fashionType:
+                        FashionTypeView(path: $path, viewModel: FashionTypeViewModel())
+                    case .fashionTypeResult(let response):
+                        FashionTypeResultView(path: $path, result: response)
+                    default:
+                        EmptyView()
                     }
                 }
 
