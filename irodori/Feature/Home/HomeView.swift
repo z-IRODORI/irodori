@@ -10,7 +10,7 @@ import SwiftUI
 struct HomeView: View {
     @Binding var path: [ViewType]
 //    @State var viewModel: HomeViewModel = .init(apiClient: MockHomeClient())
-    @State var viewModel: HomeViewModel = .init(apiClient: HomeClient())
+    @State var viewModel: HomeViewModel
     @State private var plannerViewModel: PlannerViewModel = .init()
     @State private var showAllTags = false
     @State private var showFirstTakePhotoSheet = false
@@ -85,8 +85,9 @@ struct HomeView: View {
     //                    )
     //                    .padding(.horizontal, -24)
 
-                        TomorrowPlannerView()
-                            .padding(.horizontal, -24)
+//                        TomorrowPlannerView()
+//                            .padding(.horizontal, -24)
+                        ShortCut()
                     }
 
                     // コーデの分析
@@ -321,8 +322,48 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
     }
+
+    private func ShortCut() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("相棒に相談")
+                .font(.system(size: 20, weight: .bold))
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ShortcutCard(icon: "wand.and.stars", label: "コーデ提案して")
+                ShortcutCard(icon: "bubble.left.and.text.bubble.right", label: "質問させて")
+                ShortcutCard(icon: "arrow.2.squarepath", label: "いつもと違うコーデ")
+                ShortcutCard(icon: "magnifyingglass", label: "服を探す")
+            }
+        }
+    }
+
+    private func ShortcutCard(icon: String, label: String) -> some View {
+        Button(action: {}) {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(.black)
+                Text(label)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .gray.opacity(0.15), radius: 4, x: 0, y: 2)
+        }
+    }
 }
 
 #Preview {
-    HomeView(path: .constant([]))
+    HomeView(
+        path: .constant([]),
+        viewModel: HomeViewModel(apiClient: MockHomeClient())
+    )
+    .environment(MainTabViewModel())
 }

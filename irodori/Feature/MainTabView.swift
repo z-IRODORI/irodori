@@ -13,7 +13,7 @@ struct MainTabView: View {
             TabView(selection: $vm.selectedTab) {
                 // ホーム
                 Tab("ホーム", systemImage: "house", value: MainTabViewModel.Tab.home) {
-                    HomeView(path: $path)
+                    HomeView(path: $path, viewModel: HomeViewModel(apiClient: HomeClient()))
                 }
 
                 // 相棒
