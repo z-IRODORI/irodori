@@ -5,6 +5,7 @@ struct MainTabView: View {
     @State private var viewModel: MainTabViewModel = .init()
     @State private var isSheetPresented = false
     @State private var previousTab: MainTabViewModel.Tab = .home
+    private let toastManager = ToastManager.shared
 
     var body: some View {
         @Bindable var vm = viewModel
@@ -93,6 +94,18 @@ struct MainTabView: View {
                 }
             }
         }
+        .overlay(alignment: .top) {
+            if let message = toastManager.message {
+                ToastView(message: message)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: toastManager.message)
     }
 
     private var partnerIcon: UIImage {

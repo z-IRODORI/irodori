@@ -52,11 +52,6 @@ struct PartnerView: View {
                 }
             }
         }
-        .alert("エラー", isPresented: $viewModel.showError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(viewModel.errorMessage ?? "不明なエラー")
-        }
         .sheet(item: $selectedScoreDetail) { detail in
             ScoreDetailView(detail: detail)
         }

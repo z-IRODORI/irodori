@@ -15,7 +15,6 @@ final class ProfileViewModel {
     var selectedCategory: ClothingCategory = .tops
     var closetItems: [ClosetItem] = []
     var isLoading = false
-    var errorMessage: String?
     var profileInfo: ProfileInfo?
     var isLoadingProfile = false
 
@@ -45,11 +44,8 @@ final class ProfileViewModel {
 
         // 新しいタスクを作成
         loadTask = Task {
-            // エラー状態をクリア
-            errorMessage = nil
-
             guard let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else {
-                errorMessage = "ユーザー情報が取得できませんでした"
+                ToastManager.shared.show("ユーザー情報が取得できませんでした")
                 return
             }
 
@@ -65,15 +61,13 @@ final class ProfileViewModel {
                 switch result {
                 case .success(let response):
                     closetItems = response.items
-                    errorMessage = nil
                 case .failure(let error):
-                    errorMessage = error.errorDescription
+                    ToastManager.shared.show(error.errorDescription ?? "エラーが発生しました")
                 }
             } catch is CancellationError {
-                // タスクがキャンセルされた場合は何もしない（エラーメッセージを表示しない）
                 return
             } catch {
-                errorMessage = "通信エラーが発生しました: \(error.localizedDescription)"
+                ToastManager.shared.show("通信エラーが発生しました: \(error.localizedDescription)")
             }
         }
 

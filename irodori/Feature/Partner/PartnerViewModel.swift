@@ -12,8 +12,6 @@ import Foundation
 final class PartnerViewModel {
     var userInsight: UserInsightResponse?
     var isLoading: Bool = false
-    var errorMessage: String?
-    var showError: Bool = false
 
     private let apiClient: UserInsightClientProtocol
 
@@ -44,17 +42,13 @@ final class PartnerViewModel {
                         UserDefaults.standard.set(partnerIconImage, forKey: UserDefaultsKey.partnerIconImage.rawValue)
                     }
                 } else {
-                    // status: "no_data"の場合
-                    errorMessage = response.insight
-                    showError = true
+                    ToastManager.shared.show(response.insight ?? "相棒情報がありません")
                 }
             case .failure(let error):
-                errorMessage = error.errorDescription
-                showError = true
+                ToastManager.shared.show(error.errorDescription ?? "エラーが発生しました")
             }
         } catch {
-            errorMessage = "相棒コメントの取得に失敗しました"
-            showError = true
+            ToastManager.shared.show("相棒コメントの取得に失敗しました")
         }
     }
 }

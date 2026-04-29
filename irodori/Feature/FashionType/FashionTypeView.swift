@@ -54,15 +54,6 @@ struct FashionTypeView: View {
                 }
             }
         }
-        .alert("エラー", isPresented: $viewModel.showError) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-            }
-        }
     }
 
     // MARK: - Subviews
@@ -283,5 +274,12 @@ struct ScoreButton: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             }
         }
+    }
+}
+
+#Preview {
+    @Previewable @State var path: [ViewType] = []
+    NavigationStack(path: $path) {
+        FashionTypeView(path: $path, viewModel: FashionTypeViewModel())
     }
 }

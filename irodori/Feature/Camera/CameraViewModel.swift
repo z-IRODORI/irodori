@@ -19,6 +19,7 @@ enum CameraState {
 }
 
 @Observable
+@MainActor
 class CameraViewModel: NSObject {
     private let userDefaults: UserDefaults = UserDefaults.standard
 
@@ -30,7 +31,6 @@ class CameraViewModel: NSObject {
     var showPhotoLibraryPermissionAlert = false
     var showImagePicker = false
     var isLoadingPickedImage = false
-    var imageLoadError: String?
 
     // カメラセットアップ
     func setupCamera() {
@@ -124,16 +124,15 @@ class CameraViewModel: NSObject {
     // PHPickerから選択された画像を処理
     func processPickedImage(_ image: UIImage) {
         self.capturedImage = image
-        self.imageLoadError = nil  // 成功時はエラーをクリア
     }
 
     func setImageLoadingState(_ isLoading: Bool) {
         self.isLoadingPickedImage = isLoading
     }
 
-    func setImageLoadError(_ errorMessage: String) {
-        self.imageLoadError = errorMessage
-        self.isLoadingPickedImage = false  // エラー時はローディング終了
+    @MainActor func setImageLoadError(_ errorMessage: String) {
+        ToastManager.shared.show(errorMessage)
+        self.isLoadingPickedImage = false
     }
 }
 

@@ -35,6 +35,18 @@ struct irodoriApp: App {
                     }
                 }
 
+//            FashionTypeIntroView(path: $path)
+//                .navigationDestination(for: ViewType.self) { viewType in
+//                    switch viewType {
+//                    case .fashionType:
+//                        FashionTypeView(path: $path, viewModel: FashionTypeViewModel())
+//                    case .fashionTypeResult(let response):
+//                        FashionTypeResultView(path: $path, result: response)
+//                    default:
+//                        EmptyView()
+//                    }
+//                }
+
 //            SelectStandardItemView()
 
 //            // 動作確認用: FashionType -> ResultView
