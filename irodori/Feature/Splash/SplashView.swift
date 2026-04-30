@@ -122,6 +122,8 @@ struct SplashView: View {
                     EmptyView() // FashionType内のNavigationStackで処理
                 case .recommendCoordinateByStandardItem(_):
                     EmptyView()
+                case .tomorrowPlanner:
+                    EmptyView()
                 }
             }
             // .onChange(of: path) は削除済み（FirstTakePhotoView がオンボーディングから削除されたため不要）

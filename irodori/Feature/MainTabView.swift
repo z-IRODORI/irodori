@@ -72,6 +72,8 @@ struct MainTabView: View {
                         viewModel: .init(uid: params.uid, targetDateString: params.targetDateString, coordinateImageURL: params.coordinateImageURL, coordinateDetailClient: CoordinateDetailClient()),
                         showHeader: params.showHeader
                     )
+                case .tomorrowPlanner:
+                    TomorrowPlannerView()
                 case .camera:
                     CameraView(cameraViewModel: .init(), path: $path)
                 case .profileEdit:

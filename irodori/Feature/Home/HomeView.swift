@@ -329,16 +329,18 @@ struct HomeView: View {
                 .font(.system(size: 20, weight: .bold))
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ShortcutCard(icon: "wand.and.stars", label: "コーデ提案して")
-                ShortcutCard(icon: "bubble.left.and.text.bubble.right", label: "質問させて")
-                ShortcutCard(icon: "arrow.2.squarepath", label: "いつもと違うコーデ")
-                ShortcutCard(icon: "magnifyingglass", label: "服を探す")
+                ShortcutCard(icon: "wand.and.stars", label: "コーデ提案して") {
+                    path.append(.tomorrowPlanner)
+                }
+                ShortcutCard(icon: "bubble.left.and.text.bubble.right", label: "質問させて") {}
+                ShortcutCard(icon: "arrow.2.squarepath", label: "いつもと違うコーデ") {}
+                ShortcutCard(icon: "magnifyingglass", label: "服を探す") {}
             }
         }
     }
 
-    private func ShortcutCard(icon: String, label: String) -> some View {
-        Button(action: {}) {
+    private func ShortcutCard(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .medium))

@@ -10,6 +10,7 @@ import UIKit
 enum ViewType: Hashable {
     case camera
     case calendar
+    case tomorrowPlanner
     case coordinateReview(CoordinateReviewParams)
     case coordinateDetail(CoordinateDetailParams)
     case profileEdit
