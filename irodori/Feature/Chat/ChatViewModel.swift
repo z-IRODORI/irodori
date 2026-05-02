@@ -15,7 +15,7 @@ struct CoordinateChat: Identifiable, Codable {
     var messages: [ChatMessage]
     let createdAt: Date
     var lastUpdated: Date
-    var conversationId: String?  // Firestore conversation ID (nil = not yet synced)
+    var conversationId: String?
 
     init(coordinateId: String, coordinateImageName: String) {
         self.id = UUID().uuidString
@@ -34,6 +34,7 @@ final class ChatViewModel {
     var coordinateChat: CoordinateChat = .init(coordinateId: "", coordinateImageName: "")
     var inputText: String = ""
     var isLoading: Bool = false
+    var isLoadingHistory: Bool = false
     var errorMessage: String?
 
     let coordinateId: String
@@ -64,15 +65,17 @@ final class ChatViewModel {
                 coordinateImageName: coordinateImageBase64
             )
         }
-
-        // バックグラウンドで Firestore の会話 ID を取得・履歴をマージ
         Task { await syncWithRemote() }
     }
 
-    private func syncWithRemote() async {
+    // conversationId の確保 + Firestore 履歴マージ
+    // sendMessage() からも await で呼ぶため internal に
+    func syncWithRemote() async {
         guard !userId.isEmpty else { return }
 
-        // conversationId がなければ Firestore に会話を作成
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+
         if coordinateChat.conversationId == nil {
             let result = try? await apiClient.createConversation(
                 userId: userId,
@@ -86,7 +89,6 @@ final class ChatViewModel {
             }
         }
 
-        // 履歴を取得してローカルキャッシュとマージ
         guard let convId = coordinateChat.conversationId else { return }
         let histResult = try? await apiClient.fetchMessages(
             conversationId: convId,
@@ -107,6 +109,11 @@ final class ChatViewModel {
 
     func sendMessage() async {
         guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        // conversationId が未取得の場合は先に同期して Firestore に会話を作成
+        if coordinateChat.conversationId == nil {
+            await syncWithRemote()
+        }
 
         let messageText = inputText
         inputText = ""
@@ -140,34 +147,32 @@ final class ChatViewModel {
         }
         let gender = Gender.fromWithDefault(genderString, default: .other)
 
-        // Firestore 経由で送信（conversationId あり）
+        // Firestore 経由（conversationId あり） → 必ず履歴に蓄積される
         if let convId = coordinateChat.conversationId, !userId.isEmpty {
             let request = ChatWithHistoryRequest(
                 user_id: userId,
-                question: userMessage + "# 制約\n- 出力は300文字以内で",
+                question: userMessage + "\n# 制約\n- 出力は300文字以内で",
                 gender: gender,
                 image_base64: coordinateImageBase64.isEmpty ? nil : coordinateImageBase64
             )
             do {
                 let response = try await apiClient.postWithHistory(conversationId: convId, request: request)
                 if case .success(let result) = response {
-                    let aiMessage = result.ai_message.asChatMessage
-                    addMessageLocally(aiMessage)
+                    addMessageLocally(result.ai_message.asChatMessage)
                     return
                 }
             } catch {}
         }
 
-        // フォールバック: 既存のステートレス API
+        // フォールバック: ステートレス API（conversationId 未取得時）
         do {
             let response = try await apiClient.post(chatRequest: .init(
-                question: userMessage + "# 制約\n- 出力は300文字以内で",
+                question: userMessage + "\n# 制約\n- 出力は300文字以内で",
                 gender: gender,
                 image_base64: coordinateImageBase64
             ))
             if case .success(let result) = response {
-                let aiMessage = ChatMessage(text: result.answer, isUser: false)
-                addMessageLocally(aiMessage)
+                addMessageLocally(ChatMessage(text: result.answer, isUser: false))
             }
         } catch {}
     }

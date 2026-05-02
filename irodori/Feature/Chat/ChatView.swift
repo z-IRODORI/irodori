@@ -153,7 +153,6 @@ struct ChatBubbleView: View {
 
 struct ChatView: View {
     @State var viewModel: ChatViewModel
-    @State private var isScrolledToBottom: Bool = true
     @State private var showMiniImage: Bool = false
     @State private var showScrollConfirmation: Bool = false
 
@@ -168,195 +167,187 @@ struct ChatView: View {
     let image: UIImage
     init(coordinateId: String, image: UIImage) {
         self.image = image
-        // 画像サイズを削減: リサイズ + 圧縮
         let resizedImage = ChatView.resizeImage(image, targetWidth: 800)
-        // 圧縮率を0.3に設定（バックエンドでさらに0.5倍に圧縮される）
         let imageData = resizedImage.jpegData(compressionQuality: 0.3)!
-        print("Chat image data size: \(imageData.count) bytes")
-        self.viewModel = .init(coordinateId: coordinateId, coordinateImageBase64: imageData.base64EncodedString(), apiClient: ChatClient(), repository: CoordinateChatRepository())
+        self.viewModel = .init(
+            coordinateId: coordinateId,
+            coordinateImageBase64: imageData.base64EncodedString(),
+            apiClient: ChatClient(),
+            repository: CoordinateChatRepository()
+        )
     }
 
     private static func resizeImage(_ image: UIImage, targetWidth: CGFloat) -> UIImage {
         let scale = targetWidth / image.size.width
-        let newHeight = image.size.height * scale
-        let newSize = CGSize(width: targetWidth, height: newHeight)
-
+        let newSize = CGSize(width: targetWidth, height: image.size.height * scale)
         UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
         image.draw(in: CGRect(origin: .zero, size: newSize))
-        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        let resized = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
-
-        return resizedImage ?? image
+        return resized ?? image
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            ScrollViewReader { scrollViewProxy in
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // コーデ画像
-                        GeometryReader { imageGeometry in
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(3/4, contentMode: .fit)
-                                .frame(maxWidth: 200)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .padding(.bottom, 24)
-                                .frame(maxWidth: .infinity)
-                                .id("coordinateImage")
-                                .onAppear {
-                                    showMiniImage = false
-                                }
-                                .onChange(of: imageGeometry.frame(in: .global).maxY) { newValue in
-                                    showMiniImage = newValue < 0
-                                }
-                        }
-                        .frame(height: 290)
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // コーデ画像
+                    GeometryReader { geo in
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(3/4, contentMode: .fit)
+                            .frame(maxWidth: 180)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                            .frame(maxWidth: .infinity)
+                            .id("coordinateImage")
+                            .onAppear { showMiniImage = false }
+                            .onChange(of: geo.frame(in: .global).maxY) { newValue in
+                                showMiniImage = newValue < 0
+                            }
+                    }
+                    .frame(height: 270)
+                    .padding(.top, 16)
 
-                        // チャットメッセージ
+                    // メッセージ
+                    if viewModel.isLoadingHistory {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 20)
+                    } else {
                         VStack(spacing: 8) {
-                            ForEach(viewModel.coordinateChat.messages) { message in
-                                ChatBubbleView(message: message)
+                            ForEach(Array(viewModel.coordinateChat.messages.enumerated()), id: \.element.id) { index, message in
+                                let showDate = index == 0 || !Calendar.current.isDate(
+                                    message.timestamp,
+                                    inSameDayAs: viewModel.coordinateChat.messages[index - 1].timestamp
+                                )
+                                if showDate {
+                                    ChatDateSeparatorView(date: message.timestamp)
+                                }
+                                CoordinateChatBubbleView(message: message)
                                     .id(message.id)
                             }
 
                             if viewModel.isLoading {
                                 HStack {
                                     PartnerIconImage(size: 40)
-
-                                    HStack {
+                                    HStack(spacing: 6) {
                                         ProgressView()
                                             .progressViewStyle(CircularProgressViewStyle())
                                             .scaleEffect(0.8)
                                         Text("考え中...")
                                             .font(.system(size: 14))
-                                            .foregroundColor(.secondary)
+                                            .foregroundStyle(.secondary)
                                     }
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 12)
                                     .background(Color.gray.opacity(0.1))
                                     .clipShape(RoundedRectangle(cornerRadius: 20))
-
                                     Spacer(minLength: 60)
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 4)
                             }
                         }
-                        .padding(.vertical, 20)
+                        .padding(.vertical, 12)
+                    }
 
-                        // 下部スペースを確保（id "bottom"でスクロール位置の基準に）
-                        Color.clear
-                            .frame(height: 20)
-                            .id("bottom")
-                    }
+                    Color.clear.frame(height: 20).id("bottom")
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .onTapGesture {
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                }
-                .onChange(of: viewModel.coordinateChat.messages.count) { _ in
-                    withAnimation {
-                        scrollViewProxy.scrollTo("bottom", anchor: .bottom)
-                    }
-                }
-                .overlay(
-                    // 下へスクロールボタン
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Button(action: {
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    scrollViewProxy.scrollTo("bottom", anchor: .bottom)
-                                }
-                            }) {
-                                Image(systemName: "arrow.down")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .frame(width: 44, height: 44)
-                                    .background(Color.white)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                            }
-                            .padding(.trailing, 20)
-                            .padding(.bottom, 20) // 質問候補の上に配置
-                        }
-                    },
-                    alignment: .bottomTrailing
-                )
-                .overlay(
-                    // ミニ画像オーバーレイ
-                    Group {
-                        if showMiniImage {
-                            VStack {
-                                HStack {
-                                    Button(action: {
-                                        showScrollConfirmation = true
-                                    }) {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .aspectRatio(3/4, contentMode: .fit)
-                                            .frame(width: 100)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-                                    }
-                                    .padding(.leading, 16)
-                                    .padding(.top, 16)
-                                    .transition(.asymmetric(
-                                        insertion: .scale.combined(with: .opacity),
-                                        removal: .scale.combined(with: .opacity)
-                                    ))
-                                    .alert("画像まで移動しますか？", isPresented: $showScrollConfirmation) {
-                                        Button("キャンセル", role: .cancel) {}
-                                        Button("移動") {
-                                            withAnimation(.easeInOut(duration: 0.5)) {
-                                                scrollViewProxy.scrollTo("coordinateImage", anchor: .top)
-                                            }
-                                        }
-                                    } message: {
-                                        Text("コーディネート画像の位置まで戻りますか？")
-                                    }
-                                    Spacer()
-                                }
-                                Spacer()
-                            }
-                        }
-                    }
-                        .animation(.easeInOut(duration: 0.3), value: showMiniImage),
-                    alignment: .topLeading
-                )
             }
+            .scrollDismissesKeyboard(.interactively)
+            .onTapGesture {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
+            .onChange(of: viewModel.coordinateChat.messages.count) { _ in
+                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
+            .overlay(alignment: .topLeading) {
+                if showMiniImage {
+                    Button(action: { showScrollConfirmation = true }) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(3/4, contentMode: .fit)
+                            .frame(width: 56)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+                    }
+                    .padding(.leading, 16)
+                    .padding(.top, 12)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 0.8).combined(with: .opacity)
+                    ))
+                    .alert("画像まで移動しますか？", isPresented: $showScrollConfirmation) {
+                        Button("キャンセル", role: .cancel) {}
+                        Button("移動") {
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                proxy.scrollTo("coordinateImage", anchor: .top)
+                            }
+                        }
+                    } message: {
+                        Text("コーディネート画像の位置まで戻りますか？")
+                    }
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: showMiniImage)
         }
+        .background(.white)
+        .navigationTitle("コーデについて相談する")
+        .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
-            // 下部固定エリア（キーボード対応）
             VStack(spacing: 0) {
                 Divider()
-
-                // 質問候補
-                SuggestedQuestionsView(
+                GeneralSuggestedQuestionsView(
                     questions: suggestedQuestions,
-                    onQuestionTapped: { question in
-                        viewModel.addSuggestedQuestion(question)
-                    }
+                    onQuestionTapped: { viewModel.addSuggestedQuestion($0) }
                 )
-
-                // テキスト入力フィールド
-                ChatInputView(
+                GeneralChatInputView(
                     text: $viewModel.inputText,
-                    onSend: {
-                        Task {
-                            await viewModel.sendMessage()
-                        }
-                    }
+                    onSend: { Task { await viewModel.sendMessage() } }
                 )
             }
             .background(.ultraThinMaterial)
         }
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             viewModel.loadCoordinateChat()
         }
+    }
+}
+
+// MARK: - CoordinateChatBubbleView
+// GeneralChatBubbleView と同構造。ユーザーバブルをインディゴに変更してコーデ相談と汎用チャットを視覚的に区別
+
+struct CoordinateChatBubbleView: View {
+    let message: ChatMessage
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 6) {
+            if message.isUser {
+                Spacer(minLength: 60)
+            } else {
+                PartnerIconImage(size: 40)
+            }
+
+            Text(.init(message.text))
+                .font(.system(size: 14))
+                .foregroundStyle(message.isUser ? .white : .primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(message.isUser ? Color.indigo : Color.gray.opacity(0.1))
+                )
+                .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
+
+            if !message.isUser {
+                Spacer(minLength: 30)
+            }
+        }
+        .padding(.trailing, 16)
+        .padding(.leading, 8)
+        .padding(.vertical, 4)
     }
 }
 
