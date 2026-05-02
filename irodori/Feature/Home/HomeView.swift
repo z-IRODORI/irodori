@@ -26,6 +26,8 @@ struct HomeView: View {
                 VStack(spacing: 32) {
                     if viewModel.isLoadingHome {
                         recentCoordinatesSkeleton
+                    } else if viewModel.hasLoadError {
+                        recentCoordinatesError
                     } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
                         RecentCoordinates(
                             recentCoordinates: viewModel.homeResponse.recent_coordinates,
@@ -252,6 +254,32 @@ struct HomeView: View {
             .padding(.horizontal, 24)
         }
         .padding(.horizontal, -24)
+    }
+
+    // MARK: - ローディングエラー
+
+    private var recentCoordinatesError: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 20))
+                .foregroundStyle(Color.gray.opacity(0.5))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("読み込めませんでした")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.black)
+                Button(action: { Task { await viewModel.onAppear() } }) {
+                    Text("再試行する")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.black)
+                        .underline()
+                }
+            }
+            Spacer()
+        }
+        .padding(16)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
     }
 
     // MARK: - コーデ未登録 空状態

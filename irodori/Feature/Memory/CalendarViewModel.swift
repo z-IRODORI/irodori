@@ -31,6 +31,13 @@ final class CalendarViewModel {
         setupMonths()
     }
 
+    var isInitiallyLoading: Bool {
+        !monthStates.isEmpty && monthStates.allSatisfy {
+            if case .loading = $0 { return true }
+            return false
+        }
+    }
+
     var allLoaded: Bool {
         !monthStates.isEmpty && monthStates.allSatisfy {
             if case .loading = $0 { return false }

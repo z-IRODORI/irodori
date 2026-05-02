@@ -20,7 +20,7 @@ struct CalendarView: View {
 
     var body: some View {
         Group {
-            if viewModel.months.isEmpty {
+            if viewModel.months.isEmpty || viewModel.isInitiallyLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.allLoaded && !viewModel.hasAnyCoordinates {
@@ -78,7 +78,7 @@ struct CalendarView: View {
 
     private func monthSection(month: Month, responses: [CoordinateListResponse]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("\(month.year)年\(month.monthOfTheYear)月")
+            Text(verbatim: "\(month.year)年\(month.monthOfTheYear)月")
                 .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(.black)
                 .padding(.bottom, 2)
@@ -109,7 +109,7 @@ struct CalendarView: View {
 
     private func monthEmptySection(month: Month) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(month.year)年\(month.monthOfTheYear)月")
+            Text(verbatim: "\(month.year)年\(month.monthOfTheYear)月")
                 .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(.black)
 
@@ -277,14 +277,6 @@ struct CalendarView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - Safe subscript
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
     }
 }
 

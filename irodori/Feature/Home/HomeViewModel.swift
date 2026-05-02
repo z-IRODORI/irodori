@@ -17,9 +17,10 @@ final class HomeViewModel {
     var recentCoordinateAnalysis: String = ""
     var selectCoordinateItemsByDate: [Int: SelectCoordinateItem] = [:]
 
-    // ローディング状態
+    // ローディング・エラー状態
     var isLoadingHome: Bool = true
     var isLoadingAnalysis: Bool = true
+    var hasLoadError: Bool = false
 
     // クローゼットアイテムピッカー
     var closetItems: [ClosetItem] = []
@@ -59,6 +60,7 @@ final class HomeViewModel {
 
     func onAppear() async {
         isLoadingHome = true
+        hasLoadError = false
         defer { isLoadingHome = false }
 
         do {
@@ -68,14 +70,12 @@ final class HomeViewModel {
             switch result {
             case .success(let response):
                 self.homeResponse = response
-                // home API のレスポンス後に analyze-recent-coordinate API を呼び出し
                 await fetchRecentCoordinateAnalysis(uid: uid)
             case .failure:
-                // エラーハンドリング
-                break
+                hasLoadError = true
             }
         } catch {
-            // エラーハンドリング
+            hasLoadError = true
         }
     }
 

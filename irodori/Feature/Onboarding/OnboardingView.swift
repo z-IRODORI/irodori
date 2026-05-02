@@ -16,7 +16,6 @@ struct OnboardingInfo: Hashable {
 
 struct OnboardingView: View {
     let onbordingInfos: [OnboardingInfo] = [
-        // 必ず1つ目のidは0, TabView のタグに使われる
         .init(id: 0, title: "毎日のコーデを撮影", description: "家を出る前 や 明日のコーデを考える時\n 鏡に映る**全身写真**を撮影", imageName: "onboarding1"),
         .init(id: 1, title: "相棒がコーデをレビュー", description: "撮影したコーデをもとに\n相棒が **あなただけ** のレビューをお届け", imageName: "onboarding2")
     ]
@@ -24,73 +23,78 @@ struct OnboardingView: View {
     let closeButtonTapped: () -> Void
 
     var body: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 0) {
             TabView(selection: $selectedOnbordingIndex) {
-                ForEach(onbordingInfos, id: \.self) { onbordingInfo in
-                    OnboardingCardView(onbordingInfo: onbordingInfo)
-                        .tag(onbordingInfo.id)
+                ForEach(onbordingInfos, id: \.self) { info in
+                    OnboardingCardView(info: info)
+                        .tag(info.id)
                 }
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-            .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.6)
             .animation(.easeInOut, value: selectedOnbordingIndex)
 
-            TabIndexView(numberOfPages: onbordingInfos.count, currentIndex: selectedOnbordingIndex)
-            NextButton()
+            VStack(spacing: 24) {
+                TabIndexView(
+                    numberOfPages: onbordingInfos.count,
+                    currentIndex: selectedOnbordingIndex,
+                    dotSize: 8,
+                    spacing: 8
+                )
+
+                Button(action: {
+                    if selectedOnbordingIndex < onbordingInfos.count - 1 {
+                        AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
+                            "action": GAEventAction.nextPage.rawValue,
+                            "page_index": selectedOnbordingIndex + 1
+                        ])
+                        selectedOnbordingIndex += 1
+                    } else {
+                        AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
+                            "action": GAEventAction.closeOnboarding.rawValue
+                        ])
+                        closeButtonTapped()
+                    }
+                }) {
+                    Text(selectedOnbordingIndex < onbordingInfos.count - 1 ? "次へ" : "閉じる")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .padding(.horizontal, 24)
+            }
+            .padding(.top, 24)
+            .padding(.bottom, 40)
         }
-        .frame(maxHeight: .infinity, alignment: .top)
-        .padding(.top, 32)
+        .background(.white)
         .onAppear {
             AnalyticsLogger.shared.log(screen: .onboardingScreenView)
         }
     }
 
-    private func OnboardingCardView(onbordingInfo: OnboardingInfo) -> some View {
-        VStack(spacing: 12) {
-            Text("\(onbordingInfo.title)")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.black)
-                .padding(.horizontal, 24)
-                .multilineTextAlignment(.center)
+    private func OnboardingCardView(info: OnboardingInfo) -> some View {
+        VStack(spacing: 16) {
+            VStack(spacing: 8) {
+                Text(info.title)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.black)
+                    .multilineTextAlignment(.center)
 
-            // マークダウン形式で表示するために String.init() を使用
-            Text(.init(onbordingInfo.description))
-                .font(.system(size: 16))
-                .foregroundStyle(.gray)
-                .padding(.horizontal, 24)
-                .multilineTextAlignment(.center)
-
-//            Image(uiImage: uiImage)
-            Image(onbordingInfo.imageName)
-                .resizable()
-                .frame(maxWidth: .infinity)
-                .aspectRatio(contentMode: .fit)
-                .padding(.top, 12)
-        }
-    }
-
-    private func NextButton() -> some View {
-        Button(action: {
-            if selectedOnbordingIndex < onbordingInfos.count - 1 {
-                AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
-                    "action": GAEventAction.nextPage.rawValue,
-                    "page_index": selectedOnbordingIndex + 1
-                ])
-                selectedOnbordingIndex += 1
-            } else {
-                AnalyticsLogger.shared.log(screen: .onboardingScreenView, parameters: [
-                    "action": GAEventAction.closeOnboarding.rawValue
-                ])
-                closeButtonTapped()
+                Text(.init(info.description))
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
             }
-        }) {
-            Text(selectedOnbordingIndex < onbordingInfos.count - 1 ? "次へ" : "閉じる")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white)
+            .padding(.horizontal, 32)
+            .padding(.top, 32)
+
+            Image(info.imageName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
                 .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(.black)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
                 .padding(.horizontal, 24)
         }
     }
