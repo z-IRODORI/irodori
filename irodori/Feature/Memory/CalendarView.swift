@@ -20,16 +20,29 @@ struct CalendarView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoading {
+            if viewModel.months.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if !viewModel.hasAnyCoordinates {
+            } else if viewModel.allLoaded && !viewModel.hasAnyCoordinates {
                 EmptyStateView(path: $path)
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 28) {
-                        ForEach(0..<viewModel.coordinateListResponses.count, id: \.self) { i in
-                            monthSection(index: i)
+                        ForEach(Array(zip(viewModel.months, viewModel.monthStates).enumerated()), id: \.offset) { i, pair in
+                            let (month, state) = pair
+                            switch state {
+                            case .loading:
+                                monthSkeletonSection(month: month)
+                            case .loaded(let responses):
+                                let hasPhotos = responses.contains { $0.coodinate_image_path != nil }
+                                if hasPhotos {
+                                    monthSection(month: month, responses: responses)
+                                } else {
+                                    monthEmptySection(month: month)
+                                }
+                            case .failed:
+                                monthEmptySection(month: month)
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -61,11 +74,10 @@ struct CalendarView: View {
         }
     }
 
-    // MARK: - Month Section
+    // MARK: - Month Section（写真あり）
 
-    private func monthSection(index i: Int) -> some View {
-        let month = viewModel.months[i]
-        return VStack(alignment: .leading, spacing: 6) {
+    private func monthSection(month: Month, responses: [CoordinateListResponse]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             Text("\(month.year)年\(month.monthOfTheYear)月")
                 .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(.black)
@@ -85,9 +97,68 @@ struct CalendarView: View {
                 }
 
                 ForEach(1...month.amountOfDays, id: \.self) { day in
-                    if !viewModel.coordinateListResponses.isEmpty {
-                        dayCell(month: month, day: day, index: i)
-                    }
+                    dayCell(month: month, day: day, responses: responses)
+                }
+            }
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        .animation(.easeOut(duration: 0.25), value: UUID())
+    }
+
+    // MARK: - Month Section（0件）
+
+    private func monthEmptySection(month: Month) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(month.year)年\(month.monthOfTheYear)月")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.black)
+
+            HStack(spacing: 8) {
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.gray.opacity(0.35))
+                Text("この月の記録はありません")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.gray.opacity(0.45))
+                Spacer()
+            }
+            .padding(.vertical, 14)
+            .padding(.horizontal, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.gray.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(
+                                Color.gray.opacity(0.15),
+                                style: StrokeStyle(lineWidth: 1, dash: [4, 4])
+                            )
+                    )
+            )
+        }
+        .transition(.opacity)
+        .animation(.easeOut(duration: 0.2), value: UUID())
+    }
+
+    // MARK: - Month Skeleton（ロード中）
+
+    private func monthSkeletonSection(month: Month) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.gray.opacity(0.15))
+                .frame(width: 90, height: 18)
+                .padding(.bottom, 2)
+
+            LazyVGrid(columns: columns7, spacing: 4) {
+                ForEach(0..<7, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.gray.opacity(0.10))
+                        .frame(height: 10)
+                }
+                ForEach(0..<28, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.09))
+                        .aspectRatio(3/4, contentMode: .fill)
                 }
             }
         }
@@ -95,8 +166,8 @@ struct CalendarView: View {
 
     // MARK: - Day Cell
 
-    private func dayCell(month: Month, day: Int, index i: Int) -> some View {
-        let imageURL = viewModel.coordinateListResponses[i][day - 1].coodinate_image_path
+    private func dayCell(month: Month, day: Int, responses: [CoordinateListResponse]) -> some View {
+        let imageURL = responses[safe: day - 1]?.coodinate_image_path
         let isToday = checkIsToday(year: month.year, month: month.monthOfTheYear, day: day)
 
         return Button(action: {
@@ -154,7 +225,6 @@ struct CalendarView: View {
 
     // MARK: - Helpers
 
-    /// httpURLはKFImageで読み込み、アセット名（Preview用）はImage()にフォールバック
     @ViewBuilder
     private func coordinateImage(from path: String) -> some View {
         if path.hasPrefix("http"), let url = URL(string: path) {
@@ -172,7 +242,7 @@ struct CalendarView: View {
         return today.year == year && today.month == month && today.day == day
     }
 
-    // MARK: - Empty State
+    // MARK: - Empty State（全コーデ0件）
 
     private func EmptyStateView(path: Binding<[ViewType]>) -> some View {
         VStack(spacing: 24) {
@@ -207,6 +277,14 @@ struct CalendarView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Safe subscript
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 
