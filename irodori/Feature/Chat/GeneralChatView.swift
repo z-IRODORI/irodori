@@ -35,7 +35,11 @@ struct GeneralChatView: View {
                                 .padding(.vertical, 20)
                         } else {
                             VStack(spacing: 8) {
-                                ForEach(viewModel.messages) { message in
+                                ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
+                                    let showDate = index == 0 || !Calendar.current.isDate(message.timestamp, inSameDayAs: viewModel.messages[index - 1].timestamp)
+                                    if showDate {
+                                        ChatDateSeparatorView(date: message.timestamp)
+                                    }
                                     GeneralChatBubbleView(message: message)
                                         .id(message.id)
                                 }
@@ -259,6 +263,31 @@ struct GeneralChatInputView: View {
         .padding(.top, 8)
         .padding(.bottom, 4)
         .background(Color(UIColor.systemBackground))
+    }
+}
+
+// MARK: - ChatDateSeparatorView
+
+struct ChatDateSeparatorView: View {
+    let date: Date
+
+    var body: some View {
+        Text(formatted)
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background(Color.gray.opacity(0.12))
+            .clipShape(Capsule())
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+    }
+
+    private var formatted: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = "yyyy年MM月dd日"
+        return formatter.string(from: date)
     }
 }
 

@@ -28,7 +28,11 @@ struct ChatHistoryDetailView: View {
                                 .padding(24)
                         } else {
                             VStack(spacing: 8) {
-                                ForEach(viewModel.messages) { message in
+                                ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
+                                    let showDate = index == 0 || !Calendar.current.isDate(message.timestamp, inSameDayAs: viewModel.messages[index - 1].timestamp)
+                                    if showDate {
+                                        ChatDateSeparatorView(date: message.timestamp)
+                                    }
                                     GeneralChatBubbleView(message: message)
                                         .id(message.id)
                                 }
