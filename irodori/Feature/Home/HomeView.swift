@@ -97,13 +97,15 @@ struct HomeView: View {
                 }
             )
         }
-        .sheet(isPresented: $showFirstTakePhotoSheet) {
+        .sheet(isPresented: $showFirstTakePhotoSheet, onDismiss: {
+            Task { await viewModel.onAppear() }
+        }) {
             FirstTakePhotoView(
                 path: $path,
                 viewModel: .init(fashionReviewClient: FashionReviewClient()),
                 showCloseButton: true,
                 onClose: { showFirstTakePhotoSheet = false },
-                okButtonTapped: { showFirstTakePhotoSheet = false },
+                okButtonTapped: {},
                 onDontShowAgain: {
                     UserDefaults.standard.set(Date(), forKey: UserDefaultsKey.lastDismissedFirstTakePhotoDate.rawValue)
                     showFirstTakePhotoSheet = false
