@@ -9,176 +9,75 @@ import SwiftUI
 
 struct HomeView: View {
     @Binding var path: [ViewType]
-//    @State var viewModel: HomeViewModel = .init(apiClient: MockHomeClient())
     @State var viewModel: HomeViewModel
-    @State private var plannerViewModel: PlannerViewModel = .init()
-    @State private var showAllTags = false
     @State private var showFirstTakePhotoSheet = false
     @State private var showTutorialSheet = false
     @Environment(MainTabViewModel.self) private var tabViewModel
 
     var body: some View {
-        VStack(spacing: 12) {
-            Header()
+        VStack(spacing: 0) {
+            headerView
                 .padding(.horizontal, 24)
                 .padding(.top, 12)
+                .padding(.bottom, 12)
+                .background(.white)
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 40) {
-                    // TODO: 直近のコーデが存在しない場合のUIを考える
-                    // 直近のコーデが存在しない場合、コーデだけではなく分析やタグを表示できないので、それも踏まえてUIを考える
-                    RecentCoordinates(
-                        recentCoordinates: viewModel.homeResponse.recent_coordinates,
-                        isEditMode: viewModel.isEditMode,
-                        onToggleEditMode: {
-                            viewModel.toggleEditMode()
-                        },
-                        onDeleteRequest: { coordinateId in
-                            viewModel.requestDelete(coordinateId: coordinateId)
-                        }
-                    )
-                    .padding(.horizontal, -24)
-
-                    VStack(spacing: 24) {
-    //                    Text("コーデ提案")
-    //                        .font(.system(size: 20, weight: .bold))
-    //                        .frame(maxWidth: .infinity, alignment: .leading)
-    //                    Text("3日間分のコーデを提案します。過去に登録したアイテムやコーデから提案します。")
-    //                        .font(.system(size: 14, weight: .regular))
-    //                        .foregroundStyle(.gray)
-    //                        .frame(maxWidth: .infinity, alignment: .leading)
-    //                        .padding(.top, -18)
-    //                    WeeklyPlannerContent(
-    //                        calendarList: plannerViewModel.calendarList,
-    //                        selectedDateID: $plannerViewModel.selectedDateID,
-    //                        relativeDateText: plannerViewModel.relativeDateText,
-    //                        onSelectDate: { id in plannerViewModel.selectDate(id: id) },
-    //                        isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) }
-    //                    )
-    //                    .padding(.horizontal, -24)
-
-    //                    ThreeDaysPlanner(
-    //                        calendarList: plannerViewModel.calendarList,
-    //                        selectedDateID: $plannerViewModel.selectedDateID,
-    //                        relativeDateText: plannerViewModel.relativeDateText,
-    //                        selectCoordinateItemForDate: { dateID in viewModel.selectCoordinateItem(for: dateID) },
-    //                        onSelectDate: { id in plannerViewModel.selectDate(id: id) },
-    //                        isCurrentMonth: { date in plannerViewModel.isCurrentMonth(date: date) },
-    //                        coordinatesForDate: { dateID in viewModel.coordinates(for: dateID) },
-    //                        isLoadingForDate: { dateID in viewModel.isLoading(for: dateID) },
-    //                        onAddCoordinateRandom: { dateID in
-    //                            Task {
-    //                                await viewModel.addCoordinateByItem(for: dateID)
-    //                            }
-    //                        },
-    //                        onAddCoordinateByItem: { dateID in
-    //                            viewModel.showItemPicker(for: dateID)
-    //                        },
-    //                        onChangeItem: {
-    //                            if let dateID = plannerViewModel.selectedDateID {
-    //                                viewModel.showItemPicker(for: dateID)
-    //                            }
-    //                        },
-    //                        onReset: { dateID in
-    //                            viewModel.resetCoordinate(for: dateID)
-    //                        }
-    //                    )
-    //                    .padding(.horizontal, -24)
-
-//                        TomorrowPlannerView()
-//                            .padding(.horizontal, -24)
-                        ShortCut()
-                    }
-
-                    // コーデの分析
-                    VStack(spacing: 12) {
-                        HStack(spacing: 6) {
-                            PartnerIconImage(size: 50)
-                                .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
-
-                            SpeechBubbleView(text: "これまでのコーデを分析しました")
-                                .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
-                        }
-                        if !viewModel.recentCoordinateAnalysis.isEmpty {
-                            Text(.init(viewModel.recentCoordinateAnalysis))
-                                .font(.system(size: 16, weight: .regular))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .redacted(reason: viewModel.isLoadingAnalysis ? .placeholder : [])
-                        } else {
-                            ProgressView()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-
-                    // これまでのタグ
-                    VStack(spacing: 12) {
-                        HStack(spacing: 12) {
-                            Text("これまでのタグ")
-                                .font(.system(size: 20, weight: .bold))
-                                .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
-                            if let tags = viewModel.homeResponse.tags, tags.count > 8 {
-                                Button(action: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        showAllTags.toggle()
-                                    }
-                                }) {
-                                    Text(showAllTags ? "閉じる" : "すべて見る")
-                                        .font(.system(size: 14, weight: .regular))
-                                }
-                                .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
+                VStack(spacing: 32) {
+                    if viewModel.isLoadingHome {
+                        recentCoordinatesSkeleton
+                    } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
+                        RecentCoordinates(
+                            recentCoordinates: viewModel.homeResponse.recent_coordinates,
+                            isEditMode: viewModel.isEditMode,
+                            onToggleEditMode: { viewModel.toggleEditMode() },
+                            onDeleteRequest: { coordinateId in
+                                viewModel.requestDelete(coordinateId: coordinateId)
                             }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        if let tags = viewModel.homeResponse.tags {
-                            let displayedTags = showAllTags ? tags : Array(tags.prefix(8))
-                            TagsView(tags: displayedTags, tagTextColor: .black, borderColor: .gray, tagFont: .system(size: 14, weight: .regular))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
-                        } else {
-                            Text("タグが存在しません")
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .redacted(reason: viewModel.isLoadingHome ? .placeholder : [])
-                        }
+                        )
+                        .padding(.horizontal, -24)
+                    } else {
+                        coordinateEmptyState
+                    }
+
+                    partnerCard
+
+                    if let tags = viewModel.homeResponse.tags, !tags.isEmpty {
+                        tagsSection
                     }
 
                     Spacer().frame(height: 60)
                 }
                 .padding(.horizontal, 24)
+                .padding(.top, 20)
             }
             .refreshable {
                 await viewModel.onAppear()
             }
         }
+        .background(Color.gray.opacity(0.08))
         .onAppear {
             Task {
-                // 既にデータがある場合は読み込まない
                 if viewModel.homeResponse.recent_coordinates.isEmpty {
                     await viewModel.onAppear()
                 }
             }
         }
         .onChange(of: viewModel.isLoadingHome) { oldValue, newValue in
-            // データロード完了時に、直近のコーデが0件の場合、FirstTakePhotoViewを表示
-            // ただし、最後に「1時間表示しない」を押してから1時間以内は表示しない
             if oldValue == true && newValue == false {
                 if viewModel.homeResponse.recent_coordinates.isEmpty {
-                    // 最後に非表示にした日時を取得
                     if let lastDismissedDate = UserDefaults.standard.object(forKey: UserDefaultsKey.lastDismissedFirstTakePhotoDate.rawValue) as? Date {
-                        // 1時間（3600秒）経過しているかチェック
                         let oneHour: TimeInterval = 3600
                         if Date().timeIntervalSince(lastDismissedDate) >= oneHour {
                             showFirstTakePhotoSheet = true
                         }
                     } else {
-                        // 初回は表示
                         showFirstTakePhotoSheet = true
                     }
                 }
             }
         }
         .onChange(of: tabViewModel.shouldShowFirstTakePhotoOnHome) { _, newValue in
-            // カレンダー画面から「コーデを登録する」ボタンでホームに戻ってきた場合
             if newValue {
                 showFirstTakePhotoSheet = true
                 tabViewModel.shouldShowFirstTakePhotoOnHome = false
@@ -192,9 +91,7 @@ struct HomeView: View {
                 closetItems: viewModel.closetItems,
                 isLoading: viewModel.isLoadingCloset,
                 onSelect: { closetItem in
-                    Task {
-                        await viewModel.selectAndRecommend(closetItem: closetItem)
-                    }
+                    Task { await viewModel.selectAndRecommend(closetItem: closetItem) }
                 }
             )
         }
@@ -203,74 +100,29 @@ struct HomeView: View {
                 path: $path,
                 viewModel: .init(fashionReviewClient: FashionReviewClient()),
                 showCloseButton: true,
-                onClose: {
-                    showFirstTakePhotoSheet = false
-                },
-                okButtonTapped: {
-                    showFirstTakePhotoSheet = false
-                },
+                onClose: { showFirstTakePhotoSheet = false },
+                okButtonTapped: { showFirstTakePhotoSheet = false },
                 onDontShowAgain: {
-                    // 「1時間表示しない」を押した日時をUserDefaultsに保存
                     UserDefaults.standard.set(Date(), forKey: UserDefaultsKey.lastDismissedFirstTakePhotoDate.rawValue)
                     showFirstTakePhotoSheet = false
                 },
                 onCameraButtonTapped: {
-                    // 1. sheetを閉じる
                     showFirstTakePhotoSheet = false
-
-                    // 2. sheetのdismissアニメーション完了を待つ（0.3秒）
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        // 3. CameraViewへNavigationStack経由で遷移
                         path.append(.camera)
                     }
                 }
             )
         }
         .sheet(isPresented: $showTutorialSheet) {
-            OnboardingView(closeButtonTapped: {
-                showTutorialSheet = false
-            })
+            OnboardingView(closeButtonTapped: { showTutorialSheet = false })
         }
-        .background(.gray.opacity(0.08))
-//        .overlay(alignment: .bottom) {
-//            HStack(spacing: 12) {
-//                Button(action: {
-//                    // action
-//                }, label: {
-//                    Text("写真選択")
-//                        .font(.system(size: 18, weight: .regular))
-//                        .foregroundStyle(.white)
-//                        .frame(maxWidth: 200)
-//                        .frame(height: 50)
-//                        .background(.black)
-//                        .clipShape(RoundedRectangle(cornerRadius: 20))
-//                })
-//
-//                Button(action: {
-//                    // action
-//                }, label: {
-//                    Text("カメラ")
-//                        .font(.system(size: 18, weight: .regular))
-//                        .foregroundStyle(.white)
-//                        .frame(maxWidth: 200)
-//                        .frame(height: 50)
-//                        .background(.black)
-//                        .clipShape(RoundedRectangle(cornerRadius: 20))
-//                })
-//            }
-//            .padding(.top, 24)
-//            .padding(.horizontal, 24)
-//            .padding(.bottom, 90)  // TabBar の高さ分のパディング
-//            .background(.white)
-//        }
         .alert("コーディネートを削除", isPresented: $viewModel.showDeleteConfirmation) {
             Button("キャンセル", role: .cancel) {
                 viewModel.coordinateToDelete = nil
             }
             Button("削除", role: .destructive) {
-                Task {
-                    await viewModel.deleteCoordinate()
-                }
+                Task { await viewModel.deleteCoordinate() }
             }
         } message: {
             Text("このコーディネートを削除してもよろしいですか？")
@@ -278,14 +130,11 @@ struct HomeView: View {
         .overlay {
             if viewModel.isDeletingCoordinate {
                 ZStack {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-
+                    Color.black.opacity(0.4).ignoresSafeArea()
                     VStack(spacing: 16) {
                         ProgressView()
                             .scaleEffect(1.5)
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-
                         Text("削除中...")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(.white)
@@ -298,67 +147,165 @@ struct HomeView: View {
         }
     }
 
-    private func Header() -> some View {
+    // MARK: - Header
+
+    private var headerView: some View {
         ZStack {
             Text("ホーム")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
-            HStack(spacing: 24) {
-                Button(action: {
-                    path.append(.calendar)
-                }) {
+            HStack(spacing: 20) {
+                Spacer()
+                Button(action: { path.append(.calendar) }) {
                     Image(systemName: "calendar")
                 }
-
-                Button(action: {
-                    showTutorialSheet = true
-                }) {
+                Button(action: { showTutorialSheet = true }) {
                     Image(systemName: "questionmark.circle")
                 }
             }
             .font(.system(size: 20))
             .foregroundStyle(.black)
-            .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity)
     }
 
-    private func ShortCut() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("相棒に相談")
-                .font(.system(size: 20, weight: .bold))
+    // MARK: - 相棒カード（統合）
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ShortcutCard(icon: "wand.and.stars", label: "コーデ提案して") {
-                    path.append(.tomorrowPlanner)
+    private var partnerCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                PartnerIconImage(size: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("今週のあなたへ")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text("相棒からのメッセージ")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.gray.opacity(0.6))
                 }
-                ShortcutCard(icon: "bubble.left.and.text.bubble.right", label: "質問させて") {}
-                ShortcutCard(icon: "arrow.2.squarepath", label: "いつもと違うコーデ") {}
-                ShortcutCard(icon: "magnifyingglass", label: "服を探す") {}
+                Spacer()
+            }
+            .padding(.bottom, 14)
+
+            if viewModel.isLoadingAnalysis {
+                VStack(spacing: 8) {
+                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
+                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
+                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(width: 200, height: 14).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                Text(.init(viewModel.recentCoordinateAnalysis.isEmpty
+                    ? "コーデが登録されると分析が表示されます。"
+                    : viewModel.recentCoordinateAnalysis))
+                    .font(.system(size: 14, weight: .regular))
+                    .lineSpacing(5)
+                    .foregroundStyle(.primary)
+            }
+
+            Divider().padding(.vertical, 16)
+
+            HStack(spacing: 10) {
+                Button(action: { path.append(.tomorrowPlanner) }) {
+                    Label("コーデ提案して", systemImage: "wand.and.stars")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                Button(action: { path.append(.generalChat) }) {
+                    Label("質問する", systemImage: "bubble.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.gray.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                }
             }
         }
+        .padding(20)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
     }
 
-    private func ShortcutCard(icon: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(.black)
-                Text(label)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-                    .fixedSize(horizontal: false, vertical: true)
+    // MARK: - ローディング スケルトン
+
+    private var recentCoordinatesSkeleton: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(0..<4, id: \.self) { _ in
+                    VStack(spacing: 0) {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.gray.opacity(0.12))
+                            .frame(width: 100, height: 134)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.gray.opacity(0.10))
+                            .frame(width: 56, height: 10)
+                            .padding(.vertical, 8)
+                    }
+                    .background(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .gray.opacity(0.15), radius: 4, x: 0, y: 2)
+            .padding(.horizontal, 24)
         }
+        .padding(.horizontal, -24)
+    }
+
+    // MARK: - コーデ未登録 空状態
+
+    private var coordinateEmptyState: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 12) {
+                PartnerIconImage(size: 44)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("コーデを記録しましょう")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.black)
+                    Text("着こなしを残すと、相棒があなたのスタイルを分析します。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Button(action: { path.append(.camera) }) {
+                HStack {
+                    Text("写真を撮って登録する")
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(.black)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        .padding(20)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+    }
+
+    // MARK: - タグ
+
+    private var tagsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("これまでのタグ")
+                .font(.system(size: 20, weight: .bold))
+            TagsView(
+                tags: Array((viewModel.homeResponse.tags ?? []).prefix(8)),
+                tagTextColor: .black,
+                borderColor: .gray,
+                tagFont: .system(size: 14, weight: .regular)
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

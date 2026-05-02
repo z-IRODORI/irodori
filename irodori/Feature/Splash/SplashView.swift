@@ -124,6 +124,12 @@ struct SplashView: View {
                     EmptyView()
                 case .tomorrowPlanner:
                     EmptyView()
+                case .generalChat:
+                    EmptyView()
+                case .chatHistoryList:
+                    EmptyView()
+                case .chatHistoryDetail:
+                    EmptyView()
                 }
             }
             // .onChange(of: path) は削除済み（FirstTakePhotoView がオンボーディングから削除されたため不要）

@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct TomorrowPlannerView: View {
+    @Binding var path: [ViewType]
     @State private var viewModel: TomorrowPlannerViewModel = .init()
     @State private var showResetDialog = false
 
@@ -118,7 +119,15 @@ struct TomorrowPlannerView: View {
             }
             .padding(.horizontal, 24)
         }
-        .navigationBarHidden(true)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { path.removeLast() }) {
+                    Image(systemName: "chevron.left")
+                        .foregroundColor(.black)
+                }
+            }
+        }
         .task {
             await viewModel.onAppear()
         }
@@ -158,5 +167,5 @@ struct TomorrowPlannerView: View {
 }
 
 #Preview {
-    TomorrowPlannerView()
+    TomorrowPlannerView(path: .constant([]))
 }

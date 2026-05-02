@@ -9,62 +9,87 @@ import Foundation
 
 protocol ChatClientProtocol {
     func post(chatRequest: ChatRequest) async throws -> Result<ChatResponse, HTTPError>
+    func createConversation(userId: String, type: String, coordinateId: String?) async throws -> Result<ConversationResponse, HTTPError>
+    func fetchMessages(conversationId: String, userId: String, limit: Int) async throws -> Result<ChatHistoryResponse, HTTPError>
+    func postWithHistory(conversationId: String, request: ChatWithHistoryRequest) async throws -> Result<ChatWithHistoryResponse, HTTPError>
+    func fetchConversations(userId: String, limit: Int) async throws -> Result<[ConversationResponse], HTTPError>
 }
 
 final class ChatClient: ChatClientProtocol {
-    func post(chatRequest: ChatRequest) async throws -> Result<ChatResponse, HTTPError> {
-        print("=== ChatClient POST Request ===")
-        let baseURL = "https://irodori-api.onrender.com"
-        let endpoint = "chat"
-        let url = URL(string: "\(baseURL)/\(endpoint)")!
+    private let baseURL = "https://irodori-api.onrender.com"
 
+    func post(chatRequest: ChatRequest) async throws -> Result<ChatResponse, HTTPError> {
+        let url = URL(string: "\(baseURL)/chat")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // タイムアウトを延長（デフォルト60秒→120秒）
         request.timeoutInterval = 120
+        request.httpBody = try JSONEncoder().encode(chatRequest)
+        return await perform(request: request, decoding: ChatResponse.self)
+    }
 
-        do {
-            request.httpBody = try JSONEncoder().encode(chatRequest)
-            print("Request body size: \(request.httpBody?.count ?? 0) bytes")
-        } catch {
-            print("Failed to encode request: \(error)")
-            throw error
-        }
+    func createConversation(userId: String, type: String, coordinateId: String?) async throws -> Result<ConversationResponse, HTTPError> {
+        let url = URL(string: "\(baseURL)/api/chat/conversations")!
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.timeoutInterval = 30
 
+        struct Body: Encodable { let user_id: String; let type: String; let coordinate_id: String? }
+        urlRequest.httpBody = try JSONEncoder().encode(Body(user_id: userId, type: type, coordinate_id: coordinateId))
+        return await perform(request: urlRequest, decoding: ConversationResponse.self)
+    }
+
+    func fetchMessages(conversationId: String, userId: String, limit: Int = 20) async throws -> Result<ChatHistoryResponse, HTTPError> {
+        var components = URLComponents(string: "\(baseURL)/api/chat/conversations/\(conversationId)/messages")!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: userId),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        var urlRequest = URLRequest(url: components.url!)
+        urlRequest.httpMethod = "GET"
+        urlRequest.timeoutInterval = 30
+        return await perform(request: urlRequest, decoding: ChatHistoryResponse.self)
+    }
+
+    func postWithHistory(conversationId: String, request: ChatWithHistoryRequest) async throws -> Result<ChatWithHistoryResponse, HTTPError> {
+        let url = URL(string: "\(baseURL)/api/chat/conversations/\(conversationId)/messages")!
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.timeoutInterval = 120
+        urlRequest.httpBody = try JSONEncoder().encode(request)
+        return await perform(request: urlRequest, decoding: ChatWithHistoryResponse.self)
+    }
+
+    func fetchConversations(userId: String, limit: Int = 20) async throws -> Result<[ConversationResponse], HTTPError> {
+        var components = URLComponents(string: "\(baseURL)/api/chat/conversations")!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: userId),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        var urlRequest = URLRequest(url: components.url!)
+        urlRequest.httpMethod = "GET"
+        urlRequest.timeoutInterval = 30
+        return await perform(request: urlRequest, decoding: [ConversationResponse].self)
+    }
+
+    // MARK: - Private
+
+    private func perform<T: Decodable>(request: URLRequest, decoding: T.Type) async -> Result<T, HTTPError> {
         do {
-            print("Sending request to: \(url)")
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
-            print("Received response, data size: \(data.count) bytes")
-
-            // ステータスコードをチェック
-            if let httpResponse = urlResponse as? HTTPURLResponse {
-                let statusCode = httpResponse.statusCode
-                print("HTTP Status Code: \(statusCode)")
-                if statusCode >= 400 {
-                    return .failure(HTTPError.fromStatusCode(statusCode))
-                }
+            if let httpResponse = urlResponse as? HTTPURLResponse, httpResponse.statusCode >= 400 {
+                return .failure(HTTPError.fromStatusCode(httpResponse.statusCode))
             }
-
-            // レスポンスの内容を確認
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Response JSON: \(responseString)")
-            }
-
-            // JSONレスポンスをデコード
             do {
-                let response = try JSONDecoder().decode(ChatResponse.self, from: data)
-                print("Successfully decoded response")
-                print("===============================")
-                return .success(response)
+                return .success(try JSONDecoder().decode(T.self, from: data))
             } catch {
                 print("Decode error: \(error)")
-                print("===============================")
                 return .failure(.decodeError)
             }
         } catch {
             print("Network error: \(error.localizedDescription)")
-            print("===============================")
             return .failure(.responseError)
         }
     }
@@ -75,5 +100,53 @@ final class ChatClient: ChatClientProtocol {
 final class MockChatClient: ChatClientProtocol {
     func post(chatRequest: ChatRequest) async throws -> Result<ChatResponse, HTTPError> {
         return .success(.mock())
+    }
+
+    func createConversation(userId: String, type: String, coordinateId: String?) async throws -> Result<ConversationResponse, HTTPError> {
+        return .success(ConversationResponse(
+            conversation_id: "mock-conversation-id",
+            type: type,
+            coordinate_id: coordinateId,
+            created_at: ISO8601DateFormatter().string(from: Date()),
+            last_updated: ISO8601DateFormatter().string(from: Date()),
+            message_count: 0,
+            last_message_preview: nil
+        ))
+    }
+
+    func fetchConversations(userId: String, limit: Int) async throws -> Result<[ConversationResponse], HTTPError> {
+        let now = ISO8601DateFormatter().string(from: Date())
+        return .success([
+            ConversationResponse(
+                conversation_id: "mock-general",
+                type: "general",
+                coordinate_id: nil,
+                created_at: now,
+                last_updated: now,
+                message_count: 5,
+                last_message_preview: "シンプルなコーデのポイントを教えてください"
+            ),
+            ConversationResponse(
+                conversation_id: "mock-coord-1",
+                type: "coordinate",
+                coordinate_id: "coord-abc",
+                created_at: now,
+                last_updated: now,
+                message_count: 3,
+                last_message_preview: "このコーデに合う靴は何ですか？"
+            )
+        ])
+    }
+
+    func fetchMessages(conversationId: String, userId: String, limit: Int) async throws -> Result<ChatHistoryResponse, HTTPError> {
+        return .success(ChatHistoryResponse(conversation_id: conversationId, messages: []))
+    }
+
+    func postWithHistory(conversationId: String, request: ChatWithHistoryRequest) async throws -> Result<ChatWithHistoryResponse, HTTPError> {
+        let now = ISO8601DateFormatter().string(from: Date())
+        return .success(ChatWithHistoryResponse(
+            user_message: ChatMessageRecord(id: UUID().uuidString, text: request.question, is_user: true, created_at: now),
+            ai_message: ChatMessageRecord(id: UUID().uuidString, text: "モックの返答です。", is_user: false, created_at: now)
+        ))
     }
 }

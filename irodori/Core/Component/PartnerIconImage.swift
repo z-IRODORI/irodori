@@ -16,13 +16,12 @@ struct PartnerIconImage: View {
 
     var body: some View {
         Group {
-            // UserDefaultsからpartnerIconImageを取得
-            if let partnerIconImageName = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerIconImage.rawValue),
-               UIImage(named: partnerIconImageName) != nil {
-                Image(partnerIconImageName)
-                    .resizable()
+            if let name = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerIconImage.rawValue),
+               UIImage(named: name) != nil {
+                Image(name).resizable()
+            } else if UIImage(named: "アヴァンギャルド・スター_icon") != nil {
+                Image("アヴァンギャルド・スター_icon").resizable()
             } else {
-                // デフォルト：SF Symbol
                 Image(systemName: "person.circle.fill")
                     .resizable()
                     .foregroundStyle(.gray)

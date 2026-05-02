@@ -73,7 +73,12 @@ struct MainTabView: View {
                         showHeader: params.showHeader
                     )
                 case .tomorrowPlanner:
-                    TomorrowPlannerView()
+                    TomorrowPlannerView(path: $path)
+                case .generalChat:
+                    GeneralChatView(
+                        path: $path,
+                        viewModel: GeneralChatViewModel(apiClient: ChatClient())
+                    )
                 case .camera:
                     CameraView(cameraViewModel: .init(), path: $path)
                 case .profileEdit:
@@ -93,6 +98,17 @@ struct MainTabView: View {
                     )
                 case .recommendCoordinateByStandardItem(_):
                     EmptyView()
+                case .chatHistoryList:
+                    ChatHistoryListView(
+                        path: $path,
+                        viewModel: ChatHistoryListViewModel(apiClient: ChatClient())
+                    )
+                case .chatHistoryDetail(let conversationId):
+                    ChatHistoryDetailView(
+                        path: $path,
+                        conversationId: conversationId,
+                        viewModel: ChatHistoryDetailViewModel(apiClient: ChatClient())
+                    )
                 }
             }
         }

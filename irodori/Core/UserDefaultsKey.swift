@@ -24,4 +24,5 @@ enum UserDefaultsKey: String {
     case partnerImage
     case partnerIconImage
     case hasSelectedStandardItems
+    case generalChatConversationId
 }

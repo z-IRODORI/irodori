@@ -11,6 +11,9 @@ enum ViewType: Hashable {
     case camera
     case calendar
     case tomorrowPlanner
+    case generalChat
+    case chatHistoryList
+    case chatHistoryDetail(conversationId: String)
     case coordinateReview(CoordinateReviewParams)
     case coordinateDetail(CoordinateDetailParams)
     case profileEdit
