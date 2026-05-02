@@ -115,9 +115,8 @@ struct CalendarView: View {
             path.append(.coordinateDetail(params))
         }) {
             ZStack {
-                if let imageURL, let url = URL(string: imageURL) {
-                    KFImage(url)
-                        .resizable()
+                if let imageURL {
+                    coordinateImage(from: imageURL)
                         .scaledToFill()
                         .frame(minWidth: 0, maxWidth: .infinity,
                                minHeight: 0, maxHeight: .infinity)
@@ -154,6 +153,18 @@ struct CalendarView: View {
     }
 
     // MARK: - Helpers
+
+    /// httpURLはKFImageで読み込み、アセット名（Preview用）はImage()にフォールバック
+    @ViewBuilder
+    private func coordinateImage(from path: String) -> some View {
+        if path.hasPrefix("http"), let url = URL(string: path) {
+            KFImage(url)
+                .resizable()
+        } else {
+            Image(path)
+                .resizable()
+        }
+    }
 
     private func checkIsToday(year: Int, month: Int, day: Int) -> Bool {
         let calendar = Calendar.current
@@ -200,6 +211,6 @@ struct CalendarView: View {
 }
 
 #Preview {
-    CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: .constant([]))
+    CalendarView(viewModel: .init(apiClient: MockCoordinateListClient()), path: .constant([]))
         .environment(MainTabViewModel())
 }

@@ -36,3 +36,31 @@ final class CoordinateListClient: CoordinateListClientProtocol {
         }
     }
 }
+
+// MARK: - Mock
+
+final class MockCoordinateListClient: CoordinateListClientProtocol {
+    // coordinate-1〜10 をランダムな日付に割り当て
+    private let imageNames = (1...10).map { "coordinate-\($0)" }
+
+    func get(uid: String, year: Int, month: Int) async throws -> Result<[CoordinateListResponse], Error> {
+        let calendar = Calendar.current
+        let components = DateComponents(year: year, month: month)
+        guard let firstDay = calendar.date(from: components),
+              let range = calendar.range(of: .day, in: .month, for: firstDay)
+        else { return .success([]) }
+
+        // 画像を割り当てる日を固定（再現性のため決定論的に選ぶ）
+        let totalDays = range.count
+        let imageDays: Set<Int> = [1, 3, 5, 8, 10, 14, 17, 20, 24, 28]
+            .filter { $0 <= totalDays }
+            .reduce(into: Set<Int>()) { $0.insert($1) }
+
+        let responses = (1...totalDays).map { day -> CoordinateListResponse in
+            let imageIndex = imageDays.sorted().firstIndex(of: day)
+            let imageName = imageIndex.map { imageNames[$0 % imageNames.count] }
+            return CoordinateListResponse(year: year, month: month, day: day, id: nil, coodinate_image_path: imageName)
+        }
+        return .success(responses)
+    }
+}
