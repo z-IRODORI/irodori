@@ -9,7 +9,7 @@ import Foundation
 
 protocol ChatClientProtocol {
     func post(chatRequest: ChatRequest) async throws -> Result<ChatResponse, HTTPError>
-    func createConversation(userId: String, type: String, coordinateId: String?) async throws -> Result<ConversationResponse, HTTPError>
+    func createConversation(userId: String, type: String, coordinateId: String?, forceNew: Bool) async throws -> Result<ConversationResponse, HTTPError>
     func fetchMessages(conversationId: String, userId: String, limit: Int) async throws -> Result<ChatHistoryResponse, HTTPError>
     func postWithHistory(conversationId: String, request: ChatWithHistoryRequest) async throws -> Result<ChatWithHistoryResponse, HTTPError>
     func fetchConversations(userId: String, limit: Int) async throws -> Result<[ConversationResponse], HTTPError>
@@ -28,15 +28,15 @@ final class ChatClient: ChatClientProtocol {
         return await perform(request: request, decoding: ChatResponse.self)
     }
 
-    func createConversation(userId: String, type: String, coordinateId: String?) async throws -> Result<ConversationResponse, HTTPError> {
+    func createConversation(userId: String, type: String, coordinateId: String?, forceNew: Bool = false) async throws -> Result<ConversationResponse, HTTPError> {
         let url = URL(string: "\(baseURL)/api/chat/conversations")!
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.timeoutInterval = 30
 
-        struct Body: Encodable { let user_id: String; let type: String; let coordinate_id: String? }
-        urlRequest.httpBody = try JSONEncoder().encode(Body(user_id: userId, type: type, coordinate_id: coordinateId))
+        struct Body: Encodable { let user_id: String; let type: String; let coordinate_id: String?; let force_new: Bool }
+        urlRequest.httpBody = try JSONEncoder().encode(Body(user_id: userId, type: type, coordinate_id: coordinateId, force_new: forceNew))
         return await perform(request: urlRequest, decoding: ConversationResponse.self)
     }
 
@@ -102,9 +102,9 @@ final class MockChatClient: ChatClientProtocol {
         return .success(.mock())
     }
 
-    func createConversation(userId: String, type: String, coordinateId: String?) async throws -> Result<ConversationResponse, HTTPError> {
+    func createConversation(userId: String, type: String, coordinateId: String?, forceNew: Bool) async throws -> Result<ConversationResponse, HTTPError> {
         return .success(ConversationResponse(
-            conversation_id: "mock-conversation-id",
+            conversation_id: forceNew ? UUID().uuidString : "mock-conversation-id",
             type: type,
             coordinate_id: coordinateId,
             created_at: ISO8601DateFormatter().string(from: Date()),
@@ -116,9 +116,10 @@ final class MockChatClient: ChatClientProtocol {
 
     func fetchConversations(userId: String, limit: Int) async throws -> Result<[ConversationResponse], HTTPError> {
         let now = ISO8601DateFormatter().string(from: Date())
+        let yesterday = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86400))
         return .success([
             ConversationResponse(
-                conversation_id: "mock-general",
+                conversation_id: "mock-general-2",
                 type: "general",
                 coordinate_id: nil,
                 created_at: now,
@@ -134,6 +135,15 @@ final class MockChatClient: ChatClientProtocol {
                 last_updated: now,
                 message_count: 3,
                 last_message_preview: "このコーデに合う靴は何ですか？"
+            ),
+            ConversationResponse(
+                conversation_id: "mock-general-1",
+                type: "general",
+                coordinate_id: nil,
+                created_at: yesterday,
+                last_updated: yesterday,
+                message_count: 8,
+                last_message_preview: "秋のコーデに合うカラーは何ですか"
             )
         ])
     }

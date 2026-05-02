@@ -21,8 +21,6 @@ struct GeneralChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
@@ -80,35 +78,41 @@ struct GeneralChatView: View {
 
             bottomBar
         }
-        .background(Color.gray.opacity(0.04))
-        .navigationBarBackButtonHidden(true)
+        .background(.white)
+        .navigationTitle("相棒に質問する")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 16) {
+                    Button(action: {
+                        if viewModel.messages.isEmpty {
+                            Task { await viewModel.startNewConversation() }
+                        } else {
+                            viewModel.showNewConversationAlert = true
+                        }
+                    }) {
+                        Image(systemName: "square.and.pencil")
+                            .foregroundStyle(.black)
+                    }
+                    Button(action: { path.append(.chatHistoryList) }) {
+                        Image(systemName: "clock")
+                            .foregroundStyle(.black)
+                    }
+                }
+            }
+        }
+        .alert("新しい会話を始めますか？", isPresented: $viewModel.showNewConversationAlert) {
+            Button("キャンセル", role: .cancel) {}
+            Button("始める") {
+                Task { await viewModel.startNewConversation() }
+            }
+        } message: {
+            Text("現在の会話は履歴に保存されます。")
+        }
         .task { await viewModel.onAppear() }
     }
 
     // MARK: - Subviews
-
-    private var header: some View {
-        ZStack {
-            Text("相棒に質問する")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
-            HStack {
-                Button(action: { path.removeLast() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.black)
-                }
-                Spacer()
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 14)
-        .background(.white)
-        .overlay(alignment: .bottom) {
-            Divider()
-        }
-    }
 
     private var partnerIntro: some View {
         HStack(spacing: 10) {
@@ -262,7 +266,7 @@ struct GeneralChatInputView: View {
     NavigationStack {
         GeneralChatView(
             path: .constant([]),
-            viewModel: GeneralChatViewModel(apiClient: MockChatClient())
+            viewModel: GeneralChatViewModel(apiClient: MockChatClient(), conversationId: nil)
         )
     }
 }

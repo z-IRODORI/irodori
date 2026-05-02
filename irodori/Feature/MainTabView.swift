@@ -74,10 +74,10 @@ struct MainTabView: View {
                     )
                 case .tomorrowPlanner:
                     TomorrowPlannerView(path: $path)
-                case .generalChat:
+                case .generalChat(let conversationId):
                     GeneralChatView(
                         path: $path,
-                        viewModel: GeneralChatViewModel(apiClient: ChatClient())
+                        viewModel: GeneralChatViewModel(apiClient: ChatClient(), conversationId: conversationId)
                     )
                 case .camera:
                     CameraView(cameraViewModel: .init(), path: $path)

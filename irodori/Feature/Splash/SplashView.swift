@@ -125,7 +125,7 @@ struct SplashView: View {
                 case .tomorrowPlanner:
                     EmptyView()
                 case .generalChat:
-                    EmptyView()
+                    EmptyView() // handled by MainTabView navigationDestination
                 case .chatHistoryList:
                     EmptyView()
                 case .chatHistoryDetail:

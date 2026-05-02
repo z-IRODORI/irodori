@@ -212,7 +212,7 @@ struct HomeView: View {
                         .background(.black)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                Button(action: { path.append(.generalChat) }) {
+                Button(action: { path.append(.generalChat(conversationId: nil)) }) {
                     Label("質問する", systemImage: "bubble.left")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.black)
@@ -259,7 +259,7 @@ struct HomeView: View {
     private var coordinateEmptyState: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 12) {
-                PartnerIconImage(size: 44)
+//                PartnerIconImage(size: 44)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("コーデを記録しましょう")
                         .font(.system(size: 15, weight: .semibold))

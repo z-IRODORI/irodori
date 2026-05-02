@@ -15,15 +15,22 @@ final class GeneralChatViewModel {
     var inputText: String = ""
     var isLoading: Bool = false
     var isLoadingHistory: Bool = false
+    var showNewConversationAlert: Bool = false
 
-    private var conversationId: String?
+    private(set) var conversationId: String?
+    private let initialConversationId: String?
     private let userId: String
     private let apiClient: ChatClientProtocol
 
-    init(apiClient: ChatClientProtocol) {
+    init(apiClient: ChatClientProtocol, conversationId: String? = nil) {
         self.userId = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
         self.apiClient = apiClient
-        self.conversationId = UserDefaults.standard.string(forKey: UserDefaultsKey.generalChatConversationId.rawValue)
+        self.initialConversationId = conversationId
+        if let conversationId {
+            self.conversationId = conversationId
+        } else {
+            self.conversationId = UserDefaults.standard.string(forKey: UserDefaultsKey.generalChatConversationId.rawValue)
+        }
     }
 
     func onAppear() async {
@@ -32,22 +39,33 @@ final class GeneralChatViewModel {
         defer { isLoadingHistory = false }
 
         if conversationId == nil {
-            await createConversation()
+            await createConversation(forceNew: false)
         }
 
         guard let convId = conversationId else { return }
         await loadHistory(conversationId: convId)
     }
 
-    private func createConversation() async {
+    func startNewConversation() async {
+        messages = []
+        conversationId = nil
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+        await createConversation(forceNew: true)
+    }
+
+    private func createConversation(forceNew: Bool) async {
         let result = try? await apiClient.createConversation(
             userId: userId,
             type: "general",
-            coordinateId: nil
+            coordinateId: nil,
+            forceNew: forceNew
         )
         if case .success(let conv) = result {
             conversationId = conv.conversation_id
-            UserDefaults.standard.set(conv.conversation_id, forKey: UserDefaultsKey.generalChatConversationId.rawValue)
+            if initialConversationId == nil {
+                UserDefaults.standard.set(conv.conversation_id, forKey: UserDefaultsKey.generalChatConversationId.rawValue)
+            }
         }
     }
 

@@ -13,8 +13,6 @@ struct ChatHistoryListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-
             if viewModel.isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -34,33 +32,13 @@ struct ChatHistoryListView: View {
                 }
             }
         }
-        .background(Color.gray.opacity(0.08))
-        .navigationBarBackButtonHidden(true)
+        .background(.white)
+        .navigationTitle("チャット履歴")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.onAppear() }
     }
 
     // MARK: - Subviews
-
-    private var header: some View {
-        ZStack {
-            Text("チャット履歴")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
-            HStack {
-                Button(action: { path.removeLast() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.black)
-                }
-                Spacer()
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 14)
-        .background(.white)
-        .overlay(alignment: .bottom) { Divider() }
-    }
 
     private var emptyState: some View {
         VStack(spacing: 16) {
@@ -79,7 +57,7 @@ struct ChatHistoryListView: View {
 
     private func navigate(_ conv: ConversationResponse) {
         if conv.type == "general" {
-            path.append(.generalChat)
+            path.append(.generalChat(conversationId: conv.conversation_id))
         } else {
             path.append(.chatHistoryDetail(conversationId: conv.conversation_id))
         }

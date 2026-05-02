@@ -14,8 +14,6 @@ struct ChatHistoryDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
@@ -48,38 +46,18 @@ struct ChatHistoryDetailView: View {
 
             continueButton
         }
-        .background(Color.gray.opacity(0.04))
-        .navigationBarBackButtonHidden(true)
+        .background(.white)
+        .navigationTitle("コーデ相談の履歴")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.loadMessages(conversationId: conversationId) }
     }
 
     // MARK: - Subviews
 
-    private var header: some View {
-        ZStack {
-            Text("コーデ相談の履歴")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
-            HStack {
-                Button(action: { path.removeLast() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.black)
-                }
-                Spacer()
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 14)
-        .background(.white)
-        .overlay(alignment: .bottom) { Divider() }
-    }
-
     private var continueButton: some View {
         VStack(spacing: 0) {
             Divider()
-            Button(action: { path.append(.generalChat) }) {
+            Button(action: { path.append(.generalChat(conversationId: nil)) }) {
                 HStack(spacing: 8) {
                     PartnerIconImage(size: 24)
                     Text("この相棒に質問する")
