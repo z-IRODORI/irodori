@@ -15,7 +15,7 @@ struct CalendarView: View {
     @Environment(MainTabViewModel.self) private var tabViewModel
     @Environment(\.dismiss) private var dismiss
 
-    private let columns7 = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
+    private let columns7 = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
     private let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
 
     var body: some View {
@@ -71,7 +71,7 @@ struct CalendarView: View {
                 .foregroundStyle(.black)
                 .padding(.bottom, 2)
 
-            LazyVGrid(columns: columns7, spacing: 2) {
+            LazyVGrid(columns: columns7, spacing: 4) {
                 ForEach(weekdays, id: \.self) { wd in
                     Text(wd)
                         .font(.system(size: 11, weight: .medium))
@@ -81,7 +81,7 @@ struct CalendarView: View {
                 }
 
                 ForEach(0..<(month.spacesBeforeFirst - 1), id: \.self) { _ in
-                    Color.clear.aspectRatio(1, contentMode: .fill)
+                    Color.clear.aspectRatio(3/4, contentMode: .fill)
                 }
 
                 ForEach(1...month.amountOfDays, id: \.self) { day in
@@ -120,7 +120,7 @@ struct CalendarView: View {
                         .scaledToFill()
                         .frame(minWidth: 0, maxWidth: .infinity,
                                minHeight: 0, maxHeight: .infinity)
-                        .aspectRatio(1, contentMode: .fill)
+                        .aspectRatio(3/4, contentMode: .fill)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
 
                     Text("\(day)")
@@ -130,7 +130,7 @@ struct CalendarView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(4)
                 } else {
-                    Color.clear.aspectRatio(1, contentMode: .fill)
+                    Color.clear.aspectRatio(3/4, contentMode: .fill)
 
                     if isToday {
                         Circle()
@@ -146,7 +146,7 @@ struct CalendarView: View {
                     }
                 }
             }
-            .aspectRatio(1, contentMode: .fill)
+            .aspectRatio(3/4, contentMode: .fill)
         }
         .buttonStyle(.plain)
         .disabled(imageURL == nil)
