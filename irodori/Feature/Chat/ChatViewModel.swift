@@ -77,7 +77,8 @@ final class ChatViewModel {
             let result = try? await apiClient.createConversation(
                 userId: userId,
                 type: "coordinate",
-                coordinateId: coordinateId
+                coordinateId: coordinateId,
+                forceNew: false
             )
             if case .success(let conv) = result {
                 coordinateChat.conversationId = conv.conversation_id
