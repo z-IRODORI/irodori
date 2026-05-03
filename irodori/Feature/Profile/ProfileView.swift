@@ -46,6 +46,34 @@ struct ProfileView: View {
             }
         }
         .background(Color.white)
+        .alert("アイテムを削除", isPresented: $viewModel.showDeleteConfirmation) {
+            Button("キャンセル", role: .cancel) {
+                viewModel.itemToDelete = nil
+            }
+            Button("削除", role: .destructive) {
+                Task { await viewModel.deleteItem() }
+            }
+        } message: {
+            Text("このアイテムをクローゼットから削除しますか？\nこの操作は取り消せません。")
+        }
+        .overlay {
+            if viewModel.isDeletingItem {
+                ZStack {
+                    Color.black.opacity(0.4).ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        Text("削除中...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(32)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(16)
+                }
+            }
+        }
         .task {
             if !hasLoadedItems {
                 await viewModel.loadItems()
@@ -69,6 +97,12 @@ struct ProfileView: View {
     // MARK: - 1. headerNavigationBar
     private var headerNavigationBar: some View {
         HStack {
+            Button(viewModel.isEditMode ? "完了" : "編集") {
+                viewModel.toggleEditMode()
+            }
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(.black)
+
             Spacer()
 
             Text("プロフィール")
@@ -83,8 +117,6 @@ struct ProfileView: View {
                 }) {
                     Image(systemName: "calendar")
                 }
-//                Button(action: {}) { Image(systemName: "clock.arrow.circlepath") }
-//                Button(action: {}) { Image(systemName: "line.3.horizontal") }
             }
             .font(.system(size: 20))
             .foregroundStyle(.black)
@@ -262,103 +294,120 @@ struct ProfileView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: itemSpacing) {
                     ForEach(viewModel.filteredItems) { item in
-                        if let imageUrl = item.image_url, let url = URL(string: imageUrl) {
-                            VStack(spacing: 6) {
-                                // 画像部分
-                                CachedAsyncImage(url: url) { phase in
-                                    switch phase {
-                                    case .empty:
-                                        ProgressView()
-                                            .frame(maxWidth: .infinity)
-                                            .aspectRatio(1, contentMode: .fit)
-                                            .background(Color.gray.opacity(0.1))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    case .success(let image):
-                                        image
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(maxWidth: .infinity)
-                                            .aspectRatio(1, contentMode: .fit)
-                                            .background(Color.gray.opacity(0.1))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                            .clipped()
-                                    case .failure:
-                                        Image(systemName: "photo")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(maxWidth: .infinity)
-                                            .aspectRatio(1, contentMode: .fit)
-                                            .padding(30)
-                                            .foregroundStyle(.gray.opacity(0.5))
-                                            .background(Color.gray.opacity(0.1))
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    @unknown default:
-                                        EmptyView()
+                        ZStack(alignment: .topTrailing) {
+                            if let imageUrl = item.image_url, let url = URL(string: imageUrl) {
+                                VStack(spacing: 6) {
+                                    // 画像部分
+                                    CachedAsyncImage(url: url) { phase in
+                                        switch phase {
+                                        case .empty:
+                                            ProgressView()
+                                                .frame(maxWidth: .infinity)
+                                                .aspectRatio(1, contentMode: .fit)
+                                                .background(Color.gray.opacity(0.1))
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(maxWidth: .infinity)
+                                                .aspectRatio(1, contentMode: .fit)
+                                                .background(Color.gray.opacity(0.1))
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                .clipped()
+                                        case .failure:
+                                            Image(systemName: "photo")
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(maxWidth: .infinity)
+                                                .aspectRatio(1, contentMode: .fit)
+                                                .padding(30)
+                                                .foregroundStyle(.gray.opacity(0.5))
+                                                .background(Color.gray.opacity(0.1))
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        @unknown default:
+                                            EmptyView()
+                                        }
                                     }
-                                }
 
-                                // 情報部分（category & color）
-                                VStack(spacing: 2) {
-                                    if let category = item.category {
-                                        Text(category)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(.black)
-                                            .lineLimit(1)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    // 情報部分（category & color）
+                                    VStack(spacing: 2) {
+                                        if let category = item.category {
+                                            Text(category)
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(.black)
+                                                .lineLimit(1)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                        if let color = item.color {
+                                            Text(color)
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(.gray)
+                                                .lineLimit(1)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
                                     }
-                                    if let color = item.color {
-                                        Text(color)
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.gray)
-                                            .lineLimit(1)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
+                                    .padding(.horizontal, 2)
                                 }
-                                .padding(.horizontal, 2)
-                            }
-                            .padding(8)
-                            .background(Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                            )
-                        } else {
-                            VStack(spacing: 6) {
-                                Image(systemName: "photo")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(maxWidth: .infinity)
-                                    .aspectRatio(1, contentMode: .fit)
-                                    .padding(30)
-                                    .foregroundStyle(.gray.opacity(0.5))
-                                    .background(Color.gray.opacity(0.1))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .padding(8)
+                                .background(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                )
+                            } else {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "photo")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxWidth: .infinity)
+                                        .aspectRatio(1, contentMode: .fit)
+                                        .padding(30)
+                                        .foregroundStyle(.gray.opacity(0.5))
+                                        .background(Color.gray.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                                VStack(spacing: 2) {
-                                    if let category = item.category {
-                                        Text(category)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(.black)
-                                            .lineLimit(1)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    VStack(spacing: 2) {
+                                        if let category = item.category {
+                                            Text(category)
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(.black)
+                                                .lineLimit(1)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                        if let color = item.color {
+                                            Text(color)
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(.gray)
+                                                .lineLimit(1)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
                                     }
-                                    if let color = item.color {
-                                        Text(color)
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.gray)
-                                            .lineLimit(1)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
+                                    .padding(.horizontal, 2)
                                 }
-                                .padding(.horizontal, 2)
+                                .padding(8)
+                                .background(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                )
                             }
-                            .padding(8)
-                            .background(Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                            )
+
+                            // 編集モード時の削除ボタン
+                            if viewModel.isEditMode {
+                                Button {
+                                    viewModel.requestDelete(itemId: item.id)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(.white)
+                                        .background(Circle().fill(.red).padding(2))
+                                }
+                                .offset(x: -4, y: 4)
+                                .transition(.scale.combined(with: .opacity))
+                            }
                         }
+                        .animation(.easeInOut(duration: 0.2), value: viewModel.isEditMode)
                     }
                 }
             }
