@@ -176,20 +176,18 @@ struct FashionTypeResultView: View {
             .background(Color.white)
             .navigationBarBackButtonHidden(true)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        if let onComplete = onComplete {
-                            onComplete()
-                        } else {
+                if onComplete == nil {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: {
                             if path.count >= 2 {
                                 path.removeLast(2)
                             } else {
                                 path.removeAll()
                             }
+                        }) {
+                            Image(systemName: "xmark")
+                                .foregroundColor(.black)
                         }
-                    }) {
-                        Image(systemName: "xmark")
-                            .foregroundColor(.black)
                     }
                 }
             }

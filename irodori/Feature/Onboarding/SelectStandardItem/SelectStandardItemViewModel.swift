@@ -211,12 +211,8 @@ final class SelectStandardItemViewModel {
 
                     await fetchCoordinateRecommendations(for: Array(registeredItems))
 
-                    if !coordinateRecommendResults.isEmpty {
-                        registrationSuccess = true
-                        clearSelection()
-                    } else {
-                        errorMessage = "コーデ提案の取得に失敗しました"
-                    }
+                    registrationSuccess = true
+                    clearSelection()
                 } else {
                     let errorDetails = response.errors.map { "[\($0.index)]: \($0.error)" }.joined(separator: "\n")
                     errorMessage = "一部のアイテムの登録に失敗しました:\n\(errorDetails)"

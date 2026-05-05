@@ -26,15 +26,14 @@ final class InputUserInfoViewModel {
         userDefaults.set(uid, forKey: UserDefaultsKey.userId.rawValue)
 
         let user = User(username: username, birthday: BirthDay(year: "0", month: "0", day: "0"), gender: selectedGender)
+        // API の成否に関わらずローカルに先行保存する
+        if let encoded = try? JSONEncoder().encode(user) {
+            userDefaults.set(encoded, forKey: UserDefaultsKey.userInfo.rawValue)
+            userDefaults.set(selectedGender.apiValue, forKey: UserDefaultsKey.gender.rawValue)
+            userDefaults.set(true, forKey: UserDefaultsKey.hasCompletedUserInfo.rawValue)
+        }
         do {
             let _ = try await createUserClient.post(createUserRequest: .init(id: uid, cognito_id: uid, user_name: username, year: 0, month: 0, day: 0, gender: selectedGender.number))
-            if let encoded = try? JSONEncoder().encode(user) {
-                userDefaults.set(encoded, forKey: UserDefaultsKey.userInfo.rawValue)
-                userDefaults.set(selectedGender.apiValue, forKey: UserDefaultsKey.gender.rawValue)
-                userDefaults.set(true, forKey: UserDefaultsKey.hasCompletedUserInfo.rawValue)
-            }
-        } catch {
-
-        }
+        } catch {}
     }
 }

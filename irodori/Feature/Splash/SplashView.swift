@@ -24,8 +24,7 @@ struct SplashView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            Group {
+        Group {
                 switch viewModel.state {
                 case .termsOfService:
                     SplashView()
@@ -97,41 +96,6 @@ struct SplashView: View {
                         .environment(AuthManager.shared)
                 }
             }
-            .navigationDestination(for: ViewType.self) { viewType in
-                switch viewType {
-                case .coordinateReview(let params):
-                    CoordinateReviewView(
-                        viewModel: .init(
-                            coordinateImage: params.image!.correctOrientation,
-                            apiClient: FashionReviewClient()
-                        ),
-                        fromFirstTakePhotoView: params.fromFirstTakePhotoView,
-                        path: $path
-                    )
-                case .camera:
-                    CameraView(cameraViewModel: .init(), path: $path)
-                case .calendar:
-                    EmptyView() // FirstTakePhotoView からは使用しない
-                case .coordinateDetail:
-                    EmptyView() // FirstTakePhotoView からは使用しない
-                case .profileEdit:
-                    EmptyView() // FirstTakePhotoView からは使用しない
-                case .fashionType:
-                    EmptyView() // FashionType画面は.fashionType stateで直接表示
-                case .fashionTypeResult:
-                    EmptyView() // FashionType内のNavigationStackで処理
-                case .recommendCoordinateByStandardItem(_):
-                    EmptyView()
-                case .tomorrowPlanner:
-                    EmptyView()
-                case .generalChat(_):
-                    EmptyView()
-                case .chatHistoryList:
-                    EmptyView()
-                case .chatHistoryDetail:
-                    EmptyView()
-                }
-            }
             // .onChange(of: path) は削除済み（FirstTakePhotoView がオンボーディングから削除されたため不要）
             .onChange(of: viewModel.state) { oldState, newState in
                 // state が変わったときに path をクリアして、古い NavigationStack の履歴を削除
@@ -155,7 +119,6 @@ struct SplashView: View {
 //            })
 //        case .home:
 //            MainTabView()
-        }
         .overlay(alignment: .top) {
             if !isHomeState, let message = toastManager.message {
                 ToastView(message: message)
