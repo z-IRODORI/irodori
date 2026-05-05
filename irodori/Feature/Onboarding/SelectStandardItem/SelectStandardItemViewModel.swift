@@ -66,12 +66,18 @@ final class SelectStandardItemViewModel {
             switch result {
             case .success(let response):
                 // 全てのパラメータが揃っているアイテムのみをフィルタリング
-                items = response.items.filter { item in
+                let filtered = response.items.filter { item in
                     !item.gender.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                     !item.main_category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                     !item.sub_category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                     !item.color.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 }
+                // sub_category + color の組み合わせが重複する場合、後に来るものを優先して1つだけ残す
+                var seen: [String: String] = [:]
+                for item in filtered {
+                    seen["\(item.sub_category)_\(item.color)"] = item.id
+                }
+                items = filtered.filter { seen["\($0.sub_category)_\($0.color)"] == $0.id }
                 errorMessage = nil
             case .failure(let error):
                 errorMessage = error.errorDescription
