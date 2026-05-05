@@ -18,11 +18,22 @@ final class ProfileViewModel {
     var profileInfo: ProfileInfo?
     var isLoadingProfile = false
 
+    // MARK: - Delete State
+    var isEditMode: Bool = false
+    var showDeleteConfirmation: Bool = false
+    var itemToDelete: String? = nil
+    var isDeletingItem: Bool = false
+
     private let closetClient: ClosetClientProtocol
+    private let deleteClosetItemClient: DeleteClosetItemClientProtocol
     private var loadTask: Task<Void, Never>?
 
-    init(closetClient: ClosetClientProtocol = ClosetClient()) {
+    init(
+        closetClient: ClosetClientProtocol = ClosetClient(),
+        deleteClosetItemClient: DeleteClosetItemClientProtocol = DeleteClosetItemClient()
+    ) {
         self.closetClient = closetClient
+        self.deleteClosetItemClient = deleteClosetItemClient
         loadProfileFromDefaults()
     }
 
@@ -72,6 +83,53 @@ final class ProfileViewModel {
         }
 
         await loadTask?.value
+    }
+
+    // MARK: - Delete Methods
+
+    func toggleEditMode() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isEditMode.toggle()
+        }
+        if !isEditMode {
+            itemToDelete = nil
+            showDeleteConfirmation = false
+        }
+    }
+
+    func requestDelete(itemId: String) {
+        itemToDelete = itemId
+        showDeleteConfirmation = true
+    }
+
+    func deleteItem() async {
+        guard let itemId = itemToDelete,
+              let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else { return }
+
+        isDeletingItem = true
+        defer { isDeletingItem = false }
+
+        do {
+            let result = try await deleteClosetItemClient.delete(uid: uid, itemId: itemId)
+            switch result {
+            case .success(let response):
+                if response.success {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        closetItems.removeAll { $0.id == itemId }
+                    }
+                    itemToDelete = nil
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isEditMode = false
+                    }
+                } else {
+                    ToastManager.shared.show(response.message)
+                }
+            case .failure(let error):
+                ToastManager.shared.show(error.errorDescription ?? "削除に失敗しました")
+            }
+        } catch {
+            ToastManager.shared.show("削除に失敗しました")
+        }
     }
 
     // MARK: - Profile Management

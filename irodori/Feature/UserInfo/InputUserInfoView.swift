@@ -8,12 +8,7 @@
 import SwiftUI
 import Combine
 
-enum FocusedField: Hashable {
-    case year, month, day
-}
-
 struct InputUserInfoView: View {
-    @FocusState private var focusedField: FocusedField?
     @State private(set) var viewModel: InputUserInfoViewModel
     let finishedInputUserInfo: () -> Void
 
@@ -53,77 +48,6 @@ struct InputUserInfoView: View {
                         )
                 }
                 
-                // 誕生日入力
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("生年月日")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.black)
-                    
-                    HStack(spacing: 4) {
-                        // 年入力
-                        TextField("YYYY", text: $viewModel.birthDay.year)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.center)
-                            .font(.system(size: 16, weight: .medium))
-                            .frame(height: 44)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
-                            .focused($focusedField, equals: .year)
-                            .onChange(of: viewModel.birthDay.year) { value, newValue in
-                                if viewModel.birthDay.year.count == 4 {
-                                    focusedField = .month
-                                } else if viewModel.birthDay.year.count > 4 {
-                                    focusedField = .month
-                                    viewModel.updateYear(value)
-                                }
-                            }
-                        Text("年")
-                            .font(.system(size: 16, weight: .medium))
-
-                        // 月入力
-                        TextField("MM", text: $viewModel.birthDay.month)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.center)
-                            .font(.system(size: 16, weight: .medium))
-                            .frame(height: 44)
-                            .padding(.leading, 8)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
-                            .focused($focusedField, equals: .month)
-                            .onChange(of: viewModel.birthDay.month) { value, newValue in
-                                if viewModel.birthDay.month.count == 2 {
-                                    focusedField = .day
-                                } else if viewModel.birthDay.month.count > 2 {
-                                    focusedField = .day
-                                    viewModel.updateMonth(value)
-                                }
-                            }
-                        Text("月")
-                            .font(.system(size: 16, weight: .medium))
-
-                        // 日入力
-                        TextField("DD", text: $viewModel.birthDay.day)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.center)
-                            .font(.system(size: 16, weight: .medium))
-                            .frame(height: 44)
-                            .padding(.leading, 8)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
-                            .focused($focusedField, equals: .day)
-                            .onChange(of: viewModel.birthDay.day) { value, newValue in
-                                if viewModel.birthDay.day.count == 2 {
-                                    focusedField = nil
-                                } else if viewModel.birthDay.day.count > 2 {
-                                    focusedField = nil
-                                    viewModel.updateDay(value)
-                                }
-                            }
-                        Text("日")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                }
-
                 // 性別選択
                 VStack(alignment: .leading, spacing: 8) {
                     Text("性別")
@@ -180,9 +104,6 @@ struct InputUserInfoView: View {
         }
         .background(Color.white)
         .ignoresSafeArea()
-        .onTapGesture {
-            focusedField = nil
-        }
         .onAppear {
             AnalyticsLogger.shared.log(screen: .userInfoScreenView)
         }
