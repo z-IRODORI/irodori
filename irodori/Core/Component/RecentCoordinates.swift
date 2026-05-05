@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 struct RecentCoordinates: View {
     let recentCoordinates: [RecentCoordinate]
@@ -64,17 +65,11 @@ struct RecentCoordinates: View {
     ) -> some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
-                CachedAsyncImage(url: URL(string: coordinate.image_url)!) { phase in
-                    if let image = phase.image {
-                        image.resizable()
-                    } else if phase.error != nil {
-                        Color.red
-                    } else {
-                        Color.gray.opacity(0.5)
-                    }
-                }
-                .aspectRatio(3/4, contentMode: .fit)
-                .frame(width: 110)
+                KFImage(URL(string: coordinate.image_url))
+                    .placeholder { Color.gray.opacity(0.3) }
+                    .resizable()
+                    .aspectRatio(3/4, contentMode: .fit)
+                    .frame(width: 110)
 
                 Text("\(coordinate.date)")
                     .font(.system(size: 12, weight: .semibold))

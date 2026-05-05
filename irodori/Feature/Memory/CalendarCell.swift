@@ -23,8 +23,6 @@ struct CalendarCell: View {
                 if let thumbnailImageURL,
                    let imageURL = URL(string: thumbnailImageURL) {
                     KFImage.url(imageURL)
-                        .loadDiskFileSynchronously()
-                        .cacheMemoryOnly()
                         .resizable()
                         .scaledToFill()
                         .frame(height: height)

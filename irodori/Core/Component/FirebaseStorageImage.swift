@@ -7,6 +7,7 @@
 
 import SwiftUI
 import FirebaseAuth
+import Kingfisher
 
 struct FirebaseStorageImage: View {
     let path: String
@@ -23,35 +24,47 @@ struct FirebaseStorageImage: View {
         self.storageClient = storageClient
         self.onLoaded = onLoaded
 
-        // 初期化時に画像キャッシュをチェック
-        if let cachedImage = UIImageCache.shared.getImage(for: path) {
+        // 初期化時に画像キャッシュをチェック（パス形式のみ）
+        if !path.hasPrefix("http"), let cachedImage = UIImageCache.shared.getImage(for: path) {
             _uiImage = State(initialValue: cachedImage)
             _isLoading = State(initialValue: false)
         }
     }
 
     var body: some View {
-        Group {
-            if let uiImage = uiImage {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else if isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if error != nil {
-                VStack(spacing: 4) {
-                    placeholderView
-                    Text("読み込み失敗")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+        // 完全URLの場合はKingfisherで直接表示（Firebase SDK不要）
+        if path.hasPrefix("http"), let url = URL(string: path) {
+            KFImage(url)
+                .placeholder {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } else {
-                placeholderView
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .onSuccess { _ in onLoaded?() }
+        } else {
+            Group {
+                if let uiImage = uiImage {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if error != nil {
+                    VStack(spacing: 4) {
+                        placeholderView
+                        Text("読み込み失敗")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    placeholderView
+                }
             }
-        }
-        .task(id: path) {
-            await loadImage()
+            .task(id: path) {
+                await loadImage()
+            }
         }
     }
 
