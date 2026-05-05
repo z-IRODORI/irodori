@@ -38,12 +38,6 @@ struct PartnerView: View {
                                 scoreSection(fashionType: fashionType)
                             }
 
-                            // 動物占い情報
-                            if let animalFortune = insight.animal_fortune {
-                                animalFortuneSection(animalFortune: animalFortune)
-                            } else {
-                                animalFortuneEmptySection
-                            }
                         }
                         .padding(.top, 32)
                         .padding(.bottom, 100)
@@ -297,45 +291,6 @@ struct PartnerView: View {
         } else {
             return "アヴァンギャルド・スター"
         }
-    }
-
-    private func animalFortuneSection(animalFortune: UserInsightResponse.AnimalFortuneInfo) -> some View {
-        VStack(spacing: 24) {
-            Text("動物占い")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.black)
-
-            // 動物名
-            Text(animalFortune.animal_name)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.black)
-
-            // 基本性格
-            if let basePersonality = animalFortune.base_personality {
-                InfoRow(title: "基本性格", content: basePersonality)
-            }
-
-            // 人生傾向
-            if let lifeTendency = animalFortune.life_tendency {
-                InfoRow(title: "人生傾向", content: lifeTendency)
-            }
-        }
-        .padding(.horizontal, 24)
-    }
-
-    private var animalFortuneEmptySection: some View {
-        VStack(spacing: 12) {
-            Text("動物占い")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.black)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text("生年月日を登録すると\n動物占いが表示されます")
-                .font(.system(size: 14))
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal, 24)
     }
 
     private var emptyStateView: some View {
