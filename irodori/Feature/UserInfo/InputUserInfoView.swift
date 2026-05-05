@@ -53,7 +53,7 @@ struct InputUserInfoView: View {
                     Text("性別")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.black)
-                    
+
                     HStack(spacing: 12) {
                         ForEach(Gender.allCases, id: \.self) { gender in
                             Button(action: {
@@ -72,6 +72,68 @@ struct InputUserInfoView: View {
                                     )
                             }
                         }
+                    }
+                }
+
+                // 生年月日（任意）
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text("生年月日")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.black)
+                        Text("任意")
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.gray.opacity(0.15))
+                            .cornerRadius(4)
+                    }
+                    Text("動物占いに利用します")
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray)
+
+                    HStack(spacing: 6) {
+                        TextField("1990", text: Bindable(viewModel).birthYearText)
+                            .keyboardType(.numberPad)
+                            .font(.system(size: 16))
+                            .multilineTextAlignment(.center)
+                            .frame(width: 68)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 12)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                        Text("年")
+                            .font(.system(size: 15))
+                            .foregroundColor(.black)
+                        TextField("1", text: Bindable(viewModel).birthMonthText)
+                            .keyboardType(.numberPad)
+                            .font(.system(size: 16))
+                            .multilineTextAlignment(.center)
+                            .frame(width: 44)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 12)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                        Text("月")
+                            .font(.system(size: 15))
+                            .foregroundColor(.black)
+                        TextField("1", text: Bindable(viewModel).birthDayText)
+                            .keyboardType(.numberPad)
+                            .font(.system(size: 16))
+                            .multilineTextAlignment(.center)
+                            .frame(width: 44)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 12)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                        Text("日")
+                            .font(.system(size: 15))
+                            .foregroundColor(.black)
+                        Spacer()
                     }
                 }
             }

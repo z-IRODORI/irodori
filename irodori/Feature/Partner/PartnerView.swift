@@ -41,6 +41,8 @@ struct PartnerView: View {
                             // 動物占い情報
                             if let animalFortune = insight.animal_fortune {
                                 animalFortuneSection(animalFortune: animalFortune)
+                            } else {
+                                animalFortuneEmptySection
                             }
                         }
                         .padding(.top, 32)
@@ -317,6 +319,21 @@ struct PartnerView: View {
             if let lifeTendency = animalFortune.life_tendency {
                 InfoRow(title: "人生傾向", content: lifeTendency)
             }
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private var animalFortuneEmptySection: some View {
+        VStack(spacing: 12) {
+            Text("動物占い")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("生年月日を登録すると\n動物占いが表示されます")
+                .font(.system(size: 14))
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 24)
     }

@@ -25,4 +25,7 @@ enum UserDefaultsKey: String {
     case partnerIconImage
     case hasSelectedStandardItems
     case generalChatConversationId
+    case birthYear
+    case birthMonth
+    case birthDay
 }
