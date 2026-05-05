@@ -35,13 +35,13 @@ struct FirebaseStorageImage: View {
         // 完全URLの場合はKingfisherで直接表示（Firebase SDK不要）
         if path.hasPrefix("http"), let url = URL(string: path) {
             KFImage(url)
+                .onSuccess { _ in onLoaded?() }
                 .placeholder {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .onSuccess { _ in onLoaded?() }
         } else {
             Group {
                 if let uiImage = uiImage {
