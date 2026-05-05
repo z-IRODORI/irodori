@@ -56,13 +56,32 @@ struct SelectStandardItemView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding(.horizontal, 24)
                     } else if viewModel.items.isEmpty {
-                        VStack(spacing: 12) {
+                        VStack(spacing: 16) {
                             Image(systemName: "photo")
                                 .font(.system(size: 48))
                                 .foregroundStyle(.gray.opacity(0.3))
                             Text("アイテムが見つかりませんでした")
                                 .font(.system(size: 14))
                                 .foregroundStyle(.secondary)
+                            Button("再試行") {
+                                Task {
+                                    await viewModel.fetchItems()
+                                }
+                            }
+                            .font(.system(size: 14, weight: .medium))
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 10)
+                            .background(Color.black)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            if onComplete != nil {
+                                Button("スキップ") {
+                                    UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
+                                    onComplete?()
+                                }
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                            }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
