@@ -61,22 +61,26 @@ final class HomeViewModel {
     func onAppear() async {
         isLoadingHome = true
         hasLoadError = false
-        defer { isLoadingHome = false }
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
 
         do {
-            let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
             let result = try await apiClient.get(uid: uid)
-
             switch result {
             case .success(let response):
                 self.homeResponse = response
-                await fetchRecentCoordinateAnalysis(uid: uid)
             case .failure:
                 hasLoadError = true
             }
         } catch {
             hasLoadError = true
         }
+
+        // コーデ一覧取得完了時点でスケルトンを解除し、直近のコーデを先に表示する
+        isLoadingHome = false
+
+        // 分析APIは独立して続行（isLoadingAnalysis で今週のあなたへを制御）
+        await fetchRecentCoordinateAnalysis(uid: uid)
     }
 
     private func fetchRecentCoordinateAnalysis(uid: String) async {
