@@ -8,9 +8,14 @@
 import SwiftUI
 import Combine
 
+private enum BirthdayField {
+    case year, month, day
+}
+
 struct InputUserInfoView: View {
     @State private(set) var viewModel: InputUserInfoViewModel
     let finishedInputUserInfo: () -> Void
+    @FocusState private var focusedBirthdayField: BirthdayField?
 
     var cancellables = Set<AnyCancellable>()
 
@@ -89,12 +94,9 @@ struct InputUserInfoView: View {
                             .background(Color.gray.opacity(0.15))
                             .cornerRadius(4)
                     }
-                    Text("動物占いに利用します")
-                        .font(.system(size: 12))
-                        .foregroundColor(.gray)
 
                     HStack(spacing: 6) {
-                        TextField("1990", text: Bindable(viewModel).birthYearText)
+                        TextField("YYYY", text: Bindable(viewModel).birthYearText)
                             .keyboardType(.numberPad)
                             .font(.system(size: 16))
                             .multilineTextAlignment(.center)
@@ -104,10 +106,22 @@ struct InputUserInfoView: View {
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(12)
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .focused($focusedBirthdayField, equals: .year)
+                            .onChange(of: viewModel.birthYearText) { _, newValue in
+                                let digits = newValue.filter { $0.isNumber }
+                                if digits.count > 4 {
+                                    viewModel.birthYearText = String(digits.prefix(4))
+                                } else {
+                                    viewModel.birthYearText = digits
+                                }
+                                if viewModel.birthYearText.count == 4 {
+                                    focusedBirthdayField = .month
+                                }
+                            }
                         Text("年")
                             .font(.system(size: 15))
                             .foregroundColor(.black)
-                        TextField("1", text: Bindable(viewModel).birthMonthText)
+                        TextField("MM", text: Bindable(viewModel).birthMonthText)
                             .keyboardType(.numberPad)
                             .font(.system(size: 16))
                             .multilineTextAlignment(.center)
@@ -117,10 +131,24 @@ struct InputUserInfoView: View {
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(12)
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .focused($focusedBirthdayField, equals: .month)
+                            .onChange(of: viewModel.birthMonthText) { _, newValue in
+                                let digits = newValue.filter { $0.isNumber }
+                                if digits.count > 2 {
+                                    viewModel.birthMonthText = String(digits.prefix(2))
+                                } else {
+                                    viewModel.birthMonthText = digits
+                                }
+                                if viewModel.birthMonthText.count == 2 {
+                                    focusedBirthdayField = .day
+                                } else if viewModel.birthMonthText.isEmpty {
+                                    focusedBirthdayField = .year
+                                }
+                            }
                         Text("月")
                             .font(.system(size: 15))
                             .foregroundColor(.black)
-                        TextField("1", text: Bindable(viewModel).birthDayText)
+                        TextField("DD", text: Bindable(viewModel).birthDayText)
                             .keyboardType(.numberPad)
                             .font(.system(size: 16))
                             .multilineTextAlignment(.center)
@@ -130,6 +158,18 @@ struct InputUserInfoView: View {
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(12)
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .focused($focusedBirthdayField, equals: .day)
+                            .onChange(of: viewModel.birthDayText) { _, newValue in
+                                let digits = newValue.filter { $0.isNumber }
+                                if digits.count > 2 {
+                                    viewModel.birthDayText = String(digits.prefix(2))
+                                } else {
+                                    viewModel.birthDayText = digits
+                                }
+                                if viewModel.birthDayText.isEmpty {
+                                    focusedBirthdayField = .month
+                                }
+                            }
                         Text("日")
                             .font(.system(size: 15))
                             .foregroundColor(.black)
