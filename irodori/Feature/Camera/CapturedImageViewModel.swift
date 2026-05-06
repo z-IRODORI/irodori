@@ -20,6 +20,11 @@ final class CapturedImageViewModel {
     }
 
     func onAppear() {
+        #if targetEnvironment(simulator)
+        isDetectHuman = true
+        return
+        #endif
+
         isLoading = true
         guard let inputCIImage = CIImage(image: inputUIImage) else {
             isLoading = false

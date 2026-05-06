@@ -34,7 +34,7 @@ struct InputUserInfoView: View {
             .padding(.top, 80)
             
             // フォーム
-            VStack(spacing: 24) {
+            VStack(spacing: 30) {
                 // ユーザー名入力
                 VStack(alignment: .leading, spacing: 8) {
                     Text("ユーザー名")
@@ -96,7 +96,7 @@ struct InputUserInfoView: View {
                     }
 
                     HStack(spacing: 6) {
-                        TextField("YYYY", text: Bindable(viewModel).birthYearText)
+                        TextField("2000", text: Bindable(viewModel).birthYearText)
                             .keyboardType(.numberPad)
                             .font(.system(size: 16))
                             .multilineTextAlignment(.center)
@@ -121,7 +121,7 @@ struct InputUserInfoView: View {
                         Text("年")
                             .font(.system(size: 15))
                             .foregroundColor(.black)
-                        TextField("MM", text: Bindable(viewModel).birthMonthText)
+                        TextField("01", text: Bindable(viewModel).birthMonthText)
                             .keyboardType(.numberPad)
                             .font(.system(size: 16))
                             .multilineTextAlignment(.center)
@@ -148,7 +148,7 @@ struct InputUserInfoView: View {
                         Text("月")
                             .font(.system(size: 15))
                             .foregroundColor(.black)
-                        TextField("DD", text: Bindable(viewModel).birthDayText)
+                        TextField("01", text: Bindable(viewModel).birthDayText)
                             .keyboardType(.numberPad)
                             .font(.system(size: 16))
                             .multilineTextAlignment(.center)
