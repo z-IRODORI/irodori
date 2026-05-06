@@ -60,47 +60,40 @@ final class HomeViewModel {
 
     func onAppear() async {
         isLoadingHome = true
+        isLoadingAnalysis = true
         hasLoadError = false
 
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
 
+        // 両APIを同時に起動
+        async let homeResult = apiClient.get(uid: uid)
+        async let analysisResult = analyzeRecentCoordinateClient.post(uid: uid, targetDays: 7)
+
+        // コーデ一覧: 完了次第スケルトンを解除して表示
         do {
-            let result = try await apiClient.get(uid: uid)
-            switch result {
+            switch try await homeResult {
             case .success(let response):
-                self.homeResponse = response
+                homeResponse = response
             case .failure:
                 hasLoadError = true
             }
         } catch {
             hasLoadError = true
         }
-
-        // コーデ一覧取得完了時点でスケルトンを解除し、直近のコーデを先に表示する
         isLoadingHome = false
 
-        // 分析APIは独立して続行（isLoadingAnalysis で今週のあなたへを制御）
-        await fetchRecentCoordinateAnalysis(uid: uid)
-    }
-
-    private func fetchRecentCoordinateAnalysis(uid: String) async {
-        isLoadingAnalysis = true
-        defer { isLoadingAnalysis = false }
-
+        // 分析: 完了次第「今週のあなたへ」を更新（homeより遅くなることが多い）
         do {
-            let result = try await analyzeRecentCoordinateClient.post(uid: uid, targetDays: 7)
-
-            switch result {
+            switch try await analysisResult {
             case .success(let response):
-                self.recentCoordinateAnalysis = response.analyze_recent_coordinate
+                recentCoordinateAnalysis = response.analyze_recent_coordinate
             case .failure:
-                // エラー時はデフォルトメッセージを表示
-                self.recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
+                recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
             }
         } catch {
-            // エラー時はデフォルトメッセージを表示
-            self.recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
+            recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
         }
+        isLoadingAnalysis = false
     }
 
     func selectCoordinateItem(for dateID: Int) -> SelectCoordinateItem? {
