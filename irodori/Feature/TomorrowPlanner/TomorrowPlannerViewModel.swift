@@ -145,8 +145,9 @@ final class TomorrowPlannerViewModel {
     }
 
     func selectAndRecommend(closetItem: ClosetItem) async {
+        let userGender = UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue) ?? "men"
         selectCoordinateItem = SelectCoordinateItem(
-            gender: selectCoordinateItem?.gender ?? "men",
+            gender: selectCoordinateItem?.gender ?? userGender,
             input_type: closetItem.item_type,
             category: closetItem.category ?? closetItem.item_type,
             text: [closetItem.color, closetItem.category].compactMap { $0 }.joined(separator: ", "),
