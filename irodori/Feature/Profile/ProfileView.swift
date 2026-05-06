@@ -96,30 +96,19 @@ struct ProfileView: View {
 
     // MARK: - 1. headerNavigationBar
     private var headerNavigationBar: some View {
-        HStack {
-            Button(viewModel.isEditMode ? "完了" : "編集") {
-                viewModel.toggleEditMode()
-            }
-            .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(.black)
-
-            Spacer()
-
+        ZStack {
             Text("プロフィール")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.black)
 
-            Spacer()
-
-            HStack(spacing: 20) {
-                Button(action: {
-                    path.append(.calendar)
-                }) {
+            HStack {
+                Spacer()
+                Button(action: { path.append(.calendar) }) {
                     Image(systemName: "calendar")
                 }
+                .font(.system(size: 20))
+                .foregroundStyle(.black)
             }
-            .font(.system(size: 20))
-            .foregroundStyle(.black)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
@@ -246,7 +235,7 @@ struct ProfileView: View {
 //    }
 
     private var categorySelector: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     // Enum の CaseIterable を利用してループ
@@ -267,14 +256,12 @@ struct ProfileView: View {
                 .padding(.horizontal, 20)
             }
 
-            // 右側の三点リーダーやフィルターアイコン
-//            HStack(spacing: 12) {
-//                Image(systemName: "line.3.horizontal.decrease.circle.fill")
-//                Image(systemName: "ellipsis.circle.fill")
-//            }
-//            .font(.system(size: 24))
-//            .foregroundStyle(Color.gray.opacity(0.2))
-//            .padding(.trailing, 20)
+            Button(viewModel.isEditMode ? "完了" : "編集") {
+                viewModel.toggleEditMode()
+            }
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(.blue)
+            .padding(.horizontal, 20)
         }
     }
 
