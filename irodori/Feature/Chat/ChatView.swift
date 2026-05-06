@@ -217,10 +217,11 @@ struct ChatView: View {
                             .padding(.vertical, 20)
                     } else {
                         VStack(spacing: 8) {
-                            ForEach(Array(viewModel.coordinateChat.messages.enumerated()), id: \.element.id) { index, message in
+                            let messagesSnapshot = Array(viewModel.coordinateChat.messages.enumerated())
+                            ForEach(messagesSnapshot, id: \.element.id) { index, message in
                                 let showDate = index == 0 || !Calendar.current.isDate(
                                     message.timestamp,
-                                    inSameDayAs: viewModel.coordinateChat.messages[index - 1].timestamp
+                                    inSameDayAs: messagesSnapshot[index - 1].element.timestamp
                                 )
                                 if showDate {
                                     ChatDateSeparatorView(date: message.timestamp)

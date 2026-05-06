@@ -35,8 +35,9 @@ struct GeneralChatView: View {
                                 .padding(.vertical, 20)
                         } else {
                             VStack(spacing: 8) {
-                                ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
-                                    let showDate = index == 0 || !Calendar.current.isDate(message.timestamp, inSameDayAs: viewModel.messages[index - 1].timestamp)
+                                let messagesSnapshot = Array(viewModel.messages.enumerated())
+                                ForEach(messagesSnapshot, id: \.element.id) { index, message in
+                                    let showDate = index == 0 || !Calendar.current.isDate(message.timestamp, inSameDayAs: messagesSnapshot[index - 1].element.timestamp)
                                     if showDate {
                                         ChatDateSeparatorView(date: message.timestamp)
                                     }
