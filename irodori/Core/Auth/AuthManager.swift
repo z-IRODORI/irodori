@@ -28,10 +28,10 @@ final class AuthManager {
 
     /// Sign in with Apple（Firebase連携）
     func signInWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws {
-        let credential = OAuthProvider.credential(
-            withProviderID: "apple.com",
-            idToken: idToken,
-            rawNonce: nonce
+        let credential = OAuthProvider.appleCredential(
+            withIDToken: idToken,
+            rawNonce: nonce,
+            fullName: fullName
         )
         let result = try await Auth.auth().signIn(with: credential)
         self.isAuthenticated = true
