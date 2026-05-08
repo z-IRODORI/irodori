@@ -2,11 +2,11 @@
 //  AuthManager.swift
 //  irodori
 //
-//  Created by Claude Code on 2026/01/22.
-//
 
 import Foundation
 import FirebaseAuth
+import CryptoKit
+import AuthenticationServices
 
 @MainActor
 @Observable
@@ -18,7 +18,6 @@ final class AuthManager {
     var authError: Error?
 
     private init() {
-        // 認証状態の監視
         Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in
                 self?.isAuthenticated = (user != nil)
@@ -27,17 +26,30 @@ final class AuthManager {
         }
     }
 
-    /// 匿名認証を実行
-    func signInAnonymously() async throws {
-        do {
-            let result = try await Auth.auth().signInAnonymously()
-            self.isAuthenticated = true
-            self.currentUserID = result.user.uid
-            self.authError = nil
-        } catch {
-            self.authError = error
-            throw error
+    /// Sign in with Apple（Firebase連携）
+    func signInWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws {
+        let credential = OAuthProvider.credential(
+            withProviderID: "apple.com",
+            idToken: idToken,
+            rawNonce: nonce
+        )
+        let result = try await Auth.auth().signIn(with: credential)
+        self.isAuthenticated = true
+        self.currentUserID = result.user.uid
+
+        // Appleは初回のみ氏名を返すため、displayNameが未設定なら更新
+        if let fullName, let givenName = fullName.givenName, result.user.displayName == nil {
+            let changeRequest = result.user.createProfileChangeRequest()
+            changeRequest.displayName = [fullName.familyName, givenName].compactMap { $0 }.joined(separator: " ")
+            try? await changeRequest.commitChanges()
         }
+
+        self.authError = nil
+    }
+
+    /// Apple Sign Inで認証済みかどうか
+    var isSignedInWithApple: Bool {
+        Auth.auth().currentUser?.providerData.contains(where: { $0.providerID == "apple.com" }) ?? false
     }
 
     /// ログアウト
@@ -56,5 +68,19 @@ final class AuthManager {
     /// 現在のユーザーを取得
     var currentUser: FirebaseAuth.User? {
         return Auth.auth().currentUser
+    }
+
+    // MARK: - Nonce helpers（Apple Sign In用）
+
+    static func randomNonceString(length: Int = 32) -> String {
+        var randomBytes = [UInt8](repeating: 0, count: length)
+        _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        return String(randomBytes.map { charset[Int($0) % charset.count] })
+    }
+
+    static func sha256(_ input: String) -> String {
+        let hashedData = SHA256.hash(data: Data(input.utf8))
+        return hashedData.compactMap { String(format: "%02x", $0) }.joined()
     }
 }

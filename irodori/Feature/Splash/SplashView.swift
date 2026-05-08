@@ -33,6 +33,10 @@ struct SplashView: View {
                                 viewModel.updateState()
                             })
                         }
+                case .login:
+                    LoginView {
+                        viewModel.updateState()
+                    }
                 case .userInfo:
                     InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {
                         viewModel.setupSignUpDate()   // アプリインストールしてから一度しか呼ばれない想定

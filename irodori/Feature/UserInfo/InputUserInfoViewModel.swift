@@ -6,8 +6,7 @@
 //
 
 import SwiftUI
-
-
+import FirebaseAuth
 
 @Observable
 @MainActor
@@ -31,7 +30,7 @@ final class InputUserInfoViewModel {
 
     func okButtonTapped() async {
         let createUserClient: CreateUserClient = CreateUserClient()
-        let uid = UUID().uuidString
+        let uid = Auth.auth().currentUser?.uid ?? UUID().uuidString
         userDefaults.set(uid, forKey: UserDefaultsKey.userId.rawValue)
 
         let year = Int(birthYearText) ?? 0
