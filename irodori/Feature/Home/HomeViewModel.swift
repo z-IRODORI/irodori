@@ -34,11 +34,18 @@ final class HomeViewModel {
     var coordinateToDelete: String? = nil
     var isDeletingCoordinate: Bool = false
 
+    // 明日のコーデ推薦
+    var dailyRecommendation: DailyRecommendationResponse? = nil
+    var isLoadingDailyRecommendation: Bool = false
+    var hasDailyRecommendationError: Bool = false
+    var selectedDailyRecommendation: DailyRecommendationItem? = nil
+
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
     let analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol
     let closetClient: ClosetClientProtocol
     let deleteCoordinateClient: DeleteCoordinateClientProtocol
+    let dailyRecommendationClient: DailyRecommendationClientProtocol
     private let plannerCacheRepository: HomePlannerCacheRepositoryProtocol
 
     init(
@@ -47,6 +54,7 @@ final class HomeViewModel {
         analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol = AnalyzeRecentCoordinateClient(),
         closetClient: ClosetClientProtocol = ClosetClient(),
         deleteCoordinateClient: DeleteCoordinateClientProtocol = DeleteCoordinateClient(),
+        dailyRecommendationClient: DailyRecommendationClientProtocol = DailyRecommendationClient(),
         plannerCacheRepository: HomePlannerCacheRepositoryProtocol = HomePlannerCacheRepository()
     ) {
         self.apiClient = apiClient
@@ -54,6 +62,7 @@ final class HomeViewModel {
         self.analyzeRecentCoordinateClient = analyzeRecentCoordinateClient
         self.closetClient = closetClient
         self.deleteCoordinateClient = deleteCoordinateClient
+        self.dailyRecommendationClient = dailyRecommendationClient
         self.plannerCacheRepository = plannerCacheRepository
         loadPlannerCache()
     }
@@ -61,13 +70,19 @@ final class HomeViewModel {
     func onAppear() async {
         isLoadingHome = true
         isLoadingAnalysis = true
+        isLoadingDailyRecommendation = true
         hasLoadError = false
+        hasDailyRecommendationError = false
 
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
 
-        // 両APIを同時に起動
+        // 3つのAPIを同時に起動
         async let homeResult = apiClient.get(uid: uid)
         async let analysisResult = analyzeRecentCoordinateClient.post(uid: uid, targetDays: 7)
+        async let dailyResult = dailyRecommendationClient.get(uid: uid, gender: gender)
 
         // コーデ一覧: 完了次第スケルトンを解除して表示
         do {
@@ -94,6 +109,40 @@ final class HomeViewModel {
             recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
         }
         isLoadingAnalysis = false
+
+        // 明日のコーデ：完了次第表示（キャッシュHIT時は瞬時、フォールバック時は1-2秒）
+        do {
+            switch try await dailyResult {
+            case .success(let response):
+                dailyRecommendation = response
+            case .failure:
+                hasDailyRecommendationError = true
+            }
+        } catch {
+            hasDailyRecommendationError = true
+        }
+        isLoadingDailyRecommendation = false
+    }
+
+    /// 「これを今日着る」マーク
+    func markWorn(item: DailyRecommendationItem) async -> Bool {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        let today = formatter.string(from: Date())
+        do {
+            let result = try await dailyRecommendationClient.markWorn(
+                uid: uid, poolId: item.pool_id, wornDate: today
+            )
+            switch result {
+            case .success: return true
+            case .failure: return false
+            }
+        } catch {
+            return false
+        }
     }
 
     func selectCoordinateItem(for dateID: Int) -> SelectCoordinateItem? {

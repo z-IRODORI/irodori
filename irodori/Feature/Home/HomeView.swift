@@ -44,6 +44,14 @@ struct HomeView: View {
 
                     partnerCard
 
+                    DailyRecommendationSection(
+                        response: viewModel.dailyRecommendation,
+                        isLoading: viewModel.isLoadingDailyRecommendation,
+                        onTap: { item in
+                            viewModel.selectedDailyRecommendation = item
+                        }
+                    )
+
                     if let tags = viewModel.homeResponse.tags, !tags.isEmpty {
                         tagsSection
                     }
@@ -96,6 +104,26 @@ struct HomeView: View {
                     Task { await viewModel.selectAndRecommend(closetItem: closetItem) }
                 }
             )
+        }
+        .sheet(item: Binding(
+            get: { viewModel.selectedDailyRecommendation },
+            set: { viewModel.selectedDailyRecommendation = $0 }
+        )) { item in
+            NavigationStack {
+                DailyRecommendationDetailView(
+                    item: item,
+                    onWear: { item in
+                        await viewModel.markWorn(item: item)
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") {
+                            viewModel.selectedDailyRecommendation = nil
+                        }
+                    }
+                }
+            }
         }
         .sheet(isPresented: $showFirstTakePhotoSheet, onDismiss: {
             Task { await viewModel.onAppear() }
