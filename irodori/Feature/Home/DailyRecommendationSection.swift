@@ -2,7 +2,13 @@
 //  DailyRecommendationSection.swift
 //  irodori
 //
-//  ホーム画面の「明日のコーデ」セクション。天気カード + ヒーローカード + 4×2 サブグリッドで合計9件表示。
+//  ホーム画面の「明日のコーデ」セクション。
+//  - 見出し右にミニ天気バッジ
+//  - partner_comment （全体方針）
+//  - 3×3 グリッド（先頭に「イチオシ」バッジ）
+//  - 選択中カードの直下に「選んだ理由」パネル
+//  - 未選択カードのタップ: 選択（枠線+理由更新）
+//  - 選択中カードのタップ or 右下拡大ボタン: onTap で詳細モーダルへ
 //
 
 import SwiftUI
@@ -13,7 +19,9 @@ struct DailyRecommendationSection: View {
     let isLoading: Bool
     let onTap: (DailyRecommendationItem) -> Void
 
-    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+    @State private var selectedIndex: Int = 0
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -25,10 +33,13 @@ struct DailyRecommendationSection: View {
     // MARK: - Header
 
     private var sectionHeader: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             Text("明日のコーデ")
                 .font(.system(size: 20, weight: .bold))
             Spacer()
+            if let r = response {
+                miniWeather(r.weather)
+            }
         }
     }
 
@@ -40,70 +51,43 @@ struct DailyRecommendationSection: View {
             skeleton
         } else if let r = response, !r.recommendations.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                weatherCard(weather: r.weather, dateString: r.target_date)
                 if let comment = r.partner_comment, !comment.isEmpty {
                     partnerComment(comment)
                 }
-                heroCard(item: r.recommendations[0])
-                if r.recommendations.count > 1 {
-                    altLabel
-                    subGrid(items: Array(r.recommendations.dropFirst()))
-                }
+                grid(items: r.recommendations)
+                reasonPanel(items: r.recommendations)
             }
         } else {
             emptyState
         }
     }
 
-    // MARK: - Weather Card
+    // MARK: - Mini Weather
 
-    private func weatherCard(weather: DailyRecommendationWeather, dateString: String) -> some View {
-        let style = WeatherDisplay.style(for: weather.condition)
-        return HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(style.tint.opacity(0.14))
-                    .frame(width: 56, height: 56)
-                Image(systemName: style.iconName)
-                    .symbolRenderingMode(.multicolor)
-                    .font(.system(size: 28))
-                    .foregroundStyle(style.tint)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(WeatherDisplay.formatDate(dateString))
-                    .font(.system(size: 12, weight: .semibold))
+    private func miniWeather(_ w: DailyRecommendationWeather) -> some View {
+        let style = WeatherDisplay.style(for: w.condition)
+        return HStack(spacing: 6) {
+            Image(systemName: style.iconName)
+                .symbolRenderingMode(.multicolor)
+                .font(.system(size: 14))
+                .foregroundStyle(style.tint)
+            HStack(spacing: 2) {
+                Text("\(w.min_temp)")
+                    .foregroundStyle(Color.blue.opacity(0.85))
+                Text("/")
                     .foregroundStyle(.secondary)
-                Text(weather.condition)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                HStack(spacing: 8) {
-                    tempLabel(value: weather.min_temp, isMax: false)
-                    Text("/")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    tempLabel(value: weather.max_temp, isMax: true)
-                }
+                Text("\(w.max_temp)")
+                    .foregroundStyle(.orange)
+                Text("°")
+                    .foregroundStyle(.secondary)
             }
-            Spacer()
+            .font(.system(size: 13, weight: .semibold))
         }
-        .padding(14)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
-    }
-
-    private func tempLabel(value: Int, isMax: Bool) -> some View {
-        let color = isMax ? Color.orange : Color.blue.opacity(0.85)
-        let arrow = isMax ? "arrow.up" : "arrow.down"
-        return HStack(spacing: 2) {
-            Image(systemName: arrow)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(color)
-            Text("\(value)°")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(color)
-        }
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Color.black.opacity(0.06), lineWidth: 1))
     }
 
     // MARK: - Partner Comment
@@ -129,58 +113,75 @@ struct DailyRecommendationSection: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
-    // MARK: - Hero Card
+    // MARK: - Grid
 
-    private func heroCard(item: DailyRecommendationItem) -> some View {
-        Button(action: { onTap(item) }) {
-            HStack(alignment: .top, spacing: 12) {
+    private func grid(items: [DailyRecommendationItem]) -> some View {
+        LazyVGrid(columns: columns, spacing: 10) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                gridCell(index: idx, item: item)
+            }
+        }
+    }
+
+    private func gridCell(index idx: Int, item: DailyRecommendationItem) -> some View {
+        Button {
+            handleTap(index: idx, item: item)
+        } label: {
+            ZStack(alignment: .topTrailing) {
                 KFImage(URL(string: item.image_url))
                     .resizable()
-                    .placeholder {
-                        Rectangle().fill(Color.gray.opacity(0.12))
-                    }
+                    .placeholder { Rectangle().fill(Color.gray.opacity(0.15)) }
                     .scaledToFill()
-                    .frame(width: 130, height: 174)
+                    .frame(height: 150)
+                    .frame(maxWidth: .infinity)
                     .clipped()
                     .cornerRadius(10)
-                VStack(alignment: .leading, spacing: 8) {
-                    pickBadge
-                    Text(heroBody(item))
-                        .font(.system(size: 13))
-                        .foregroundStyle(.primary)
-                        .lineSpacing(3)
-                        .lineLimit(6)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Spacer(minLength: 0)
-                    tagRow(item)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(idx == selectedIndex ? Color.orange : Color.clear, lineWidth: 3)
+                    )
+                if idx == 0 {
+                    ichioshiBadge.padding(6)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(12)
-            .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .bottomTrailing) {
+            if idx == selectedIndex {
+                Button { onTap(item) } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(8)
+                        .background(Color.black.opacity(0.65))
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1)
+                }
+                .buttonStyle(.plain)
+                .padding(6)
+                .transition(.opacity.combined(with: .scale))
+            }
+        }
     }
 
-    private func heroBody(_ item: DailyRecommendationItem) -> String {
-        if let r = item.reason, !r.isEmpty { return r }
-        if !item.vibe.isEmpty { return item.vibe }
-        return "明日の気候と最近の傾向から選んだ一着です。"
+    private func handleTap(index: Int, item: DailyRecommendationItem) {
+        if index == selectedIndex {
+            onTap(item)
+        } else {
+            withAnimation(.easeInOut(duration: 0.18)) { selectedIndex = index }
+        }
     }
 
-    private var pickBadge: some View {
-        HStack(spacing: 4) {
+    private var ichioshiBadge: some View {
+        HStack(spacing: 3) {
             Image(systemName: "sparkles")
+                .font(.system(size: 9, weight: .bold))
+            Text("イチオシ")
                 .font(.system(size: 10, weight: .bold))
-            Text("今日のイチオシ")
-                .font(.system(size: 11, weight: .bold))
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .background(
             LinearGradient(
                 colors: [.orange, Color(red: 1.0, green: 0.45, blue: 0.4)],
@@ -189,19 +190,47 @@ struct DailyRecommendationSection: View {
             )
         )
         .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.18), radius: 3, x: 0, y: 1)
     }
 
-    @ViewBuilder
-    private func tagRow(_ item: DailyRecommendationItem) -> some View {
-        let style = item.style.trimmingCharacters(in: .whitespaces)
-        let colorText = item.main_colors.prefix(2).joined(separator: "・")
-        HStack(spacing: 6) {
-            if !style.isEmpty { tagChip(style) }
-            if !colorText.isEmpty { tagChip(colorText) }
+    // MARK: - Reason Panel
+
+    private func reasonPanel(items: [DailyRecommendationItem]) -> some View {
+        let safeIndex = min(max(selectedIndex, 0), max(items.count - 1, 0))
+        let item = items[safeIndex]
+        let bodyText: String = {
+            if let r = item.reason, !r.isEmpty { return r }
+            if !item.vibe.isEmpty { return item.vibe }
+            return "明日のコンディションに合う一着です。"
+        }()
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundStyle(.orange)
+                    .font(.system(size: 13))
+                Text("選んだ理由")
+                    .font(.system(size: 13, weight: .bold))
+                Spacer()
+            }
+            Text(bodyText)
+                .font(.system(size: 13))
+                .foregroundStyle(.primary)
+                .lineSpacing(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 6) {
+                if !item.style.isEmpty { chip(item.style) }
+                if !item.main_colors.isEmpty {
+                    chip(item.main_colors.prefix(2).joined(separator: "・"))
+                }
+            }
         }
+        .padding(14)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 
-    private func tagChip(_ text: String) -> some View {
+    private func chip(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 10, weight: .medium))
             .foregroundStyle(.secondary)
@@ -211,58 +240,23 @@ struct DailyRecommendationSection: View {
             .clipShape(Capsule())
     }
 
-    // MARK: - Sub Grid
-
-    private var altLabel: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "square.grid.2x2")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Text("ほかの提案")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.top, 2)
-    }
-
-    private func subGrid(items: [DailyRecommendationItem]) -> some View {
-        LazyVGrid(columns: gridColumns, spacing: 8) {
-            ForEach(items) { item in
-                Button(action: { onTap(item) }) {
-                    KFImage(URL(string: item.image_url))
-                        .resizable()
-                        .placeholder {
-                            Rectangle().fill(Color.gray.opacity(0.15))
-                        }
-                        .scaledToFill()
-                        .frame(height: 104)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-                        .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
     // MARK: - Skeleton
 
     private var skeleton: some View {
         VStack(alignment: .leading, spacing: 14) {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(Color.gray.opacity(0.12))
-                .frame(height: 84)
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.gray.opacity(0.12))
-                .frame(height: 198)
-            LazyVGrid(columns: gridColumns, spacing: 8) {
-                ForEach(0..<8, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 8)
+                .frame(height: 64)
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(0..<9, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 10)
                         .fill(Color.gray.opacity(0.15))
-                        .frame(height: 104)
+                        .frame(height: 150)
                 }
             }
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.gray.opacity(0.12))
+                .frame(height: 96)
         }
     }
 
@@ -276,7 +270,7 @@ struct DailyRecommendationSection: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, minHeight: 130)
+        .frame(maxWidth: .infinity, minHeight: 150)
     }
 }
 
@@ -315,21 +309,6 @@ private enum WeatherDisplay {
             return .init(iconName: "sun.max.fill", tint: .orange)
         }
         return .init(iconName: "cloud.sun.fill", tint: .gray)
-    }
-
-    static func formatDate(_ ymd: String) -> String {
-        let inFmt = DateFormatter()
-        inFmt.dateFormat = "yyyy-MM-dd"
-        inFmt.locale = Locale(identifier: "en_US_POSIX")
-        inFmt.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        guard let date = inFmt.date(from: ymd) else {
-            return "明日"
-        }
-        let outFmt = DateFormatter()
-        outFmt.locale = Locale(identifier: "ja_JP")
-        outFmt.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        outFmt.dateFormat = "明日 M月d日(E)"
-        return outFmt.string(from: date)
     }
 }
 
