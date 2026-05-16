@@ -16,6 +16,7 @@ struct InputUserInfoView: View {
     @State private(set) var viewModel: InputUserInfoViewModel
     let finishedInputUserInfo: () -> Void
     @FocusState private var focusedBirthdayField: BirthdayField?
+    @State private var showingPrefecturePicker = false
 
     var cancellables = Set<AnyCancellable>()
 
@@ -176,9 +177,39 @@ struct InputUserInfoView: View {
                         Spacer()
                     }
                 }
+
+                // お住まいの地域
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("お住まいの地域")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.black)
+
+                    Button {
+                        showingPrefecturePicker = true
+                    } label: {
+                        HStack {
+                            Text(viewModel.selectedPrefectureName)
+                                .font(.system(size: 16))
+                                .foregroundColor(.black)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 20)
-            
+
             Spacer()
             
             // 完了ボタン
@@ -208,6 +239,23 @@ struct InputUserInfoView: View {
         .ignoresSafeArea()
         .onAppear {
             AnalyticsLogger.shared.log(screen: .userInfoScreenView)
+        }
+        .sheet(isPresented: $showingPrefecturePicker) {
+            NavigationStack {
+                PrefecturePickerView(
+                    selectedCode: viewModel.selectedPrefectureCode,
+                    onSelect: { prefecture in
+                        viewModel.selectedPrefectureCode = prefecture.code
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") {
+                            showingPrefecturePicker = false
+                        }
+                    }
+                }
+            }
         }
     }
 }

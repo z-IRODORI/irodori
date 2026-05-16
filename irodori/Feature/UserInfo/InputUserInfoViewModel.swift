@@ -16,9 +16,14 @@ final class InputUserInfoViewModel {
     var birthYearText: String = ""
     var birthMonthText: String = ""
     var birthDayText: String = ""
+    var selectedPrefectureCode: String = Prefecture.default.code
 
     var isFormValid: Bool {
         !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var selectedPrefectureName: String {
+        Prefecture.find(byCode: selectedPrefectureCode)?.name ?? Prefecture.default.name
     }
 
     var isBirthdayComplete: Bool {
@@ -27,11 +32,20 @@ final class InputUserInfoViewModel {
     }
 
     private let userDefaults = UserDefaults.standard
+    private let prefectureClient: UpdateUserPrefectureClientProtocol
+
+    init(prefectureClient: UpdateUserPrefectureClientProtocol = UpdateUserPrefectureClient()) {
+        self.prefectureClient = prefectureClient
+    }
 
     func okButtonTapped() async {
         let createUserClient: CreateUserClient = CreateUserClient()
         let uid = Auth.auth().currentUser?.uid ?? UUID().uuidString
         userDefaults.set(uid, forKey: UserDefaultsKey.userId.rawValue)
+
+        // 居住地を UD に先行保存し、サーバへ送信 (失敗してもオンボーディングは進める)
+        userDefaults.set(selectedPrefectureCode, forKey: UserDefaultsKey.prefectureCode.rawValue)
+        _ = try? await prefectureClient.put(uid: uid, prefectureCode: selectedPrefectureCode)
 
         let year = Int(birthYearText) ?? 0
         let month = Int(birthMonthText) ?? 0
