@@ -48,6 +48,32 @@ enum DailyWeatherDisplay {
     }
 }
 
+// MARK: - 場所バッジ (天気の左に配置)
+
+struct DailyLocationBadge: View {
+    let prefectureName: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.blue)
+                Text(prefectureName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.white)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.black.opacity(0.06), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - ミニ天気バッジ (見出し右に配置)
 
 struct DailyMiniWeatherBadge: View {

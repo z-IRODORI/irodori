@@ -16,7 +16,9 @@ import SwiftUI
 struct DailyRecommendationCaptionSection: View {
     let response: DailyRecommendationResponse?
     let isLoading: Bool
+    let prefectureName: String
     let onTap: (DailyRecommendationItem) -> Void
+    let onLocationTap: () -> Void
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
@@ -34,6 +36,7 @@ struct DailyRecommendationCaptionSection: View {
             Text("明日のコーデ")
                 .font(.system(size: 20, weight: .bold))
             Spacer()
+            DailyLocationBadge(prefectureName: prefectureName, action: onLocationTap)
             if let r = response {
                 DailyMiniWeatherBadge(weather: r.weather)
             }
@@ -133,7 +136,9 @@ struct DailyRecommendationCaptionSection: View {
     DailyRecommendationCaptionSection(
         response: .mock(),
         isLoading: false,
-        onTap: { _ in }
+        prefectureName: Prefecture.default.name,
+        onTap: { _ in },
+        onLocationTap: {}
     )
     .padding()
     .background(Color.gray.opacity(0.08))

@@ -40,12 +40,25 @@ final class HomeViewModel {
     var hasDailyRecommendationError: Bool = false
     var selectedDailyRecommendation: DailyRecommendationItem? = nil
 
+    // 居住地 (天気ヘッダの場所バッジ用. UserDefaults と同期)
+    var currentPrefectureCode: String? = UserDefaults.standard.string(
+        forKey: UserDefaultsKey.prefectureCode.rawValue
+    )
+
+    var currentPrefectureName: String {
+        if let code = currentPrefectureCode, let p = Prefecture.find(byCode: code) {
+            return p.name
+        }
+        return Prefecture.default.name
+    }
+
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
     let analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol
     let closetClient: ClosetClientProtocol
     let deleteCoordinateClient: DeleteCoordinateClientProtocol
     let dailyRecommendationClient: DailyRecommendationClientProtocol
+    let updatePrefectureClient: UpdateUserPrefectureClientProtocol
     private let plannerCacheRepository: HomePlannerCacheRepositoryProtocol
 
     init(
@@ -55,6 +68,7 @@ final class HomeViewModel {
         closetClient: ClosetClientProtocol = ClosetClient(),
         deleteCoordinateClient: DeleteCoordinateClientProtocol = DeleteCoordinateClient(),
         dailyRecommendationClient: DailyRecommendationClientProtocol = DailyRecommendationClient(),
+        updatePrefectureClient: UpdateUserPrefectureClientProtocol = UpdateUserPrefectureClient(),
         plannerCacheRepository: HomePlannerCacheRepositoryProtocol = HomePlannerCacheRepository()
     ) {
         self.apiClient = apiClient
@@ -63,6 +77,7 @@ final class HomeViewModel {
         self.closetClient = closetClient
         self.deleteCoordinateClient = deleteCoordinateClient
         self.dailyRecommendationClient = dailyRecommendationClient
+        self.updatePrefectureClient = updatePrefectureClient
         self.plannerCacheRepository = plannerCacheRepository
         loadPlannerCache()
     }
@@ -113,6 +128,40 @@ final class HomeViewModel {
         // 明日のコーデ：完了次第表示（キャッシュHIT時は瞬時、フォールバック時は1-2秒）
         do {
             switch try await dailyResult {
+            case .success(let response):
+                dailyRecommendation = response
+            case .failure:
+                hasDailyRecommendationError = true
+            }
+        } catch {
+            hasDailyRecommendationError = true
+        }
+        isLoadingDailyRecommendation = false
+    }
+
+    /// 場所バッジから居住地を変更. UD/サーバ永続化 + daily-recommendation 単独再フェッチ.
+    func updatePrefecture(_ prefecture: Prefecture) async {
+        UserDefaults.standard.set(prefecture.code, forKey: UserDefaultsKey.prefectureCode.rawValue)
+        currentPrefectureCode = prefecture.code
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        if !uid.isEmpty {
+            _ = try? await updatePrefectureClient.put(uid: uid, prefectureCode: prefecture.code)
+        }
+        await refreshDailyRecommendation()
+    }
+
+    /// daily-recommendation のみ再取得 (recent_coordinates 等はそのまま)
+    func refreshDailyRecommendation() async {
+        isLoadingDailyRecommendation = true
+        hasDailyRecommendationError = false
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
+        do {
+            switch try await dailyRecommendationClient.get(uid: uid, gender: gender) {
             case .success(let response):
                 dailyRecommendation = response
             case .failure:

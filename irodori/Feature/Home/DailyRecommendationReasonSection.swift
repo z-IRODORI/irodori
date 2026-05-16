@@ -16,7 +16,9 @@ import SwiftUI
 struct DailyRecommendationReasonSection: View {
     let response: DailyRecommendationResponse?
     let isLoading: Bool
+    let prefectureName: String
     let onTap: (DailyRecommendationItem) -> Void
+    let onLocationTap: () -> Void
 
     @State private var selectedIndex: Int = 0
 
@@ -36,6 +38,7 @@ struct DailyRecommendationReasonSection: View {
             Text("明日のコーデ")
                 .font(.system(size: 20, weight: .bold))
             Spacer()
+            DailyLocationBadge(prefectureName: prefectureName, action: onLocationTap)
             if let r = response {
                 DailyMiniWeatherBadge(weather: r.weather)
             }
@@ -199,7 +202,9 @@ struct DailyRecommendationReasonSection: View {
     DailyRecommendationReasonSection(
         response: .mock(),
         isLoading: false,
-        onTap: { _ in }
+        prefectureName: Prefecture.default.name,
+        onTap: { _ in },
+        onLocationTap: {}
     )
     .padding()
     .background(Color.gray.opacity(0.08))

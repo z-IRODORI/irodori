@@ -12,6 +12,7 @@ struct HomeView: View {
     @State var viewModel: HomeViewModel
     @State private var showFirstTakePhotoSheet = false
     @State private var showTutorialSheet = false
+    @State private var showingPrefecturePicker = false
     @Environment(MainTabViewModel.self) private var tabViewModel
 
     var body: some View {
@@ -50,8 +51,13 @@ struct HomeView: View {
                     DailyRecommendationReasonSection(
                         response: viewModel.dailyRecommendation,
                         isLoading: viewModel.isLoadingDailyRecommendation,
+                        prefectureName: viewModel.currentPrefectureName,
                         onTap: { item in
                             viewModel.selectedDailyRecommendation = item
+                        },
+                        onLocationTap: {
+                            Haptic.impact(.soft)
+                            showingPrefecturePicker = true
                         }
                     )
 
@@ -151,6 +157,21 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showTutorialSheet) {
             OnboardingView(closeButtonTapped: { showTutorialSheet = false })
+        }
+        .sheet(isPresented: $showingPrefecturePicker) {
+            NavigationStack {
+                PrefecturePickerView(
+                    selectedCode: viewModel.currentPrefectureCode,
+                    onSelect: { prefecture in
+                        Task { await viewModel.updatePrefecture(prefecture) }
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") { showingPrefecturePicker = false }
+                    }
+                }
+            }
         }
         .alert("コーディネートを削除", isPresented: $viewModel.showDeleteConfirmation) {
             Button("キャンセル", role: .cancel) {
