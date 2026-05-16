@@ -52,6 +52,17 @@ final class HomeViewModel {
         return Prefecture.default.name
     }
 
+    /// 居住地はコーデの再生成を伴うため JST カレンダー日で 1日1回まで.
+    /// 未変更 (lastChanged が無い) は常に true (オンボーディング後の初変更も許容).
+    var canChangePrefectureToday: Bool {
+        guard let last = UserDefaults.standard.object(
+            forKey: UserDefaultsKey.prefectureLastChangedAt.rawValue
+        ) as? Date else { return true }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+        return !cal.isDate(last, inSameDayAs: Date())
+    }
+
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
     let analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol
@@ -140,8 +151,17 @@ final class HomeViewModel {
     }
 
     /// 場所バッジから居住地を変更. UD/サーバ永続化 + daily-recommendation 単独再フェッチ.
+    /// 同日 2 回目以降は no-op (コーデ無限再生成の防止).
     func updatePrefecture(_ prefecture: Prefecture) async {
+        guard canChangePrefectureToday else {
+            ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
+            return
+        }
+        // 同じ県を選び直した場合も lastChanged を消費させない
+        guard prefecture.code != currentPrefectureCode else { return }
+
         UserDefaults.standard.set(prefecture.code, forKey: UserDefaultsKey.prefectureCode.rawValue)
+        UserDefaults.standard.set(Date(), forKey: UserDefaultsKey.prefectureLastChangedAt.rawValue)
         currentPrefectureCode = prefecture.code
 
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""

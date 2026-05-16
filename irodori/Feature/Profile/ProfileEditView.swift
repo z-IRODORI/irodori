@@ -115,28 +115,37 @@ struct ProfileEditView: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.gray)
 
-            NavigationLink {
-                PrefecturePickerView(
-                    selectedCode: viewModel.prefectureCode,
-                    onSelect: { prefecture in
-                        viewModel.prefectureCode = prefecture.code
-                    }
-                )
-            } label: {
-                HStack {
-                    Text(viewModel.prefectureDisplayName)
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            if viewModel.canChangePrefectureToday {
+                NavigationLink {
+                    PrefecturePickerView(
+                        selectedCode: viewModel.prefectureCode,
+                        onSelect: { prefecture in
+                            viewModel.prefectureCode = prefecture.code
+                        }
+                    )
+                } label: { prefectureRowLabel }
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
+                } label: { prefectureRowLabel }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
+    }
+
+    private var prefectureRowLabel: some View {
+        HStack {
+            Text(viewModel.prefectureDisplayName)
+                .foregroundStyle(.primary)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -172,6 +181,16 @@ final class ProfileEditViewModel {
         return "未設定 (\(Prefecture.default.name))"
     }
 
+    /// 居住地は JST カレンダー日で 1日1回まで変更可能 (コーデ無限再生成防止).
+    var canChangePrefectureToday: Bool {
+        guard let last = UserDefaults.standard.object(
+            forKey: UserDefaultsKey.prefectureLastChangedAt.rawValue
+        ) as? Date else { return true }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+        return !cal.isDate(last, inSameDayAs: Date())
+    }
+
     func save() {
         guard var profile = profileInfo else {
             persistPrefectureIfChanged()
@@ -201,7 +220,14 @@ final class ProfileEditViewModel {
     private func persistPrefectureIfChanged() {
         guard let code = prefectureCode, !code.isEmpty else { return }
         guard code != lastSyncedPrefectureCode else { return }
+        guard canChangePrefectureToday else {
+            // 1日1回制限。選択は破棄して直近 sync 済みに戻す.
+            ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
+            prefectureCode = lastSyncedPrefectureCode
+            return
+        }
         UserDefaults.standard.set(code, forKey: UserDefaultsKey.prefectureCode.rawValue)
+        UserDefaults.standard.set(Date(), forKey: UserDefaultsKey.prefectureLastChangedAt.rawValue)
         lastSyncedPrefectureCode = code
 
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""

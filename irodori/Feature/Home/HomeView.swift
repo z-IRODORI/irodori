@@ -57,7 +57,11 @@ struct HomeView: View {
                         },
                         onLocationTap: {
                             Haptic.impact(.soft)
-                            showingPrefecturePicker = true
+                            if viewModel.canChangePrefectureToday {
+                                showingPrefecturePicker = true
+                            } else {
+                                ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
+                            }
                         }
                     )
 
