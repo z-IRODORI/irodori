@@ -18,10 +18,15 @@ final class DailyRecommendationClient: DailyRecommendationClientProtocol {
     func get(uid: String, gender: Gender) async throws -> Result<DailyRecommendationResponse, HTTPError> {
         let endpoint = "api/home/daily-recommendation"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")!
-        components.queryItems = [
+        var items: [URLQueryItem] = [
             URLQueryItem(name: "user_id", value: uid),
             URLQueryItem(name: "gender", value: gender.apiValue),
         ]
+        if let prefectureCode = UserDefaults.standard.string(forKey: UserDefaultsKey.prefectureCode.rawValue),
+           !prefectureCode.isEmpty {
+            items.append(URLQueryItem(name: "prefecture_code", value: prefectureCode))
+        }
+        components.queryItems = items
         guard let url = components.url else {
             return .failure(.responseError)
         }
