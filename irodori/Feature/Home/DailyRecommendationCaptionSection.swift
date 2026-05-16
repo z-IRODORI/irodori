@@ -63,7 +63,10 @@ struct DailyRecommendationCaptionSection: View {
     private func grid(items: [DailyRecommendationItem]) -> some View {
         LazyVGrid(columns: columns, spacing: 14) {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                Button { onTap(item) } label: {
+                Button {
+                    Haptic.impact(.soft)
+                    onTap(item)
+                } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         ZStack(alignment: .topTrailing) {
                             DailyGridImage(imageURL: item.image_url)

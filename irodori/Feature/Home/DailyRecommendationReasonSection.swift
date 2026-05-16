@@ -85,7 +85,10 @@ struct DailyRecommendationReasonSection: View {
         .buttonStyle(.plain)
         .overlay(alignment: .bottomTrailing) {
             if idx == selectedIndex {
-                Button { onTap(item) } label: {
+                Button {
+                    Haptic.impact(.soft)
+                    onTap(item)
+                } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
@@ -103,8 +106,10 @@ struct DailyRecommendationReasonSection: View {
 
     private func handleTap(index: Int, item: DailyRecommendationItem) {
         if index == selectedIndex {
+            Haptic.impact(.soft)
             onTap(item)
         } else {
+            Haptic.selection()
             withAnimation(.easeInOut(duration: 0.18)) { selectedIndex = index }
         }
     }

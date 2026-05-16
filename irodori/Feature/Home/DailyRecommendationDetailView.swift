@@ -103,14 +103,17 @@ struct DailyRecommendationDetailView: View {
             .cornerRadius(8)
         } else {
             Button {
+                Haptic.impact(.medium)
                 Task {
                     isMarking = true
                     errorText = nil
                     let ok = await onWear(item)
                     isMarking = false
                     if ok {
+                        Haptic.notify(.success)
                         marked = true
                     } else {
+                        Haptic.notify(.error)
                         errorText = "記録に失敗しました。時間をおいて再度お試しください。"
                     }
                 }
