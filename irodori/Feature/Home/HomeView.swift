@@ -45,9 +45,9 @@ struct HomeView: View {
                     partnerCard
 
                     // 表示方式の切替ポイント:
-                    //  - DailyRecommendationCaptionSection: 各カード下にキャプション (C版・現行)
-                    //  - DailyRecommendationReasonSection:   下部に理由インラインパネル (B版)
-                    DailyRecommendationCaptionSection(
+                    //  - DailyRecommendationReasonSection:   下部に理由インラインパネル (B版・現行)
+                    //  - DailyRecommendationCaptionSection: 各カード下にキャプション (C版)
+                    DailyRecommendationReasonSection(
                         response: viewModel.dailyRecommendation,
                         isLoading: viewModel.isLoadingDailyRecommendation,
                         onTap: { item in
