@@ -16,13 +16,20 @@ struct FavoritesView: View {
     @State private var selectedKind: FavoriteKind = .pool
     @State private var isLoading: Bool = false
     @State private var presentedPoolItem: DailyRecommendationItem? = nil
+    @State private var isLoadingPool: Bool = false
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
     private let dailyClient: DailyRecommendationClientProtocol
+    private let poolClient: RecommendationPoolClientProtocol
 
-    init(path: Binding<[ViewType]>, dailyClient: DailyRecommendationClientProtocol = DailyRecommendationClient()) {
+    init(
+        path: Binding<[ViewType]>,
+        dailyClient: DailyRecommendationClientProtocol = DailyRecommendationClient(),
+        poolClient: RecommendationPoolClientProtocol = RecommendationPoolClient()
+    ) {
         self._path = path
         self.dailyClient = dailyClient
+        self.poolClient = poolClient
     }
 
     var body: some View {
@@ -54,6 +61,14 @@ struct FavoritesView: View {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("閉じる") { presentedPoolItem = nil }
                     }
+                }
+            }
+        }
+        .overlay {
+            if isLoadingPool {
+                ZStack {
+                    Color.black.opacity(0.25).ignoresSafeArea()
+                    ProgressView().tint(.white)
                 }
             }
         }
@@ -116,6 +131,40 @@ struct FavoritesView: View {
     private func handleTap(_ fav: Favorite) {
         switch fav.kindEnum {
         case .pool:
+            Task { await openPool(fav) }
+        case .self:
+            path.append(.coordinateDetail(.init(
+                coordinateId: fav.target_id,
+                coordinateImageURL: fav.image_url ?? "",
+                showHeader: true
+            )))
+        }
+    }
+
+    private func openPool(_ fav: Favorite) async {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        isLoadingPool = true
+        defer { isLoadingPool = false }
+        do {
+            switch try await poolClient.get(poolId: fav.target_id, uid: uid) {
+            case .success(let item):
+                presentedPoolItem = item
+            case .failure:
+                // フォールバック: 最低限の表示でも開いてあげる
+                presentedPoolItem = DailyRecommendationItem(
+                    pool_id: fav.target_id,
+                    kind: "pool",
+                    image_url: fav.image_url ?? "",
+                    reason: nil,
+                    main_colors: [],
+                    items: [:],
+                    vibe: "",
+                    style: "",
+                    cleanliness: 3,
+                    is_favorite: true
+                )
+            }
+        } catch {
             presentedPoolItem = DailyRecommendationItem(
                 pool_id: fav.target_id,
                 kind: "pool",
@@ -128,12 +177,6 @@ struct FavoritesView: View {
                 cleanliness: 3,
                 is_favorite: true
             )
-        case .self:
-            path.append(.coordinateDetail(.init(
-                coordinateId: fav.target_id,
-                coordinateImageURL: fav.image_url ?? "",
-                showHeader: true
-            )))
         }
     }
 

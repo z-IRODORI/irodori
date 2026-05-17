@@ -55,7 +55,7 @@ struct DailyRecommendationDetailView: View {
                     Text(reason).font(.body)
                 }
 
-                if item.kindEnum == .pool {
+                if item.kindEnum == .pool, hasCoordItems {
                     sectionTitle("コーデ構成")
                     coordItemsSection
                 }
@@ -92,6 +92,13 @@ struct DailyRecommendationDetailView: View {
                     imageURL: item.image_url
                 )
             }
+        }
+    }
+
+    private var hasCoordItems: Bool {
+        ["tops", "bottoms", "outer", "accessory"].contains { key in
+            if let v = item.items[key] ?? nil, !v.isEmpty { return true }
+            return false
         }
     }
 

@@ -15,23 +15,43 @@ struct CoordinateDetailView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 32) {
+                // fetch 結果に関わらず画像はプレースホルダとして表示する
+                LargeCoordinateCardWithURL(
+                    coordinateImageURL: viewModel.coordinateImageURL,
+                    currentSchedule: viewModel.coordinateDetail?.current_coordinate.date ?? "",
+                    aiCatchphrase: viewModel.coordinateDetail?.ai_catchphrase ?? ""
+                )
+
                 if let coordinateDetail = viewModel.coordinateDetail {
-                    LargeCoordinateCardWithURL(
-                        coordinateImageURL: viewModel.coordinateImageURL,
-                        currentSchedule: coordinateDetail.current_coordinate.date,
-                        aiCatchphrase: coordinateDetail.ai_catchphrase
-                    )
                     VStack(alignment: .leading, spacing: 12) {
                         PartnerIconImage(size: 50)
                         ReviewText(aiReviewComment: coordinateDetail.ai_review_comment)
                     }
                     .padding(.horizontal, 24)
-
-                    // アイテム抽出をサーバーで行うようになったらコメント外す
-                    // MLを使うとなぜか重い
-    //                CoordinateItems(topsUIImage: viewModel.topsUIImage, bottomsUIImage: viewModel.bottomsUIImage)
-    //                    .padding(.horizontal, 24)
-    //                    .padding(.bottom, 50 + 12 + 12)   // ButtonHeight + ButtonBottomPadding + BottomPadding
+                } else if viewModel.isLoadingDetail {
+                    ProgressView()
+                        .padding(.top, 32)
+                } else {
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.secondary)
+                        Text("詳細を取得できませんでした")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                        Button {
+                            Task { await viewModel.fetchCoordinateDetail() }
+                        } label: {
+                            Text("再試行")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(.black)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.top, 32)
                 }
             }
             .padding(.bottom, 100)
