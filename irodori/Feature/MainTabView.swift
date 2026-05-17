@@ -129,6 +129,11 @@ struct MainTabView: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: toastManager.message)
+        // NavigationStack 外側に environment を流すことで、
+        // .navigationDestination で push する画面 (FavoritesView 等) や
+        // .sheet で出すモーダル (DailyRecommendationDetailView 等) にも届く
+        .environment(favoritesStore)
+        .environment(viewModel)
     }
 
     private var partnerIcon: UIImage {
