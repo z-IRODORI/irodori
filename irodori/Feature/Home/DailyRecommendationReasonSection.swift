@@ -108,12 +108,12 @@ struct DailyRecommendationReasonSection: View {
                     onTap(item)
                 } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(8)
-                        .background(Color.black.opacity(0.65))
+                        .background(Color.black.opacity(0.55))
                         .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1)
+                        .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
                 }
                 .buttonStyle(.plain)
                 .padding(6)
@@ -166,7 +166,7 @@ struct DailyRecommendationReasonSection: View {
         .padding(14)
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
     }
 
     private func chip(_ text: String) -> some View {

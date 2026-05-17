@@ -139,22 +139,16 @@ struct DailyIchioshiBadge: View {
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: "sparkles")
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 9, weight: .semibold))
             Text("イチオシ")
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: 10, weight: .semibold))
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(
-            LinearGradient(
-                colors: [.orange, Color(red: 1.0, green: 0.45, blue: 0.4)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
+        .background(Color.orange)
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.18), radius: 3, x: 0, y: 1)
+        .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
     }
 }
 

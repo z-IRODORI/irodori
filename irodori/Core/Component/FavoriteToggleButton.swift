@@ -19,22 +19,18 @@ struct FavoriteToggleButton: View {
             action()
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
-                .font(.system(size: size, weight: .bold))
+                .font(.system(size: size, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(padding)
                 .background {
                     if isFavorite {
-                        LinearGradient(
-                            colors: [.orange, Color(red: 1.0, green: 0.45, blue: 0.4)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                        Color.orange
                     } else {
                         Color.black.opacity(0.45)
                     }
                 }
                 .clipShape(Circle())
-                .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
+                .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
         }
         .buttonStyle(.plain)
     }

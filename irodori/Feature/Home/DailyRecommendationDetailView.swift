@@ -34,9 +34,20 @@ struct DailyRecommendationDetailView: View {
                 }
 
                 if item.kindEnum == .self {
-                    Label("お気に入りに登録した自分のコーデ", systemImage: "heart.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.orange)
+                    HStack(spacing: 6) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("お気に入りに登録した自分のコーデ")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.orange.opacity(0.08))
+                    .overlay(
+                        Capsule().stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                    )
+                    .clipShape(Capsule())
                 }
 
                 if let reason = item.reason, !reason.isEmpty {
