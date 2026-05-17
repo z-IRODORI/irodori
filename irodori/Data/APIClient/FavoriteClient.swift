@@ -15,6 +15,7 @@ struct AddFavoriteRequest: Encodable {
     let kind: String
     let target_id: String
     let image_url: String?
+    let date: String?
 }
 
 struct AddFavoriteResponse: Decodable {
@@ -24,7 +25,7 @@ struct AddFavoriteResponse: Decodable {
 
 protocol FavoriteClientProtocol {
     func list(uid: String, kind: FavoriteKind?) async throws -> Result<[Favorite], HTTPError>
-    func add(uid: String, kind: FavoriteKind, targetId: String, imageURL: String?) async throws -> Result<String, HTTPError>
+    func add(uid: String, kind: FavoriteKind, targetId: String, imageURL: String?, date: String?) async throws -> Result<String, HTTPError>
     func remove(uid: String, favId: String) async throws -> Result<Bool, HTTPError>
 }
 
@@ -60,7 +61,7 @@ final class FavoriteClient: FavoriteClientProtocol {
         }
     }
 
-    func add(uid: String, kind: FavoriteKind, targetId: String, imageURL: String?) async throws -> Result<String, HTTPError> {
+    func add(uid: String, kind: FavoriteKind, targetId: String, imageURL: String?, date: String?) async throws -> Result<String, HTTPError> {
         var components = URLComponents(string: "\(baseURL)/api/favorites")!
         components.queryItems = [URLQueryItem(name: "user_id", value: uid)]
         guard let url = components.url else { return .failure(.responseError) }
@@ -69,7 +70,7 @@ final class FavoriteClient: FavoriteClientProtocol {
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(
-            AddFavoriteRequest(kind: kind.rawValue, target_id: targetId, image_url: imageURL)
+            AddFavoriteRequest(kind: kind.rawValue, target_id: targetId, image_url: imageURL, date: date)
         )
 
         do {
@@ -114,7 +115,7 @@ final class FavoriteClient: FavoriteClientProtocol {
 // MARK: - Mock
 final class MockFavoriteClient: FavoriteClientProtocol {
     func list(uid: String, kind: FavoriteKind?) async throws -> Result<[Favorite], HTTPError> { .success([]) }
-    func add(uid: String, kind: FavoriteKind, targetId: String, imageURL: String?) async throws -> Result<String, HTTPError> {
+    func add(uid: String, kind: FavoriteKind, targetId: String, imageURL: String?, date: String?) async throws -> Result<String, HTTPError> {
         .success(Favorite.favId(kind: kind, targetId: targetId))
     }
     func remove(uid: String, favId: String) async throws -> Result<Bool, HTTPError> { .success(true) }

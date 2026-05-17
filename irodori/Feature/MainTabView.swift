@@ -90,7 +90,7 @@ struct MainTabView: View {
                         profileInfo: getProfileInfo()
                     )
                 case .favorites:
-                    FavoritesView()
+                    FavoritesView(path: $path)
                 case .fashionType:
                     FashionTypeView(
                         path: $path,

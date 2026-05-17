@@ -3,17 +3,27 @@
 //  irodori
 //
 //  お気に入りコーデ一覧画面. 自分のコーデ / おすすめコーデでタブ切替.
+//  - pool タップ: DailyRecommendationDetailView を sheet で表示
+//  - self タップ: CoordinateDetailView へ push
 //
 
 import SwiftUI
 import Kingfisher
 
 struct FavoritesView: View {
+    @Binding var path: [ViewType]
     @Environment(FavoritesStore.self) private var store
     @State private var selectedKind: FavoriteKind = .pool
     @State private var isLoading: Bool = false
+    @State private var presentedPoolItem: DailyRecommendationItem? = nil
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+    private let dailyClient: DailyRecommendationClientProtocol
+
+    init(path: Binding<[ViewType]>, dailyClient: DailyRecommendationClientProtocol = DailyRecommendationClient()) {
+        self._path = path
+        self.dailyClient = dailyClient
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,6 +44,19 @@ struct FavoritesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await refreshIfNeeded() }
         .refreshable { await store.refresh() }
+        .sheet(item: $presentedPoolItem) { item in
+            NavigationStack {
+                DailyRecommendationDetailView(
+                    item: item,
+                    onWear: { item in await wear(item: item) }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") { presentedPoolItem = nil }
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -56,29 +79,86 @@ struct FavoritesView: View {
     }
 
     private func gridCell(_ fav: Favorite) -> some View {
-        ZStack(alignment: .topTrailing) {
-            Color.gray.opacity(0.15)
-                .aspectRatio(3.0 / 4.0, contentMode: .fit)
-                .overlay {
-                    if let url = fav.image_url, let u = URL(string: url) {
-                        KFImage(u)
-                            .resizable()
-                            .placeholder { Color.gray.opacity(0.15) }
-                            .scaledToFill()
+        Button {
+            Haptic.impact(.soft)
+            handleTap(fav)
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Color.gray.opacity(0.15)
+                    .aspectRatio(3.0 / 4.0, contentMode: .fit)
+                    .overlay {
+                        if let url = fav.image_url, let u = URL(string: url) {
+                            KFImage(u)
+                                .resizable()
+                                .placeholder { Color.gray.opacity(0.15) }
+                                .scaledToFill()
+                        }
                     }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            FavoriteToggleButton(isFavorite: true, size: 13, padding: 7) {
-                Task {
-                    await store.toggle(
-                        kind: fav.kindEnum,
-                        targetId: fav.target_id,
-                        imageURL: fav.image_url
-                    )
-                }
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(alignment: .bottomLeading) {
+                        FavoriteToggleButton(isFavorite: true, size: 12, padding: 7) {
+                            Task {
+                                await store.toggle(
+                                    kind: fav.kindEnum,
+                                    targetId: fav.target_id,
+                                    imageURL: fav.image_url,
+                                    date: fav.date
+                                )
+                            }
+                        }
+                        .padding(6)
+                    }
             }
-            .padding(6)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func handleTap(_ fav: Favorite) {
+        switch fav.kindEnum {
+        case .pool:
+            presentedPoolItem = DailyRecommendationItem(
+                pool_id: fav.target_id,
+                kind: "pool",
+                image_url: fav.image_url ?? "",
+                reason: nil,
+                main_colors: [],
+                items: [:],
+                vibe: "",
+                style: "",
+                cleanliness: 3,
+                is_favorite: true
+            )
+        case .self:
+            // 自分のコーデは登録日 (撮影日) ベースで CoordinateDetail へ
+            guard let date = fav.date, !date.isEmpty else {
+                ToastManager.shared.show("撮影日が無いため詳細を開けません")
+                return
+            }
+            let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+            path.append(.coordinateDetail(.init(
+                uid: uid,
+                targetDateString: date,
+                coordinateImageURL: fav.image_url ?? "",
+                showHeader: true
+            )))
+        }
+    }
+
+    private func wear(item: DailyRecommendationItem) async -> Bool {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        let today = formatter.string(from: Date())
+        do {
+            let result = try await dailyClient.markWorn(uid: uid, poolId: item.pool_id, wornDate: today)
+            switch result {
+            case .success: return true
+            case .failure: return false
+            }
+        } catch {
+            return false
         }
     }
 
@@ -108,7 +188,7 @@ struct FavoritesView: View {
 
 #Preview {
     NavigationStack {
-        FavoritesView()
+        FavoritesView(path: .constant([]))
             .environment(FavoritesStore(client: MockFavoriteClient()))
     }
 }

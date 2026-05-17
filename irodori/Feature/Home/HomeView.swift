@@ -36,6 +36,15 @@ struct HomeView: View {
                             onToggleEditMode: { viewModel.toggleEditMode() },
                             onDeleteRequest: { coordinateId in
                                 viewModel.requestDelete(coordinateId: coordinateId)
+                            },
+                            onTapCoordinate: { coordinate in
+                                let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+                                path.append(.coordinateDetail(.init(
+                                    uid: uid,
+                                    targetDateString: coordinate.date,
+                                    coordinateImageURL: coordinate.image_url,
+                                    showHeader: true
+                                )))
                             }
                         )
                         .padding(.horizontal, -24)

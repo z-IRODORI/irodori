@@ -51,7 +51,8 @@ final class FavoritesStore {
     }
 
     /// 楽観更新でお気に入りを切替. 失敗時は元に戻す.
-    func toggle(kind: FavoriteKind, targetId: String, imageURL: String?) async {
+    /// - Parameter date: kind=self の場合、コーデの撮影日 (YYYY-MM-DD)。詳細遷移用。
+    func toggle(kind: FavoriteKind, targetId: String, imageURL: String?, date: String? = nil) async {
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
         guard !uid.isEmpty else { return }
         let cacheKey = Self.key(kind: kind, targetId: targetId)
@@ -71,6 +72,7 @@ final class FavoritesStore {
                     kind: kind.rawValue,
                     target_id: targetId,
                     image_url: imageURL,
+                    date: date,
                     created_at: now
                 ),
                 at: 0
@@ -81,22 +83,26 @@ final class FavoritesStore {
         do {
             if wasFavorite {
                 let result = try await client.remove(uid: uid, favId: favId)
-                if case .failure = result { rollback(wasFavorite: wasFavorite, cacheKey: cacheKey, favId: favId, kind: kind, targetId: targetId, imageURL: imageURL) }
+                if case .failure = result {
+                    rollback(wasFavorite: wasFavorite, cacheKey: cacheKey, favId: favId, kind: kind, targetId: targetId, imageURL: imageURL, date: date)
+                }
             } else {
-                let result = try await client.add(uid: uid, kind: kind, targetId: targetId, imageURL: imageURL)
-                if case .failure = result { rollback(wasFavorite: wasFavorite, cacheKey: cacheKey, favId: favId, kind: kind, targetId: targetId, imageURL: imageURL) }
+                let result = try await client.add(uid: uid, kind: kind, targetId: targetId, imageURL: imageURL, date: date)
+                if case .failure = result {
+                    rollback(wasFavorite: wasFavorite, cacheKey: cacheKey, favId: favId, kind: kind, targetId: targetId, imageURL: imageURL, date: date)
+                }
             }
         } catch {
-            rollback(wasFavorite: wasFavorite, cacheKey: cacheKey, favId: favId, kind: kind, targetId: targetId, imageURL: imageURL)
+            rollback(wasFavorite: wasFavorite, cacheKey: cacheKey, favId: favId, kind: kind, targetId: targetId, imageURL: imageURL, date: date)
         }
     }
 
-    private func rollback(wasFavorite: Bool, cacheKey: String, favId: String, kind: FavoriteKind, targetId: String, imageURL: String?) {
+    private func rollback(wasFavorite: Bool, cacheKey: String, favId: String, kind: FavoriteKind, targetId: String, imageURL: String?, date: String?) {
         if wasFavorite {
             keys.insert(cacheKey)
             let now = ISO8601DateFormatter().string(from: Date())
             favorites.insert(
-                Favorite(fav_id: favId, kind: kind.rawValue, target_id: targetId, image_url: imageURL, created_at: now),
+                Favorite(fav_id: favId, kind: kind.rawValue, target_id: targetId, image_url: imageURL, date: date, created_at: now),
                 at: 0
             )
         } else {

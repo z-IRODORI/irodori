@@ -27,6 +27,7 @@ struct Favorite: Codable, Hashable, Identifiable {
     let kind: String         // "pool" | "self"
     let target_id: String
     let image_url: String?
+    let date: String?        // YYYY-MM-DD (kind=self の詳細遷移用)
     let created_at: String?
 
     var id: String { fav_id }
