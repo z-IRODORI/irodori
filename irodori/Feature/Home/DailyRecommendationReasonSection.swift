@@ -21,6 +21,7 @@ struct DailyRecommendationReasonSection: View {
     let onLocationTap: () -> Void
 
     @State private var selectedIndex: Int = 0
+    @Environment(FavoritesStore.self) private var favoritesStore
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
@@ -87,9 +88,18 @@ struct DailyRecommendationReasonSection: View {
         }
         .buttonStyle(.plain)
         .overlay(alignment: .bottomLeading) {
-            if item.is_favorite {
-                DailyFavoriteBadge().padding(6)
+            let kind = item.kindEnum
+            let isFav = favoritesStore.isFavorite(kind: kind, targetId: item.pool_id) || item.is_favorite
+            FavoriteToggleButton(isFavorite: isFav, size: 11, padding: 6) {
+                Task {
+                    await favoritesStore.toggle(
+                        kind: kind,
+                        targetId: item.pool_id,
+                        imageURL: item.image_url
+                    )
+                }
             }
+            .padding(6)
         }
         .overlay(alignment: .bottomTrailing) {
             if idx == selectedIndex {

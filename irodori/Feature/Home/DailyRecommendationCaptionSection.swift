@@ -20,6 +20,8 @@ struct DailyRecommendationCaptionSection: View {
     let onTap: (DailyRecommendationItem) -> Void
     let onLocationTap: () -> Void
 
+    @Environment(FavoritesStore.self) private var favoritesStore
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
     var body: some View {
@@ -76,6 +78,20 @@ struct DailyRecommendationCaptionSection: View {
                             if idx == 0 {
                                 DailyIchioshiBadge().padding(6)
                             }
+                        }
+                        .overlay(alignment: .bottomLeading) {
+                            let kind = item.kindEnum
+                            let isFav = favoritesStore.isFavorite(kind: kind, targetId: item.pool_id) || item.is_favorite
+                            FavoriteToggleButton(isFavorite: isFav, size: 11, padding: 6) {
+                                Task {
+                                    await favoritesStore.toggle(
+                                        kind: kind,
+                                        targetId: item.pool_id,
+                                        imageURL: item.image_url
+                                    )
+                                }
+                            }
+                            .padding(6)
                         }
                         Text(caption(for: item))
                             .font(.system(size: 11, weight: .medium))

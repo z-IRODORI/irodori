@@ -73,8 +73,7 @@ struct DailyRecommendationDetailView: View {
     private var favoriteButton: some View {
         let kind = item.kindEnum
         let isFav = favoritesStore.isFavorite(kind: kind, targetId: item.pool_id) || item.is_favorite
-        return Button {
-            Haptic.impact(.light)
+        return FavoriteToggleButton(isFavorite: isFav, size: 16, padding: 10) {
             Task {
                 await favoritesStore.toggle(
                     kind: kind,
@@ -82,15 +81,7 @@ struct DailyRecommendationDetailView: View {
                     imageURL: item.image_url
                 )
             }
-        } label: {
-            Image(systemName: isFav ? "heart.fill" : "heart")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(isFav ? .orange : .white)
-                .padding(10)
-                .background(Circle().fill(Color.black.opacity(0.55)))
-                .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1)
         }
-        .buttonStyle(.plain)
     }
 
     private var coordItemsSection: some View {

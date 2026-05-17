@@ -101,8 +101,7 @@ struct RecentCoordinates: View {
 
     private func favoriteButton(for coordinate: RecentCoordinate) -> some View {
         let isFav = favoritesStore.isFavorite(kind: .self, targetId: coordinate.id)
-        return Button {
-            Haptic.impact(.light)
+        return FavoriteToggleButton(isFavorite: isFav, size: 12, padding: 7) {
             Task {
                 await favoritesStore.toggle(
                     kind: .self,
@@ -110,15 +109,7 @@ struct RecentCoordinates: View {
                     imageURL: coordinate.image_url
                 )
             }
-        } label: {
-            Image(systemName: isFav ? "heart.fill" : "heart")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(isFav ? .orange : .white)
-                .padding(7)
-                .background(Circle().fill(Color.black.opacity(0.45)))
-                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
         }
-        .buttonStyle(.plain)
     }
 }
 

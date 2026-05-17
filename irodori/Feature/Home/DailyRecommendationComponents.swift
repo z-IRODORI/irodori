@@ -181,22 +181,3 @@ struct DailyGridImage: View {
     }
 }
 
-// MARK: - お気に入りバッジ (グリッドカード左下に重ねる)
-
-struct DailyFavoriteBadge: View {
-    var body: some View {
-        Image(systemName: "heart.fill")
-            .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(.white)
-            .padding(6)
-            .background(
-                LinearGradient(
-                    colors: [.orange, Color(red: 1.0, green: 0.45, blue: 0.4)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .clipShape(Circle())
-            .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-    }
-}
