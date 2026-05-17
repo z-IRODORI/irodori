@@ -146,7 +146,7 @@ struct DailyIchioshiBadge: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color.orange)
+        .background(Color.pink)
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
     }

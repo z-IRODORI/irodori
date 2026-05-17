@@ -24,7 +24,7 @@ struct FavoriteToggleButton: View {
                 .padding(padding)
                 .background {
                     if isFavorite {
-                        Color.orange
+                        Color.pink
                     } else {
                         Color.black.opacity(0.45)
                     }

@@ -69,8 +69,7 @@ struct FavoritesView: View {
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
-            Button {
-                Haptic.impact(.light)
+            FavoriteToggleButton(isFavorite: true, size: 13, padding: 7) {
                 Task {
                     await store.toggle(
                         kind: fav.kindEnum,
@@ -78,22 +77,7 @@ struct FavoritesView: View {
                         imageURL: fav.image_url
                     )
                 }
-            } label: {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(7)
-                    .background(
-                        LinearGradient(
-                            colors: [.orange, Color(red: 1.0, green: 0.45, blue: 0.4)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
             }
-            .buttonStyle(.plain)
             .padding(6)
         }
     }

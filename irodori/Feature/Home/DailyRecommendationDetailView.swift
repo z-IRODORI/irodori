@@ -40,12 +40,12 @@ struct DailyRecommendationDetailView: View {
                         Text("お気に入りに登録した自分のコーデ")
                             .font(.system(size: 12, weight: .semibold))
                     }
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.pink)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Color.orange.opacity(0.08))
+                    .background(Color.pink.opacity(0.08))
                     .overlay(
-                        Capsule().stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                        Capsule().stroke(Color.pink.opacity(0.2), lineWidth: 1)
                     )
                     .clipShape(Capsule())
                 }
@@ -164,7 +164,7 @@ struct DailyRecommendationDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(Color.orange)
+                .background(Color.black)
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }
