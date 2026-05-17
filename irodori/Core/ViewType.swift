@@ -17,6 +17,7 @@ enum ViewType: Hashable {
     case coordinateReview(CoordinateReviewParams)
     case coordinateDetail(CoordinateDetailParams)
     case profileEdit
+    case favorites
     case fashionType
     case fashionTypeResult(FashionTypeResponse)
     case recommendCoordinateByStandardItem(RecommendCoordinateParams)

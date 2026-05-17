@@ -215,6 +215,9 @@ struct HomeView: View {
                 .font(.system(size: 18, weight: .semibold))
             HStack(spacing: 20) {
                 Spacer()
+                Button(action: { path.append(.favorites) }) {
+                    Image(systemName: "heart")
+                }
                 Button(action: { path.append(.calendar) }) {
                     Image(systemName: "calendar")
                 }

@@ -8,9 +8,11 @@
 
 import Foundation
 
-enum FavoriteKind: String, Codable, Hashable, CaseIterable {
+enum FavoriteKind: String, Codable, Hashable, CaseIterable, Identifiable {
     case pool
     case `self` = "self"
+
+    var id: String { rawValue }
 
     var displayName: String {
         switch self {
