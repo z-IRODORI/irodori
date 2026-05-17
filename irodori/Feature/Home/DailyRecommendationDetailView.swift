@@ -2,7 +2,8 @@
 //  DailyRecommendationDetailView.swift
 //  irodori
 //
-//  推薦コーデの詳細モーダル。タップして「これを今日着る」ボタンで着用記録を送信。
+//  推薦コーデの詳細モーダル。kind=pool は「これを今日着る」ボタンで着用記録を送信、
+//  kind=self は自分のお気に入りコーデなので着用ボタンは出さない。
 //
 
 import SwiftUI
@@ -12,6 +13,7 @@ struct DailyRecommendationDetailView: View {
     let item: DailyRecommendationItem
     let onWear: (DailyRecommendationItem) async -> Bool
     @Environment(\.dismiss) private var dismiss
+    @Environment(FavoritesStore.self) private var favoritesStore
 
     @State private var isMarking = false
     @State private var marked = false
@@ -20,35 +22,31 @@ struct DailyRecommendationDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                KFImage(URL(string: item.image_url))
-                    .resizable()
-                    .placeholder {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.15))
-                    }
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity)
-                    .cornerRadius(12)
+                ZStack(alignment: .topTrailing) {
+                    KFImage(URL(string: item.image_url))
+                        .resizable()
+                        .placeholder { Rectangle().fill(Color.gray.opacity(0.15)) }
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .cornerRadius(12)
+                    favoriteButton
+                        .padding(10)
+                }
+
+                if item.kindEnum == .self {
+                    Label("お気に入りに登録した自分のコーデ", systemImage: "heart.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.orange)
+                }
 
                 if let reason = item.reason, !reason.isEmpty {
                     sectionTitle("おすすめ理由")
-                    Text(reason)
-                        .font(.body)
+                    Text(reason).font(.body)
                 }
 
-                sectionTitle("コーデ構成")
-                ForEach(["tops", "bottoms", "outer", "accessory"], id: \.self) { key in
-                    if let v = item.items[key] ?? nil, !v.isEmpty {
-                        HStack(alignment: .top) {
-                            Text(labelFor(key))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .frame(width: 70, alignment: .leading)
-                            Text(v)
-                                .font(.subheadline)
-                            Spacer()
-                        }
-                    }
+                if item.kindEnum == .pool {
+                    sectionTitle("コーデ構成")
+                    coordItemsSection
                 }
 
                 if !item.vibe.isEmpty {
@@ -58,18 +56,58 @@ struct DailyRecommendationDetailView: View {
                         .foregroundColor(.secondary)
                 }
 
-                wearButton
+                if item.kindEnum == .pool {
+                    wearButton
+                }
 
                 if let e = errorText {
-                    Text(e)
-                        .font(.caption)
-                        .foregroundColor(.red)
+                    Text(e).font(.caption).foregroundColor(.red)
                 }
             }
             .padding(20)
         }
         .navigationTitle("詳細")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var favoriteButton: some View {
+        let kind = item.kindEnum
+        let isFav = favoritesStore.isFavorite(kind: kind, targetId: item.pool_id) || item.is_favorite
+        return Button {
+            Haptic.impact(.light)
+            Task {
+                await favoritesStore.toggle(
+                    kind: kind,
+                    targetId: item.pool_id,
+                    imageURL: item.image_url
+                )
+            }
+        } label: {
+            Image(systemName: isFav ? "heart.fill" : "heart")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(isFav ? .orange : .white)
+                .padding(10)
+                .background(Circle().fill(Color.black.opacity(0.55)))
+                .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var coordItemsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(["tops", "bottoms", "outer", "accessory"], id: \.self) { key in
+                if let v = item.items[key] ?? nil, !v.isEmpty {
+                    HStack(alignment: .top) {
+                        Text(labelFor(key))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(width: 70, alignment: .leading)
+                        Text(v).font(.subheadline)
+                        Spacer()
+                    }
+                }
+            }
+        }
     }
 
     private func sectionTitle(_ text: String) -> some View {
@@ -119,12 +157,8 @@ struct DailyRecommendationDetailView: View {
                 }
             } label: {
                 HStack {
-                    if isMarking {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                    Text(isMarking ? "送信中…" : "これを今日着る")
-                        .font(.headline)
+                    if isMarking { ProgressView().tint(.white) }
+                    Text(isMarking ? "送信中…" : "これを今日着る").font(.headline)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -146,5 +180,6 @@ struct DailyRecommendationDetailView: View {
                 return true
             }
         )
+        .environment(FavoritesStore(client: MockFavoriteClient()))
     }
 }

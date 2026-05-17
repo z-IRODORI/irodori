@@ -86,6 +86,11 @@ struct DailyRecommendationReasonSection: View {
             }
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .bottomLeading) {
+            if item.is_favorite {
+                DailyFavoriteBadge().padding(6)
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             if idx == selectedIndex {
                 Button {

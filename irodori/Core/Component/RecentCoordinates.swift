@@ -14,6 +14,8 @@ struct RecentCoordinates: View {
     let onToggleEditMode: () -> Void
     let onDeleteRequest: (String) -> Void
 
+    @Environment(FavoritesStore.self) private var favoritesStore
+
     var body: some View {
         VStack(spacing: 12) {
             HStack {
@@ -89,9 +91,34 @@ struct RecentCoordinates: View {
                 }
                 .offset(x: -4, y: 4)
                 .transition(.scale.combined(with: .opacity))
+            } else {
+                favoriteButton(for: coordinate)
+                    .offset(x: -6, y: 6)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isEditMode)
+    }
+
+    private func favoriteButton(for coordinate: RecentCoordinate) -> some View {
+        let isFav = favoritesStore.isFavorite(kind: .self, targetId: coordinate.id)
+        return Button {
+            Haptic.impact(.light)
+            Task {
+                await favoritesStore.toggle(
+                    kind: .self,
+                    targetId: coordinate.id,
+                    imageURL: coordinate.image_url
+                )
+            }
+        } label: {
+            Image(systemName: isFav ? "heart.fill" : "heart")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(isFav ? .orange : .white)
+                .padding(7)
+                .background(Circle().fill(Color.black.opacity(0.45)))
+                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+        }
+        .buttonStyle(.plain)
     }
 }
 
