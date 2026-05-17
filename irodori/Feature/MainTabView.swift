@@ -3,6 +3,7 @@ import SwiftUI
 struct MainTabView: View {
     @State private var path: [ViewType] = []
     @State private var viewModel: MainTabViewModel = .init()
+    @State private var favoritesStore: FavoritesStore = .init()
     @State private var isSheetPresented = false
     @State private var previousTab: MainTabViewModel.Tab = .home
     private let toastManager = ToastManager.shared
@@ -38,6 +39,8 @@ struct MainTabView: View {
                 }
             }
             .environment(viewModel)
+            .environment(favoritesStore)
+            .task { await favoritesStore.refresh() }
             .onChange(of: viewModel.selectedTab) { oldTab, newTab in
                 if newTab == .plus {
                     isSheetPresented = true
