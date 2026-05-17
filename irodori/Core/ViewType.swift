@@ -28,8 +28,7 @@ enum ViewType: Hashable {
     }
 
     struct CoordinateDetailParams: Hashable {
-        let uid: String
-        let targetDateString: String
+        let coordinateId: String
         let coordinateImageURL: String
         let showHeader: Bool
     }

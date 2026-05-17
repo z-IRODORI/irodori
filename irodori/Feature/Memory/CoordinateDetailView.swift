@@ -18,7 +18,7 @@ struct CoordinateDetailView: View {
                 if let coordinateDetail = viewModel.coordinateDetail {
                     LargeCoordinateCardWithURL(
                         coordinateImageURL: viewModel.coordinateImageURL,
-                        currentSchedule: viewModel.targetDateString,
+                        currentSchedule: coordinateDetail.current_coordinate.date,
                         aiCatchphrase: coordinateDetail.ai_catchphrase
                     )
                     VStack(alignment: .leading, spacing: 12) {
@@ -40,7 +40,7 @@ struct CoordinateDetailView: View {
             Button(action: {
                 AnalyticsLogger.shared.log(action: .recommendationRequested, parameters: [
                     "source": GAEventAction.coordinateDetail.rawValue,
-                    "date": viewModel.targetDateString
+                    "coordinate_id": viewModel.coordinateId
                 ])
 //                viewModel.tappedRecommendCoordinateButton()
                 viewModel.tappedWillShowChatView()
@@ -71,14 +71,14 @@ struct CoordinateDetailView: View {
         .toolbar {
             if showHeader {
                 ToolbarItem(placement: .principal) {
-                    Text(viewModel.targetDateString)
+                    Text(viewModel.coordinateDetail?.current_coordinate.date ?? "")
                         .font(.system(size: 16, weight: .semibold))
                 }
             }
         }
         .task {
             AnalyticsLogger.shared.log(screen: .coordinateDetailScreenView, parameters: [
-                "date": viewModel.targetDateString
+                "coordinate_id": viewModel.coordinateId
             ])
             await viewModel.onAppear()
             await loadCoordinateImage()

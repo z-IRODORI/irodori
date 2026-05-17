@@ -72,7 +72,11 @@ struct MainTabView: View {
                         .environment(viewModel)
                 case .coordinateDetail(let params):
                     CoordinateDetailView(
-                        viewModel: .init(uid: params.uid, targetDateString: params.targetDateString, coordinateImageURL: params.coordinateImageURL, coordinateDetailClient: CoordinateDetailClient()),
+                        viewModel: .init(
+                            coordinateId: params.coordinateId,
+                            coordinateImageURL: params.coordinateImageURL,
+                            coordinateDetailClient: CoordinateDetailClient()
+                        ),
                         showHeader: params.showHeader
                     )
                 case .tomorrowPlanner:

@@ -129,15 +129,8 @@ struct FavoritesView: View {
                 is_favorite: true
             )
         case .self:
-            // 自分のコーデは登録日 (撮影日) ベースで CoordinateDetail へ
-            guard let date = fav.date, !date.isEmpty else {
-                ToastManager.shared.show("撮影日が無いため詳細を開けません")
-                return
-            }
-            let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
             path.append(.coordinateDetail(.init(
-                uid: uid,
-                targetDateString: date,
+                coordinateId: fav.target_id,
                 coordinateImageURL: fav.image_url ?? "",
                 showHeader: true
             )))

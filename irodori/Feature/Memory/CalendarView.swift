@@ -167,19 +167,20 @@ struct CalendarView: View {
     // MARK: - Day Cell
 
     private func dayCell(month: Month, day: Int, responses: [CoordinateListResponse]) -> some View {
-        let imageURL = responses[safe: day - 1]?.coodinate_image_path
+        let coord = responses[safe: day - 1]
+        let imageURL = coord?.coodinate_image_path
+        let coordinateId = coord?.id
         let isToday = checkIsToday(year: month.year, month: month.monthOfTheYear, day: day)
 
         return Button(action: {
-            guard let imageURL else { return }
+            guard let imageURL, let coordinateId, !coordinateId.isEmpty else { return }
             let targetDateString = String(format: "%04d-%02d-%02d", month.year, month.monthOfTheYear, day)
             AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
                 "date": targetDateString,
                 "has_coordinate": true
             ])
             let params = ViewType.CoordinateDetailParams(
-                uid: viewModel.uid,
-                targetDateString: targetDateString,
+                coordinateId: coordinateId,
                 coordinateImageURL: imageURL,
                 showHeader: false
             )
