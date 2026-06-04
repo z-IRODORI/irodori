@@ -66,46 +66,54 @@ struct RecentCoordinates: View {
         isEditMode: Bool,
         onDelete: @escaping () -> Void
     ) -> some View {
-        Button {
-            guard !isEditMode else { return }
-            Haptic.impact(.soft)
-            onTapCoordinate(coordinate)
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                VStack(spacing: 0) {
-                    KFImage(URL(string: coordinate.image_url))
-                        .placeholder { Color.gray.opacity(0.3) }
-                        .resizable()
-                        .aspectRatio(3/4, contentMode: .fit)
-                        .frame(width: 110)
-                        .overlay(alignment: .bottomLeading) {
-                            if !isEditMode {
-                                favoriteButton(for: coordinate)
-                                    .padding(6)
-                            }
-                        }
-
-                    Text("\(coordinate.date)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 10)
-                }
-                .background(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                if isEditMode {
-                    Button(action: onDelete) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white)
-                            .background(Circle().fill(.red))
+        // カード全体を Button でラップすると、ハートタップが上位 Button に奪われる場面があるため
+        // 画像/日付ラベルそれぞれに onTapGesture を割り当て、ハートは独立した Button のままにする.
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 0) {
+                KFImage(URL(string: coordinate.image_url))
+                    .placeholder { Color.gray.opacity(0.3) }
+                    .resizable()
+                    .aspectRatio(3/4, contentMode: .fit)
+                    .frame(width: 110)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard !isEditMode else { return }
+                        Haptic.impact(.soft)
+                        onTapCoordinate(coordinate)
                     }
-                    .offset(x: -4, y: 4)
-                    .transition(.scale.combined(with: .opacity))
+                    .overlay(alignment: .bottomLeading) {
+                        if !isEditMode {
+                            favoriteButton(for: coordinate)
+                                .padding(6)
+                        }
+                    }
+
+                Text("\(coordinate.date)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard !isEditMode else { return }
+                        Haptic.impact(.soft)
+                        onTapCoordinate(coordinate)
+                    }
+            }
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            if isEditMode {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white)
+                        .background(Circle().fill(.red))
                 }
+                .offset(x: -4, y: 4)
+                .transition(.scale.combined(with: .opacity))
             }
         }
-        .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.2), value: isEditMode)
     }
 
@@ -113,7 +121,8 @@ struct RecentCoordinates: View {
         let isFav = favoritesStore.isFavorite(kind: .self, targetId: coordinate.id)
         return FavoriteToggleButton(isFavorite: isFav, size: 12, padding: 7) {
             Task {
-                await favoritesStore.toggle(
+                await favoritesStore.setFavorite(
+                    !isFav,
                     kind: .self,
                     targetId: coordinate.id,
                     imageURL: coordinate.image_url,

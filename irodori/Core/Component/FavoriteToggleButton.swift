@@ -18,19 +18,23 @@ struct FavoriteToggleButton: View {
             Haptic.impact(.light)
             action()
         } label: {
-            Image(systemName: isFavorite ? "heart.fill" : "heart")
-                .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(padding)
-                .background {
-                    if isFavorite {
-                        Color.pink
-                    } else {
-                        Color.black.opacity(0.45)
-                    }
-                }
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
+            ZStack {
+                // 未押下時の細いアウトライン: 画像背景に埋もれない最小限の存在感
+                Image(systemName: "heart")
+                    .font(.system(size: size * 1.5, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.95))
+                    .shadow(color: .black.opacity(0.18), radius: 1.2, x: 0, y: 0.5)
+                // 押下時のフィル (オン/オフをフェードで切替)
+                Image(systemName: "heart.fill")
+                    .font(.system(size: size * 1.5, weight: .regular))
+                    .foregroundStyle(Color.pink)
+                    .shadow(color: Color.pink.opacity(0.18), radius: 1.2, x: 0, y: 0.5)
+                    .opacity(isFavorite ? 1 : 0)
+            }
+            .scaleEffect(isFavorite ? 1.0 : 0.96)
+            .animation(.spring(response: 0.28, dampingFraction: 0.65), value: isFavorite)
+            .padding(padding)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

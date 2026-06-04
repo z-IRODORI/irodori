@@ -83,10 +83,15 @@ struct DailyRecommendationDetailView: View {
 
     private var favoriteButton: some View {
         let kind = item.kindEnum
-        let isFav = favoritesStore.isFavorite(kind: kind, targetId: item.pool_id) || item.is_favorite
+        let isFav = favoritesStore.isFavoriteRespectingSession(
+            kind: kind,
+            targetId: item.pool_id,
+            fallback: item.is_favorite
+        )
         return FavoriteToggleButton(isFavorite: isFav, size: 16, padding: 10) {
             Task {
-                await favoritesStore.toggle(
+                await favoritesStore.setFavorite(
+                    !isFav,
                     kind: kind,
                     targetId: item.pool_id,
                     imageURL: item.image_url

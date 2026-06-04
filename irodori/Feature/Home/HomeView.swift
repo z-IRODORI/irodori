@@ -52,9 +52,9 @@ struct HomeView: View {
 
                     partnerCard
 
-                    // 表示方式の切替ポイント:
-                    //  - DailyRecommendationReasonSection:   下部に理由インラインパネル (B版・現行)
-                    //  - DailyRecommendationCaptionSection: 各カード下にキャプション (C版)
+                    // 「明日のコーデ」セクション:
+                    //  - DailyRecommendationReasonSection:  3×3 グリッドのみ. 画像タップで詳細モーダル.
+                    //  - DailyRecommendationCaptionSection: 各カード下にキャプションを併記する代替案.
                     DailyRecommendationReasonSection(
                         response: viewModel.dailyRecommendation,
                         isLoading: viewModel.isLoadingDailyRecommendation,

@@ -18,6 +18,8 @@ struct irodoriApp: App {
 
     var body: some Scene {
         WindowGroup {
+//            PartnerDesignsCompare()
+
             SplashView()
                 .onAppear {
                     AnalyticsLogger.shared.log(screen: .splashScreenView)

@@ -134,29 +134,36 @@ struct DailyPartnerCommentBox: View {
 }
 
 // MARK: - イチオシバッジ
+// IRODORI のデザイン言語に合わせた控えめな仕上げ:
+//  - 白カプセル + 細いピンク縁 + ピンクテキスト (DailyMiniWeatherBadge と同系)
+//  - 強い色面・グラデ・濃いシャドウは使わず、画像の主張を邪魔しない
 
 struct DailyIchioshiBadge: View {
     var body: some View {
         HStack(spacing: 3) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 9, weight: .semibold))
+            Image(systemName: "sparkle")
+                .font(.system(size: 8, weight: .semibold))
             Text("イチオシ")
                 .font(.system(size: 10, weight: .semibold))
+                .tracking(0.2)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Color.pink)
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.pink)
+        .padding(.vertical, 3.5)
+        .background(.white)
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
+        .overlay(
+            Capsule().stroke(Color.pink.opacity(0.35), lineWidth: 0.8)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 2, x: 0, y: 1)
     }
 }
 
 // MARK: - 3:4 縦長クロップ画像
+// 画像タップで直接モーダルが開く構成のため、選択状態の枠線は廃止.
 
 struct DailyGridImage: View {
     let imageURL: String
-    var isSelected: Bool = false
 
     var body: some View {
         Color.gray.opacity(0.15)
@@ -167,11 +174,7 @@ struct DailyGridImage: View {
                     .placeholder { Color.gray.opacity(0.15) }
                     .scaledToFill()
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(isSelected ? Color.orange : Color.clear, lineWidth: 3)
-            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

@@ -68,41 +68,56 @@ struct DailyRecommendationCaptionSection: View {
     private func grid(items: [DailyRecommendationItem]) -> some View {
         LazyVGrid(columns: columns, spacing: 14) {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                Button {
-                    Haptic.impact(.soft)
-                    onTap(item)
-                } label: {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ZStack(alignment: .topTrailing) {
-                            DailyGridImage(imageURL: item.image_url)
-                            if idx == 0 {
-                                DailyIchioshiBadge().padding(6)
-                            }
-                        }
-                        .overlay(alignment: .bottomLeading) {
-                            let kind = item.kindEnum
-                            let isFav = favoritesStore.isFavorite(kind: kind, targetId: item.pool_id) || item.is_favorite
-                            FavoriteToggleButton(isFavorite: isFav, size: 11, padding: 6) {
-                                Task {
-                                    await favoritesStore.toggle(
-                                        kind: kind,
-                                        targetId: item.pool_id,
-                                        imageURL: item.image_url
-                                    )
-                                }
-                            }
-                            .padding(6)
-                        }
-                        Text(caption(for: item))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                cell(idx: idx, item: item)
+            }
+        }
+    }
+
+    // カードを Button でラップするとハートタップが奪われるため、画像とキャプションを
+    // それぞれ onTapGesture でハンドリングし、ハートは独立した Button として配置する.
+    private func cell(idx: Int, item: DailyRecommendationItem) -> some View {
+        let kind = item.kindEnum
+        let isFav = favoritesStore.isFavoriteRespectingSession(
+            kind: kind,
+            targetId: item.pool_id,
+            fallback: item.is_favorite
+        )
+        return VStack(alignment: .leading, spacing: 6) {
+            ZStack(alignment: .topTrailing) {
+                DailyGridImage(imageURL: item.image_url)
+                    .contentShape(RoundedRectangle(cornerRadius: 12))
+                    .onTapGesture {
+                        Haptic.impact(.soft)
+                        onTap(item)
+                    }
+                if idx == 0 {
+                    DailyIchioshiBadge().padding(6)
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                FavoriteToggleButton(isFavorite: isFav, size: 11, padding: 6) {
+                    Task {
+                        await favoritesStore.setFavorite(
+                            !isFav,
+                            kind: kind,
+                            targetId: item.pool_id,
+                            imageURL: item.image_url
+                        )
                     }
                 }
-                .buttonStyle(.plain)
+                .padding(6)
             }
+            Text(caption(for: item))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    Haptic.impact(.soft)
+                    onTap(item)
+                }
         }
     }
 

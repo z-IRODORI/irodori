@@ -94,38 +94,39 @@ struct FavoritesView: View {
     }
 
     private func gridCell(_ fav: Favorite) -> some View {
-        Button {
-            Haptic.impact(.soft)
-            handleTap(fav)
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                Color.gray.opacity(0.15)
-                    .aspectRatio(3.0 / 4.0, contentMode: .fit)
-                    .overlay {
-                        if let url = fav.image_url, let u = URL(string: url) {
-                            KFImage(u)
-                                .resizable()
-                                .placeholder { Color.gray.opacity(0.15) }
-                                .scaledToFill()
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(alignment: .bottomLeading) {
-                        FavoriteToggleButton(isFavorite: true, size: 12, padding: 7) {
-                            Task {
-                                await store.toggle(
-                                    kind: fav.kindEnum,
-                                    targetId: fav.target_id,
-                                    imageURL: fav.image_url,
-                                    date: fav.date
-                                )
-                            }
-                        }
-                        .padding(6)
-                    }
+        // カード全体を Button にすると内側のハート Button のタップが奪われるため、
+        // 画像に直接 onTapGesture を割り当て、ハートは独立した Button のままにする.
+        let isFav = store.isFavorite(kind: fav.kindEnum, targetId: fav.target_id)
+        return Color.gray.opacity(0.15)
+            .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            .overlay {
+                if let url = fav.image_url, let u = URL(string: url) {
+                    KFImage(u)
+                        .resizable()
+                        .placeholder { Color.gray.opacity(0.15) }
+                        .scaledToFill()
+                }
             }
-        }
-        .buttonStyle(.plain)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .onTapGesture {
+                Haptic.impact(.soft)
+                handleTap(fav)
+            }
+            .overlay(alignment: .bottomLeading) {
+                FavoriteToggleButton(isFavorite: isFav, size: 12, padding: 7) {
+                    Task {
+                        await store.setFavorite(
+                            !isFav,
+                            kind: fav.kindEnum,
+                            targetId: fav.target_id,
+                            imageURL: fav.image_url,
+                            date: fav.date
+                        )
+                    }
+                }
+                .padding(6)
+            }
     }
 
     private func handleTap(_ fav: Favorite) {

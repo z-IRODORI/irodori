@@ -2,13 +2,14 @@
 //  DailyRecommendationReasonSection.swift
 //  irodori
 //
-//  「明日のコーデ」セクション・B 版（理由インライン）。
-//  - 3×3 グリッド主役
-//  - 未選択カードのタップ: 選択（枠線+理由パネル更新）
-//  - 選択中カードのタップ or 右下拡大ボタン: onTap で詳細モーダルへ
+//  「明日のコーデ」セクション。
+//  - 見出し (タイトル + 場所バッジ + 天気バッジ)
+//  - partner_comment ボックス
+//  - 3×3 グリッド (画像タップで詳細モーダル / ハートでお気に入り)
 //
-//  キャプション版に戻したい場合は HomeView 側で
-//  DailyRecommendationCaptionSection を呼び出してください。
+//  ※ もともと "理由インライン版" として作成したが、選択&理由パネルは廃止し、
+//    画像タップで直接モーダルが開くシンプルな構成に変更.
+//    呼び出し側互換のためファイル名・型名はそのまま残している.
 //
 
 import SwiftUI
@@ -20,7 +21,6 @@ struct DailyRecommendationReasonSection: View {
     let onTap: (DailyRecommendationItem) -> Void
     let onLocationTap: () -> Void
 
-    @State private var selectedIndex: Int = 0
     @Environment(FavoritesStore.self) private var favoritesStore
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
@@ -58,7 +58,6 @@ struct DailyRecommendationReasonSection: View {
                     DailyPartnerCommentBox(text: comment)
                 }
                 grid(items: r.recommendations)
-                reasonPanel(items: r.recommendations)
             }
         } else {
             emptyState
@@ -76,23 +75,28 @@ struct DailyRecommendationReasonSection: View {
     }
 
     private func gridCell(index idx: Int, item: DailyRecommendationItem) -> some View {
-        Button {
-            handleTap(index: idx, item: item)
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                DailyGridImage(imageURL: item.image_url, isSelected: idx == selectedIndex)
-                if idx == 0 {
-                    DailyIchioshiBadge().padding(6)
+        let kind = item.kindEnum
+        let isFav = favoritesStore.isFavoriteRespectingSession(
+            kind: kind,
+            targetId: item.pool_id,
+            fallback: item.is_favorite
+        )
+        return ZStack(alignment: .topTrailing) {
+            DailyGridImage(imageURL: item.image_url)
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+                .onTapGesture {
+                    Haptic.impact(.soft)
+                    onTap(item)
                 }
+            if idx == 0 {
+                DailyIchioshiBadge().padding(6)
             }
         }
-        .buttonStyle(.plain)
         .overlay(alignment: .bottomLeading) {
-            let kind = item.kindEnum
-            let isFav = favoritesStore.isFavorite(kind: kind, targetId: item.pool_id) || item.is_favorite
             FavoriteToggleButton(isFavorite: isFav, size: 11, padding: 6) {
                 Task {
-                    await favoritesStore.toggle(
+                    await favoritesStore.setFavorite(
+                        !isFav,
                         kind: kind,
                         targetId: item.pool_id,
                         imageURL: item.image_url
@@ -101,82 +105,6 @@ struct DailyRecommendationReasonSection: View {
             }
             .padding(6)
         }
-        .overlay(alignment: .bottomTrailing) {
-            if idx == selectedIndex {
-                Button {
-                    Haptic.impact(.soft)
-                    onTap(item)
-                } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(Color.black.opacity(0.55))
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
-                }
-                .buttonStyle(.plain)
-                .padding(6)
-                .transition(.opacity.combined(with: .scale))
-            }
-        }
-    }
-
-    private func handleTap(index: Int, item: DailyRecommendationItem) {
-        if index == selectedIndex {
-            Haptic.impact(.soft)
-            onTap(item)
-        } else {
-            Haptic.selection()
-            withAnimation(.easeInOut(duration: 0.18)) { selectedIndex = index }
-        }
-    }
-
-    // MARK: - Reason Panel
-
-    private func reasonPanel(items: [DailyRecommendationItem]) -> some View {
-        let safeIndex = min(max(selectedIndex, 0), max(items.count - 1, 0))
-        let item = items[safeIndex]
-        let bodyText: String = {
-            if let r = item.reason, !r.isEmpty { return r }
-            if !item.vibe.isEmpty { return item.vibe }
-            return "明日のコンディションに合う一着です。"
-        }()
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "lightbulb.fill")
-                    .foregroundStyle(.orange)
-                    .font(.system(size: 13))
-                Text("選んだ理由")
-                    .font(.system(size: 13, weight: .bold))
-                Spacer()
-            }
-            Text(bodyText)
-                .font(.system(size: 13))
-                .foregroundStyle(.primary)
-                .lineSpacing(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 6) {
-                if !item.style.isEmpty { chip(item.style) }
-                if !item.main_colors.isEmpty {
-                    chip(item.main_colors.prefix(2).joined(separator: "・"))
-                }
-            }
-        }
-        .padding(14)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
-    }
-
-    private func chip(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.gray.opacity(0.1))
-            .clipShape(Capsule())
     }
 
     // MARK: - Skeleton
@@ -193,9 +121,6 @@ struct DailyRecommendationReasonSection: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
             }
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.12))
-                .frame(height: 96)
         }
     }
 
