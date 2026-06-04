@@ -40,7 +40,8 @@ struct CoordinateReviewView: View {
                             recentCoordinates: viewModel.fashionReview!.recent_coordinates,
                             isEditMode: false,
                             onToggleEditMode: {},
-                            onDeleteRequest: { _ in }
+                            onDeleteRequest: { _ in },
+                            onTapCoordinate: { _ in }
                         )
                         VStack(alignment: .leading, spacing: 12) {
                             PartnerIconImage(size: 50)

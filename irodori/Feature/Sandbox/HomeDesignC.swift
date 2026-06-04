@@ -35,7 +35,8 @@ struct HomeDesignC: View {
                         recentCoordinates: viewModel.homeResponse.recent_coordinates,
                         isEditMode: false,
                         onToggleEditMode: {},
-                        onDeleteRequest: { _ in }
+                        onDeleteRequest: { _ in },
+                        onTapCoordinate: { _ in }
                     )
                     .padding(.horizontal, -24)
 

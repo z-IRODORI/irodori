@@ -3,6 +3,7 @@ import SwiftUI
 struct MainTabView: View {
     @State private var path: [ViewType] = []
     @State private var viewModel: MainTabViewModel = .init()
+    @State private var favoritesStore: FavoritesStore = .init()
     @State private var isSheetPresented = false
     @State private var previousTab: MainTabViewModel.Tab = .home
     private let toastManager = ToastManager.shared
@@ -38,6 +39,8 @@ struct MainTabView: View {
                 }
             }
             .environment(viewModel)
+            .environment(favoritesStore)
+            .task { await favoritesStore.refresh() }
             .onChange(of: viewModel.selectedTab) { oldTab, newTab in
                 if newTab == .plus {
                     isSheetPresented = true
@@ -69,7 +72,11 @@ struct MainTabView: View {
                         .environment(viewModel)
                 case .coordinateDetail(let params):
                     CoordinateDetailView(
-                        viewModel: .init(uid: params.uid, targetDateString: params.targetDateString, coordinateImageURL: params.coordinateImageURL, coordinateDetailClient: CoordinateDetailClient()),
+                        viewModel: .init(
+                            coordinateId: params.coordinateId,
+                            coordinateImageURL: params.coordinateImageURL,
+                            coordinateDetailClient: CoordinateDetailClient()
+                        ),
                         showHeader: params.showHeader
                     )
                 case .tomorrowPlanner:
@@ -86,6 +93,8 @@ struct MainTabView: View {
                         path: $path,
                         profileInfo: getProfileInfo()
                     )
+                case .favorites:
+                    FavoritesView(path: $path)
                 case .fashionType:
                     FashionTypeView(
                         path: $path,
@@ -124,6 +133,11 @@ struct MainTabView: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: toastManager.message)
+        // NavigationStack 外側に environment を流すことで、
+        // .navigationDestination で push する画面 (FavoritesView 等) や
+        // .sheet で出すモーダル (DailyRecommendationDetailView 等) にも届く
+        .environment(favoritesStore)
+        .environment(viewModel)
     }
 
     private var partnerIcon: UIImage {

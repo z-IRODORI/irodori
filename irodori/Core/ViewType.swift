@@ -17,6 +17,7 @@ enum ViewType: Hashable {
     case coordinateReview(CoordinateReviewParams)
     case coordinateDetail(CoordinateDetailParams)
     case profileEdit
+    case favorites
     case fashionType
     case fashionTypeResult(FashionTypeResponse)
     case recommendCoordinateByStandardItem(RecommendCoordinateParams)
@@ -27,8 +28,7 @@ enum ViewType: Hashable {
     }
 
     struct CoordinateDetailParams: Hashable {
-        let uid: String
-        let targetDateString: String
+        let coordinateId: String
         let coordinateImageURL: String
         let showHeader: Bool
     }

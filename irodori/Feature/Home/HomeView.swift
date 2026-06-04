@@ -12,6 +12,7 @@ struct HomeView: View {
     @State var viewModel: HomeViewModel
     @State private var showFirstTakePhotoSheet = false
     @State private var showTutorialSheet = false
+    @State private var showingPrefecturePicker = false
     @Environment(MainTabViewModel.self) private var tabViewModel
 
     var body: some View {
@@ -35,6 +36,13 @@ struct HomeView: View {
                             onToggleEditMode: { viewModel.toggleEditMode() },
                             onDeleteRequest: { coordinateId in
                                 viewModel.requestDelete(coordinateId: coordinateId)
+                            },
+                            onTapCoordinate: { coordinate in
+                                path.append(.coordinateDetail(.init(
+                                    coordinateId: coordinate.id,
+                                    coordinateImageURL: coordinate.image_url,
+                                    showHeader: true
+                                )))
                             }
                         )
                         .padding(.horizontal, -24)
@@ -43,6 +51,26 @@ struct HomeView: View {
                     }
 
                     partnerCard
+
+                    // 「明日のコーデ」セクション:
+                    //  - DailyRecommendationReasonSection:  3×3 グリッドのみ. 画像タップで詳細モーダル.
+                    //  - DailyRecommendationCaptionSection: 各カード下にキャプションを併記する代替案.
+                    DailyRecommendationReasonSection(
+                        response: viewModel.dailyRecommendation,
+                        isLoading: viewModel.isLoadingDailyRecommendation,
+                        prefectureName: viewModel.currentPrefectureName,
+                        onTap: { item in
+                            viewModel.selectedDailyRecommendation = item
+                        },
+                        onLocationTap: {
+                            Haptic.impact(.soft)
+                            if viewModel.canChangePrefectureToday {
+                                showingPrefecturePicker = true
+                            } else {
+                                ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
+                            }
+                        }
+                    )
 
                     if let tags = viewModel.homeResponse.tags, !tags.isEmpty {
                         tagsSection
@@ -97,6 +125,26 @@ struct HomeView: View {
                 }
             )
         }
+        .sheet(item: Binding(
+            get: { viewModel.selectedDailyRecommendation },
+            set: { viewModel.selectedDailyRecommendation = $0 }
+        )) { item in
+            NavigationStack {
+                DailyRecommendationDetailView(
+                    item: item,
+                    onWear: { item in
+                        await viewModel.markWorn(item: item)
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") {
+                            viewModel.selectedDailyRecommendation = nil
+                        }
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showFirstTakePhotoSheet, onDismiss: {
             Task { await viewModel.onAppear() }
         }) {
@@ -120,6 +168,21 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showTutorialSheet) {
             OnboardingView(closeButtonTapped: { showTutorialSheet = false })
+        }
+        .sheet(isPresented: $showingPrefecturePicker) {
+            NavigationStack {
+                PrefecturePickerView(
+                    selectedCode: viewModel.currentPrefectureCode,
+                    onSelect: { prefecture in
+                        Task { await viewModel.updatePrefecture(prefecture) }
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") { showingPrefecturePicker = false }
+                    }
+                }
+            }
         }
         .alert("コーディネートを削除", isPresented: $viewModel.showDeleteConfirmation) {
             Button("キャンセル", role: .cancel) {
@@ -159,6 +222,9 @@ struct HomeView: View {
                 .font(.system(size: 18, weight: .semibold))
             HStack(spacing: 20) {
                 Spacer()
+                Button(action: { path.append(.favorites) }) {
+                    Image(systemName: "heart")
+                }
                 Button(action: { path.append(.calendar) }) {
                     Image(systemName: "calendar")
                 }

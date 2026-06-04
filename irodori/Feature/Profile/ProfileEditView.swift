@@ -104,7 +104,48 @@ struct ProfileEditView: View {
                     .background(Color.gray.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
+
+            prefectureRow
         }
+    }
+
+    private var prefectureRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("お住まいの地域")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.gray)
+
+            if viewModel.canChangePrefectureToday {
+                NavigationLink {
+                    PrefecturePickerView(
+                        selectedCode: viewModel.prefectureCode,
+                        onSelect: { prefecture in
+                            viewModel.prefectureCode = prefecture.code
+                        }
+                    )
+                } label: { prefectureRowLabel }
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
+                } label: { prefectureRowLabel }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var prefectureRowLabel: some View {
+        HStack {
+            Text(viewModel.prefectureDisplayName)
+                .foregroundStyle(.primary)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -114,17 +155,47 @@ final class ProfileEditViewModel {
     var username: String
     var profileImageUrl: String?
     var isUploadingImage = false
+    var prefectureCode: String?
 
     private var profileInfo: ProfileInfo?
+    private let prefectureClient: UpdateUserPrefectureClientProtocol
+    private var lastSyncedPrefectureCode: String?
 
-    init(profileInfo: ProfileInfo?) {
+    init(
+        profileInfo: ProfileInfo?,
+        prefectureClient: UpdateUserPrefectureClientProtocol = UpdateUserPrefectureClient()
+    ) {
         self.profileInfo = profileInfo
         self.username = profileInfo?.username ?? ""
         self.profileImageUrl = profileInfo?.profileImageUrl
+        self.prefectureClient = prefectureClient
+        let stored = UserDefaults.standard.string(forKey: UserDefaultsKey.prefectureCode.rawValue)
+        self.prefectureCode = stored
+        self.lastSyncedPrefectureCode = stored
+    }
+
+    var prefectureDisplayName: String {
+        if let code = prefectureCode, let p = Prefecture.find(byCode: code) {
+            return p.name
+        }
+        return "未設定 (\(Prefecture.default.name))"
+    }
+
+    /// 居住地は JST カレンダー日で 1日1回まで変更可能 (コーデ無限再生成防止).
+    var canChangePrefectureToday: Bool {
+        guard let last = UserDefaults.standard.object(
+            forKey: UserDefaultsKey.prefectureLastChangedAt.rawValue
+        ) as? Date else { return true }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+        return !cal.isDate(last, inSameDayAs: Date())
     }
 
     func save() {
-        guard var profile = profileInfo else { return }
+        guard var profile = profileInfo else {
+            persistPrefectureIfChanged()
+            return
+        }
 
         // ユーザー名を更新し、表示名もユーザー名と同じにする
         profile.username = username.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -141,6 +212,29 @@ final class ProfileEditViewModel {
             UserDefaults.standard.set(data, forKey: UserDefaultsKey.profileInfo.rawValue)
         } catch {
             print("Failed to save profile: \(error)")
+        }
+
+        persistPrefectureIfChanged()
+    }
+
+    private func persistPrefectureIfChanged() {
+        guard let code = prefectureCode, !code.isEmpty else { return }
+        guard code != lastSyncedPrefectureCode else { return }
+        guard canChangePrefectureToday else {
+            // 1日1回制限。選択は破棄して直近 sync 済みに戻す.
+            ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
+            prefectureCode = lastSyncedPrefectureCode
+            return
+        }
+        UserDefaults.standard.set(code, forKey: UserDefaultsKey.prefectureCode.rawValue)
+        UserDefaults.standard.set(Date(), forKey: UserDefaultsKey.prefectureLastChangedAt.rawValue)
+        lastSyncedPrefectureCode = code
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        guard !uid.isEmpty else { return }
+        let client = prefectureClient
+        Task {
+            _ = try? await client.put(uid: uid, prefectureCode: code)
         }
     }
 

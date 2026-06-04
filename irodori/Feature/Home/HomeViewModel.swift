@@ -34,11 +34,42 @@ final class HomeViewModel {
     var coordinateToDelete: String? = nil
     var isDeletingCoordinate: Bool = false
 
+    // 明日のコーデ推薦
+    var dailyRecommendation: DailyRecommendationResponse? = nil
+    var isLoadingDailyRecommendation: Bool = false
+    var hasDailyRecommendationError: Bool = false
+    var selectedDailyRecommendation: DailyRecommendationItem? = nil
+
+    // 居住地 (天気ヘッダの場所バッジ用. UserDefaults と同期)
+    var currentPrefectureCode: String? = UserDefaults.standard.string(
+        forKey: UserDefaultsKey.prefectureCode.rawValue
+    )
+
+    var currentPrefectureName: String {
+        if let code = currentPrefectureCode, let p = Prefecture.find(byCode: code) {
+            return p.name
+        }
+        return Prefecture.default.name
+    }
+
+    /// 居住地はコーデの再生成を伴うため JST カレンダー日で 1日1回まで.
+    /// 未変更 (lastChanged が無い) は常に true (オンボーディング後の初変更も許容).
+    var canChangePrefectureToday: Bool {
+        guard let last = UserDefaults.standard.object(
+            forKey: UserDefaultsKey.prefectureLastChangedAt.rawValue
+        ) as? Date else { return true }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+        return !cal.isDate(last, inSameDayAs: Date())
+    }
+
     let apiClient: HomeClientProtocol
     let coordinateRecommendClient: CoordinateRecommendClientProtocol
     let analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol
     let closetClient: ClosetClientProtocol
     let deleteCoordinateClient: DeleteCoordinateClientProtocol
+    let dailyRecommendationClient: DailyRecommendationClientProtocol
+    let updatePrefectureClient: UpdateUserPrefectureClientProtocol
     private let plannerCacheRepository: HomePlannerCacheRepositoryProtocol
 
     init(
@@ -47,6 +78,8 @@ final class HomeViewModel {
         analyzeRecentCoordinateClient: AnalyzeRecentCoordinateClientProtocol = AnalyzeRecentCoordinateClient(),
         closetClient: ClosetClientProtocol = ClosetClient(),
         deleteCoordinateClient: DeleteCoordinateClientProtocol = DeleteCoordinateClient(),
+        dailyRecommendationClient: DailyRecommendationClientProtocol = DailyRecommendationClient(),
+        updatePrefectureClient: UpdateUserPrefectureClientProtocol = UpdateUserPrefectureClient(),
         plannerCacheRepository: HomePlannerCacheRepositoryProtocol = HomePlannerCacheRepository()
     ) {
         self.apiClient = apiClient
@@ -54,6 +87,8 @@ final class HomeViewModel {
         self.analyzeRecentCoordinateClient = analyzeRecentCoordinateClient
         self.closetClient = closetClient
         self.deleteCoordinateClient = deleteCoordinateClient
+        self.dailyRecommendationClient = dailyRecommendationClient
+        self.updatePrefectureClient = updatePrefectureClient
         self.plannerCacheRepository = plannerCacheRepository
         loadPlannerCache()
     }
@@ -61,13 +96,19 @@ final class HomeViewModel {
     func onAppear() async {
         isLoadingHome = true
         isLoadingAnalysis = true
+        isLoadingDailyRecommendation = true
         hasLoadError = false
+        hasDailyRecommendationError = false
 
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
 
-        // 両APIを同時に起動
+        // 3つのAPIを同時に起動
         async let homeResult = apiClient.get(uid: uid)
         async let analysisResult = analyzeRecentCoordinateClient.post(uid: uid, targetDays: 7)
+        async let dailyResult = dailyRecommendationClient.get(uid: uid, gender: gender)
 
         // コーデ一覧: 完了次第スケルトンを解除して表示
         do {
@@ -94,6 +135,83 @@ final class HomeViewModel {
             recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
         }
         isLoadingAnalysis = false
+
+        // 明日のコーデ：完了次第表示（キャッシュHIT時は瞬時、フォールバック時は1-2秒）
+        do {
+            switch try await dailyResult {
+            case .success(let response):
+                dailyRecommendation = response
+            case .failure:
+                hasDailyRecommendationError = true
+            }
+        } catch {
+            hasDailyRecommendationError = true
+        }
+        isLoadingDailyRecommendation = false
+    }
+
+    /// 場所バッジから居住地を変更. UD/サーバ永続化 + daily-recommendation 単独再フェッチ.
+    /// 同日 2 回目以降は no-op (コーデ無限再生成の防止).
+    func updatePrefecture(_ prefecture: Prefecture) async {
+        guard canChangePrefectureToday else {
+            ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
+            return
+        }
+        // 同じ県を選び直した場合も lastChanged を消費させない
+        guard prefecture.code != currentPrefectureCode else { return }
+
+        UserDefaults.standard.set(prefecture.code, forKey: UserDefaultsKey.prefectureCode.rawValue)
+        UserDefaults.standard.set(Date(), forKey: UserDefaultsKey.prefectureLastChangedAt.rawValue)
+        currentPrefectureCode = prefecture.code
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        if !uid.isEmpty {
+            _ = try? await updatePrefectureClient.put(uid: uid, prefectureCode: prefecture.code)
+        }
+        await refreshDailyRecommendation()
+    }
+
+    /// daily-recommendation のみ再取得 (recent_coordinates 等はそのまま)
+    func refreshDailyRecommendation() async {
+        isLoadingDailyRecommendation = true
+        hasDailyRecommendationError = false
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
+        do {
+            switch try await dailyRecommendationClient.get(uid: uid, gender: gender) {
+            case .success(let response):
+                dailyRecommendation = response
+            case .failure:
+                hasDailyRecommendationError = true
+            }
+        } catch {
+            hasDailyRecommendationError = true
+        }
+        isLoadingDailyRecommendation = false
+    }
+
+    /// 「これを今日着る」マーク
+    func markWorn(item: DailyRecommendationItem) async -> Bool {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        let today = formatter.string(from: Date())
+        do {
+            let result = try await dailyRecommendationClient.markWorn(
+                uid: uid, poolId: item.pool_id, wornDate: today
+            )
+            switch result {
+            case .success: return true
+            case .failure: return false
+            }
+        } catch {
+            return false
+        }
     }
 
     func selectCoordinateItem(for dateID: Int) -> SelectCoordinateItem? {

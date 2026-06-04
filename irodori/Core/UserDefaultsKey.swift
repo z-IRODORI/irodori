@@ -28,4 +28,6 @@ enum UserDefaultsKey: String {
     case birthYear
     case birthMonth
     case birthDay
+    case prefectureCode
+    case prefectureLastChangedAt
 }

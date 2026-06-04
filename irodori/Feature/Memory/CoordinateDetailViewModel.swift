@@ -10,8 +10,7 @@ import UIKit
 @Observable
 @MainActor
 final class CoordinateDetailViewModel {
-    let uid: String
-    let targetDateString: String
+    let coordinateId: String
     let coordinateImageURL: String
     let coordinateDetailClient: CoordinateDetailClientProtocol
 
@@ -21,13 +20,11 @@ final class CoordinateDetailViewModel {
     var willShowChatView = false
 
     init(
-        uid: String,
-        targetDateString: String,
+        coordinateId: String,
         coordinateImageURL: String,
         coordinateDetailClient: CoordinateDetailClientProtocol
     ) {
-        self.uid = uid
-        self.targetDateString = targetDateString
+        self.coordinateId = coordinateId
         self.coordinateImageURL = coordinateImageURL
         self.coordinateDetailClient = coordinateDetailClient
     }
@@ -41,12 +38,10 @@ final class CoordinateDetailViewModel {
         defer { isLoadingDetail = false }
 
         do {
-            let result = try await coordinateDetailClient.get(uid: uid, targetDate: targetDateString)
+            let result = try await coordinateDetailClient.get(coordinateId: coordinateId)
             switch result {
             case .success(let response):
-                if let firstDetail = response.first {
-                    coordinateDetail = firstDetail
-                }
+                coordinateDetail = response
             case .failure(let error):
                 print("Failed to fetch coordinate detail: \(error)")
             }

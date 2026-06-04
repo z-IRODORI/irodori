@@ -13,6 +13,9 @@ struct RecentCoordinates: View {
     let isEditMode: Bool
     let onToggleEditMode: () -> Void
     let onDeleteRequest: (String) -> Void
+    let onTapCoordinate: (RecentCoordinate) -> Void
+
+    @Environment(FavoritesStore.self) private var favoritesStore
 
     var body: some View {
         VStack(spacing: 12) {
@@ -63,6 +66,8 @@ struct RecentCoordinates: View {
         isEditMode: Bool,
         onDelete: @escaping () -> Void
     ) -> some View {
+        // カード全体を Button でラップすると、ハートタップが上位 Button に奪われる場面があるため
+        // 画像/日付ラベルそれぞれに onTapGesture を割り当て、ハートは独立した Button のままにする.
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
                 KFImage(URL(string: coordinate.image_url))
@@ -70,16 +75,34 @@ struct RecentCoordinates: View {
                     .resizable()
                     .aspectRatio(3/4, contentMode: .fit)
                     .frame(width: 110)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard !isEditMode else { return }
+                        Haptic.impact(.soft)
+                        onTapCoordinate(coordinate)
+                    }
+                    .overlay(alignment: .bottomLeading) {
+                        if !isEditMode {
+                            favoriteButton(for: coordinate)
+                                .padding(6)
+                        }
+                    }
 
                 Text("\(coordinate.date)")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard !isEditMode else { return }
+                        Haptic.impact(.soft)
+                        onTapCoordinate(coordinate)
+                    }
             }
             .background(.white)
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            // 削除ボタン（編集モード時のみ表示）
             if isEditMode {
                 Button(action: onDelete) {
                     Image(systemName: "xmark.circle.fill")
@@ -93,6 +116,21 @@ struct RecentCoordinates: View {
         }
         .animation(.easeInOut(duration: 0.2), value: isEditMode)
     }
+
+    private func favoriteButton(for coordinate: RecentCoordinate) -> some View {
+        let isFav = favoritesStore.isFavorite(kind: .self, targetId: coordinate.id)
+        return FavoriteToggleButton(isFavorite: isFav, size: 12, padding: 7) {
+            Task {
+                await favoritesStore.setFavorite(
+                    !isFav,
+                    kind: .self,
+                    targetId: coordinate.id,
+                    imageURL: coordinate.image_url,
+                    date: coordinate.date
+                )
+            }
+        }
+    }
 }
 
 #Preview {
@@ -100,6 +138,8 @@ struct RecentCoordinates: View {
         recentCoordinates: [],
         isEditMode: false,
         onToggleEditMode: {},
-        onDeleteRequest: { _ in }
+        onDeleteRequest: { _ in },
+        onTapCoordinate: { _ in }
     )
+    .environment(FavoritesStore(client: MockFavoriteClient()))
 }
