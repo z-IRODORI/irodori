@@ -72,6 +72,20 @@ struct HomeView: View {
                         }
                     )
 
+                    // 「買い足すなら」セクション: 手持ち服が活きる買い足しアイテム3件.
+                    //  カードタップで Yahoo Shopping の商品ページを WebView で開く.
+                    ClosetBridgeSection(
+                        response: viewModel.closetBridge,
+                        isLoading: viewModel.isLoadingClosetBridge,
+                        hasError: viewModel.hasClosetBridgeError,
+                        onTapItem: { item in
+                            viewModel.selectedClosetBridgeItem = item
+                        },
+                        onRetry: {
+                            Task { await viewModel.refreshClosetBridge() }
+                        }
+                    )
+
                     if let tags = viewModel.homeResponse.tags, !tags.isEmpty {
                         tagsSection
                     }
@@ -143,6 +157,28 @@ struct HomeView: View {
                         }
                     }
                 }
+            }
+        }
+        .sheet(item: Binding(
+            get: { viewModel.selectedClosetBridgeItem },
+            set: { viewModel.selectedClosetBridgeItem = $0 }
+        )) { item in
+            if !item.product.url.isEmpty, let url = URL(string: item.product.url) {
+                WebViewContainer(url: url)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "bag.badge.questionmark")
+                        .font(.system(size: 28))
+                        .foregroundStyle(Color.gray.opacity(0.5))
+                    Text("商品ページを開けませんでした")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("下にスワイプで閉じる")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.gray.opacity(0.6))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .presentationDetents([.medium])
             }
         }
         .sheet(isPresented: $showFirstTakePhotoSheet, onDismiss: {
