@@ -13,39 +13,36 @@ struct PartnerView: View {
     @State private var selectedScoreDetail: ScoreDetail?
     @State private var showFashionTypeDetail = false
 
+    // 5パターン比較用の切替（採用パターン決定後に固定化する）
+    @AppStorage("partnerPatternVariant") private var patternVariantRaw = PartnerPatternVariant.dailyTalk.rawValue
+
+    private var patternVariant: PartnerPatternVariant {
+        PartnerPatternVariant(rawValue: patternVariantRaw) ?? .dailyTalk
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // ヘッダー
             headerNavigationBar
 
-            ZStack {
-                if viewModel.isLoading {
-                    ProgressView("読み込み中...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let insight = viewModel.userInsight {
-                    ScrollView {
-                        VStack(spacing: 32) {
-                            // 上部：左に画像・ファッションタイプ、右にインサイト
-                            if let fashionType = insight.fashion_type {
-                                topSection(fashionType: fashionType, insight: insight.insight)
-                            } else {
-                                // ファッションタイプがない場合はインサイトのみ表示
-                                insightSection(insight: insight.insight)
-                            }
-
-                            // ファッションタイプのスコア情報
-                            if let fashionType = insight.fashion_type {
-                                scoreSection(fashionType: fashionType)
-                            }
-
-                        }
-                        .padding(.top, 32)
-                        .padding(.bottom, 100)
-                    }
-                    .background(Color.white)
-                } else {
-                    emptyStateView
-                }
+            switch patternVariant {
+            case .dailyTalk:
+                PartnerPattern1DailyTalkView()
+                    .id(patternVariantRaw)
+            case .insightCards:
+                PartnerPattern2InsightCardsView()
+                    .id(patternVariantRaw)
+            case .growth:
+                PartnerPattern3GrowthView()
+                    .id(patternVariantRaw)
+            case .tasteVote:
+                PartnerPattern4TasteVoteView()
+                    .id(patternVariantRaw)
+            case .notebook:
+                PartnerPattern5NotebookView()
+                    .id(patternVariantRaw)
+            case .classic:
+                classicContent
             }
         }
         .sheet(item: $selectedScoreDetail) { detail in
@@ -57,10 +54,44 @@ struct PartnerView: View {
                 FashionTypeDetailSheet(description: description)
             }
         }
-        .task {
-            // 既にデータがある場合は読み込まない
-            if viewModel.userInsight == nil {
+        .task(id: patternVariantRaw) {
+            // 現行デザイン表示時のみ既存データを読み込む
+            if patternVariant == .classic, viewModel.userInsight == nil {
                 await viewModel.fetchUserInsight()
+            }
+        }
+    }
+
+    // MARK: - 現行デザイン
+
+    private var classicContent: some View {
+        ZStack {
+            if viewModel.isLoading {
+                ProgressView("読み込み中...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let insight = viewModel.userInsight {
+                ScrollView {
+                    VStack(spacing: 32) {
+                        // 上部：左に画像・ファッションタイプ、右にインサイト
+                        if let fashionType = insight.fashion_type {
+                            topSection(fashionType: fashionType, insight: insight.insight)
+                        } else {
+                            // ファッションタイプがない場合はインサイトのみ表示
+                            insightSection(insight: insight.insight)
+                        }
+
+                        // ファッションタイプのスコア情報
+                        if let fashionType = insight.fashion_type {
+                            scoreSection(fashionType: fashionType)
+                        }
+
+                    }
+                    .padding(.top, 32)
+                    .padding(.bottom, 100)
+                }
+                .background(Color.white)
+            } else {
+                emptyStateView
             }
         }
     }
@@ -68,14 +99,35 @@ struct PartnerView: View {
     // MARK: - Header
 
     private var headerNavigationBar: some View {
-        HStack {
-            Spacer()
-
+        ZStack {
             Text("相棒")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.black)
 
-            Spacer()
+            // パターン比較用メニュー（採用決定後に削除する）
+            HStack {
+                Spacer()
+
+                Menu {
+                    Picker("デザインパターン", selection: $patternVariantRaw) {
+                        ForEach(PartnerPatternVariant.allCases) { variant in
+                            Text(variant.title).tag(variant.rawValue)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "paintpalette")
+                            .font(.system(size: 13))
+                        Text(patternVariant.title)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(.gray)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.gray.opacity(0.08))
+                    .clipShape(Capsule())
+                }
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
