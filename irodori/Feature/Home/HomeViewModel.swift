@@ -40,6 +40,13 @@ final class HomeViewModel {
     var hasDailyRecommendationError: Bool = false
     var selectedDailyRecommendation: DailyRecommendationItem? = nil
 
+    // コーデコラージュ (クローゼットでコーデ)
+    var outfitCollage: OutfitCollageResponse? = nil
+    var isLoadingOutfitCollage: Bool = false
+    var hasOutfitCollageError: Bool = false
+    var isRegeneratingOutfitCollage: Bool = false
+    var showingOutfitCollageDetail: Bool = false
+
     // 居住地 (天気ヘッダの場所バッジ用. UserDefaults と同期)
     var currentPrefectureCode: String? = UserDefaults.standard.string(
         forKey: UserDefaultsKey.prefectureCode.rawValue
@@ -70,6 +77,7 @@ final class HomeViewModel {
     let deleteCoordinateClient: DeleteCoordinateClientProtocol
     let dailyRecommendationClient: DailyRecommendationClientProtocol
     let updatePrefectureClient: UpdateUserPrefectureClientProtocol
+    let outfitCollageClient: OutfitCollageClientProtocol
     private let plannerCacheRepository: HomePlannerCacheRepositoryProtocol
 
     init(
@@ -80,6 +88,7 @@ final class HomeViewModel {
         deleteCoordinateClient: DeleteCoordinateClientProtocol = DeleteCoordinateClient(),
         dailyRecommendationClient: DailyRecommendationClientProtocol = DailyRecommendationClient(),
         updatePrefectureClient: UpdateUserPrefectureClientProtocol = UpdateUserPrefectureClient(),
+        outfitCollageClient: OutfitCollageClientProtocol = OutfitCollageClient(),
         plannerCacheRepository: HomePlannerCacheRepositoryProtocol = HomePlannerCacheRepository()
     ) {
         self.apiClient = apiClient
@@ -89,6 +98,7 @@ final class HomeViewModel {
         self.deleteCoordinateClient = deleteCoordinateClient
         self.dailyRecommendationClient = dailyRecommendationClient
         self.updatePrefectureClient = updatePrefectureClient
+        self.outfitCollageClient = outfitCollageClient
         self.plannerCacheRepository = plannerCacheRepository
         loadPlannerCache()
     }
@@ -97,18 +107,21 @@ final class HomeViewModel {
         isLoadingHome = true
         isLoadingAnalysis = true
         isLoadingDailyRecommendation = true
+        isLoadingOutfitCollage = true
         hasLoadError = false
         hasDailyRecommendationError = false
+        hasOutfitCollageError = false
 
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
         let gender = Gender.fromWithDefault(
             UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
         )
 
-        // 3つのAPIを同時に起動
+        // 4つのAPIを同時に起動
         async let homeResult = apiClient.get(uid: uid)
         async let analysisResult = analyzeRecentCoordinateClient.post(uid: uid, targetDays: 7)
         async let dailyResult = dailyRecommendationClient.get(uid: uid, gender: gender)
+        async let collageResult = outfitCollageClient.get(uid: uid, gender: gender)
 
         // コーデ一覧: 完了次第スケルトンを解除して表示
         do {
@@ -148,6 +161,90 @@ final class HomeViewModel {
             hasDailyRecommendationError = true
         }
         isLoadingDailyRecommendation = false
+
+        // コーデコラージュ：完了次第表示（当日キャッシュHIT時は瞬時、初回生成は1秒前後）
+        do {
+            switch try await collageResult {
+            case .success(let response):
+                outfitCollage = response
+            case .failure:
+                hasOutfitCollageError = true
+            }
+        } catch {
+            hasOutfitCollageError = true
+        }
+        isLoadingOutfitCollage = false
+    }
+
+    // MARK: - Outfit Collage (クローゼットでコーデ)
+
+    /// コラージュのみ再取得 (エラー時の再試行用)
+    func refreshOutfitCollage() async {
+        isLoadingOutfitCollage = true
+        hasOutfitCollageError = false
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
+        do {
+            switch try await outfitCollageClient.get(uid: uid, gender: gender) {
+            case .success(let response):
+                outfitCollage = response
+            case .failure:
+                hasOutfitCollageError = true
+            }
+        } catch {
+            hasOutfitCollageError = true
+        }
+        isLoadingOutfitCollage = false
+    }
+
+    /// シャッフル: 現在のアイテムを避けて再生成
+    func shuffleOutfitCollage() async {
+        guard let current = outfitCollage else { return }
+        await regenerateOutfitCollage(
+            itemIds: [:],
+            excludeItemIds: current.items.map { $0.id }
+        )
+    }
+
+    /// アイテム差し替え: 指定スロットだけ入れ替え、他のスロットはピン留めして再生成
+    func swapOutfitCollageItem(slot: String, to item: OutfitCollageItem) async {
+        guard let current = outfitCollage else { return }
+        var itemIds: [String: String] = [:]
+        for it in current.items {
+            itemIds[it.slot] = it.id
+        }
+        itemIds[slot] = item.id
+        await regenerateOutfitCollage(itemIds: itemIds, excludeItemIds: [])
+    }
+
+    private func regenerateOutfitCollage(itemIds: [String: String], excludeItemIds: [String]) async {
+        guard !isRegeneratingOutfitCollage else { return }
+        isRegeneratingOutfitCollage = true
+        defer { isRegeneratingOutfitCollage = false }
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
+        do {
+            switch try await outfitCollageClient.regenerate(
+                uid: uid, gender: gender, itemIds: itemIds, excludeItemIds: excludeItemIds
+            ) {
+            case .success(let response):
+                if response.isDisplayable {
+                    outfitCollage = response
+                } else {
+                    ToastManager.shared.show("コーデを組み替えられませんでした")
+                }
+            case .failure:
+                ToastManager.shared.show("コーデの再生成に失敗しました")
+            }
+        } catch {
+            ToastManager.shared.show("コーデの再生成に失敗しました")
+        }
     }
 
     /// 場所バッジから居住地を変更. UD/サーバ永続化 + daily-recommendation 単独再フェッチ.

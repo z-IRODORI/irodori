@@ -72,6 +72,21 @@ struct HomeView: View {
                         }
                     )
 
+                    // 「クローゼットでコーデ」セクション:
+                    //  クローゼットのアイテムをバックエンドで合成したコーデコラージュ.
+                    //  タップ / CTA で差し替え・シャッフルの詳細モーダルを開く.
+                    OutfitCollageSection(
+                        response: viewModel.outfitCollage,
+                        isLoading: viewModel.isLoadingOutfitCollage,
+                        hasError: viewModel.hasOutfitCollageError,
+                        onOpenDetail: {
+                            viewModel.showingOutfitCollageDetail = true
+                        },
+                        onRetry: {
+                            Task { await viewModel.refreshOutfitCollage() }
+                        }
+                    )
+
                     if let tags = viewModel.homeResponse.tags, !tags.isEmpty {
                         tagsSection
                     }
@@ -143,6 +158,21 @@ struct HomeView: View {
                         }
                     }
                 }
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { viewModel.showingOutfitCollageDetail },
+            set: { viewModel.showingOutfitCollageDetail = $0 }
+        )) {
+            NavigationStack {
+                OutfitCollageDetailView(viewModel: viewModel)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("閉じる") {
+                                viewModel.showingOutfitCollageDetail = false
+                            }
+                        }
+                    }
             }
         }
         .sheet(isPresented: $showFirstTakePhotoSheet, onDismiss: {
