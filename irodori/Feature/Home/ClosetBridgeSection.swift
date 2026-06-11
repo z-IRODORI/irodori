@@ -3,8 +3,10 @@
 //  irodori
 //
 //  「買い足すなら」セクション。
-//  クローゼット + 明日の天気から、手持ち服が活きる買い足しアイテムを3件提案する。
-//  各カードをタップすると Yahoo Shopping の商品ページ（アフィリエイト URL）を WebView で開く。
+//  クローゼット + 明日の天気から、手持ち服が活きる買い足しカテゴリを3件提案する。
+//  各カテゴリは Yahoo Shopping の商品を最大10件 横スクロールで提示し、
+//  商品タップで商品ページ（アフィリエイト URL）を、「ZOZOTOWNで探す」で
+//  ZOZOTOWN の検索ページを WebView で開く。
 //
 
 import SwiftUI
@@ -13,7 +15,8 @@ struct ClosetBridgeSection: View {
     let response: ClosetBridgeResponse?
     let isLoading: Bool
     let hasError: Bool
-    let onTapItem: (ClosetBridgeItem) -> Void
+    let onTapProduct: (ClosetBridgeProduct) -> Void
+    let onTapZozo: (ClosetBridgeItem) -> Void
     let onRetry: () -> Void
 
     var body: some View {
@@ -34,7 +37,7 @@ struct ClosetBridgeSection: View {
         VStack(alignment: .leading, spacing: 2) {
             Text("買い足すなら")
                 .font(.system(size: 20, weight: .bold))
-            Text("いまの服が活きる3着")
+            Text("いまの服が活きる3カテゴリ")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
@@ -48,13 +51,13 @@ struct ClosetBridgeSection: View {
         if isLoading {
             skeleton
         } else if let items = response?.items, !items.isEmpty {
-            VStack(spacing: 12) {
-                // index ベースで識別（product.url 欠落時の id 衝突を避ける）
+            VStack(spacing: 14) {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                    ClosetBridgeItemCard(item: item) {
-                        Haptic.impact(.soft)
-                        onTapItem(item)
-                    }
+                    ClosetBridgeItemRow(
+                        item: item,
+                        onTapProduct: onTapProduct,
+                        onTapZozo: onTapZozo
+                    )
                 }
             }
         } else {
@@ -65,22 +68,23 @@ struct ClosetBridgeSection: View {
     // MARK: - Skeleton
 
     private var skeleton: some View {
-        VStack(spacing: 12) {
-            ForEach(0..<3, id: \.self) { _ in
-                HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.gray.opacity(0.12))
-                        .frame(width: 88, height: 110)
-                    VStack(alignment: .leading, spacing: 8) {
-                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 60, height: 12)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(height: 12)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 140, height: 12)
-                        Spacer(minLength: 0)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 70, height: 14)
+        VStack(spacing: 14) {
+            ForEach(0..<2, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: 10) {
+                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 160, height: 12)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(0..<4, id: \.self) { _ in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.12)).frame(width: 132, height: 132)
+                                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 100, height: 11)
+                                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 60, height: 13)
+                                }
+                            }
+                        }
                     }
-                    .frame(height: 110)
                 }
-                .padding(12)
+                .padding(14)
                 .background(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
             }
@@ -114,60 +118,199 @@ struct ClosetBridgeSection: View {
     }
 }
 
-// MARK: - Item Card
+// MARK: - Sort Order
 
-struct ClosetBridgeItemCard: View {
+enum ClosetBridgeSortOrder: CaseIterable, Identifiable {
+    case recommended      // Yahoo スコア順 (API 返却順)
+    case priceAscending
+    case priceDescending
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .recommended: return "おすすめ順"
+        case .priceAscending: return "安い順"
+        case .priceDescending: return "高い順"
+        }
+    }
+
+    var iconSystemName: String {
+        switch self {
+        case .recommended: return "sparkles"
+        case .priceAscending: return "arrow.up"
+        case .priceDescending: return "arrow.down"
+        }
+    }
+}
+
+// MARK: - Item Row (1カテゴリ = キャプション + 商品横スクロール + ZOZO導線)
+
+struct ClosetBridgeItemRow: View {
     let item: ClosetBridgeItem
-    let onTap: () -> Void
+    let onTapProduct: (ClosetBridgeProduct) -> Void
+    let onTapZozo: (ClosetBridgeItem) -> Void
+
+    @State private var sortOrder: ClosetBridgeSortOrder = .recommended
+
+    private var sortedProducts: [ClosetBridgeProduct] {
+        switch sortOrder {
+        case .recommended:
+            return item.products
+        case .priceAscending:
+            // 価格 0 (未取得) は末尾に回す
+            return item.products.sorted { a, b in
+                if a.price == 0 && b.price != 0 { return false }
+                if b.price == 0 && a.price != 0 { return true }
+                return a.price < b.price
+            }
+        case .priceDescending:
+            return item.products.sorted { a, b in
+                if a.price == 0 && b.price != 0 { return false }
+                if b.price == 0 && a.price != 0 { return true }
+                return a.price > b.price
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // ヘッダ: カテゴリ/色チップ + ソート
+            HStack(spacing: 6) {
+                chip(text: item.spec.sub_category.isEmpty ? item.spec.category : item.spec.sub_category)
+                if !item.spec.color.isEmpty {
+                    chip(text: item.spec.color)
+                }
+                Spacer(minLength: 0)
+                Text("\(item.products.count)件")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                sortMenu
+            }
+
+            if !item.outfit_caption.isEmpty {
+                Text(item.outfit_caption)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // 商品横スクロール（最大YAHOO_LIMIT_PER_ITEM件、ユーザー選択順）
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Array(sortedProducts.enumerated()), id: \.offset) { _, product in
+                        Button {
+                            Haptic.impact(.soft)
+                            onTapProduct(product)
+                        } label: {
+                            ClosetBridgeProductCard(product: product)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+                .animation(.easeInOut(duration: 0.2), value: sortOrder)
+            }
+
+            // ZOZOTOWN 検索導線
+            if !item.zozo_search_url.isEmpty {
+                Button {
+                    Haptic.impact(.soft)
+                    onTapZozo(item)
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("ZOZOTOWNで探す")
+                            .font(.system(size: 13, weight: .semibold))
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+    }
+
+    private func chip(text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.gray.opacity(0.08))
+            .clipShape(Capsule())
+    }
+
+    // 並び替えメニュー (おすすめ順 / 安い順 / 高い順)
+    private var sortMenu: some View {
+        Menu {
+            ForEach(ClosetBridgeSortOrder.allCases) { order in
+                Button {
+                    Haptic.impact(.soft)
+                    sortOrder = order
+                } label: {
+                    if order == sortOrder {
+                        Label(order.label, systemImage: "checkmark")
+                    } else {
+                        Label(order.label, systemImage: order.iconSystemName)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.system(size: 9, weight: .semibold))
+                Text(sortOrder.label)
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.gray.opacity(0.08))
+            .clipShape(Capsule())
+        }
+        .accessibilityLabel("商品の並び順")
+        .accessibilityValue(sortOrder.label)
+    }
+}
+
+// MARK: - Product Card (横スクロール内の1商品)
+
+struct ClosetBridgeProductCard: View {
+    let product: ClosetBridgeProduct
 
     private var priceText: String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.groupingSeparator = ","
-        let number = formatter.string(from: NSNumber(value: item.product.price)) ?? "\(item.product.price)"
+        let number = formatter.string(from: NSNumber(value: product.price)) ?? "\(product.price)"
         return "¥\(number)"
     }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(alignment: .top, spacing: 12) {
-                productImage
-                VStack(alignment: .leading, spacing: 6) {
-                    categoryChip
-                    Text(item.product.name)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    if !item.outfit_caption.isEmpty {
-                        Text(item.outfit_caption)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                    }
-                    Spacer(minLength: 4)
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(priceText)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.primary)
-                        Spacer(minLength: 0)
-                        Text("見る")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(12)
-            .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+        VStack(alignment: .leading, spacing: 6) {
+            productImage
+            Text(product.name)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(width: 132, height: 32, alignment: .topLeading)
+            Text(priceText)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.primary)
         }
-        .buttonStyle(.plain)
+        .frame(width: 132, alignment: .leading)
     }
 
     @ViewBuilder
@@ -175,7 +318,7 @@ struct ClosetBridgeItemCard: View {
         Group {
             // image_url が空だと URL(string:"") は nil となり CachedAsyncImage が
             // .empty のまま無限スピナーになるため、空の場合はプレースホルダを直接表示
-            if !item.product.image_url.isEmpty, let url = URL(string: item.product.image_url) {
+            if !product.image_url.isEmpty, let url = URL(string: product.image_url) {
                 CachedAsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
@@ -192,7 +335,7 @@ struct ClosetBridgeItemCard: View {
                 placeholderIcon
             }
         }
-        .frame(width: 88, height: 110)
+        .frame(width: 132, height: 132)
         .background(Color.gray.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
@@ -203,25 +346,6 @@ struct ClosetBridgeItemCard: View {
             .foregroundStyle(Color.gray.opacity(0.4))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-
-    private var categoryChip: some View {
-        HStack(spacing: 6) {
-            chip(text: item.spec.sub_category.isEmpty ? item.spec.category : item.spec.sub_category)
-            if !item.spec.color.isEmpty {
-                chip(text: item.spec.color)
-            }
-        }
-    }
-
-    private func chip(text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Color.gray.opacity(0.08))
-            .clipShape(Capsule())
-    }
 }
 
 #Preview {
@@ -230,7 +354,8 @@ struct ClosetBridgeItemCard: View {
             response: .mock(),
             isLoading: false,
             hasError: false,
-            onTapItem: { _ in },
+            onTapProduct: { _ in },
+            onTapZozo: { _ in },
             onRetry: {}
         )
         .padding()

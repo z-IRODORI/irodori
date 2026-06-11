@@ -8,6 +8,12 @@
 import Foundation
 import SwiftUI
 
+/// WebView シートで開く URL のラッパー（.sheet(item:) 用に Identifiable）
+struct HomeWebLink: Identifiable, Hashable {
+    let url: URL
+    var id: String { url.absoluteString }
+}
+
 @MainActor
 @Observable
 final class HomeViewModel {
@@ -51,8 +57,8 @@ final class HomeViewModel {
     var closetBridge: ClosetBridgeResponse? = nil
     var isLoadingClosetBridge: Bool = false
     var hasClosetBridgeError: Bool = false
-    /// タップした買い足しアイテム（商品ページを WebView シートで開く用）
-    var selectedClosetBridgeItem: ClosetBridgeItem? = nil
+    /// タップした商品ページ / ZOZOTOWN検索ページ（WebView シートで開く用）
+    var selectedWebLink: HomeWebLink? = nil
 
     // 居住地 (天気ヘッダの場所バッジ用. UserDefaults と同期)
     var currentPrefectureCode: String? = UserDefaults.standard.string(

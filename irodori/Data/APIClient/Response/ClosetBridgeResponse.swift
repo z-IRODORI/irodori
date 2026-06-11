@@ -68,28 +68,42 @@ struct ClosetBridgeProduct: Decodable, Hashable {
     }
 }
 
-/// クローゼットに足したい1着（spec + product + キャプション）
+/// 買い足し提案 1 アイテム（spec + 商品候補リスト + キャプション + ZOZO検索）
 struct ClosetBridgeItem: Decodable, Hashable, Identifiable {
-    var id: String { product.url.isEmpty ? "\(spec.category)_\(spec.sub_category)_\(spec.color)" : product.url }
     let spec: ClosetBridgeSpec
-    let product: ClosetBridgeProduct
-    let outfit_caption: String    // 30字程度のコーデ説明文
+    let products: [ClosetBridgeProduct]   // Yahoo スコア順 最大10件
+    let outfit_caption: String            // 30字程度のコーデ説明文
+    let zozo_search_url: String           // ZOZOTOWN 検索ディープリンク
+
+    var id: String {
+        let first = products.first?.url ?? ""
+        return first.isEmpty ? "\(spec.category)_\(spec.sub_category)_\(spec.color)" : first
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.spec = try c.decode(ClosetBridgeSpec.self, forKey: .spec)
-        self.product = try c.decode(ClosetBridgeProduct.self, forKey: .product)
+        // 新形式 products を優先。無ければ旧形式 product(単数)を単体配列にフォールバック。
+        if let list = try? c.decode([ClosetBridgeProduct].self, forKey: .products), !list.isEmpty {
+            self.products = list
+        } else if let single = try? c.decode(ClosetBridgeProduct.self, forKey: .product) {
+            self.products = [single]
+        } else {
+            self.products = []
+        }
         self.outfit_caption = (try? c.decode(String.self, forKey: .outfit_caption)) ?? ""
+        self.zozo_search_url = (try? c.decode(String.self, forKey: .zozo_search_url)) ?? ""
     }
 
-    init(spec: ClosetBridgeSpec, product: ClosetBridgeProduct, outfit_caption: String) {
+    init(spec: ClosetBridgeSpec, products: [ClosetBridgeProduct], outfit_caption: String, zozo_search_url: String = "") {
         self.spec = spec
-        self.product = product
+        self.products = products
         self.outfit_caption = outfit_caption
+        self.zozo_search_url = zozo_search_url
     }
 
     enum CodingKeys: String, CodingKey {
-        case spec, product, outfit_caption
+        case spec, products, product, outfit_caption, zozo_search_url
     }
 }
 
@@ -125,6 +139,19 @@ struct ClosetBridgeResponse: Decodable, Hashable {
 // MARK: - Mock
 
 extension ClosetBridgeResponse {
+    /// モック用に同一プレフィックスの商品を6件生成
+    static func mockProducts(prefix: String, base: Int) -> [ClosetBridgeProduct] {
+        (0..<6).map { i in
+            .init(
+                name: "\(prefix) その\(i + 1)",
+                price: base + i * 500,
+                url: "https://shopping.yahoo.co.jp/products/sample-\(abs(prefix.hashValue))-\(i)",
+                image_url: "https://i.pinimg.com/736x/c9/61/92/c96192fc7e225468fbd88137717364ea.jpg",
+                store_name: "サンプルストア"
+            )
+        }
+    }
+
     static func mock() -> Self {
         .init(
             status: "success",
@@ -133,19 +160,22 @@ extension ClosetBridgeResponse {
             elapsed_ms: 1200,
             items: [
                 .init(
-                    spec: .init(category: "アウター", sub_category: "ステンカラーコート", color: "ベージュ", owned_pair_hint: "白T・黒スラックス"),
-                    product: .init(name: "ステンカラーコート メンズ ロング ベージュ", price: 7990, url: "https://shopping.yahoo.co.jp/products/sample1", image_url: "https://i.pinimg.com/736x/c9/61/92/c96192fc7e225468fbd88137717364ea.jpg", store_name: "サンプルストア"),
-                    outfit_caption: "手持ちの白T×黒パンツに羽織るだけで一気に大人見え。"
+                    spec: .init(category: "アウター", sub_category: "ステンカラーコート", color: "ベージュ", search_keywords: ["ベージュ", "ステンカラーコート"], owned_pair_hint: "白T・黒スラックス"),
+                    products: Self.mockProducts(prefix: "ステンカラーコート メンズ ベージュ", base: 7990),
+                    outfit_caption: "手持ちの白T×黒パンツに羽織るだけで一気に大人見え。",
+                    zozo_search_url: "https://zozo.jp/search/?p_keyv=\("ベージュ ステンカラーコート メンズ".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
                 ),
                 .init(
-                    spec: .init(category: "シューズ", sub_category: "レザースニーカー", color: "ホワイト", owned_pair_hint: "デニム全般"),
-                    product: .init(name: "レザースニーカー 白 メンズ", price: 5480, url: "https://shopping.yahoo.co.jp/products/sample2", image_url: "https://i.pinimg.com/736x/c9/61/92/c96192fc7e225468fbd88137717364ea.jpg", store_name: "サンプルストア"),
-                    outfit_caption: "どんなボトムスとも相性◎の万能白スニーカー。"
+                    spec: .init(category: "シューズ", sub_category: "レザースニーカー", color: "ホワイト", search_keywords: ["白", "レザースニーカー"], owned_pair_hint: "デニム全般"),
+                    products: Self.mockProducts(prefix: "レザースニーカー 白 メンズ", base: 5480),
+                    outfit_caption: "どんなボトムスとも相性◎の万能白スニーカー。",
+                    zozo_search_url: "https://zozo.jp/search/?p_keyv=\("白 レザースニーカー メンズ".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
                 ),
                 .init(
-                    spec: .init(category: "トップス", sub_category: "ニットベスト", color: "チャコール", owned_pair_hint: "白シャツ"),
-                    product: .init(name: "ニットベスト メンズ チャコール", price: 3990, url: "https://shopping.yahoo.co.jp/products/sample3", image_url: "https://i.pinimg.com/736x/c9/61/92/c96192fc7e225468fbd88137717364ea.jpg", store_name: "サンプルストア"),
-                    outfit_caption: "白シャツに重ねるだけで季節感のあるレイヤード。"
+                    spec: .init(category: "トップス", sub_category: "ニットベスト", color: "チャコール", search_keywords: ["チャコール", "ニットベスト"], owned_pair_hint: "白シャツ"),
+                    products: Self.mockProducts(prefix: "ニットベスト メンズ チャコール", base: 3990),
+                    outfit_caption: "白シャツに重ねるだけで季節感のあるレイヤード。",
+                    zozo_search_url: "https://zozo.jp/search/?p_keyv=\("チャコール ニットベスト メンズ".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
                 ),
             ]
         )

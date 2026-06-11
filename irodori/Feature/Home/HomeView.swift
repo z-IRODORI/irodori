@@ -93,8 +93,15 @@ struct HomeView: View {
                         response: viewModel.closetBridge,
                         isLoading: viewModel.isLoadingClosetBridge,
                         hasError: viewModel.hasClosetBridgeError,
-                        onTapItem: { item in
-                            viewModel.selectedClosetBridgeItem = item
+                        onTapProduct: { product in
+                            if !product.url.isEmpty, let url = URL(string: product.url) {
+                                viewModel.selectedWebLink = HomeWebLink(url: url)
+                            }
+                        },
+                        onTapZozo: { item in
+                            if !item.zozo_search_url.isEmpty, let url = URL(string: item.zozo_search_url) {
+                                viewModel.selectedWebLink = HomeWebLink(url: url)
+                            }
                         },
                         onRetry: {
                             Task { await viewModel.refreshClosetBridge() }
@@ -190,26 +197,10 @@ struct HomeView: View {
             }
         }
         .sheet(item: Binding(
-            get: { viewModel.selectedClosetBridgeItem },
-            set: { viewModel.selectedClosetBridgeItem = $0 }
-        )) { item in
-            if !item.product.url.isEmpty, let url = URL(string: item.product.url) {
-                WebViewContainer(url: url)
-            } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "bag.badge.questionmark")
-                        .font(.system(size: 28))
-                        .foregroundStyle(Color.gray.opacity(0.5))
-                    Text("商品ページを開けませんでした")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text("下にスワイプで閉じる")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.gray.opacity(0.6))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .presentationDetents([.medium])
-            }
+            get: { viewModel.selectedWebLink },
+            set: { viewModel.selectedWebLink = $0 }
+        )) { link in
+            WebViewContainer(url: link.url)
         }
         .sheet(isPresented: $showFirstTakePhotoSheet, onDismiss: {
             Task { await viewModel.onAppear() }
