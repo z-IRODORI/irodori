@@ -29,6 +29,7 @@ struct PartnerPattern1DailyTalkView: View {
                         greetingSection
                         statusSection
                         questionSection
+                        PartnerAdviceCard()
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 24)

@@ -52,6 +52,53 @@ struct PartnerHomeResponse: Decodable, Hashable {
     }
 }
 
+// MARK: - 共通: 相棒からあなたへ（理解 → 提案 → 発見）
+
+struct PartnerAdvice: Decodable, Hashable, Identifiable {
+    let id: String
+    let understanding: String   // あなたをこう理解してる（根拠つき）
+    let advice: String          // だから、こうしてみない？（理由つきの提案）
+    let discovery: String       // それとね、こんな発見があった
+    let evidence_hint: String?
+
+    static func mock() -> PartnerAdvice {
+        PartnerAdvice(
+            id: "advice-mock-1",
+            understanding: "最近のあなたの軸は「カジュアル」。直近12回のうち7回はこの雰囲気を選んでて、自分の「好き」がはっきりしてる人だと思ってる。診断の「トレンド・エディター」らしさも、ちゃんとにじんでるよ。",
+            advice: "「カジュアル」の軸がしっかりしてるからこそ、小物だけ「きれいめ」を一点足してみるのがおすすめ。土台がある人の「一点だけ変える」は、いちばん伝わるんだ。",
+            discovery: "面白いのはね、クイズだと「きれいめ」を選ぶのに、実際に着るのは「カジュアル」が多いこと。「憧れ」と「いつもの自分」がちょっと違うって、伸びしろの証拠だと思う。",
+            evidence_hint: "直近12件のコーデ と 17票の投票 と ファッションタイプ診断から"
+        )
+    }
+}
+
+struct PartnerAdviceResponse: Decodable, Hashable {
+    let status: String
+    let advice: PartnerAdvice
+    let state: PartnerState
+
+    static func mock() -> PartnerAdviceResponse {
+        PartnerAdviceResponse(status: "success", advice: .mock(), state: .mock())
+    }
+}
+
+struct PartnerAdviceFeedbackResponse: Decodable, Hashable {
+    let status: String
+    let reply: String
+    let exp_gained: Int
+    let state: PartnerState
+
+    static func mock(reaction: String) -> PartnerAdviceFeedbackResponse {
+        let reply: String
+        switch reaction {
+        case "helpful": reply = "よかった。あなたのことをずっと見てきた甲斐があったよ ✨"
+        case "not_for_me": reply = "正直にありがとう。じゃあ次は別の角度から考えてみるね。こういうやりとりが、いちばん勉強になるんだ。"
+        default: reply = "うれしい！試したら、どうだったかぜひ見せてね 🌷"
+        }
+        return PartnerAdviceFeedbackResponse(status: "success", reply: reply, exp_gained: 5, state: .mock(exp: 125))
+    }
+}
+
 // MARK: - パターン1: 今日の1問
 
 struct PartnerDailyQuestion: Decodable, Hashable, Identifiable {

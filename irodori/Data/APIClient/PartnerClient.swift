@@ -11,6 +11,8 @@ import Foundation
 
 protocol PartnerClientProtocol {
     func getHome(userId: String) async throws -> Result<PartnerHomeResponse, HTTPError>
+    func getAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError>
+    func sendAdviceFeedback(userId: String, adviceId: String, reaction: String) async throws -> Result<PartnerAdviceFeedbackResponse, HTTPError>
     func getDailyQuestion(userId: String) async throws -> Result<PartnerDailyQuestionResponse, HTTPError>
     func answerDailyQuestion(userId: String, questionId: String, choice: String?, freeText: String?, skipped: Bool) async throws -> Result<PartnerAnswerResponse, HTTPError>
     func getInsightCards(userId: String, limit: Int) async throws -> Result<PartnerInsightCardsResponse, HTTPError>
@@ -24,6 +26,12 @@ protocol PartnerClientProtocol {
 }
 
 // MARK: - リクエストボディ
+
+private struct AdviceFeedbackBody: Encodable {
+    let user_id: String
+    let advice_id: String
+    let reaction: String
+}
 
 private struct DailyQuestionAnswerBody: Encodable {
     let user_id: String
@@ -62,6 +70,17 @@ final class PartnerClient: PartnerClientProtocol {
 
     func getHome(userId: String) async throws -> Result<PartnerHomeResponse, HTTPError> {
         try await get(endpoint: "api/partner/home", queryItems: [URLQueryItem(name: "user_id", value: userId)])
+    }
+
+    func getAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError> {
+        try await get(endpoint: "api/partner/advice", queryItems: [URLQueryItem(name: "user_id", value: userId)])
+    }
+
+    func sendAdviceFeedback(userId: String, adviceId: String, reaction: String) async throws -> Result<PartnerAdviceFeedbackResponse, HTTPError> {
+        try await post(
+            endpoint: "api/partner/advice/feedback",
+            body: AdviceFeedbackBody(user_id: userId, advice_id: adviceId, reaction: reaction)
+        )
     }
 
     func getDailyQuestion(userId: String) async throws -> Result<PartnerDailyQuestionResponse, HTTPError> {
@@ -180,6 +199,16 @@ final class MockPartnerClient: PartnerClientProtocol {
         return .success(.mock())
     }
 
+    func getAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError> {
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        return .success(.mock())
+    }
+
+    func sendAdviceFeedback(userId: String, adviceId: String, reaction: String) async throws -> Result<PartnerAdviceFeedbackResponse, HTTPError> {
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        return .success(.mock(reaction: reaction))
+    }
+
     func getDailyQuestion(userId: String) async throws -> Result<PartnerDailyQuestionResponse, HTTPError> {
         try? await Task.sleep(nanoseconds: 300_000_000)
         return .success(.mock())
@@ -282,6 +311,17 @@ final class FallbackPartnerClient: PartnerClientProtocol {
 
     func getHome(userId: String) async throws -> Result<PartnerHomeResponse, HTTPError> {
         try await withFallback({ try await real.getHome(userId: userId) }, { try await mock.getHome(userId: userId) })
+    }
+
+    func getAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError> {
+        try await withFallback({ try await real.getAdvice(userId: userId) }, { try await mock.getAdvice(userId: userId) })
+    }
+
+    func sendAdviceFeedback(userId: String, adviceId: String, reaction: String) async throws -> Result<PartnerAdviceFeedbackResponse, HTTPError> {
+        try await withFallback(
+            { try await real.sendAdviceFeedback(userId: userId, adviceId: adviceId, reaction: reaction) },
+            { try await mock.sendAdviceFeedback(userId: userId, adviceId: adviceId, reaction: reaction) }
+        )
     }
 
     func getDailyQuestion(userId: String) async throws -> Result<PartnerDailyQuestionResponse, HTTPError> {

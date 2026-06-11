@@ -191,29 +191,32 @@ struct PartnerPattern2InsightCardsView: View {
     // MARK: - 完了
 
     private var finishedSection: some View {
-        VStack(spacing: 20) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 20) {
+                Text("✨")
+                    .font(.system(size: 56))
+                    .padding(.top, 16)
 
-            Text("✨")
-                .font(.system(size: 56))
+                Text("今日の気づきはここまで")
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundColor(.black)
 
-            Text("今日の気づきはここまで")
-                .font(.system(size: 19, weight: .bold))
-                .foregroundColor(.black)
+                Text("あなたの反応のおかげで、相棒の目がまた少し良くなったよ。\nさいごに、今日のまとめを置いていくね。")
+                    .font(.system(size: 14))
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(5)
 
-            Text("あなたの反応のおかげで、相棒の目がまた少し良くなったよ。\n明日も新しい気づきを持ってくるね。")
-                .font(.system(size: 14))
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .lineSpacing(5)
+                if let state = viewModel.state {
+                    PartnerUnderstandingBar(state: state)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+                }
 
-            if let state = viewModel.state {
-                PartnerUnderstandingBar(state: state)
-                    .padding(.horizontal, 12)
+                PartnerAdviceCard()
                     .padding(.top, 8)
             }
-
-            Spacer()
+            .padding(.bottom, 80)
         }
         .transition(.opacity.combined(with: .scale(scale: 0.92)))
     }

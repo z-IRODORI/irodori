@@ -32,6 +32,8 @@ struct PartnerPattern5NotebookView: View {
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                         }
 
+                        PartnerAdviceCard()
+
                         hypothesesSection
                         notebookSection
                     }

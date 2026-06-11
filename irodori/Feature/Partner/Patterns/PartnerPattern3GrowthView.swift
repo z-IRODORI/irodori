@@ -30,6 +30,8 @@ struct PartnerPattern3GrowthView: View {
                             PartnerTalkBubble(text: greeting)
                         }
 
+                        PartnerAdviceCard()
+
                         questsSection(quests: growth.quests)
                         levelsSection(levels: growth.levels, currentLevel: growth.state.level)
                         eventsSection(events: growth.recent_events)

@@ -231,36 +231,39 @@ struct PartnerPattern4TasteVoteView: View {
     // MARK: - 完了
 
     private var finishedSection: some View {
-        VStack(spacing: 20) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 20) {
+                Text("🎉")
+                    .font(.system(size: 56))
+                    .padding(.top, 16)
 
-            Text("🎉")
-                .font(.system(size: 56))
+                Text("今日のぶんはおしまい！")
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundColor(.black)
 
-            Text("今日のぶんはおしまい！")
-                .font(.system(size: 19, weight: .bold))
-                .foregroundColor(.black)
+                Text("あなたの「好き」、ちゃんと受け取ったよ。\n投票はぜんぶ、明日からの提案に活きていくからね。")
+                    .font(.system(size: 14))
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(5)
 
-            Text("あなたの「好き」、ちゃんと受け取ったよ。\n投票はぜんぶ、明日からの提案に活きていくからね。")
-                .font(.system(size: 14))
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .lineSpacing(5)
+                Button {
+                    Haptic.impact(.light)
+                    Task { await viewModel.load() }
+                } label: {
+                    Label("もうすこしあそぶ", systemImage: "arrow.clockwise")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 13)
+                        .background(Color.black)
+                        .clipShape(Capsule())
+                }
 
-            Button {
-                Haptic.impact(.light)
-                Task { await viewModel.load() }
-            } label: {
-                Label("もうすこしあそぶ", systemImage: "arrow.clockwise")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 13)
-                    .background(Color.black)
-                    .clipShape(Capsule())
+                PartnerAdviceCard()
+                    .padding(.top, 8)
             }
-
-            Spacer()
+            .padding(.bottom, 80)
         }
         .transition(.opacity)
     }
