@@ -16,6 +16,8 @@ struct OutfitCollageDetailView: View {
     let viewModel: HomeViewModel
 
     @State private var pickerSlot: PickerSlot? = nil
+    @State private var showingClosetPicker = false
+    @State private var webLink: HomeWebLink? = nil
 
     private struct PickerSlot: Identifiable {
         let slot: String
@@ -29,7 +31,9 @@ struct OutfitCollageDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     collageImage(response)
                     shuffleButton
+                    fromItemButton
                     itemList(response)
+                    recommendationsSection
                     Spacer().frame(height: 40)
                 }
                 .padding(.horizontal, 24)
@@ -48,6 +52,22 @@ struct OutfitCollageDetailView: View {
                     Task { await viewModel.swapOutfitCollageItem(slot: picker.slot, to: item) }
                 }
             )
+        }
+        .sheet(isPresented: $showingClosetPicker) {
+            ClosetItemPickerView(
+                closetItems: viewModel.closetItems,
+                isLoading: viewModel.isLoadingCloset,
+                onSelect: { item in
+                    showingClosetPicker = false
+                    Task { await viewModel.generateOutfitFromItem(item) }
+                }
+            )
+        }
+        .sheet(item: $webLink) { link in
+            WebViewContainer(url: link.url)
+        }
+        .onAppear {
+            Task { await viewModel.loadOutfitRecommendations() }
         }
     }
 
@@ -176,6 +196,69 @@ struct OutfitCollageDetailView: View {
             }
         }
         .padding(12)
+    }
+
+    // MARK: - アイテムから作る
+
+    private var fromItemButton: some View {
+        Button {
+            Haptic.impact(.soft)
+            showingClosetPicker = true
+            Task { await viewModel.loadClosetItemsIfNeeded() }
+        } label: {
+            Label("持っているアイテムから作る", systemImage: "tshirt")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.gray.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+        }
+        .disabled(viewModel.isRegeneratingOutfitCollage)
+    }
+
+    // MARK: - おすすめ商品 (アフィリエイト)
+
+    @ViewBuilder
+    private var recommendationsSection: some View {
+        if viewModel.isLoadingOutfitRecommendations {
+            VStack(alignment: .leading, spacing: 14) {
+                recommendHeader
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+            }
+        } else if let rec = viewModel.outfitRecommendations, !rec.items.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                recommendHeader
+                ForEach(Array(rec.items.enumerated()), id: \.offset) { _, item in
+                    ClosetBridgeItemRow(
+                        item: item,
+                        onTapProduct: { product in openWeb(product.url) },
+                        onTapZozo: { it in openWeb(it.zozo_search_url) }
+                    )
+                }
+            }
+        }
+        // 取得失敗 or 0件はセクションごと非表示 (コーデ表示を妨げない)
+    }
+
+    private var recommendHeader: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("このコーデにおすすめ")
+                .font(.system(size: 18, weight: .bold))
+            Text("買い足すともっと楽しめるアイテム")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func openWeb(_ urlString: String) {
+        guard !urlString.isEmpty, let url = URL(string: urlString) else { return }
+        Haptic.impact(.soft)
+        webLink = HomeWebLink(url: url)
     }
 }
 
