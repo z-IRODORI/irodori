@@ -60,6 +60,11 @@ final class HomeViewModel {
     /// タップした商品ページ / ZOZOTOWN検索ページ（WebView シートで開く用）
     var selectedWebLink: HomeWebLink? = nil
 
+    // コーデに合うおすすめ商品（アフィリエイト。コーデ詳細で遅延ロード）
+    var outfitRecommendations: ClosetBridgeResponse? = nil
+    var isLoadingOutfitRecommendations: Bool = false
+    var hasOutfitRecommendationsError: Bool = false
+
     // 居住地 (天気ヘッダの場所バッジ用. UserDefaults と同期)
     var currentPrefectureCode: String? = UserDefaults.standard.string(
         forKey: UserDefaultsKey.prefectureCode.rawValue
@@ -252,7 +257,7 @@ final class HomeViewModel {
         await regenerateOutfitCollage(itemIds: itemIds, excludeItemIds: [])
     }
 
-    private func regenerateOutfitCollage(itemIds: [String: String], excludeItemIds: [String]) async {
+    private func regenerateOutfitCollage(itemIds: [String: String], excludeItemIds: [String], anchorItemId: String? = nil) async {
         guard !isRegeneratingOutfitCollage else { return }
         isRegeneratingOutfitCollage = true
         defer { isRegeneratingOutfitCollage = false }
@@ -263,7 +268,7 @@ final class HomeViewModel {
         )
         do {
             switch try await outfitCollageClient.regenerate(
-                uid: uid, gender: gender, itemIds: itemIds, excludeItemIds: excludeItemIds
+                uid: uid, gender: gender, itemIds: itemIds, excludeItemIds: excludeItemIds, anchorItemId: anchorItemId
             ) {
             case .success(let response):
                 if response.isDisplayable {
@@ -277,6 +282,50 @@ final class HomeViewModel {
         } catch {
             ToastManager.shared.show("コーデの再生成に失敗しました")
         }
+    }
+
+    /// 手持ちアイテムを起点にコーデを生成する (アイテム選択導線)。
+    /// 起点アイテムは item_type からスロットを自動判定して固定される (API 側)。生成後におすすめも更新。
+    func generateOutfitFromItem(_ closetItem: ClosetItem) async {
+        await regenerateOutfitCollage(itemIds: [:], excludeItemIds: [], anchorItemId: closetItem.id)
+        await loadOutfitRecommendations()
+    }
+
+    /// アイテム選択ピッカー用にクローゼットを読み込む (未取得時のみ)。
+    func loadClosetItemsIfNeeded() async {
+        if closetItems.isEmpty {
+            await fetchClosetItems()
+        }
+    }
+
+    /// コーデに合うおすすめ商品 (アフィリエイト) を遅延ロードする。
+    /// コーデのアイテム (category, color) を closet-bridge に渡して取得。失敗/0件はセクション非表示。
+    func loadOutfitRecommendations() async {
+        guard let collage = outfitCollage, collage.isDisplayable, !collage.items.isEmpty else {
+            outfitRecommendations = nil
+            return
+        }
+        isLoadingOutfitRecommendations = true
+        hasOutfitRecommendationsError = false
+
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
+        let items = collage.items
+            .map { OutfitRecommendItem(category: $0.category ?? "", color: $0.color ?? "") }
+            .filter { !$0.category.isEmpty }
+        do {
+            switch try await outfitCollageClient.recommendations(uid: uid, gender: gender, items: items) {
+            case .success(let response):
+                outfitRecommendations = response
+            case .failure:
+                hasOutfitRecommendationsError = true
+            }
+        } catch {
+            hasOutfitRecommendationsError = true
+        }
+        isLoadingOutfitRecommendations = false
     }
 
     // MARK: - Closet Bridge (買い足し提案)
