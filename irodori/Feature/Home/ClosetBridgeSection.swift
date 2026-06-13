@@ -301,14 +301,21 @@ struct ClosetBridgeProductCard: View {
         VStack(alignment: .leading, spacing: 6) {
             productImage
             Text(product.name)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.primary)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.black)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
-                .frame(width: 132, height: 32, alignment: .topLeading)
+                .frame(width: 132, height: 40, alignment: .topLeading)
             Text(priceText)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(.primary)
+            if !product.store_name.isEmpty {
+                Text(product.store_name)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(width: 132, alignment: .leading)
+            }
         }
         .frame(width: 132, alignment: .leading)
     }
