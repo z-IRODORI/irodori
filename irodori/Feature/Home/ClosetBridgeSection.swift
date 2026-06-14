@@ -173,19 +173,33 @@ struct ClosetBridgeItemRow: View {
         }
     }
 
+    /// 見出し文字列: サブカテゴリ(無ければカテゴリ) + 色。例: "テーパードパンツ グレー"
+    private var headerTitle: String {
+        let cat = item.spec.sub_category.isEmpty ? item.spec.category : item.spec.sub_category
+        return item.spec.color.isEmpty ? cat : "\(cat) \(item.spec.color)"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // ヘッダ: カテゴリ/色チップ + ソート
-            HStack(spacing: 6) {
-                chip(text: item.spec.sub_category.isEmpty ? item.spec.category : item.spec.sub_category)
-                if !item.spec.color.isEmpty {
-                    chip(text: item.spec.color)
+            // ヘッダ: 「サブカテゴリ + 色」(例: テーパードパンツ グレー) を見出しとして目立たせる。
+            // 件数/ソートは下段に分離し、見出しが長文でも押し出されないようにする。
+            // 見出しは最大2行で折り返し、それ以上は末尾省略 (横スクロールUIを崩さない)。
+            VStack(alignment: .leading, spacing: 6) {
+                Text(headerTitle)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.black)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 6) {
+                    Text("\(item.products.count)件")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    sortMenu
                 }
-                Spacer(minLength: 0)
-                Text("\(item.products.count)件")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                sortMenu
             }
 
             if !item.outfit_caption.isEmpty {
@@ -301,11 +315,11 @@ struct ClosetBridgeProductCard: View {
         VStack(alignment: .leading, spacing: 6) {
             productImage
             Text(product.name)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.black)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.primary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
-                .frame(width: 132, height: 44, alignment: .topLeading)
+                .frame(width: 132, height: 32, alignment: .topLeading)
             Text(priceText)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(.primary)
