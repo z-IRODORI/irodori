@@ -113,6 +113,11 @@ class WebViewStore: ObservableObject {
     func goForward() {
         webView?.goForward()
     }
+
+    /// WebView が現在表示している URL (外部ブラウザで開く用)。未取得時は nil。
+    var currentURL: URL? {
+        webView?.url
+    }
 }
 
 // MARK: - WebView Container
@@ -124,6 +129,7 @@ struct WebViewContainer: View {
     @State private var isLoading = false
     @State private var webViewStore = WebViewStore()
     @Environment(\.dismiss) var dismiss
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(spacing: 0) {
@@ -191,6 +197,15 @@ struct WebViewContainer: View {
                         .foregroundColor(isLoading ? .gray : .primary)
                 }
                 .disabled(isLoading)
+
+                // ブラウザ(Safari)で開く: WebView 内で遷移した先があればその URL を優先
+                Button(action: {
+                    openURL(webViewStore.currentURL ?? url)
+                }) {
+                    Image(systemName: "safari")
+                        .foregroundColor(.primary)
+                }
+                .accessibilityLabel("ブラウザで開く")
             }
         }
     }
