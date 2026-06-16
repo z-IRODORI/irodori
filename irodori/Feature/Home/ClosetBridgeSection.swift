@@ -211,6 +211,21 @@ struct ClosetBridgeItemRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
+            // 相性の良い手持ちアイテム: 「この服と合わせると◎」(色相性で選定, 最大3件)
+            if !item.owned_items.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("この服と合わせると◎")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        ForEach(item.owned_items) { owned in
+                            ownedItemThumbnail(owned)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+
             // 商品横スクロール（最大YAHOO_LIMIT_PER_ITEM件、ユーザー選択順）
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -263,6 +278,28 @@ struct ClosetBridgeItemRow: View {
             .padding(.vertical, 3)
             .background(Color.gray.opacity(0.08))
             .clipShape(Capsule())
+    }
+
+    // 相性の良い手持ちアイテムのサムネイル (画像 + 色ラベル)
+    private func ownedItemThumbnail(_ owned: ClosetBridgeOwnedItem) -> some View {
+        VStack(spacing: 3) {
+            CachedAsyncImage(url: owned.image_url.isEmpty ? nil : URL(string: owned.image_url)) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                Color.gray.opacity(0.1)
+            }
+            .frame(width: 56, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipped()
+
+            if let color = owned.color, !color.isEmpty {
+                Text(color)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(width: 56)
     }
 
     // 並び替えメニュー (おすすめ順 / 安い順 / 高い順)

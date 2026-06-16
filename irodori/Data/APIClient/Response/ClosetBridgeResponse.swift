@@ -68,12 +68,43 @@ struct ClosetBridgeProduct: Decodable, Hashable {
     }
 }
 
-/// 買い足し提案 1 アイテム（spec + 商品候補リスト + キャプション + ZOZO検索）
+/// 買い足しアイテムと相性の良い、ユーザー自身のクローゼットアイテム（色相性で選定）
+struct ClosetBridgeOwnedItem: Decodable, Hashable, Identifiable {
+    let id: String
+    let item_type: String
+    let category: String?
+    let color: String?
+    let image_url: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, item_type, category, color, image_url
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(String.self, forKey: .id)) ?? ""
+        self.item_type = (try? c.decode(String.self, forKey: .item_type)) ?? ""
+        self.category = try? c.decode(String.self, forKey: .category)
+        self.color = try? c.decode(String.self, forKey: .color)
+        self.image_url = (try? c.decode(String.self, forKey: .image_url)) ?? ""
+    }
+
+    init(id: String, item_type: String, category: String?, color: String?, image_url: String) {
+        self.id = id
+        self.item_type = item_type
+        self.category = category
+        self.color = color
+        self.image_url = image_url
+    }
+}
+
+/// 買い足し提案 1 アイテム（spec + 商品候補リスト + キャプション + ZOZO検索 + 相性の良い手持ち服）
 struct ClosetBridgeItem: Decodable, Hashable, Identifiable {
     let spec: ClosetBridgeSpec
     let products: [ClosetBridgeProduct]   // Yahoo スコア順 最大10件
     let outfit_caption: String            // 30字程度のコーデ説明文
     let zozo_search_url: String           // ZOZOTOWN 検索ディープリンク
+    let owned_items: [ClosetBridgeOwnedItem]   // 相性の良い手持ちアイテム（色相性順 最大3件）
 
     var id: String {
         let first = products.first?.url ?? ""
@@ -93,17 +124,19 @@ struct ClosetBridgeItem: Decodable, Hashable, Identifiable {
         }
         self.outfit_caption = (try? c.decode(String.self, forKey: .outfit_caption)) ?? ""
         self.zozo_search_url = (try? c.decode(String.self, forKey: .zozo_search_url)) ?? ""
+        self.owned_items = (try? c.decode([ClosetBridgeOwnedItem].self, forKey: .owned_items)) ?? []
     }
 
-    init(spec: ClosetBridgeSpec, products: [ClosetBridgeProduct], outfit_caption: String, zozo_search_url: String = "") {
+    init(spec: ClosetBridgeSpec, products: [ClosetBridgeProduct], outfit_caption: String, zozo_search_url: String = "", owned_items: [ClosetBridgeOwnedItem] = []) {
         self.spec = spec
         self.products = products
         self.outfit_caption = outfit_caption
         self.zozo_search_url = zozo_search_url
+        self.owned_items = owned_items
     }
 
     enum CodingKeys: String, CodingKey {
-        case spec, products, product, outfit_caption, zozo_search_url
+        case spec, products, product, outfit_caption, zozo_search_url, owned_items
     }
 }
 
@@ -163,7 +196,11 @@ extension ClosetBridgeResponse {
                     spec: .init(category: "アウター", sub_category: "ステンカラーコート", color: "ベージュ", search_keywords: ["ベージュ", "ステンカラーコート"], owned_pair_hint: "白T・黒スラックス"),
                     products: Self.mockProducts(prefix: "ステンカラーコート メンズ ベージュ", base: 7990),
                     outfit_caption: "手持ちの白T×黒パンツに羽織るだけで一気に大人見え。",
-                    zozo_search_url: "https://zozo.jp/search/?p_keyv=\("ベージュ ステンカラーコート メンズ".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+                    zozo_search_url: "https://zozo.jp/search/?p_keyv=\("ベージュ ステンカラーコート メンズ".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")",
+                    owned_items: [
+                        .init(id: "own1", item_type: "トップス", category: "Tシャツ", color: "ホワイト", image_url: "https://i.pinimg.com/736x/c9/61/92/c96192fc7e225468fbd88137717364ea.jpg"),
+                        .init(id: "own2", item_type: "ボトムス", category: "スラックス", color: "ブラック", image_url: "https://i.pinimg.com/736x/c9/61/92/c96192fc7e225468fbd88137717364ea.jpg")
+                    ]
                 ),
                 .init(
                     spec: .init(category: "シューズ", sub_category: "レザースニーカー", color: "ホワイト", search_keywords: ["白", "レザースニーカー"], owned_pair_hint: "デニム全般"),
