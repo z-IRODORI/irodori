@@ -50,10 +50,15 @@ struct MainTabView: View {
                 }
             }
             .sheet(isPresented: $isSheetPresented) {
-                AddContentModalView(cameraButtonTapped: {
-                    path.append(.camera)
-                })
-                .presentationDetents([.height(200)])
+                AddContentModalView(
+                    cameraButtonTapped: {
+                        path.append(.camera)
+                    },
+                    collageButtonTapped: {
+                        path.append(.coordinateCollage)
+                    }
+                )
+                .presentationDetents([.height(280)])
                 .presentationDragIndicator(.visible)
             }
             .navigationDestination(for: ViewType.self) { viewType in
@@ -118,6 +123,8 @@ struct MainTabView: View {
                         conversationId: conversationId,
                         viewModel: ChatHistoryDetailViewModel(apiClient: ChatClient())
                     )
+                case .coordinateCollage:
+                    CoordinateCollageView(viewModel: .init(), path: $path)
                 }
             }
         }
@@ -220,6 +227,7 @@ final class MainTabViewModel {
 struct AddContentModalView: View {
     @Environment(\.dismiss) var dismiss
     let cameraButtonTapped: (() -> Void)
+    let collageButtonTapped: (() -> Void)
 
     var body: some View {
         VStack(spacing: 12) {
@@ -228,11 +236,12 @@ struct AddContentModalView: View {
                 dismiss()
             }
 
-//            modalButton(title: "アイテムを追加", icon: "tshirt") {
-//                dismiss()
-//            }
+            modalButton(title: "コーデコラージュを作る", icon: "square.grid.2x2") {
+                collageButtonTapped()
+                dismiss()
+            }
 
-//            modalButton(title: "AIスタイリストとチャット", icon: "person.circle") {
+//            modalButton(title: "アイテムを追加", icon: "tshirt") {
 //                dismiss()
 //            }
         }
