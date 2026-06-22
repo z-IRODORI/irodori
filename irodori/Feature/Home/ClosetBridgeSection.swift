@@ -34,25 +34,12 @@ struct ClosetBridgeSection: View {
     // MARK: - Header
 
     private var sectionHeader: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("買い足すなら")
-                    .font(.system(size: 20, weight: .bold))
-                Text("いまの服が活きる3カテゴリ")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            // アフィリエイト/外部ストア導線を含むため PR 表記（景表法・ステマ規制対応）
-            Text("PR")
-                .font(.system(size: 10, weight: .bold))
+        VStack(alignment: .leading, spacing: 2) {
+            Text("買い足すなら")
+                .font(.system(size: 20, weight: .bold))
+            Text("いまの服が活きる3カテゴリ")
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .overlay(
-                    Capsule().stroke(Color.gray.opacity(0.35), lineWidth: 1)
-                )
-                .accessibilityLabel("広告。アフィリエイトリンクを含みます")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -82,7 +69,7 @@ struct ClosetBridgeSection: View {
 
     private var skeleton: some View {
         VStack(spacing: 14) {
-            ForEach(0..<3, id: \.self) { _ in
+            ForEach(0..<2, id: \.self) { _ in
                 VStack(alignment: .leading, spacing: 10) {
                     RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 160, height: 12)
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -121,8 +108,6 @@ struct ClosetBridgeSection: View {
                         .foregroundStyle(.black)
                         .underline()
                 }
-                .accessibilityLabel("再試行する")
-                .accessibilityHint("提案の読み込みをやり直します")
             }
             Spacer()
         }
@@ -130,20 +115,6 @@ struct ClosetBridgeSection: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
-    }
-}
-
-// MARK: - Button Style
-
-/// カードタップ時に軽い押下フィードバック（縮小+減光）を与えるスタイル。
-/// .buttonStyle(.plain) では押下が視覚化されないため、横スクロール内の
-/// 商品カードや CTA に適用してタップの反応を明確にする。
-struct PressableCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .opacity(configuration.isPressed ? 0.72 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -222,17 +193,6 @@ struct ClosetBridgeItemRow: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 「買う理由」を見出し直後に置き、件数/ソートより先に購買判断の文脈を伝える。
-                if !item.outfit_caption.isEmpty {
-                    Text(item.outfit_caption)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
                 HStack(spacing: 6) {
                     Text("\(item.products.count)件")
                         .font(.system(size: 11))
@@ -240,6 +200,15 @@ struct ClosetBridgeItemRow: View {
                     Spacer(minLength: 0)
                     sortMenu
                 }
+            }
+
+            if !item.outfit_caption.isEmpty {
+                Text(item.outfit_caption)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // 相性の良い手持ちアイテム: 「この服と合わせると◎」(色相性で選定, 最大3件)
@@ -258,10 +227,8 @@ struct ClosetBridgeItemRow: View {
             }
 
             // 商品横スクロール（最大YAHOO_LIMIT_PER_ITEM件、ユーザー選択順）
-            // LazyHStack でビューポート外カードの生成・画像ロードを遅延させ、
-            // 初期表示の負荷（最大10件×3カテゴリの同時ロード）を抑える。
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 10) {
+                HStack(spacing: 10) {
                     ForEach(Array(sortedProducts.enumerated()), id: \.offset) { _, product in
                         Button {
                             Haptic.impact(.soft)
@@ -269,40 +236,32 @@ struct ClosetBridgeItemRow: View {
                         } label: {
                             ClosetBridgeProductCard(product: product)
                         }
-                        .buttonStyle(PressableCardButtonStyle())
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(productAccessibilityLabel(product))
-                        .accessibilityHint("タップで商品ページが開きます")
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.vertical, 2)
                 .animation(.easeInOut(duration: 0.2), value: sortOrder)
             }
 
-            // ZOZOTOWN 検索導線（横スクロールの商品＝主導線に対する補助。
-            // 主従を明確にするためアウトラインのセカンダリボタンにする）
+            // ZOZOTOWN 検索導線
             if !item.zozo_search_url.isEmpty {
                 Button {
                     Haptic.impact(.soft)
                     onTapZozo(item)
                 } label: {
                     HStack(spacing: 6) {
-                        Text("ZOZOTOWNでもっと探す")
+                        Text("ZOZOTOWNで探す")
                             .font(.system(size: 13, weight: .semibold))
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 11, weight: .semibold))
                     }
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.black.opacity(0.25), lineWidth: 1.2)
-                    )
+                    .padding(.vertical, 10)
+                    .background(Color.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .buttonStyle(PressableCardButtonStyle())
-                .accessibilityLabel("ZOZOTOWNでもっと探す")
-                .accessibilityHint("外部サイトの検索結果が開きます")
+                .buttonStyle(.plain)
             }
         }
         .padding(14)
@@ -341,24 +300,6 @@ struct ClosetBridgeItemRow: View {
             }
         }
         .frame(width: 56)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(ownedAccessibilityLabel(owned))
-    }
-
-    /// 手持ちアイテムサムネの読み上げ用ラベル（例:「合わせる手持ち：ホワイトのTシャツ」）
-    private func ownedAccessibilityLabel(_ owned: ClosetBridgeOwnedItem) -> String {
-        let color = owned.color ?? ""
-        let kind = (owned.category?.isEmpty == false ? owned.category! : owned.item_type)
-        let name = [color, kind].filter { !$0.isEmpty }.joined(separator: "の")
-        return name.isEmpty ? "手持ちアイテム" : "合わせる手持ち：\(name)"
-    }
-
-    /// 商品カードの読み上げ用ラベル（画像/名前/価格/店名を1要素に統合）
-    private func productAccessibilityLabel(_ product: ClosetBridgeProduct) -> String {
-        var parts: [String] = [product.name]
-        parts.append(product.price > 0 ? "\(product.price)円" : "価格はページで確認")
-        if !product.store_name.isEmpty { parts.append(product.store_name) }
-        return parts.joined(separator: "、")
     }
 
     // 並び替えメニュー (おすすめ順 / 安い順 / 高い順)
@@ -399,11 +340,7 @@ struct ClosetBridgeItemRow: View {
 struct ClosetBridgeProductCard: View {
     let product: ClosetBridgeProduct
 
-    private var isPriceAvailable: Bool { product.price > 0 }
-
     private var priceText: String {
-        // 価格0は「未取得」を意味する。¥0 と誤認させないため CTA 文言に置き換える。
-        guard isPriceAvailable else { return "価格を見る" }
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.groupingSeparator = ","
@@ -421,8 +358,8 @@ struct ClosetBridgeProductCard: View {
                 .multilineTextAlignment(.leading)
                 .frame(width: 132, height: 32, alignment: .topLeading)
             Text(priceText)
-                .font(.system(size: 14, weight: isPriceAvailable ? .bold : .semibold))
-                .foregroundStyle(isPriceAvailable ? Color.primary : Color.gray.opacity(0.7))
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.primary)
             if !product.store_name.isEmpty {
                 Text(product.store_name)
                     .font(.system(size: 11))
@@ -459,10 +396,6 @@ struct ClosetBridgeProductCard: View {
         .frame(width: 132, height: 132)
         .background(Color.gray.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
     }
 
     private var placeholderIcon: some View {
