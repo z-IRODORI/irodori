@@ -13,23 +13,25 @@ import Foundation
 // MARK: - 共通: 相棒の状態
 
 struct PartnerState: Decodable, Hashable {
-    let level: Int
+    let level: Int              // LV = 累計ログイン日数
     let level_name: String
     let exp: Int
     let exp_to_next: Int
     let understanding_pct: Int
     let streak_days: Int
     let total_interactions: Int
+    let login_days: Int?        // 累計ログイン日数（= level）
 
     static func mock(exp: Int = 120, streak: Int = 4) -> PartnerState {
         PartnerState(
-            level: 2,
+            level: 5,
             level_name: "かおみしり",
             exp: exp,
             exp_to_next: 150 - exp > 0 ? 150 - exp : 0,
             understanding_pct: min(100, exp * 100 / 500),
             streak_days: streak,
-            total_interactions: 23
+            total_interactions: 23,
+            login_days: 5
         )
     }
 }
@@ -56,18 +58,18 @@ struct PartnerHomeResponse: Decodable, Hashable {
 
 struct PartnerAdvice: Decodable, Hashable, Identifiable {
     let id: String
-    let understanding: String   // あなたをこう理解してる（根拠つき）
-    let advice: String          // だから、こうしてみない？（理由つきの提案）
-    let discovery: String       // それとね、こんな発見があった
+    let good_point: String      // 良い点（いまのスタイルの良いところ）
+    let concern: String         // 気になる点（やさしく・責めない）
+    let advice: String          // ワンポイントアドバイス（人物像に近づくファッション提案）
     let evidence_hint: String?
 
     static func mock() -> PartnerAdvice {
         PartnerAdvice(
             id: "advice-mock-1",
-            understanding: "ここだけの話、してもいい？ あなたの「カジュアル」率、12回中7回なんだ。たぶん私しか知らない数字。こういうのを見つけると、あなたともっと話したくなる。",
-            advice: "それでね、内緒のおすすめがひとつあるの。小物だけきれいめを一点足すと、たぶんもう一段化けると思う。今度の休日、気が向いたら試してみてほしいな。",
-            discovery: "ひとつ打ち明けると、あなたの目は「きれいめ」を追ってるのに、手は「カジュアル」を取ることが多いんだ。憧れの側も、たまには現実にしてあげない？ 私も見てみたいな。",
-            evidence_hint: "直近12件のコーデと17票の選択から"
+            good_point: "最近の「きれいめカジュアル」な雰囲気、軸が通っていてすごく良いと思う。シンプルなのに地味すぎない、絶妙なバランス。",
+            concern: "ワンパターンに見えないように、たまに違う色や小物を混ぜてみるのもありかも。攻めの一着があってもいいな。",
+            advice: "差し色の小物をひとつ足すだけで、ぐっとあなたらしさが立つと思う。今度の休日、気が向いたら試してみてほしいな。",
+            evidence_hint: "いつものコーデから"
         )
     }
 }
@@ -379,6 +381,7 @@ struct PartnerExpEvent: Decodable, Hashable {
     let label: String
     let exp: Int
     let at: String
+    let kind: String?           // coordinate | partner（活動ログの種別）
 }
 
 struct PartnerGrowthResponse: Decodable, Hashable {
@@ -405,10 +408,10 @@ struct PartnerGrowthResponse: Decodable, Hashable {
                 PartnerQuest(id: "style_votes", title: "好みクイズに3回投票する", exp: 9, done: false),
             ],
             recent_events: [
-                PartnerExpEvent(label: "今日の1問にこたえた", exp: 10, at: "2026-06-11T08:30:00+09:00"),
-                PartnerExpEvent(label: "好みクイズに投票した", exp: 3, at: "2026-06-10T21:10:00+09:00"),
-                PartnerExpEvent(label: "相棒の気づきに反応した", exp: 5, at: "2026-06-10T21:05:00+09:00"),
-                PartnerExpEvent(label: "今日も会いに来てくれた", exp: 1, at: "2026-06-10T21:00:00+09:00"),
+                PartnerExpEvent(label: "コーデを記録した — 「きれいめカジュアル」", exp: 0, at: "2026-06-11T08:30:00+09:00", kind: "coordinate"),
+                PartnerExpEvent(label: "今日の1問にこたえた", exp: 10, at: "2026-06-10T21:10:00+09:00", kind: "partner"),
+                PartnerExpEvent(label: "好みクイズに投票した", exp: 3, at: "2026-06-10T21:05:00+09:00", kind: "partner"),
+                PartnerExpEvent(label: "今日も会いに来てくれた", exp: 1, at: "2026-06-10T21:00:00+09:00", kind: "partner"),
             ]
         )
     }

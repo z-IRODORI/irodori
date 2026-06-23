@@ -94,16 +94,16 @@ struct PartnerAdviceCard: View {
     private func stepsTimeline(advice: PartnerAdvice) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             adviceStep(
-                icon: "eye.fill", color: .blue, label: "あなたのこと、見えてきた",
-                text: advice.understanding, isLast: false
+                icon: "hand.thumbsup.fill", color: .green, label: "いいところ",
+                text: advice.good_point, isLast: false
             )
             adviceStep(
-                icon: "lightbulb.fill", color: .pink, label: "だから、ためしてほしい",
-                text: advice.advice, isLast: false
+                icon: "exclamationmark.bubble.fill", color: .orange, label: "気になるところ",
+                text: advice.concern, isLast: false
             )
             adviceStep(
-                icon: "sparkles", color: .orange, label: "それとね、発見があった",
-                text: advice.discovery, isLast: true
+                icon: "wand.and.stars", color: .pink, label: "ワンポイントアドバイス",
+                text: advice.advice, isLast: true
             )
         }
     }

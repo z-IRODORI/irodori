@@ -15,6 +15,7 @@ import SwiftUI
 
 struct PartnerPattern3GrowthView: View {
     @State private var viewModel = PartnerPattern3ViewModel()
+    @State private var showAllEvents = false
 
     var body: some View {
         ZStack {
@@ -98,15 +99,9 @@ struct PartnerPattern3GrowthView: View {
                         .foregroundColor(.black)
                 }
 
-                if state.exp_to_next > 0 {
-                    Text("つぎのレベルまで あと \(state.exp_to_next)")
-                        .font(.system(size: 12))
-                        .foregroundColor(.gray)
-                } else {
-                    Text("さいこうの相棒になれたよ 🤍")
-                        .font(.system(size: 12))
-                        .foregroundColor(.pink)
-                }
+                Text("これまで \(state.level)日 いっしょにいるよ")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
 
                 HStack(spacing: 4) {
                     Image(systemName: "flame.fill")
@@ -140,23 +135,70 @@ struct PartnerPattern3GrowthView: View {
                     .padding(.vertical, 20)
             } else {
                 VStack(spacing: 8) {
-                    ForEach(Array(events.enumerated()), id: \.offset) { _, event in
-                        HStack {
-                            Text(event.label)
-                                .font(.system(size: 13))
-                                .foregroundColor(.black)
-
-                            Spacer()
-
-                            Text("+\(event.exp)")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(.pink)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Color.gray.opacity(0.04))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    ForEach(Array(events.prefix(10).enumerated()), id: \.offset) { _, event in
+                        eventRow(event)
                     }
+                }
+
+                if events.count > 10 {
+                    Button {
+                        Haptic.impact(.soft)
+                        showAllEvents = true
+                    } label: {
+                        Text("すべてを見る（\(events.count)件）")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.pink)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.pink.opacity(0.08))
+                            .clipShape(Capsule())
+                    }
+                    .padding(.top, 4)
+                }
+            }
+        }
+        .sheet(isPresented: $showAllEvents) {
+            allEventsSheet(events: events)
+        }
+    }
+
+    // ふたりのきろくの1行（活動ログ。exp は出さず、種別アイコンで表す）
+    private func eventRow(_ event: PartnerExpEvent) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: event.kind == "coordinate" ? "tshirt.fill" : "heart.fill")
+                .font(.system(size: 12))
+                .foregroundColor(event.kind == "coordinate" ? .blue : .pink)
+
+            Text(event.label)
+                .font(.system(size: 13))
+                .foregroundColor(.black)
+                .lineLimit(2)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.gray.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    // 全件をスクロールで見るシート
+    private func allEventsSheet(events: [PartnerExpEvent]) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 8) {
+                    ForEach(Array(events.enumerated()), id: \.offset) { _, event in
+                        eventRow(event)
+                    }
+                }
+                .padding(20)
+            }
+            .navigationTitle("ふたりのきろく")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("閉じる") { showAllEvents = false }
+                        .foregroundColor(.black)
                 }
             }
         }
