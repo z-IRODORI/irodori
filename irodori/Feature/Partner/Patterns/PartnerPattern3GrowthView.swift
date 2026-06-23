@@ -32,8 +32,6 @@ struct PartnerPattern3GrowthView: View {
 
                         PartnerAdviceCard()
 
-                        questsSection(quests: growth.quests)
-                        levelsSection(levels: growth.levels, currentLevel: growth.state.level)
                         eventsSection(events: growth.recent_events)
                     }
                     .padding(.horizontal, 20)
@@ -128,100 +126,7 @@ struct PartnerPattern3GrowthView: View {
         }
     }
 
-    // MARK: - 今日のクエスト
-
-    private func questsSection(quests: [PartnerQuest]) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("今日のクエスト", icon: "checklist")
-
-            VStack(spacing: 10) {
-                ForEach(quests) { quest in
-                    HStack(spacing: 12) {
-                        Image(systemName: quest.done ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 22))
-                            .foregroundColor(quest.done ? .green : .gray.opacity(0.4))
-
-                        Text(quest.title)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(quest.done ? .gray : .black)
-                            .strikethrough(quest.done, color: .gray)
-
-                        Spacer()
-
-                        Text("+\(quest.exp)")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(quest.done ? .gray.opacity(0.5) : .pink)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(quest.done ? Color.green.opacity(0.06) : Color.gray.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-            }
-        }
-    }
-
-    // MARK: - 解放ロードマップ
-
-    private func levelsSection(levels: [PartnerLevelInfo], currentLevel: Int) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("相棒ができるようになること", icon: "sparkles")
-
-            VStack(spacing: 0) {
-                ForEach(levels) { level in
-                    HStack(spacing: 14) {
-                        ZStack {
-                            Circle()
-                                .fill(level.unlocked ? Color.pink.opacity(0.12) : Color.gray.opacity(0.08))
-                                .frame(width: 38, height: 38)
-
-                            Image(systemName: level.unlocked ? "heart.fill" : "lock.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(level.unlocked ? .pink : .gray.opacity(0.5))
-                        }
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 6) {
-                                Text("Lv.\(level.level) \(level.name)")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(level.unlocked ? .black : .gray)
-
-                                if level.level == currentLevel {
-                                    Text("いまここ")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .background(Color.pink)
-                                        .clipShape(Capsule())
-                                }
-                            }
-
-                            Text(level.perk)
-                                .font(.system(size: 12))
-                                .foregroundColor(.gray)
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.vertical, 10)
-
-                    if level.level < levels.count {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .frame(height: 1)
-                            .padding(.leading, 52)
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color.gray.opacity(0.04))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-    }
-
-    // MARK: - 最近のできごと
+    // MARK: - ふたりのきろく
 
     private func eventsSection(events: [PartnerExpEvent]) -> some View {
         VStack(alignment: .leading, spacing: 14) {
