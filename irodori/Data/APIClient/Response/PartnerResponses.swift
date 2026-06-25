@@ -416,3 +416,37 @@ struct PartnerGrowthResponse: Decodable, Hashable {
         )
     }
 }
+
+// MARK: - 話し方設定
+
+struct PartnerSpeakingStyleOption: Decodable, Hashable, Identifiable {
+    let key: String
+    let label: String
+    let text: String
+    var id: String { key }
+}
+
+struct PartnerSpeakingStyleResponse: Decodable, Hashable {
+    let status: String
+    let speaking_style: String
+    let speaking_style_text: String
+    let presets: [PartnerSpeakingStyleOption]
+
+    static func mock(selected: String = "spicy") -> PartnerSpeakingStyleResponse {
+        let presets = [
+            PartnerSpeakingStyleOption(key: "normal", label: "ふつう", text: "ふつうの親しい友だち口調"),
+            PartnerSpeakingStyleOption(key: "gentle", label: "やさしい", text: "やさしく寄り添う口調"),
+            PartnerSpeakingStyleOption(key: "spicy", label: "毒舌・辛口", text: "毒舌・辛口だけど愛のある親友口調"),
+            PartnerSpeakingStyleOption(key: "kansai", label: "関西弁", text: "関西弁のにぎやかな口調"),
+            PartnerSpeakingStyleOption(key: "cool", label: "クール", text: "クールで大人っぽい口調"),
+            PartnerSpeakingStyleOption(key: "gal", label: "ギャル", text: "ギャルっぽい高めの口調"),
+            PartnerSpeakingStyleOption(key: "ojou", label: "お嬢様", text: "お嬢様口調"),
+        ]
+        return PartnerSpeakingStyleResponse(
+            status: "success",
+            speaking_style: selected,
+            speaking_style_text: presets.first { $0.key == selected }?.text ?? selected,
+            presets: presets
+        )
+    }
+}

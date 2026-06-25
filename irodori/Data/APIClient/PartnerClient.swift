@@ -23,6 +23,8 @@ protocol PartnerClientProtocol {
     func sendVerdict(userId: String, hypothesisId: String, verdict: String, comment: String?) async throws -> Result<PartnerVerdictResponse, HTTPError>
     func getNotebook(userId: String) async throws -> Result<PartnerNotebookResponse, HTTPError>
     func getGrowth(userId: String) async throws -> Result<PartnerGrowthResponse, HTTPError>
+    func getSpeakingStyle(userId: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError>
+    func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError>
 }
 
 // MARK: - リクエストボディ
@@ -61,6 +63,11 @@ private struct HypothesisVerdictBody: Encodable {
     let hypothesis_id: String
     let verdict: String
     let comment: String?
+}
+
+private struct SpeakingStyleBody: Encodable {
+    let user_id: String
+    let style: String
 }
 
 // MARK: - 実装
@@ -140,6 +147,14 @@ final class PartnerClient: PartnerClientProtocol {
 
     func getGrowth(userId: String) async throws -> Result<PartnerGrowthResponse, HTTPError> {
         try await get(endpoint: "api/partner/growth", queryItems: [URLQueryItem(name: "user_id", value: userId)])
+    }
+
+    func getSpeakingStyle(userId: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
+        try await get(endpoint: "api/partner/speaking-style", queryItems: [URLQueryItem(name: "user_id", value: userId)])
+    }
+
+    func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
+        try await post(endpoint: "api/partner/speaking-style", body: SpeakingStyleBody(user_id: userId, style: style))
     }
 
     // MARK: - 共通リクエスト処理
@@ -277,6 +292,14 @@ final class MockPartnerClient: PartnerClientProtocol {
         try? await Task.sleep(nanoseconds: 400_000_000)
         return .success(.mock())
     }
+
+    func getSpeakingStyle(userId: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
+        return .success(.mock())
+    }
+
+    func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
+        return .success(.mock(selected: style))
+    }
 }
 
 // MARK: - フォールバック付きクライアント
@@ -377,5 +400,13 @@ final class FallbackPartnerClient: PartnerClientProtocol {
 
     func getGrowth(userId: String) async throws -> Result<PartnerGrowthResponse, HTTPError> {
         try await withFallback({ try await real.getGrowth(userId: userId) }, { try await mock.getGrowth(userId: userId) })
+    }
+
+    func getSpeakingStyle(userId: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
+        try await withFallback({ try await real.getSpeakingStyle(userId: userId) }, { try await mock.getSpeakingStyle(userId: userId) })
+    }
+
+    func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
+        try await withFallback({ try await real.setSpeakingStyle(userId: userId, style: style) }, { try await mock.setSpeakingStyle(userId: userId, style: style) })
     }
 }

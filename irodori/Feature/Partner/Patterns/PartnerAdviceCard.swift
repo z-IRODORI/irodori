@@ -19,6 +19,7 @@ import SwiftUI
 
 struct PartnerAdviceCard: View {
     @State private var viewModel = PartnerAdviceCardViewModel()
+    @State private var showStyleSheet = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -65,6 +66,16 @@ struct PartnerAdviceCard: View {
                 await viewModel.load()
             }
         }
+        .sheet(isPresented: $showStyleSheet) {
+            SpeakingStyleSheet(
+                response: viewModel.styleResponse,
+                isSaving: viewModel.isSavingStyle,
+                onSelect: { style in
+                    Task { await viewModel.setStyle(style) }
+                },
+                onClose: { showStyleSheet = false }
+            )
+        }
     }
 
     // MARK: - ヘッダー
@@ -79,13 +90,23 @@ struct PartnerAdviceCard: View {
 
             Spacer()
 
-            Text("きょうのひとこと")
-                .font(.system(size: 10, weight: .medium))
+            Button {
+                Haptic.impact(.soft)
+                Task { await viewModel.loadStyle() }
+                showStyleSheet = true
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "bubble.left.and.text.bubble.right")
+                        .font(.system(size: 10))
+                    Text("話し方")
+                        .font(.system(size: 11, weight: .medium))
+                }
                 .foregroundColor(.pink)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.pink.opacity(0.1))
                 .clipShape(Capsule())
+            }
         }
     }
 
@@ -212,11 +233,35 @@ final class PartnerAdviceCardViewModel {
     var expGained: Int?
     var isLoading = false
     var isSending = false
+    var styleResponse: PartnerSpeakingStyleResponse?
+    var isSavingStyle = false
 
     private let apiClient: PartnerClientProtocol
 
     init(apiClient: PartnerClientProtocol = FallbackPartnerClient()) {
         self.apiClient = apiClient
+    }
+
+    func loadStyle() async {
+        if let result = try? await apiClient.getSpeakingStyle(userId: PartnerPatternUtility.userId),
+           case .success(let response) = result {
+            styleResponse = response
+        }
+    }
+
+    func setStyle(_ style: String) async {
+        guard !isSavingStyle else { return }
+        isSavingStyle = true
+        defer { isSavingStyle = false }
+        if let result = try? await apiClient.setSpeakingStyle(userId: PartnerPatternUtility.userId, style: style),
+           case .success(let response) = result {
+            styleResponse = response
+            // 話し方が変わったので「相棒からあなたへ」を取り直す
+            advice = nil
+            reply = nil
+            expGained = nil
+            await load()
+        }
     }
 
     func load() async {
@@ -253,6 +298,109 @@ final class PartnerAdviceCardViewModel {
             }
         } catch {
             ToastManager.shared.show("送信に失敗しました")
+        }
+    }
+}
+
+// MARK: - 話し方を変えるシート
+
+struct SpeakingStyleSheet: View {
+    let response: PartnerSpeakingStyleResponse?
+    let isSaving: Bool
+    let onSelect: (String) -> Void
+    let onClose: () -> Void
+
+    @State private var customText = ""
+
+    private var trimmedCustom: String {
+        customText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("相棒の話し方を選べます。プリセットから選ぶか、自由に入力できます。")
+                        .font(.system(size: 13))
+                        .foregroundColor(.gray)
+
+                    if let presets = response?.presets {
+                        VStack(spacing: 8) {
+                            ForEach(presets) { option in
+                                Button {
+                                    Haptic.impact(.soft)
+                                    onSelect(option.key)
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(option.label)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundColor(.black)
+                                            Text(option.text)
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.gray)
+                                                .lineLimit(2)
+                                                .multilineTextAlignment(.leading)
+                                        }
+                                        Spacer()
+                                        if response?.speaking_style == option.key {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundColor(.pink)
+                                        }
+                                    }
+                                    .padding(14)
+                                    .background(Color.gray.opacity(0.05))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isSaving)
+                            }
+                        }
+                    } else {
+                        ProgressView().frame(maxWidth: .infinity).padding()
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("自由に決める")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.black)
+                        TextField("例: 海賊みたいに / 落語家風に", text: $customText)
+                            .textFieldStyle(.roundedBorder)
+                        Button {
+                            Haptic.impact(.soft)
+                            if !trimmedCustom.isEmpty { onSelect(trimmedCustom) }
+                        } label: {
+                            Text("この話し方にする")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 11)
+                                .background(trimmedCustom.isEmpty ? Color.gray.opacity(0.3) : Color.pink)
+                                .clipShape(Capsule())
+                        }
+                        .disabled(isSaving || trimmedCustom.isEmpty)
+                    }
+                    .padding(.top, 8)
+
+                    if isSaving {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("話し方を変えて、コメントを作り直してるよ…")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .navigationTitle("相棒の話し方")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("閉じる") { onClose() }
+                        .foregroundColor(.black)
+                }
+            }
         }
     }
 }
