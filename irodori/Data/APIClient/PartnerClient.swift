@@ -12,6 +12,7 @@ import Foundation
 protocol PartnerClientProtocol {
     func getHome(userId: String) async throws -> Result<PartnerHomeResponse, HTTPError>
     func getAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError>
+    func regenerateAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError>
     func sendAdviceFeedback(userId: String, adviceId: String, reaction: String) async throws -> Result<PartnerAdviceFeedbackResponse, HTTPError>
     func getDailyQuestion(userId: String) async throws -> Result<PartnerDailyQuestionResponse, HTTPError>
     func answerDailyQuestion(userId: String, questionId: String, choice: String?, freeText: String?, skipped: Bool) async throws -> Result<PartnerAnswerResponse, HTTPError>
@@ -33,6 +34,10 @@ private struct AdviceFeedbackBody: Encodable {
     let user_id: String
     let advice_id: String
     let reaction: String
+}
+
+private struct AdviceRegenerateBody: Encodable {
+    let user_id: String
 }
 
 private struct DailyQuestionAnswerBody: Encodable {
@@ -81,6 +86,10 @@ final class PartnerClient: PartnerClientProtocol {
 
     func getAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError> {
         try await get(endpoint: "api/partner/advice", queryItems: [URLQueryItem(name: "user_id", value: userId)])
+    }
+
+    func regenerateAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError> {
+        try await post(endpoint: "api/partner/advice/regenerate", body: AdviceRegenerateBody(user_id: userId))
     }
 
     func sendAdviceFeedback(userId: String, adviceId: String, reaction: String) async throws -> Result<PartnerAdviceFeedbackResponse, HTTPError> {
@@ -219,6 +228,11 @@ final class MockPartnerClient: PartnerClientProtocol {
         return .success(.mock())
     }
 
+    func regenerateAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError> {
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        return .success(.mock())
+    }
+
     func sendAdviceFeedback(userId: String, adviceId: String, reaction: String) async throws -> Result<PartnerAdviceFeedbackResponse, HTTPError> {
         try? await Task.sleep(nanoseconds: 250_000_000)
         return .success(.mock(reaction: reaction))
@@ -338,6 +352,10 @@ final class FallbackPartnerClient: PartnerClientProtocol {
 
     func getAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError> {
         try await withFallback({ try await real.getAdvice(userId: userId) }, { try await mock.getAdvice(userId: userId) })
+    }
+
+    func regenerateAdvice(userId: String) async throws -> Result<PartnerAdviceResponse, HTTPError> {
+        try await withFallback({ try await real.regenerateAdvice(userId: userId) }, { try await mock.regenerateAdvice(userId: userId) })
     }
 
     func sendAdviceFeedback(userId: String, adviceId: String, reaction: String) async throws -> Result<PartnerAdviceFeedbackResponse, HTTPError> {

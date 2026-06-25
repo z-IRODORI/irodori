@@ -20,13 +20,14 @@ import SwiftUI
 struct PartnerAdviceCard: View {
     @State private var viewModel = PartnerAdviceCardViewModel()
     @State private var showStyleSheet = false
+    @State private var showRegenerateConfirm = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
 
-            if viewModel.isLoading {
-                ProgressView()
+            if viewModel.isLoading || viewModel.isRegenerating {
+                ProgressView(viewModel.isRegenerating ? "相棒が考え直してるよ…" : "")
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 30)
             } else if let advice = viewModel.advice {
@@ -76,6 +77,14 @@ struct PartnerAdviceCard: View {
                 onClose: { showStyleSheet = false }
             )
         }
+        .confirmationDialog("いまのコメントを作り直しますか？", isPresented: $showRegenerateConfirm, titleVisibility: .visible) {
+            Button("作り直す") {
+                Task { await viewModel.regenerate() }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("「相棒からあなたへ」を、もう一度生成します。")
+        }
     }
 
     // MARK: - ヘッダー
@@ -89,6 +98,20 @@ struct PartnerAdviceCard: View {
                 .foregroundColor(.black)
 
             Spacer()
+
+            // 再生成（作り直すかは確認ダイアログでユーザーが選ぶ）
+            Button {
+                Haptic.impact(.soft)
+                showRegenerateConfirm = true
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.pink)
+                    .padding(6)
+                    .background(Color.pink.opacity(0.1))
+                    .clipShape(Circle())
+            }
+            .disabled(viewModel.isRegenerating)
 
             Button {
                 Haptic.impact(.soft)
@@ -235,11 +258,24 @@ final class PartnerAdviceCardViewModel {
     var isSending = false
     var styleResponse: PartnerSpeakingStyleResponse?
     var isSavingStyle = false
+    var isRegenerating = false
 
     private let apiClient: PartnerClientProtocol
 
     init(apiClient: PartnerClientProtocol = FallbackPartnerClient()) {
         self.apiClient = apiClient
+    }
+
+    func regenerate() async {
+        guard !isRegenerating else { return }
+        isRegenerating = true
+        defer { isRegenerating = false }
+        if let result = try? await apiClient.regenerateAdvice(userId: PartnerPatternUtility.userId),
+           case .success(let response) = result {
+            advice = response.advice
+            reply = nil
+            expGained = nil
+        }
     }
 
     func loadStyle() async {
