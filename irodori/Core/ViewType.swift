@@ -22,6 +22,7 @@ enum ViewType: Hashable {
     case fashionTypeResult(FashionTypeResponse)
     case recommendCoordinateByStandardItem(RecommendCoordinateParams)
     case coordinateCollage
+    case outfitSuggestion
 
     struct CoordinateReviewParams: Hashable {
         let image: UIImage?

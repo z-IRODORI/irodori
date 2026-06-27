@@ -330,7 +330,7 @@ struct HomeView: View {
             Divider().padding(.vertical, 16)
 
             HStack(spacing: 10) {
-                Button(action: { path.append(.tomorrowPlanner) }) {
+                Button(action: { path.append(.outfitSuggestion) }) {
                     Label("コーデ提案して", systemImage: "wand.and.stars")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)

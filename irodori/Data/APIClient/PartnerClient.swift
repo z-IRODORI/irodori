@@ -26,6 +26,7 @@ protocol PartnerClientProtocol {
     func getGrowth(userId: String) async throws -> Result<PartnerGrowthResponse, HTTPError>
     func getSpeakingStyle(userId: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError>
     func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError>
+    func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError>
 }
 
 // MARK: - リクエストボディ
@@ -73,6 +74,22 @@ private struct HypothesisVerdictBody: Encodable {
 private struct SpeakingStyleBody: Encodable {
     let user_id: String
     let style: String
+}
+
+private struct OutfitSuggestionBody: Encodable {
+    let user_id: String
+    let gender: String
+    let when: String
+    let looks: [String]
+    let with_who: String?
+    let whereText: String?
+    let prefecture_code: String?
+
+    enum CodingKeys: String, CodingKey {
+        case user_id, gender, when, looks, with_who
+        case whereText = "where"
+        case prefecture_code
+    }
 }
 
 // MARK: - 実装
@@ -164,6 +181,16 @@ final class PartnerClient: PartnerClientProtocol {
 
     func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
         try await post(endpoint: "api/partner/speaking-style", body: SpeakingStyleBody(user_id: userId, style: style))
+    }
+
+    func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {
+        try await post(
+            endpoint: "api/partner/outfit-suggestion",
+            body: OutfitSuggestionBody(
+                user_id: userId, gender: gender, when: when, looks: looks,
+                with_who: withWho, whereText: whereText, prefecture_code: prefectureCode
+            )
+        )
     }
 
     // MARK: - 共通リクエスト処理
@@ -314,6 +341,11 @@ final class MockPartnerClient: PartnerClientProtocol {
     func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
         return .success(.mock(selected: style))
     }
+
+    func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {
+        try? await Task.sleep(nanoseconds: 800_000_000)
+        return .success(.mock())
+    }
 }
 
 // MARK: - フォールバック付きクライアント
@@ -426,5 +458,12 @@ final class FallbackPartnerClient: PartnerClientProtocol {
 
     func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
         try await withFallback({ try await real.setSpeakingStyle(userId: userId, style: style) }, { try await mock.setSpeakingStyle(userId: userId, style: style) })
+    }
+
+    func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {
+        try await withFallback(
+            { try await real.proposeOutfitSuggestion(userId: userId, gender: gender, when: when, looks: looks, withWho: withWho, whereText: whereText, prefectureCode: prefectureCode) },
+            { try await mock.proposeOutfitSuggestion(userId: userId, gender: gender, when: when, looks: looks, withWho: withWho, whereText: whereText, prefectureCode: prefectureCode) }
+        )
     }
 }

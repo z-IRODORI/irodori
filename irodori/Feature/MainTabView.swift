@@ -125,6 +125,8 @@ struct MainTabView: View {
                     )
                 case .coordinateCollage:
                     CoordinateCollageView(viewModel: .init(), path: $path)
+                case .outfitSuggestion:
+                    OutfitSuggestionView(path: $path)
                 }
             }
         }
