@@ -6,9 +6,23 @@
 //  入力(いつ/どう見られたい/誰と/どこ) → ローディング → 結果(相棒コメント +
 //  スナップからおすすめ + クローゼットからコーデ) の3ステップを 1 画面で管理する。
 //
+//  入力UIは IRODORI のデザインシステムに準拠:
+//   - 背景 gray.0.08 / セクションは白カード(角丸16, shadow)
+//   - アクセントはブランドグラデーション(#FF446B→#FF724C)
+//   - 「どう見られたい」は絵文字付き複数選択チップ
+//   - 「誰と/どこ」はサジェストチップ + 自由入力で素早く
+//   - CTA は下部固定(safeAreaInset)
+//
 
 import SwiftUI
 import Kingfisher
+
+// MARK: - ブランドカラー
+
+private let brandGradient = LinearGradient(
+    colors: [Color(red: 1.0, green: 0.27, blue: 0.42), Color(red: 1.0, green: 0.45, blue: 0.30)],
+    startPoint: .leading, endPoint: .trailing
+)
 
 // MARK: - 入力選択肢
 
@@ -34,7 +48,22 @@ enum OutfitLookOption: String, CaseIterable, Identifiable {
     case cute = "かわいく"
     case calm = "落ち着いて"
     var id: String { rawValue }
+    var emoji: String {
+        switch self {
+        case .cool: return "🔥"
+        case .attractive: return "💘"
+        case .elegant: return "✨"
+        case .neat: return "🤍"
+        case .casual: return "🧢"
+        case .cute: return "🎀"
+        case .calm: return "🍵"
+        }
+    }
 }
+
+// サジェスト候補（タップで自由入力欄にセットでき、素早く入力できる）
+private let withWhoSuggestions = ["友人", "恋人", "家族", "同僚", "上司", "ひとり"]
+private let whereSuggestions = ["カフェ", "デート", "オフィス", "ごはん", "お出かけ", "結婚式"]
 
 // MARK: - ViewModel
 
@@ -139,135 +168,224 @@ struct OutfitSuggestionView: View {
     // MARK: 入力
 
     private var inputView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack(spacing: 10) {
-                    PartnerIconImage(size: 44)
-                    Text("予定を教えてくれたら、\n次に着るコーデを提案するよ！")
-                        .font(.system(size: 14, weight: .medium))
-                        .lineSpacing(3)
-                    Spacer()
-                }
-
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
+                greetingHeader
                 if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.red.opacity(0.07))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    errorBanner(errorMessage)
                 }
-
-                // いつ
-                section(title: "いつ", required: true) {
-                    HStack(spacing: 8) {
-                        ForEach(OutfitWhenOption.allCases) { opt in
-                            let selected = viewModel.when == opt
-                            Button { viewModel.when = opt } label: {
-                                Text(opt.label)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(selected ? .white : .primary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(selected ? Color.black : Color.gray.opacity(0.1))
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                // どう見られたい (複数選択)
-                section(title: "どう見られたい？", required: true, hint: "いくつでも選べるよ") {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 96), spacing: 8)],
-                        alignment: .leading,
-                        spacing: 8
-                    ) {
-                        ForEach(OutfitLookOption.allCases) { look in
-                            lookChip(look)
-                        }
-                    }
-                }
-
-                // 誰と (任意)
-                section(title: "誰と会う？", required: false, hint: "任意") {
-                    TextField("例: 友人、恋人、上司 など", text: $viewModel.withWho)
-                        .textFieldStyle(.plain)
-                        .padding(12)
-                        .background(Color.gray.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-
-                // どこに (任意)
-                section(title: "どこに行く？", required: false, hint: "任意") {
-                    TextField("例: 渋谷のカフェ、結婚式 など", text: $viewModel.whereText)
-                        .textFieldStyle(.plain)
-                        .padding(12)
-                        .background(Color.gray.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-
-                Button { Task { await viewModel.submit() } } label: {
-                    Text("相棒に提案してもらう")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(viewModel.canSubmit ? Color.pink : Color.gray.opacity(0.4))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .disabled(!viewModel.canSubmit)
-                .padding(.top, 4)
+                whenCard
+                looksCard
+                withWhoCard
+                whereCard
+                Color.clear.frame(height: 8)
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
         }
+        .background(Color.gray.opacity(0.08))
+        .safeAreaInset(edge: .bottom) { ctaBar }
     }
 
-    private func lookChip(_ look: OutfitLookOption) -> some View {
-        let selected = viewModel.selectedLooks.contains(look)
-        return Button { viewModel.toggle(look) } label: {
-            Text(look.rawValue)
+    // 相棒の吹き出し風ヘッダー
+    private var greetingHeader: some View {
+        HStack(alignment: .top, spacing: 10) {
+            PartnerIconImage(size: 44)
+            Text("予定を教えてくれたら、\nぴったりのコーデを提案するよ！")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(selected ? .white : .primary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 9)
-                .background(selected ? Color.pink : Color.gray.opacity(0.1))
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule().stroke(selected ? Color.pink : Color.gray.opacity(0.2), lineWidth: 1)
-                )
+                .lineSpacing(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14).padding(.vertical, 11)
+                .background(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.black.opacity(0.05), lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .padding(.top, 4)
     }
 
-    private func section<Content: View>(
+    private func errorBanner(_ msg: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(.red.opacity(0.8))
+            Text(msg)
+                .font(.system(size: 13))
+                .foregroundStyle(.red)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(12)
+        .background(Color.red.opacity(0.07))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // カード共通レイアウト
+    private func card<Content: View>(
         title: String,
         required: Bool,
         hint: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 6) {
-                Text(title)
-                    .font(.system(size: 15, weight: .bold))
-                if required {
-                    Text("必須")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Color.pink)
-                        .clipShape(Capsule())
-                }
+                Text(title).font(.system(size: 15, weight: .bold))
+                Text(required ? "必須" : "任意")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(required ? Color.white : Color.secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(required ? AnyShapeStyle(Color.pink) : AnyShapeStyle(Color.gray.opacity(0.15)))
+                    .clipShape(Capsule())
                 if let hint {
-                    Text(hint)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                    Text(hint).font(.system(size: 11)).foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 0)
             }
             content()
         }
+        .padding(16)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+
+    private var whenCard: some View {
+        card(title: "いつ着る？", required: true) {
+            HStack(spacing: 8) {
+                ForEach(OutfitWhenOption.allCases) { opt in
+                    let selected = viewModel.when == opt
+                    Button {
+                        Haptic.impact(.soft)
+                        viewModel.when = opt
+                    } label: {
+                        Text(opt.label)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(selected ? .white : .primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                            .background(selected ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.gray.opacity(0.1)))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var looksCard: some View {
+        card(title: "どう見られたい？", required: true, hint: "いくつでもOK") {
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
+                spacing: 10
+            ) {
+                ForEach(OutfitLookOption.allCases) { look in
+                    lookChip(look)
+                }
+            }
+        }
+    }
+
+    private func lookChip(_ look: OutfitLookOption) -> some View {
+        let selected = viewModel.selectedLooks.contains(look)
+        return Button {
+            Haptic.impact(.soft)
+            viewModel.toggle(look)
+        } label: {
+            HStack(spacing: 6) {
+                Text(look.emoji).font(.system(size: 15))
+                Text(look.rawValue)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(selected ? .white : .primary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(selected ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.gray.opacity(0.08)))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(selected ? Color.clear : Color.gray.opacity(0.15), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var withWhoCard: some View {
+        card(title: "誰と会う？", required: false, hint: "任意") {
+            suggestionRow(suggestions: withWhoSuggestions, selection: viewModel.withWho) {
+                viewModel.withWho = $0
+            }
+            TextField("自由入力もできるよ（例: 後輩、義両親）", text: $viewModel.withWho)
+                .font(.system(size: 14))
+                .padding(12)
+                .background(Color.gray.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private var whereCard: some View {
+        card(title: "どこに行く？", required: false, hint: "任意") {
+            suggestionRow(suggestions: whereSuggestions, selection: viewModel.whereText) {
+                viewModel.whereText = $0
+            }
+            TextField("自由入力もできるよ（例: 渋谷のカフェ）", text: $viewModel.whereText)
+                .font(.system(size: 14))
+                .padding(12)
+                .background(Color.gray.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    // サジェストチップ行（タップで自由入力欄にセット / もう一度タップで解除）
+    private func suggestionRow(
+        suggestions: [String],
+        selection: String,
+        onTap: @escaping (String) -> Void
+    ) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 76), spacing: 8)],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            ForEach(suggestions, id: \.self) { s in
+                let selected = (selection == s)
+                Button {
+                    Haptic.impact(.soft)
+                    onTap(selected ? "" : s)
+                } label: {
+                    Text(s)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(selected ? .white : .primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(selected ? AnyShapeStyle(Color.pink) : AnyShapeStyle(Color.gray.opacity(0.08)))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(selected ? Color.clear : Color.gray.opacity(0.15), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // 下部固定 CTA
+    private var ctaBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            Button {
+                Haptic.impact(.medium)
+                Task { await viewModel.submit() }
+            } label: {
+                Text("相棒に提案してもらう")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(viewModel.canSubmit ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.gray.opacity(0.35)))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .disabled(!viewModel.canSubmit)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+        }
+        .background(.ultraThinMaterial)
     }
 
     // MARK: ローディング
@@ -277,17 +395,19 @@ struct OutfitSuggestionView: View {
             PartnerIconImage(size: 72)
             ProgressView()
                 .scaleEffect(1.2)
+                .tint(.pink)
             Text("相棒がコーデを考えているよ…")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.gray.opacity(0.08))
     }
 
     // MARK: 結果
 
     private var resultView: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             if let result = viewModel.result {
                 VStack(alignment: .leading, spacing: 28) {
                     // 相棒コメント
@@ -352,7 +472,10 @@ struct OutfitSuggestionView: View {
                         }
                     }
 
-                    Button { viewModel.reset() } label: {
+                    Button {
+                        Haptic.impact(.soft)
+                        viewModel.reset()
+                    } label: {
                         Text("条件を変えてもう一度")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.black)
@@ -367,6 +490,7 @@ struct OutfitSuggestionView: View {
                 .padding(20)
             }
         }
+        .background(Color.gray.opacity(0.08))
     }
 
     private func emptyBox(_ text: String) -> some View {
