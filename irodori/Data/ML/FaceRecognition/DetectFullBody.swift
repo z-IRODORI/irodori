@@ -22,16 +22,14 @@ struct DetectFullBody {
         }
         guard let obs = request.results?.first else { return false }
 
-        // 足首が見えていれば確実に全身（足先まで写る）
-        let ankles: [VNHumanBodyPoseObservation.JointName] = [.leftAnkle, .rightAnkle]
-        if hasAny(obs, ankles, minConfidence) { return true }
-
-        // 足首が服等で隠れても、膝が十分下（画像下端付近）に見えていれば全身とみなす
-        let knees: [VNHumanBodyPoseObservation.JointName] = [.leftKnee, .rightKnee]
-        if let kneeY = lowestY(obs, knees, minConfidence), kneeY > 0.75 {
-            return true
-        }
-        return false
+        // 「頭から膝くらいまで」写っていればOK（完璧な全身でなくてよい）。
+        // 膝または足首のどちらかが見えていれば、膝以下まで写っているとみなす。
+        // 頭部は本人判定（顔）で担保されているため、ここでは下半身の有無だけを見る。
+        // 上半身だけ（膝・足首が無い）の写真は除外される。
+        let lowerBody: [VNHumanBodyPoseObservation.JointName] = [
+            .leftKnee, .rightKnee, .leftAnkle, .rightAnkle,
+        ]
+        return hasAny(obs, lowerBody, minConfidence)
     }
 
     private func hasAny(
@@ -45,21 +43,5 @@ struct DetectFullBody {
             }
         }
         return false
-    }
-
-    /// 指定関節のうち最も下にある点の y（Vision 正規化・原点左下 → 0=下,1=上 を 0=上,1=下 に直して返す）
-    private func lowestY(
-        _ obs: VNHumanBodyPoseObservation,
-        _ joints: [VNHumanBodyPoseObservation.JointName],
-        _ minConfidence: Float
-    ) -> CGFloat? {
-        var maxDownward: CGFloat?
-        for joint in joints {
-            if let p = try? obs.recognizedPoint(joint), p.confidence >= minConfidence {
-                let downward = 1 - p.location.y  // 0=上, 1=下
-                maxDownward = max(maxDownward ?? 0, downward)
-            }
-        }
-        return maxDownward
     }
 }
