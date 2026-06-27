@@ -489,6 +489,16 @@ private struct ResultStep: View {
                     .background(Circle().fill(.black.opacity(isSelected ? 0 : 0.15)).frame(width: 24, height: 24))
                     .padding(6)
             }
+            .overlay(alignment: .bottomLeading) {
+                // 本人らしさ（コサイン類似度）。閾値調整の目安。
+                Text(String(format: "%.0f%%", candidate.similarity * 100))
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(.black.opacity(0.45)))
+                    .padding(5)
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(isSelected ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.clear), lineWidth: 2.5)
