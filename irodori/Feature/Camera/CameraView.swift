@@ -15,6 +15,7 @@ struct CameraView: View {
     @Binding var path: [ViewType]
     @State private var showCapturedImage = false
     @State private var isShowOnboardingModal: Bool = false
+    @State private var showFullBodyPicker = false
     var onPhotoCaptured: ((UIImage) -> Void)? = nil
 
     var body: some View {
@@ -49,6 +50,9 @@ struct CameraView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.leading, 24)
                         CaptureButton()
+                        AIFullBodyButton()
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .padding(.trailing, 24)
                     }
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
@@ -73,6 +77,9 @@ struct CameraView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.leading, 24)
                         CaptureButton()
+                        AIFullBodyButton()
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .padding(.trailing, 24)
                     }
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
@@ -101,6 +108,20 @@ struct CameraView: View {
                     }
                 )   // キャプチャした画像表示画面
             }
+        }
+        .fullScreenCover(isPresented: $showFullBodyPicker) {
+            FullBodyPickerView(
+                onComplete: { images in
+                    showFullBodyPicker = false
+                    if let image = images.first {
+                        cameraViewModel.processPickedImage(image)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showCapturedImage = true
+                        }
+                    }
+                },
+                onClose: { showFullBodyPicker = false }
+            )
         }
         .sheet(isPresented: $isShowOnboardingModal) {
             OnboardingView(closeButtonTapped: {
@@ -235,6 +256,30 @@ extension CameraView {
         }
     }
     
+    private func AIFullBodyButton() -> some View {
+        Button(action: {
+            Haptic.impact(.soft)
+            showFullBodyPicker = true
+        }) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [Color(red: 1.0, green: 0.27, blue: 0.42), Color(red: 1.0, green: 0.45, blue: 0.30)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 64, height: 64)
+                VStack(spacing: 1) {
+                    Image(systemName: "person.crop.square.badge.camera")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white)
+                    Text("AI")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+    }
+
     private func CaptureButton() -> some View {
         Button(action: {
             AnalyticsLogger.shared.log(action: .photoTaken, parameters: [
