@@ -12,7 +12,7 @@ import UIKit
 
 struct DetectFullBody {
     /// 下半身（足首・膝）のキーポイントが検出されれば全身とみなす
-    func isFullBody(in cgImage: CGImage, minConfidence: Float = 0.3) -> Bool {
+    func isFullBody(in cgImage: CGImage, minConfidence: Float = 0.25) -> Bool {
         let request = VNDetectHumanBodyPoseRequest()
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         do {

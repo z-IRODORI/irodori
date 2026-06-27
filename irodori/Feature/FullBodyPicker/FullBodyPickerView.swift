@@ -20,6 +20,28 @@ private let brandGradient = LinearGradient(
     startPoint: .leading, endPoint: .trailing
 )
 
+// MARK: - 走査オプション
+
+enum ScanPeriod: Int, CaseIterable, Identifiable {
+    case month1 = 1, month3 = 3, month6 = 6, year1 = 12, year2 = 24
+    var id: Int { rawValue }
+    var label: String {
+        switch self {
+        case .month1: return "1ヶ月"
+        case .month3: return "3ヶ月"
+        case .month6: return "6ヶ月"
+        case .year1: return "1年"
+        case .year2: return "2年"
+        }
+    }
+}
+
+enum ScanLimit: Int, CaseIterable, Identifiable {
+    case n300 = 300, n500 = 500, n1000 = 1000, n2000 = 2000
+    var id: Int { rawValue }
+    var label: String { "\(rawValue)枚" }
+}
+
 // MARK: - ViewModel
 
 @MainActor
@@ -33,8 +55,17 @@ final class FullBodyPickerViewModel {
     var candidates: [FullBodyCandidate] = []
     var selected: Set<String> = []
     var errorMessage: String?
+    var scanPeriod: ScanPeriod = .year1
+    var scanLimit: ScanLimit = .n1000
 
     private let service = FullBodyPickerService()
+
+    /// 最大枚数からのおおよその所要時間（1枚あたり約0.1秒を目安）
+    static func estimatedTime(forLimit limit: Int) -> String {
+        let seconds = Double(limit) * 0.1
+        if seconds < 60 { return "約\(Int(seconds))秒" }
+        return "約\(Int((seconds / 60).rounded(.up)))分"
+    }
 
     /// 選択/撮影した画像を顔中心の正方形に切り抜いてセット
     func setFaceImage(_ image: UIImage) {
@@ -62,7 +93,9 @@ final class FullBodyPickerViewModel {
                 return
             }
 
-            let result = await service.pickFullBodyPhotos(targetEmbedding: emb) { p in
+            let months = self.scanPeriod.rawValue
+            let limit = self.scanLimit.rawValue
+            let result = await service.pickFullBodyPhotos(targetEmbedding: emb, months: months, limit: limit) { p in
                 Task { @MainActor in self.progress = p }
             }
             self.candidates = result
@@ -252,7 +285,7 @@ private struct EntryRow: View {
 // MARK: - ② 顔写真を使う
 
 private struct FaceInputStep: View {
-    let viewModel: FullBodyPickerViewModel
+    @Bindable var viewModel: FullBodyPickerViewModel
     let onClose: () -> Void
 
     @State private var libraryItem: PhotosPickerItem?
@@ -290,6 +323,8 @@ private struct FaceInputStep: View {
                             .foregroundStyle(.pink)
                             .underline()
                     }
+
+                    scanSettings
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 12)
@@ -339,6 +374,42 @@ private struct FaceInputStep: View {
             }
             .ignoresSafeArea()
         }
+    }
+
+    private var scanSettings: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text("対象期間")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.black)
+                Spacer()
+                Picker("対象期間", selection: $viewModel.scanPeriod) {
+                    ForEach(ScanPeriod.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.menu)
+                .tint(.pink)
+            }
+            Divider()
+            HStack {
+                Text("最大枚数")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.black)
+                Spacer()
+                Picker("最大枚数", selection: $viewModel.scanLimit) {
+                    ForEach(ScanLimit.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.menu)
+                .tint(.pink)
+            }
+            Text("直近\(viewModel.scanPeriod.label)の写真を最大\(viewModel.scanLimit.rawValue)枚調べます（\(FullBodyPickerViewModel.estimatedTime(forLimit: viewModel.scanLimit.rawValue))ほどかかります）")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 2)
+        }
+        .padding(14)
+        .background(Color.gray.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     @ViewBuilder

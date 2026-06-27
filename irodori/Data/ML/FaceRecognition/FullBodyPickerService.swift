@@ -27,13 +27,9 @@ final class FullBodyPickerService {
     private let faceEmbedder: FaceEmbedder?
     private let aligner = FaceAligner()
     private let detectFullBody = DetectFullBody()
-    private let monthsBack: Int
-    private let scanLimit: Int
 
-    init(faceEmbedder: FaceEmbedder? = FaceEmbedder(), monthsBack: Int = 12, scanLimit: Int = 2000) {
+    init(faceEmbedder: FaceEmbedder? = FaceEmbedder()) {
         self.faceEmbedder = faceEmbedder
-        self.monthsBack = monthsBack
-        self.scanLimit = scanLimit
     }
 
     var isModelAvailable: Bool { faceEmbedder != nil }
@@ -61,14 +57,16 @@ final class FullBodyPickerService {
     /// threshold は本人判定のコサイン類似度のしきい値（高いほど厳しい）。
     func pickFullBodyPhotos(
         targetEmbedding: [Float],
-        threshold: Float = 0.5,
+        months: Int = 12,
+        limit: Int = 1000,
+        threshold: Float = 0.45,
         progress: @escaping @Sendable (Double) -> Void
     ) async -> [FullBodyCandidate] {
         guard await requestAuthorization() else { return [] }
 
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        if let from = Calendar.current.date(byAdding: .month, value: -monthsBack, to: Date()) {
+        if let from = Calendar.current.date(byAdding: .month, value: -months, to: Date()) {
             options.predicate = NSPredicate(format: "creationDate >= %@", from as NSDate)
         }
         let fetched = PHAsset.fetchAssets(with: .image, options: options)
@@ -76,7 +74,7 @@ final class FullBodyPickerService {
 
         var assets: [PHAsset] = []
         fetched.enumerateObjects { asset, _, stop in
-            if assets.count >= self.scanLimit { stop.pointee = true; return }
+            if assets.count >= limit { stop.pointee = true; return }
             assets.append(asset)
         }
 
