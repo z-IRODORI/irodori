@@ -150,11 +150,12 @@ struct OutfitSuggestionView: View {
 
     private var inputView: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 32) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("予定に合わせて、相棒が今日のコーデを選びます。")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .padding(.top, 8)
+                    .padding(.horizontal, 4)
 
                 if let errorMessage = viewModel.errorMessage {
                     errorBanner(errorMessage)
@@ -213,8 +214,9 @@ struct OutfitSuggestionView: View {
                 Color.clear.frame(height: 8)
             }
             .padding(.horizontal, 20)
+            .padding(.top, 4)
         }
-        .background(.white)
+        .background(Color.gray.opacity(0.05))
         .safeAreaInset(edge: .bottom) { ctaBar }
     }
 
@@ -224,11 +226,11 @@ struct OutfitSuggestionView: View {
         note: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .tracking(0.5)
+                    .font(.system(size: 14, weight: .bold))
+                    .tracking(0.3)
                     .foregroundStyle(.primary)
                 if let note {
                     Text(note)
@@ -239,6 +241,14 @@ struct OutfitSuggestionView: View {
             }
             content()
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.07), lineWidth: 1)
+        )
     }
 
     // セグメント（いつ）: 等幅・選択で黒塗り
