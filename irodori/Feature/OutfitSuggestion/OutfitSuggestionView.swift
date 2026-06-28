@@ -32,19 +32,19 @@ enum OutfitWhenOption: String, CaseIterable, Identifiable {
 }
 
 enum OutfitLookOption: String, CaseIterable, Identifiable {
-    case cool = "かっこよく"
-    case attractive = "モテたい"
-    case elegant = "上品に"
-    case neat = "きれいめ"
-    case casual = "カジュアルに"
-    case cute = "かわいく"
-    case calm = "落ち着いて"
+    case clean = "清潔感を出したい"
+    case stylish = "おしゃれに見せたい"
+    case mature = "大人っぽく見せたい"
+    case friendly = "親しみやすく"
+    case proper = "きちんとして見せたい"
+    case effortless = "こなれ感を出したい"
+    case cute = "可愛く見せたい"
     var id: String { rawValue }
 }
 
 // サジェスト候補（タップで自由入力欄にセットでき、素早く入力できる）
 private let withWhoSuggestions = ["友人", "恋人", "家族", "同僚", "上司", "ひとり"]
-private let whereSuggestions = ["カフェ", "デート", "オフィス", "ごはん", "お出かけ", "結婚式"]
+private let whereSuggestions = ["カフェでお茶", "ランチ・ごはん", "デート", "友達と遊ぶ", "ショッピング", "仕事・打ち合わせ", "飲み会", "結婚式・式典"]
 
 // MARK: - ViewModel
 
@@ -197,8 +197,8 @@ struct OutfitSuggestionView: View {
                     }
                 }
 
-                // どこに
-                section("どこに", note: "任意") {
+                // どこで何をする
+                section("どこで何をする", note: "任意") {
                     VStack(alignment: .leading, spacing: 14) {
                         FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
                             ForEach(whereSuggestions, id: \.self) { s in
@@ -207,7 +207,7 @@ struct OutfitSuggestionView: View {
                                 }
                             }
                         }
-                        underlineField("入力する（例: 渋谷のカフェ）", text: $viewModel.whereText)
+                        underlineField("入力する（例: 渋谷でデート）", text: $viewModel.whereText)
                     }
                 }
 
