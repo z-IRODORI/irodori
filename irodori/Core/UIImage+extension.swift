@@ -102,6 +102,22 @@ extension UIImage {
         UIGraphicsEndImageContext()
         return resized ?? self
     }
+
+    /// 長辺が longEdge px を超える場合のみ、アスペクト比を保ってピクセルベースで縮小する
+    func resizedToFit(longEdge: CGFloat) -> UIImage {
+        let pixelWidth = size.width * scale
+        let pixelHeight = size.height * scale
+        let longest = max(pixelWidth, pixelHeight)
+        guard longest > longEdge else { return self }
+
+        let ratio = longEdge / longest
+        let newSize = CGSize(width: floor(pixelWidth * ratio), height: floor(pixelHeight * ratio))
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1)
+        draw(in: CGRect(origin: .zero, size: newSize))
+        let resized = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return resized ?? self
+    }
 }
 
 extension UIImage {

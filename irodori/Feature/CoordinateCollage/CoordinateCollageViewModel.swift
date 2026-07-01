@@ -41,6 +41,11 @@ final class CoordinateCollageViewModel {
     /// 直近何ヶ月分の登録コーデを取得するか
     private let monthsToFetch = 6
 
+    /// アップロード前に縮小する長辺 (px)。
+    /// サーバーは長辺 576px に縮小してから人物を切り抜くため、これ以上の
+    /// 解像度を送っても仕上がりは変わらず、通信時間だけが増える。
+    private let uploadLongEdge: CGFloat = 1600
+
     init(
         collageClient: CoordinateCollageClientProtocol = CoordinateCollageClient(),
         listClient: CoordinateListClientProtocol = CoordinateListClient()
@@ -145,7 +150,9 @@ final class CoordinateCollageViewModel {
             guard let url = URL(string: urlString),
                   let (data, _) = try? await URLSession.shared.data(from: url),
                   let image = UIImage(data: data),
-                  let jpeg = image.fixedOrientation().jpegData(compressionQuality: 0.8) else {
+                  let jpeg = image.fixedOrientation()
+                      .resizedToFit(longEdge: uploadLongEdge)
+                      .jpegData(compressionQuality: 0.8) else {
                 continue
             }
             imageDataList.append(jpeg)
@@ -153,7 +160,9 @@ final class CoordinateCollageViewModel {
 
         // 2. 写真フォルダから選んだ画像
         for image in pickedImages {
-            if let jpeg = image.fixedOrientation().jpegData(compressionQuality: 0.8) {
+            if let jpeg = image.fixedOrientation()
+                .resizedToFit(longEdge: uploadLongEdge)
+                .jpegData(compressionQuality: 0.8) {
                 imageDataList.append(jpeg)
             }
         }
