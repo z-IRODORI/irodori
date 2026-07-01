@@ -46,6 +46,26 @@ enum OutfitLookOption: String, CaseIterable, Identifiable {
 private let withWhoSuggestions = ["友人", "恋人", "家族", "同僚", "上司", "ひとり"]
 private let whereSuggestions = ["カフェでお茶", "ランチ・ごはん", "デート", "友達と遊ぶ", "ショッピング", "仕事・打ち合わせ", "飲み会", "結婚式・式典"]
 
+// MARK: - 自由入力の履歴
+
+// 「誰と」「どこで何をする」の自由入力を UserDefaults に保存し、次回以降サジェストとして再利用する。
+// デフォルトのサジェストと同じ値は保存しない。直近入力が先頭・重複なし・最大 maxCount 件。
+enum OutfitInputHistory {
+    static let maxCount = 6
+
+    static func load(_ key: UserDefaultsKey) -> [String] {
+        UserDefaults.standard.stringArray(forKey: key.rawValue) ?? []
+    }
+
+    static func save(_ value: String, key: UserDefaultsKey, excluding defaults: [String]) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !defaults.contains(trimmed) else { return }
+        var history = load(key).filter { $0 != trimmed }
+        history.insert(trimmed, at: 0)
+        UserDefaults.standard.set(Array(history.prefix(maxCount)), forKey: key.rawValue)
+    }
+}
+
 // MARK: - ViewModel
 
 @Observable
@@ -58,6 +78,9 @@ final class OutfitSuggestionViewModel {
     var selectedLooks: Set<OutfitLookOption> = []
     var withWho: String = ""
     var whereText: String = ""
+
+    var withWhoHistory: [String] = OutfitInputHistory.load(.outfitWithWhoHistory)
+    var whereHistory: [String] = OutfitInputHistory.load(.outfitWhereHistory)
 
     var result: OutfitSuggestionResponse?
     var errorMessage: String?
@@ -95,6 +118,11 @@ final class OutfitSuggestionViewModel {
             .map { $0.rawValue }
         let who = withWho.trimmingCharacters(in: .whitespacesAndNewlines)
         let place = whereText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        OutfitInputHistory.save(who, key: .outfitWithWhoHistory, excluding: withWhoSuggestions)
+        OutfitInputHistory.save(place, key: .outfitWhereHistory, excluding: whereSuggestions)
+        withWhoHistory = OutfitInputHistory.load(.outfitWithWhoHistory)
+        whereHistory = OutfitInputHistory.load(.outfitWhereHistory)
 
         do {
             let r = try await client.proposeOutfitSuggestion(
@@ -187,7 +215,7 @@ struct OutfitSuggestionView: View {
                 section("誰と", note: "任意") {
                     VStack(alignment: .leading, spacing: 14) {
                         FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
-                            ForEach(withWhoSuggestions, id: \.self) { s in
+                            ForEach(suggestions(history: viewModel.withWhoHistory, defaults: withWhoSuggestions), id: \.self) { s in
                                 pill(s, selected: viewModel.withWho == s) {
                                     viewModel.withWho = (viewModel.withWho == s) ? "" : s
                                 }
@@ -201,7 +229,7 @@ struct OutfitSuggestionView: View {
                 section("どこで何をする", note: "任意") {
                     VStack(alignment: .leading, spacing: 14) {
                         FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
-                            ForEach(whereSuggestions, id: \.self) { s in
+                            ForEach(suggestions(history: viewModel.whereHistory, defaults: whereSuggestions), id: \.self) { s in
                                 pill(s, selected: viewModel.whereText == s) {
                                     viewModel.whereText = (viewModel.whereText == s) ? "" : s
                                 }
@@ -218,6 +246,11 @@ struct OutfitSuggestionView: View {
         }
         .background(Color.gray.opacity(0.05))
         .safeAreaInset(edge: .bottom) { ctaBar }
+    }
+
+    // 履歴（直近入力）を先頭に、デフォルト候補と重複しないよう結合する
+    private func suggestions(history: [String], defaults: [String]) -> [String] {
+        history.filter { !defaults.contains($0) } + defaults
     }
 
     // セクション: 小さめのグレーラベル + 余白で区切る（カードや線で囲わない）

@@ -30,4 +30,6 @@ enum UserDefaultsKey: String {
     case birthDay
     case prefectureCode
     case prefectureLastChangedAt
+    case outfitWithWhoHistory
+    case outfitWhereHistory
 }
