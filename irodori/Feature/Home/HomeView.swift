@@ -276,7 +276,8 @@ struct HomeView: View {
     // 記録(直近のコーデ)とその分析(今週のあなたへ)を1セクションとして縦に束ねる。
     // RecentCoordinates は CoordinateReviewView と共有のため無改変で、HomeView 側で合成する。
     private var recentCoordinatesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        // spacing 12 = RecentCoordinates 内部の見出し→カード列と同じリズムに揃え、1セクションに見せる
+        VStack(alignment: .leading, spacing: 12) {
             if viewModel.isLoadingHome {
                 recentCoordinatesSkeleton
                 partnerMessageBlock(showsAnalysis: true)
@@ -309,44 +310,43 @@ struct HomeView: View {
         }
     }
 
-    // 今週のあなたへ: カードレス(白カード/影なし)でグレー背景に直置きし、
-    // 直近のコーデ・コーデ提案画面と同じミニマル言語に揃える。
+    // 今週のあなたへ: 独立したヘッダーは持たせず、相棒が写真の帯に添える
+    // キャプション(小アイコン + ぶら下げインデントの本文)として表示し、
+    // 直近のコーデと一体の1セクションに見せる。
     // 分析はコーデ一覧より遅く完了するため、スケルトンと本文で同じ最小高さを
     // 確保してレイアウトジャンプを防ぐ。
     private func partnerMessageBlock(showsAnalysis: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             if showsAnalysis {
-                HStack(spacing: 10) {
-                    PartnerIconImage(size: 44)
-                    VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .top, spacing: 10) {
+                    PartnerIconImage(size: 32)
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("今週のあなたへ")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .tracking(0.5)
-                        Text("相棒からのメッセージ")
-                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
+
+                        if viewModel.isLoadingAnalysis {
+                            VStack(spacing: 8) {
+                                RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
+                                RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
+                                RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(width: 180, height: 14).frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.top, 4)
+                            .frame(minHeight: 58, alignment: .top)
+                            .accessibilityLabel("分析を読み込み中")
+                        } else {
+                            Text(.init(viewModel.recentCoordinateAnalysis.isEmpty
+                                ? "コーデが登録されると分析が表示されます。"
+                                : viewModel.recentCoordinateAnalysis))
+                                .font(.system(size: 14, weight: .regular))
+                                .lineSpacing(5)
+                                .foregroundStyle(.primary)
+                                .frame(maxWidth: .infinity, minHeight: 58, alignment: .topLeading)
+                        }
                     }
-                    Spacer()
                 }
                 .accessibilityElement(children: .combine)
-
-                if viewModel.isLoadingAnalysis {
-                    VStack(spacing: 8) {
-                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
-                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(width: 200, height: 14).frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(minHeight: 58, alignment: .top)
-                    .accessibilityLabel("分析を読み込み中")
-                } else {
-                    Text(.init(viewModel.recentCoordinateAnalysis.isEmpty
-                        ? "コーデが登録されると分析が表示されます。"
-                        : viewModel.recentCoordinateAnalysis))
-                        .font(.system(size: 14, weight: .regular))
-                        .lineSpacing(5)
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, minHeight: 58, alignment: .topLeading)
-                }
             }
 
             HStack(spacing: 10) {
