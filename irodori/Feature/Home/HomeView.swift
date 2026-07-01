@@ -25,32 +25,9 @@ struct HomeView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 32) {
-                    if viewModel.isLoadingHome {
-                        recentCoordinatesSkeleton
-                    } else if viewModel.hasLoadError {
-                        recentCoordinatesError
-                    } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
-                        RecentCoordinates(
-                            recentCoordinates: viewModel.homeResponse.recent_coordinates,
-                            isEditMode: viewModel.isEditMode,
-                            onToggleEditMode: { viewModel.toggleEditMode() },
-                            onDeleteRequest: { coordinateId in
-                                viewModel.requestDelete(coordinateId: coordinateId)
-                            },
-                            onTapCoordinate: { coordinate in
-                                path.append(.coordinateDetail(.init(
-                                    coordinateId: coordinate.id,
-                                    coordinateImageURL: coordinate.image_url,
-                                    showHeader: true
-                                )))
-                            }
-                        )
-                        .padding(.horizontal, -24)
-                    } else {
-                        coordinateEmptyState
-                    }
-
-                    partnerCard
+                    // 「直近のコーデ」セクション:
+                    //  記録(コーデ一覧)と分析(今週のあなたへ)を1セクションに統合.
+                    recentCoordinatesSection
 
                     // 「明日のコーデ」セクション:
                     //  - DailyRecommendationReasonSection:  3×3 グリッドのみ. 画像タップで詳細モーダル.
@@ -294,48 +271,90 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - 相棒カード（統合）
+    // MARK: - 直近のコーデ + 今週のあなたへ（統合セクション）
 
-    private var partnerCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                PartnerIconImage(size: 44)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("今週のあなたへ")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    Text("相棒からのメッセージ")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.gray.opacity(0.6))
-                }
-                Spacer()
-            }
-            .padding(.bottom, 14)
-
-            if viewModel.isLoadingAnalysis {
-                VStack(spacing: 8) {
-                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
-                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
-                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(width: 200, height: 14).frame(maxWidth: .infinity, alignment: .leading)
-                }
+    // 記録(直近のコーデ)とその分析(今週のあなたへ)を1セクションとして縦に束ねる。
+    // RecentCoordinates は CoordinateReviewView と共有のため無改変で、HomeView 側で合成する。
+    private var recentCoordinatesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if viewModel.isLoadingHome {
+                recentCoordinatesSkeleton
+                partnerMessageBlock(showsAnalysis: true)
+            } else if viewModel.hasLoadError {
+                // エラー時は再試行で両API(一覧/分析)とも再取得されるため、分析枠は出さない
+                recentCoordinatesError
+            } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
+                RecentCoordinates(
+                    recentCoordinates: viewModel.homeResponse.recent_coordinates,
+                    isEditMode: viewModel.isEditMode,
+                    onToggleEditMode: { viewModel.toggleEditMode() },
+                    onDeleteRequest: { coordinateId in
+                        viewModel.requestDelete(coordinateId: coordinateId)
+                    },
+                    onTapCoordinate: { coordinate in
+                        path.append(.coordinateDetail(.init(
+                            coordinateId: coordinate.id,
+                            coordinateImageURL: coordinate.image_url,
+                            showHeader: true
+                        )))
+                    }
+                )
+                .padding(.horizontal, -24)
+                partnerMessageBlock(showsAnalysis: true)
             } else {
-                Text(.init(viewModel.recentCoordinateAnalysis.isEmpty
-                    ? "コーデが登録されると分析が表示されます。"
-                    : viewModel.recentCoordinateAnalysis))
-                    .font(.system(size: 14, weight: .regular))
-                    .lineSpacing(5)
-                    .foregroundStyle(.primary)
+                coordinateEmptyState
+                // コーデ未登録でも提案/質問はスナップ起点で使えるため CTA だけ残す
+                partnerMessageBlock(showsAnalysis: false)
             }
+        }
+    }
 
-            Divider().padding(.vertical, 16)
+    // 今週のあなたへ: カードレス(白カード/影なし)でグレー背景に直置きし、
+    // 直近のコーデ・コーデ提案画面と同じミニマル言語に揃える。
+    // 分析はコーデ一覧より遅く完了するため、スケルトンと本文で同じ最小高さを
+    // 確保してレイアウトジャンプを防ぐ。
+    private func partnerMessageBlock(showsAnalysis: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if showsAnalysis {
+                HStack(spacing: 10) {
+                    PartnerIconImage(size: 44)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("今週のあなたへ")
+                            .font(.system(size: 13, weight: .semibold))
+                            .tracking(0.5)
+                        Text("相棒からのメッセージ")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .accessibilityElement(children: .combine)
+
+                if viewModel.isLoadingAnalysis {
+                    VStack(spacing: 8) {
+                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
+                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
+                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(width: 200, height: 14).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(minHeight: 58, alignment: .top)
+                    .accessibilityLabel("分析を読み込み中")
+                } else {
+                    Text(.init(viewModel.recentCoordinateAnalysis.isEmpty
+                        ? "コーデが登録されると分析が表示されます。"
+                        : viewModel.recentCoordinateAnalysis))
+                        .font(.system(size: 14, weight: .regular))
+                        .lineSpacing(5)
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, minHeight: 58, alignment: .topLeading)
+                }
+            }
 
             HStack(spacing: 10) {
                 Button(action: { path.append(.outfitSuggestion) }) {
                     Label("コーデ提案して", systemImage: "wand.and.stars")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .background(.black)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
@@ -343,18 +362,16 @@ struct HomeView: View {
                     Label("質問する", systemImage: "bubble.left")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.gray.opacity(0.1))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black.opacity(0.2), lineWidth: 1))
                 }
             }
+            // 編集モード中の誤遷移を防ぐ (削除操作の中断防止)
+            .disabled(viewModel.isEditMode)
+            .opacity(viewModel.isEditMode ? 0.4 : 1)
         }
-        .padding(20)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
     }
 
     // MARK: - ローディング スケルトン
