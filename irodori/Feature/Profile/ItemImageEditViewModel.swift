@@ -28,7 +28,18 @@ final class ItemImageEditViewModel {
     var isRemovingNoise = false
     var isSaving = false
 
-    var hasChanges: Bool { !undoStack.isEmpty }
+    // 属性編集 (種類 / カテゴリ / カラー)
+    var editedItemType: String
+    var editedCategory: String
+    var editedColor: String
+
+    var imageChanged: Bool { !undoStack.isEmpty }
+    var attributesChanged: Bool {
+        editedItemType != item.item_type
+            || trimmed(editedCategory) != (item.category ?? "")
+            || trimmed(editedColor) != (item.color ?? "")
+    }
+    var hasChanges: Bool { imageChanged || attributesChanged }
     var canUndo: Bool { !undoStack.isEmpty }
 
     private var undoStack: [UIImage] = []
@@ -45,6 +56,13 @@ final class ItemImageEditViewModel {
         self.item = item
         self.registerClient = registerClient
         self.deleteClient = deleteClient
+        self.editedItemType = item.item_type
+        self.editedCategory = item.category ?? ""
+        self.editedColor = item.color ?? ""
+    }
+
+    private func trimmed(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func loadImage() async {
@@ -166,14 +184,19 @@ final class ItemImageEditViewModel {
         isSaving = true
         defer { isSaving = false }
 
+        // 属性は編集後の値で登録する (空欄は未設定 = nil)
+        let newItemType = editedItemType
+        let newCategory = trimmed(editedCategory).isEmpty ? nil : trimmed(editedCategory)
+        let newColor = trimmed(editedColor).isEmpty ? nil : trimmed(editedColor)
+
         let metadata = BulkItemMetadata(
             index: 0,
             gender: UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue),
             main_category: nil,
             sub_category: nil,
-            color: item.color,
-            item_type: item.item_type,
-            category: item.category,
+            color: newColor,
+            item_type: newItemType,
+            category: newCategory,
             coordinate_id: nil
         )
 
@@ -201,9 +224,9 @@ final class ItemImageEditViewModel {
                 }
                 return ClosetItem(
                     id: registered.id,
-                    item_type: registered.item_type ?? item.item_type,
-                    category: registered.category ?? item.category,
-                    color: registered.color ?? item.color,
+                    item_type: registered.item_type ?? newItemType,
+                    category: registered.category ?? newCategory,
+                    color: registered.color ?? newColor,
                     image_url: registered.storage_url,
                     date: item.date
                 )

@@ -12,6 +12,11 @@
 
 import SwiftUI
 
+// 属性編集のサジェスト候補（タップで入力欄にセット。自由入力も可能）
+private let topsCategorySuggestions = ["Tシャツ", "シャツ", "ニット", "セーター", "パーカー", "スウェット", "カーディガン", "ブラウス"]
+private let bottomsCategorySuggestions = ["パンツ", "ジーンズ", "ワイドパンツ", "スラックス", "チノパン", "ショートパンツ", "スカート", "スウェットパンツ"]
+private let colorSuggestions = ["ブラック", "ホワイト", "グレー", "ネイビー", "ベージュ", "ブラウン", "カーキ", "ブルー", "グリーン", "レッド", "イエロー", "ピンク"]
+
 struct ItemImageEditView: View {
     @State var viewModel: ItemImageEditViewModel
     let onSaved: (ClosetItem) -> Void
@@ -40,7 +45,7 @@ struct ItemImageEditView: View {
                     }
                 }
             }
-            .navigationTitle(viewModel.step == .edit ? "アイテム画像を編集" : "画像の確認")
+            .navigationTitle(viewModel.step == .edit ? "アイテムを編集" : "変更の確認")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -61,8 +66,8 @@ struct ItemImageEditView: View {
     // MARK: - 編集ステップ
 
     private var editView: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("「ノイズ除去」で背景を自動で透明にできます。気になる部分は消しゴムでなぞって透明にできます（市松模様 = 透明）。")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
@@ -90,14 +95,132 @@ struct ItemImageEditView: View {
                         .frame(width: brushSize / 2, height: brushSize / 2)
                         .frame(width: 30, height: 30)
                 }
+
+                attributesSection
+
+                Color.clear.frame(height: 8)
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
-
-            Spacer(minLength: 0)
         }
         .background(Color.gray.opacity(0.05))
+        .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) { editCtaBar }
+    }
+
+    // MARK: - アイテム情報 (属性編集)
+
+    private var attributesSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("アイテム情報")
+                .font(.system(size: 14, weight: .bold))
+                .tracking(0.3)
+
+            VStack(alignment: .leading, spacing: 10) {
+                attributeLabel("種類")
+                HStack(spacing: 8) {
+                    ForEach(ClothingCategory.allCases) { type in
+                        typeSegment(type.rawValue, selected: viewModel.editedItemType == type.rawValue) {
+                            viewModel.editedItemType = type.rawValue
+                        }
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                attributeLabel("カテゴリ")
+                FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                    ForEach(categorySuggestions, id: \.self) { suggestion in
+                        pill(suggestion, selected: viewModel.editedCategory == suggestion) {
+                            viewModel.editedCategory = (viewModel.editedCategory == suggestion) ? "" : suggestion
+                        }
+                    }
+                }
+                underlineField("入力する（例: モックネックニット）", text: $viewModel.editedCategory)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                attributeLabel("カラー")
+                FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                    ForEach(colorSuggestions, id: \.self) { suggestion in
+                        pill(suggestion, selected: viewModel.editedColor == suggestion) {
+                            viewModel.editedColor = (viewModel.editedColor == suggestion) ? "" : suggestion
+                        }
+                    }
+                }
+                underlineField("入力する（例: オフホワイト）", text: $viewModel.editedColor)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.07), lineWidth: 1)
+        )
+    }
+
+    // 種類は選択中のものに合わせたカテゴリ候補を出す
+    private var categorySuggestions: [String] {
+        viewModel.editedItemType == ClothingCategory.bottoms.rawValue
+            ? bottomsCategorySuggestions
+            : topsCategorySuggestions
+    }
+
+    private func attributeLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.secondary)
+    }
+
+    private func typeSegment(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            action()
+        } label: {
+            Text(text)
+                .font(.system(size: 14, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? .white : .primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(selected ? Color.black : Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(selected ? Color.clear : Color.black.opacity(0.15), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func pill(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            action()
+        } label: {
+            Text(text)
+                .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? .white : .primary)
+                .padding(.horizontal, 14).padding(.vertical, 9)
+                .background(selected ? Color.black : Color.white)
+                .overlay(
+                    Capsule().stroke(selected ? Color.clear : Color.black.opacity(0.18), lineWidth: 1)
+                )
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func underlineField(_ placeholder: String, text: Binding<String>) -> some View {
+        VStack(spacing: 7) {
+            TextField(placeholder, text: text)
+                .font(.system(size: 15))
+                .tint(.black)
+            Rectangle()
+                .fill(Color.black.opacity(0.15))
+                .frame(height: 1)
+        }
     }
 
     // 画像 + 消しゴム描画キャンバス
@@ -138,7 +261,8 @@ struct ItemImageEditView: View {
                     }
                 }
                 .contentShape(Rectangle())
-                .gesture(
+                // ScrollView 内でもキャンバス上のドラッグは消しゴムを優先する
+                .highPriorityGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
                             currentStroke.append(value.location)
@@ -235,26 +359,90 @@ struct ItemImageEditView: View {
     // MARK: - 確認ステップ
 
     private var confirmView: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("この画像で良いですか？")
-                .font(.system(size: 16, weight: .bold))
-                .padding(.top, 16)
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("この内容で良いですか？")
+                    .font(.system(size: 16, weight: .bold))
+                    .padding(.top, 16)
 
-            HStack(alignment: .top, spacing: 12) {
-                comparisonColumn(title: "変更前", image: viewModel.originalImage)
-                comparisonColumn(title: "変更後", image: viewModel.workingImage)
+                HStack(alignment: .top, spacing: 12) {
+                    comparisonColumn(title: "変更前", image: viewModel.originalImage)
+                    comparisonColumn(title: "変更後", image: viewModel.workingImage)
+                }
+
+                attributeChangesSummary
+
+                Text("保存すると、クローゼットのアイテムがこの内容に差し替わります。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+
+                Color.clear.frame(height: 8)
             }
-
-            Text("保存すると、クローゼットのアイテム画像がこの画像に差し替わります。")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            Spacer(minLength: 0)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.gray.opacity(0.05))
         .safeAreaInset(edge: .bottom) { confirmCtaBar }
+    }
+
+    // アイテム情報の変更前 → 変更後
+    private var attributeChangesSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("アイテム情報")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            attributeChangeRow(
+                "種類",
+                before: viewModel.item.item_type,
+                after: viewModel.editedItemType
+            )
+            attributeChangeRow(
+                "カテゴリ",
+                before: displayValue(viewModel.item.category),
+                after: displayValue(viewModel.editedCategory)
+            )
+            attributeChangeRow(
+                "カラー",
+                before: displayValue(viewModel.item.color),
+                after: displayValue(viewModel.editedColor)
+            )
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.07), lineWidth: 1)
+        )
+    }
+
+    private func attributeChangeRow(_ label: String, before: String, after: String) -> some View {
+        let changed = before != after
+        return HStack(spacing: 8) {
+            Text(label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+            Text(before)
+                .font(.system(size: 13))
+                .foregroundStyle(changed ? .secondary : .primary)
+                .strikethrough(changed)
+            if changed {
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text(after)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func displayValue(_ value: String?) -> String {
+        let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "未設定" : trimmed
     }
 
     private func comparisonColumn(title: String, image: UIImage?) -> some View {
@@ -285,12 +473,12 @@ struct ItemImageEditView: View {
                 Task {
                     if let newItem = await viewModel.save() {
                         onSaved(newItem)
-                        ToastManager.shared.show("アイテム画像を保存しました")
+                        ToastManager.shared.show("アイテムを保存しました")
                         dismiss()
                     }
                 }
             } label: {
-                Text("この画像で保存")
+                Text("この内容で保存")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
