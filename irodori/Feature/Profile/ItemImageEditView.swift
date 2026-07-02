@@ -276,14 +276,21 @@ struct ItemImageEditView: View {
     }
 
     private var toolRow: some View {
-        HStack(spacing: 8) {
+        FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
             toolButton(
                 label: viewModel.isRemovingNoise ? "処理中…" : "ノイズ除去",
                 systemImage: "sparkles",
                 emphasized: true,
-                disabled: viewModel.isRemovingNoise
+                disabled: viewModel.isRemovingNoise || viewModel.isSmoothingEdges
             ) {
                 Task { await viewModel.removeNoise() }
+            }
+            toolButton(
+                label: viewModel.isSmoothingEdges ? "処理中…" : "輪郭をなめらか",
+                systemImage: "scribble.variable",
+                disabled: viewModel.isSmoothingEdges || viewModel.isRemovingNoise
+            ) {
+                Task { await viewModel.smoothEdges() }
             }
             toolButton(
                 label: "元に戻す",
@@ -295,11 +302,10 @@ struct ItemImageEditView: View {
             toolButton(
                 label: "リセット",
                 systemImage: "arrow.counterclockwise",
-                disabled: !viewModel.hasChanges
+                disabled: !viewModel.imageChanged
             ) {
                 viewModel.resetToOriginal()
             }
-            Spacer(minLength: 0)
         }
     }
 

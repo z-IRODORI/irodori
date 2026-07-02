@@ -26,6 +26,7 @@ final class ItemImageEditViewModel {
     var originalImage: UIImage?
     var workingImage: UIImage?
     var isRemovingNoise = false
+    var isSmoothingEdges = false
     var isSaving = false
 
     // 属性編集 (種類 / カテゴリ / カラー)
@@ -106,6 +107,22 @@ final class ItemImageEditViewModel {
         } catch {
             let message = (error as? ItemNoiseRemoverError)?.errorDescription
             ToastManager.shared.show(message ?? "ノイズ除去に失敗しました")
+        }
+    }
+
+    /// 輪郭の凸凹をなめらかにする (透過画像のアルファチャンネルを補正)
+    func smoothEdges() async {
+        guard let current = workingImage, !isSmoothingEdges else { return }
+        isSmoothingEdges = true
+        defer { isSmoothingEdges = false }
+        do {
+            let smoothed = try await ItemNoiseRemover.smoothEdges(of: current)
+            pushUndo(current)
+            workingImage = smoothed
+            Haptic.impact(.soft)
+        } catch {
+            let message = (error as? ItemNoiseRemoverError)?.errorDescription
+            ToastManager.shared.show(message ?? "輪郭の補正に失敗しました")
         }
     }
 
