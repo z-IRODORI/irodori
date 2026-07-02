@@ -85,6 +85,15 @@ final class ProfileViewModel {
         await loadTask?.value
     }
 
+    /// 画像編集で差し替えたアイテムをローカル一覧へ反映する (位置を保ったまま置換)
+    func replaceItem(oldId: String, with newItem: ClosetItem) {
+        if let index = closetItems.firstIndex(where: { $0.id == oldId }) {
+            closetItems[index] = newItem
+        } else {
+            closetItems.insert(newItem, at: 0)
+        }
+    }
+
     // MARK: - Delete Methods
 
     func toggleEditMode() {

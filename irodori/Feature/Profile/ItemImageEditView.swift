@@ -1,0 +1,399 @@
+//
+//  ItemImageEditView.swift
+//  irodori
+//
+//  クローゼットアイテム画像の編集画面 (シート表示)。
+//  「ノイズ除去」(Vision 被写体マスク) と消しゴム (なぞって白で消す) で画像を整え、
+//  確認ステップ「この画像で良いですか？」で OK されたら保存する。
+//
+//  UI は OutfitSuggestionView と同じミニマル言語:
+//  白背景・黒の主CTA・白 + hairline の副CTA・ピル型ツールボタン。
+//
+
+import SwiftUI
+
+struct ItemImageEditView: View {
+    @State var viewModel: ItemImageEditViewModel
+    let onSaved: (ClosetItem) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    // 消しゴム描画中のストローク (ビュー座標)
+    @State private var currentStroke: [CGPoint] = []
+    @State private var brushSize: CGFloat = 24
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if viewModel.isLoadingImage {
+                    ProgressView()
+                        .tint(.black)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if viewModel.loadFailed {
+                    loadErrorView
+                } else {
+                    switch viewModel.step {
+                    case .edit:
+                        editView
+                    case .confirm:
+                        confirmView
+                    }
+                }
+            }
+            .navigationTitle(viewModel.step == .edit ? "アイテム画像を編集" : "画像の確認")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("閉じる") { dismiss() }
+                        .disabled(viewModel.isSaving)
+                }
+            }
+        }
+        .interactiveDismissDisabled(viewModel.isSaving)
+        .task { await viewModel.loadImage() }
+        .overlay {
+            if viewModel.isSaving {
+                savingOverlay
+            }
+        }
+    }
+
+    // MARK: - 編集ステップ
+
+    private var editView: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("「ノイズ除去」で背景を自動で消せます。気になる部分は消しゴムでなぞって消せます。")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+
+                editorCanvas
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(1, contentMode: .fit)
+                    .background(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                    )
+
+                toolRow
+
+                HStack(spacing: 10) {
+                    Text("消しゴムの太さ")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Slider(value: $brushSize, in: 10...60)
+                        .tint(.black)
+                    Circle()
+                        .stroke(Color.black.opacity(0.3), lineWidth: 1)
+                        .frame(width: brushSize / 2, height: brushSize / 2)
+                        .frame(width: 30, height: 30)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+
+            Spacer(minLength: 0)
+        }
+        .background(Color.gray.opacity(0.05))
+        .safeAreaInset(edge: .bottom) { editCtaBar }
+    }
+
+    // 画像 + 消しゴム描画キャンバス
+    private var editorCanvas: some View {
+        GeometryReader { geo in
+            if let image = viewModel.workingImage {
+                let fitRect = Self.aspectFitRect(imageSize: image.size, in: geo.size)
+                ZStack {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geo.size.width, height: geo.size.height)
+
+                    // 描画中ストロークのプレビュー (確定時に画像へ焼き込む)
+                    Path { path in
+                        guard let first = currentStroke.first else { return }
+                        path.move(to: first)
+                        for point in currentStroke.dropFirst() {
+                            path.addLine(to: point)
+                        }
+                    }
+                    .stroke(
+                        Color.white,
+                        style: StrokeStyle(lineWidth: brushSize, lineCap: .round, lineJoin: .round)
+                    )
+
+                    // ブラシカーソル
+                    if let last = currentStroke.last {
+                        Circle()
+                            .stroke(Color.black.opacity(0.35), lineWidth: 1)
+                            .frame(width: brushSize, height: brushSize)
+                            .position(last)
+                    }
+                }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            currentStroke.append(value.location)
+                        }
+                        .onEnded { _ in
+                            commitStroke(fitRect: fitRect, imageSize: image.size)
+                        }
+                )
+            }
+        }
+    }
+
+    private var toolRow: some View {
+        HStack(spacing: 8) {
+            toolButton(
+                label: viewModel.isRemovingNoise ? "処理中…" : "ノイズ除去",
+                systemImage: "sparkles",
+                emphasized: true,
+                disabled: viewModel.isRemovingNoise
+            ) {
+                Task { await viewModel.removeNoise() }
+            }
+            toolButton(
+                label: "元に戻す",
+                systemImage: "arrow.uturn.backward",
+                disabled: !viewModel.canUndo
+            ) {
+                viewModel.undo()
+            }
+            toolButton(
+                label: "リセット",
+                systemImage: "arrow.counterclockwise",
+                disabled: !viewModel.hasChanges
+            ) {
+                viewModel.resetToOriginal()
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func toolButton(
+        label: String,
+        systemImage: String,
+        emphasized: Bool = false,
+        disabled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            action()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .medium))
+                Text(label)
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(emphasized ? .white : .black)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(emphasized ? Color.black : Color.white)
+            .overlay(
+                Capsule().stroke(emphasized ? Color.clear : Color.black.opacity(0.18), lineWidth: 1)
+            )
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.4 : 1)
+    }
+
+    private var editCtaBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            Button {
+                Haptic.impact(.medium)
+                viewModel.goToConfirm()
+            } label: {
+                Text("保存する")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(viewModel.hasChanges ? Color.black : Color.black.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .disabled(!viewModel.hasChanges)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+        }
+        .background(.white)
+    }
+
+    // MARK: - 確認ステップ
+
+    private var confirmView: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("この画像で良いですか？")
+                .font(.system(size: 16, weight: .bold))
+                .padding(.top, 16)
+
+            HStack(alignment: .top, spacing: 12) {
+                comparisonColumn(title: "変更前", image: viewModel.originalImage)
+                comparisonColumn(title: "変更後", image: viewModel.workingImage)
+            }
+
+            Text("保存すると、クローゼットのアイテム画像がこの画像に差し替わります。")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.gray.opacity(0.05))
+        .safeAreaInset(edge: .bottom) { confirmCtaBar }
+    }
+
+    private func comparisonColumn(title: String, image: UIImage?) -> some View {
+        VStack(spacing: 8) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .background(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                    )
+            }
+        }
+    }
+
+    private var confirmCtaBar: some View {
+        VStack(spacing: 10) {
+            Divider()
+            Button {
+                Haptic.impact(.medium)
+                Task {
+                    if let newItem = await viewModel.save() {
+                        onSaved(newItem)
+                        ToastManager.shared.show("アイテム画像を保存しました")
+                        dismiss()
+                    }
+                }
+            } label: {
+                Text("この画像で保存")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(Color.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .disabled(viewModel.isSaving)
+            .padding(.horizontal, 20)
+            .padding(.top, 2)
+
+            Button {
+                Haptic.impact(.soft)
+                viewModel.backToEdit()
+            } label: {
+                Text("編集に戻る")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black.opacity(0.2), lineWidth: 1)
+                    )
+            }
+            .disabled(viewModel.isSaving)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 6)
+        }
+        .background(.white)
+    }
+
+    // MARK: - 読み込みエラー / 保存中
+
+    private var loadErrorView: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 24))
+                .foregroundStyle(Color.gray.opacity(0.5))
+            Text("画像を読み込めませんでした")
+                .font(.system(size: 14, weight: .semibold))
+            Button {
+                Task { await viewModel.loadImage() }
+            } label: {
+                Text("再試行する")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.black)
+                    .underline()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var savingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.4).ignoresSafeArea()
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                Text("保存中...")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            .padding(32)
+            .background(Color.black.opacity(0.7))
+            .cornerRadius(16)
+        }
+    }
+
+    // MARK: - 座標変換
+
+    /// ストローク (ビュー座標) を画像座標へ変換して焼き込む
+    private func commitStroke(fitRect: CGRect, imageSize: CGSize) {
+        defer { currentStroke = [] }
+        guard fitRect.width > 0, !currentStroke.isEmpty else { return }
+        let scale = imageSize.width / fitRect.width
+        let imagePoints = currentStroke.map { point in
+            CGPoint(x: (point.x - fitRect.minX) * scale, y: (point.y - fitRect.minY) * scale)
+        }
+        viewModel.commitEraserStroke(points: imagePoints, lineWidth: brushSize * scale)
+    }
+
+    /// アスペクトフィットで表示したときの画像の実表示領域
+    private static func aspectFitRect(imageSize: CGSize, in container: CGSize) -> CGRect {
+        guard imageSize.width > 0, imageSize.height > 0 else { return .zero }
+        let scale = min(container.width / imageSize.width, container.height / imageSize.height)
+        let size = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        let origin = CGPoint(
+            x: (container.width - size.width) / 2,
+            y: (container.height - size.height) / 2
+        )
+        return CGRect(origin: origin, size: size)
+    }
+}
+
+#Preview {
+    ItemImageEditView(
+        viewModel: .init(
+            item: ClosetItem(
+                id: "preview",
+                item_type: "トップス",
+                category: "Tシャツ",
+                color: "ホワイト",
+                image_url: "https://example.com/item.jpg",
+                date: nil
+            ),
+            registerClient: MockBulkItemRegisterClient(),
+            deleteClient: MockDeleteClosetItemClient()
+        ),
+        onSaved: { _ in }
+    )
+}

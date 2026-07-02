@@ -7,6 +7,7 @@ struct ProfileView: View {
 //    @State private var selectedTab = 0  // コーデタブ未実装のためコメントアウト
     @State private var hasLoadedItems = false
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var itemToEdit: ClosetItem?
 
     let itemSpacing: CGFloat = 4
     // グリッドのレイアウト設定 (3列)
@@ -46,6 +47,14 @@ struct ProfileView: View {
             }
         }
         .background(Color.white)
+        .sheet(item: $itemToEdit) { item in
+            ItemImageEditView(
+                viewModel: .init(item: item),
+                onSaved: { newItem in
+                    viewModel.replaceItem(oldId: item.id, with: newItem)
+                }
+            )
+        }
         .alert("アイテムを削除", isPresented: $viewModel.showDeleteConfirmation) {
             Button("キャンセル", role: .cancel) {
                 viewModel.itemToDelete = nil
@@ -342,6 +351,13 @@ struct ProfileView: View {
                                     RoundedRectangle(cornerRadius: 12)
                                         .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                                 )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    // 編集モード中は削除操作を優先 (タップで編集画面を開かない)
+                                    guard !viewModel.isEditMode else { return }
+                                    Haptic.impact(.soft)
+                                    itemToEdit = item
+                                }
                             } else {
                                 VStack(spacing: 6) {
                                     Image(systemName: "photo")
