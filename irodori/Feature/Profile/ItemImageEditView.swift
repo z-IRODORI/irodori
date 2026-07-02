@@ -3,8 +3,8 @@
 //  irodori
 //
 //  クローゼットアイテム画像の編集画面 (シート表示)。
-//  「ノイズ除去」(Vision 被写体マスク) と消しゴム (なぞって白で消す) で画像を整え、
-//  確認ステップ「この画像で良いですか？」で OK されたら保存する。
+//  「ノイズ除去」(Vision 被写体マスク) と消しゴム (なぞって透明にする) で画像を整え、
+//  確認ステップ「この画像で良いですか？」で OK されたら透過 PNG として保存する。
 //
 //  UI は OutfitSuggestionView と同じミニマル言語:
 //  白背景・黒の主CTA・白 + hairline の副CTA・ピル型ツールボタン。
@@ -63,7 +63,7 @@ struct ItemImageEditView: View {
     private var editView: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("「ノイズ除去」で背景を自動で消せます。気になる部分は消しゴムでなぞって消せます。")
+                Text("「ノイズ除去」で背景を自動で透明にできます。気になる部分は消しゴムでなぞって透明にできます（市松模様 = 透明）。")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
 
@@ -106,6 +106,11 @@ struct ItemImageEditView: View {
             if let image = viewModel.workingImage {
                 let fitRect = Self.aspectFitRect(imageSize: image.size, in: geo.size)
                 ZStack {
+                    // 透明部分を可視化する市松模様 (画像の表示領域のみ)
+                    CheckerboardBackground()
+                        .frame(width: fitRect.width, height: fitRect.height)
+                        .position(x: fitRect.midX, y: fitRect.midY)
+
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
@@ -262,7 +267,7 @@ struct ItemImageEditView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity)
-                    .background(.white)
+                    .background(CheckerboardBackground())
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
@@ -377,6 +382,30 @@ struct ItemImageEditView: View {
             y: (container.height - size.height) / 2
         )
         return CGRect(origin: origin, size: size)
+    }
+}
+
+/// 透明部分を可視化する市松模様の背景
+private struct CheckerboardBackground: View {
+    var square: CGFloat = 8
+
+    var body: some View {
+        Canvas { context, size in
+            let cols = Int(ceil(size.width / square))
+            let rows = Int(ceil(size.height / square))
+            for row in 0..<rows {
+                for col in 0..<cols where (row + col).isMultiple(of: 2) {
+                    let rect = CGRect(
+                        x: CGFloat(col) * square,
+                        y: CGFloat(row) * square,
+                        width: square,
+                        height: square
+                    )
+                    context.fill(Path(rect), with: .color(Color.gray.opacity(0.15)))
+                }
+            }
+        }
+        .background(Color.white)
     }
 }
 

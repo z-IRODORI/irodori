@@ -92,18 +92,19 @@ final class ItemImageEditViewModel {
     }
 
     /// 消しゴム1ストロークを画像に焼き込む。
-    /// points / lineWidth は画像座標系 (ピクセル基準のポイント座標)。白 = 背景色で塗る。
+    /// points / lineWidth は画像座標系 (ピクセル基準のポイント座標)。なぞった部分は透明にする。
     func commitEraserStroke(points: [CGPoint], lineWidth: CGFloat) {
         guard let current = workingImage, !points.isEmpty else { return }
 
         let format = UIGraphicsImageRendererFormat()
         format.scale = current.scale
-        format.opaque = true
+        format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: current.size, format: format)
         let erased = renderer.image { ctx in
             current.draw(in: CGRect(origin: .zero, size: current.size))
             let cg = ctx.cgContext
-            cg.setStrokeColor(UIColor.white.cgColor)
+            cg.setBlendMode(.clear)
+            cg.setStrokeColor(UIColor.black.cgColor)
             cg.setLineWidth(lineWidth)
             cg.setLineCap(.round)
             cg.setLineJoin(.round)
@@ -154,10 +155,10 @@ final class ItemImageEditViewModel {
     }
 
     /// 編集後の画像を新アイテムとして登録し、成功したら旧アイテムを削除する (差し替え)。
-    /// 成功時は差し替え後の ClosetItem を返す。
+    /// 透明背景を保持するため PNG でアップロードする。成功時は差し替え後の ClosetItem を返す。
     func save() async -> ClosetItem? {
         guard let image = workingImage,
-              let data = image.jpegData(compressionQuality: 0.8),
+              let data = image.pngData(),
               let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else {
             ToastManager.shared.show("保存に失敗しました")
             return nil

@@ -61,10 +61,14 @@ final class BulkItemRegisterClient: BulkItemRegisterClientProtocol {
         }
 
         // Add images
+        // PNG (透過アイテム画像) と JPEG が混在するため、マジックバイトで判定して MIME を合わせる
         for (index, item) in items.enumerated() {
+            let isPNG = item.imageData.starts(with: [0x89, 0x50, 0x4E, 0x47])
+            let ext = isPNG ? "png" : "jpg"
+            let mime = isPNG ? "image/png" : "image/jpeg"
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"images\"; filename=\"item_\(index).jpg\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"images\"; filename=\"item_\(index).\(ext)\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: \(mime)\r\n\r\n".data(using: .utf8)!)
             body.append(item.imageData)
             body.append("\r\n".data(using: .utf8)!)
         }

@@ -4,8 +4,9 @@
 //
 //  クローゼットのアイテム画像から背景ノイズをオンデバイスで除去する。
 //  Vision の被写体マスク (VNGenerateForegroundInstanceMaskRequest, iOS 17+) で
-//  前景 = アイテムを切り出し、白背景に合成して返す。
-//  アイテム画像は JPEG (白背景) として保存・表示されるため、透過ではなく白で塗り潰す。
+//  前景 = アイテムを切り出し、背景を透明 (アルファ) にして返す。
+//  透過を保持するため、保存時は PNG でアップロードする (バックエンドは
+//  受け取ったバイト列をそのまま保存し、コラージュ生成もアルファをそのまま利用する)。
 //
 
 import UIKit
@@ -49,11 +50,8 @@ enum ItemNoiseRemover {
             )
 
             let foreground = CIImage(cvPixelBuffer: maskedBuffer)
-            let white = CIImage(color: .white).cropped(to: foreground.extent)
-            let composed = foreground.composited(over: white)
-
             let context = CIContext()
-            guard let output = context.createCGImage(composed, from: foreground.extent) else {
+            guard let output = context.createCGImage(foreground, from: foreground.extent) else {
                 throw ItemNoiseRemoverError.renderingFailed
             }
             return UIImage(cgImage: output)
