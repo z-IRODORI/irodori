@@ -3,9 +3,10 @@
 //  irodori
 //
 //  コーデコラージュ生成画面の ViewModel。
-//  - 登録済みコーデを取得し、3枚以上選択 / 3枚未満なら写真フォルダから複数選択
-//  - 背景色を選択
-//  - API で人物切り抜き合成した「カッコいいコーデ画像」を生成・表示・保存
+//  入力(コーデ3枚以上 + 背景色) → ローディング → 結果 の 3 ステップを管理する
+//  (OutfitSuggestionViewModel と同じステップ構成)。
+//  - 生成に使う画像データはキャッシュし、「別パターンで作る」は
+//    再ダウンロードなしで即再生成する (seed 無指定なので配置が毎回変わる)
 //
 
 import SwiftUI
@@ -14,6 +15,8 @@ import Photos
 @Observable
 @MainActor
 final class CoordinateCollageViewModel {
+    enum Step { case input, loading, result }
+
     private let collageClient: CoordinateCollageClientProtocol
     private let listClient: CoordinateListClientProtocol
 
@@ -22,6 +25,9 @@ final class CoordinateCollageViewModel {
         let id: String
         let url: String
     }
+
+    // ステップ
+    var step: Step = .input
 
     // 選択ソース
     var registeredCoordinates: [RegisteredCoordinate] = []
@@ -33,10 +39,17 @@ final class CoordinateCollageViewModel {
 
     // 状態
     var isLoadingCoordinates = false
-    var isGenerating = false
+    var isShuffling = false
     var resultImage: UIImage?
     var errorMessage: String?
-    var didSaveToPhotos = false
+
+    /// 生成に使った合計枚数 (結果画面のキャプション用)
+    private(set) var generatedImageCount = 0
+
+    /// アップロード用に準備した画像データ。選択が変わるまで再利用し、
+    /// 「別パターンで作る」での登録コーデ再ダウンロードを避ける
+    private var preparedImageData: [Data] = []
+    private var generationTask: Task<Void, Never>?
 
     /// 直近何ヶ月分の登録コーデを取得するか
     private let monthsToFetch = 6
@@ -61,14 +74,14 @@ final class CoordinateCollageViewModel {
         selectedCoordinateIDs.count + pickedImages.count
     }
 
-    /// 登録コーデが 3 枚以上あるか
-    var hasEnoughRegisteredCoordinates: Bool {
-        registeredCoordinates.count >= 3
+    /// 生成に必要な残り枚数
+    var remainingCount: Int {
+        max(0, 3 - totalSelectedCount)
     }
 
-    /// 生成可能か (3枚以上選択 かつ 生成中でない)
+    /// 生成可能か (3枚以上選択)
     var canGenerate: Bool {
-        totalSelectedCount >= 3 && !isGenerating
+        totalSelectedCount >= 3
     }
 
     // MARK: - Load registered coordinates
@@ -118,27 +131,113 @@ final class CoordinateCollageViewModel {
         } else {
             selectedCoordinateIDs.insert(id)
         }
+        preparedImageData = []  // 選択が変わったので準備済みデータを無効化
     }
 
     func addPickedImages(_ images: [UIImage]) {
         pickedImages.append(contentsOf: images)
+        preparedImageData = []
     }
 
     func removePickedImage(at index: Int) {
         guard pickedImages.indices.contains(index) else { return }
         pickedImages.remove(at: index)
+        preparedImageData = []
     }
 
     // MARK: - Generate
 
-    func generate() async {
-        guard canGenerate else { return }
-
-        isGenerating = true
-        resultImage = nil
-        didSaveToPhotos = false
+    func generate() {
+        guard canGenerate, step != .loading else { return }
         errorMessage = nil
-        defer { isGenerating = false }
+        step = .loading
+        generationTask = Task { await runGenerate() }
+    }
+
+    func cancelGeneration() {
+        generationTask?.cancel()
+        generationTask = nil
+        step = .input
+    }
+
+    func backToInput() {
+        step = .input
+        errorMessage = nil
+    }
+
+    private func runGenerate() async {
+        do {
+            let images = try await prepareImageDataIfNeeded()
+            guard images.count >= 3 else {
+                failBackToInput("画像の準備に失敗しました。もう一度お試しください")
+                return
+            }
+            try Task.checkCancellation()
+
+            let result = try await requestCollage(images: images)
+            try Task.checkCancellation()
+
+            switch result {
+            case .success(let response):
+                if let image = await downloadResultImage(response) {
+                    try Task.checkCancellation()
+                    resultImage = image
+                    generatedImageCount = response.image_count
+                    step = .result
+                    Haptic.notify(.success)
+                } else {
+                    failBackToInput("合成画像の取得に失敗しました。もう一度お試しください")
+                }
+            case .failure:
+                failBackToInput("コラージュの生成に失敗しました。少し時間をおいて試してください")
+            }
+        } catch is CancellationError {
+            // キャンセル時は cancelGeneration() が既に .input へ戻している
+        } catch {
+            failBackToInput("コラージュの生成に失敗しました。少し時間をおいて試してください")
+        }
+    }
+
+    /// 別パターンで作る: 準備済み画像を再利用して即再生成 (再ダウンロードなし)
+    func shuffle() async {
+        guard !preparedImageData.isEmpty, !isShuffling else { return }
+        isShuffling = true
+        defer { isShuffling = false }
+
+        do {
+            let result = try await requestCollage(images: preparedImageData)
+            if case .success(let response) = result,
+               let image = await downloadResultImage(response) {
+                resultImage = image
+                Haptic.notify(.success)
+                return
+            }
+        } catch {}
+
+        // 失敗しても直前のコラージュは有効なので結果画面に留まる
+        Haptic.notify(.error)
+        ToastManager.shared.show("別パターンの作成に失敗しました")
+    }
+
+    private func requestCollage(images: [Data]) async throws -> Result<CoordinateCollageResponse, HTTPError> {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        return try await collageClient.generate(
+            userId: uid,
+            images: images,
+            backgroundColorHex: backgroundColor.toHexString(),
+            seed: nil
+        )
+    }
+
+    private func failBackToInput(_ message: String) {
+        guard !Task.isCancelled else { return }
+        errorMessage = message
+        step = .input
+        Haptic.notify(.error)
+    }
+
+    private func prepareImageDataIfNeeded() async throws -> [Data] {
+        if !preparedImageData.isEmpty { return preparedImageData }
 
         var imageDataList: [Data] = []
 
@@ -147,6 +246,7 @@ final class CoordinateCollageViewModel {
             .filter { selectedCoordinateIDs.contains($0.id) }
             .map { $0.url }
         for urlString in selectedURLs {
+            try Task.checkCancellation()
             guard let url = URL(string: urlString),
                   let (data, _) = try? await URLSession.shared.data(from: url),
                   let image = UIImage(data: data),
@@ -167,49 +267,25 @@ final class CoordinateCollageViewModel {
             }
         }
 
-        guard imageDataList.count >= 3 else {
-            errorMessage = "画像の準備に失敗しました。もう一度お試しください"
-            return
-        }
-
-        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
-        let hex = backgroundColor.toHexString()
-
-        do {
-            let result = try await collageClient.generate(
-                userId: uid,
-                images: imageDataList,
-                backgroundColorHex: hex,
-                seed: nil
-            )
-            switch result {
-            case .success(let response):
-                await applyResult(response)
-            case .failure(let error):
-                errorMessage = error.errorDescription
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        preparedImageData = imageDataList
+        return imageDataList
     }
 
-    private func applyResult(_ response: CoordinateCollageResponse) async {
+    private func downloadResultImage(_ response: CoordinateCollageResponse) async -> UIImage? {
         // 本番: collage_url をダウンロード
         if !response.collage_url.isEmpty,
            let url = URL(string: response.collage_url),
            let (data, _) = try? await URLSession.shared.data(from: url),
            let image = UIImage(data: data) {
-            resultImage = image
-            return
+            return image
         }
         // フォールバック: base64
         if !response.collage_base64.isEmpty,
            let data = Data(base64Encoded: response.collage_base64),
            let image = UIImage(data: data) {
-            resultImage = image
-            return
+            return image
         }
-        errorMessage = "合成画像の取得に失敗しました"
+        return nil
     }
 
     // MARK: - Save to Photos
@@ -217,21 +293,24 @@ final class CoordinateCollageViewModel {
     func saveResultToPhotos() {
         guard let image = resultImage else { return }
 
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
                 Task { @MainActor in
-                    self?.errorMessage = "写真へのアクセスが許可されていません。設定から許可してください"
+                    Haptic.notify(.error)
+                    ToastManager.shared.show("写真へのアクセスが許可されていません。設定から許可してください")
                 }
                 return
             }
             PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAsset(from: image)
-            } completionHandler: { success, error in
+            } completionHandler: { success, _ in
                 Task { @MainActor in
                     if success {
-                        self?.didSaveToPhotos = true
+                        Haptic.notify(.success)
+                        ToastManager.shared.show("写真に保存しました")
                     } else {
-                        self?.errorMessage = "保存に失敗しました: \(error?.localizedDescription ?? "不明なエラー")"
+                        Haptic.notify(.error)
+                        ToastManager.shared.show("保存に失敗しました。もう一度お試しください")
                     }
                 }
             }

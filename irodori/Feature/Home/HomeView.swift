@@ -87,6 +87,9 @@ struct HomeView: View {
                         }
                     )
 
+                    // 「コーデコラージュ」導線: 登録コーデ/写真から1枚のシェア画像を作る画面へ.
+                    collageEntryCard
+
                     // 「買い足すなら」セクション: 手持ち服が活きる買い足しアイテム3件.
                     //  カードタップで Yahoo Shopping の商品ページを WebView で開く.
                     ClosetBridgeSection(
@@ -355,6 +358,47 @@ struct HomeView: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+    }
+
+    // MARK: - コーデコラージュ導線
+
+    private var collageEntryCard: some View {
+        Button(action: {
+            Haptic.impact(.soft)
+            path.append(.coordinateCollage)
+        }) {
+            HStack(spacing: 14) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("コーデコラージュを作る")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.black)
+                    Text("お気に入りコーデを3枚以上えらんで、1枚のシェア画像に")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.gray.opacity(0.5))
+            }
+            .padding(20)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - ローディング スケルトン

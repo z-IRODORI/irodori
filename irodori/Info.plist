@@ -9,5 +9,7 @@
 	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>コーディネート画像をフォトライブラリから選択するために写真へのアクセスが必要です。</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>作成したコーデコラージュ画像をカメラロールに保存するために使用します。</string>
 </dict>
 </plist>
