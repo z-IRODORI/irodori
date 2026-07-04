@@ -19,12 +19,12 @@ struct FavoriteToggleButton: View {
             action()
         } label: {
             ZStack {
-                // 未押下時の細いアウトライン: 画像背景に埋もれない最小限の存在感
-                Image(systemName: "heart")
+                // 未お気に入り: 白塗りのハート。白っぽい写真に埋もれないよう影を強めに
+                Image(systemName: "heart.fill")
                     .font(.system(size: size * 1.5, weight: .regular))
                     .foregroundStyle(Color.white.opacity(0.95))
-                    .shadow(color: .black.opacity(0.18), radius: 1.2, x: 0, y: 0.5)
-                // 押下時のフィル (オン/オフをフェードで切替)
+                    .shadow(color: .black.opacity(0.28), radius: 1.5, x: 0, y: 0.5)
+                // お気に入り: ピンク塗り (オン/オフをフェードで切替)
                 Image(systemName: "heart.fill")
                     .font(.system(size: size * 1.5, weight: .regular))
                     .foregroundStyle(Color.pink)

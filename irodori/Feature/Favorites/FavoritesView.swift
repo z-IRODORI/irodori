@@ -17,6 +17,10 @@ struct FavoritesView: View {
     @State private var isLoading: Bool = false
     @State private var presentedPoolItem: DailyRecommendationItem? = nil
     @State private var isLoadingPool: Bool = false
+    /// この画面で表示する一覧のスナップショット。
+    /// お気に入り解除してもセルは消さず、ハート状態 (store) だけ切り替える。
+    /// 一覧との再同期は pull-to-refresh または画面の開き直しで行う。
+    @State private var displayed: [Favorite] = []
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
     private let dailyClient: DailyRecommendationClientProtocol
@@ -49,8 +53,14 @@ struct FavoritesView: View {
         .background(Color.gray.opacity(0.06))
         .navigationTitle("お気に入り")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await refreshIfNeeded() }
-        .refreshable { await store.refresh() }
+        .task {
+            await refreshIfNeeded()
+            displayed = store.favorites
+        }
+        .refreshable {
+            await store.refresh()
+            displayed = store.favorites
+        }
         .sheet(item: $presentedPoolItem) { item in
             NavigationStack {
                 DailyRecommendationDetailView(
@@ -76,7 +86,7 @@ struct FavoritesView: View {
 
     @ViewBuilder
     private var content: some View {
-        let items = store.filtered(kind: selectedKind)
+        let items = displayed.filter { $0.kindEnum == selectedKind }
         if isLoading && items.isEmpty {
             ProgressView().padding(.top, 40)
         } else if items.isEmpty {

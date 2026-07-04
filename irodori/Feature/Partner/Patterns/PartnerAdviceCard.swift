@@ -72,7 +72,12 @@ struct PartnerAdviceCard: View {
                 response: viewModel.styleResponse,
                 isSaving: viewModel.isSavingStyle,
                 onSelect: { style in
-                    Task { await viewModel.setStyle(style) }
+                    Task {
+                        if await viewModel.setStyle(style) {
+                            showStyleSheet = false
+                            ToastManager.shared.show("話し方を変更しました", style: .normal)
+                        }
+                    }
                 },
                 onClose: { showStyleSheet = false }
             )
@@ -285,8 +290,10 @@ final class PartnerAdviceCardViewModel {
         }
     }
 
-    func setStyle(_ style: String) async {
-        guard !isSavingStyle else { return }
+    /// 話し方を保存してコメントを作り直す。成功可否を返す (呼び出し側でシートを閉じる判断に使う)
+    @discardableResult
+    func setStyle(_ style: String) async -> Bool {
+        guard !isSavingStyle else { return false }
         isSavingStyle = true
         defer { isSavingStyle = false }
         if let result = try? await apiClient.setSpeakingStyle(userId: PartnerPatternUtility.userId, style: style),
@@ -297,7 +304,10 @@ final class PartnerAdviceCardViewModel {
             reply = nil
             expGained = nil
             await load()
+            return true
         }
+        ToastManager.shared.show("話し方の変更に失敗しました")
+        return false
     }
 
     func load() async {
@@ -347,49 +357,38 @@ struct SpeakingStyleSheet: View {
     let onClose: () -> Void
 
     @State private var customText = ""
+    /// 選択中の話し方 (プリセット key または現在の設定値)。
+    /// 選んだだけでは反映せず、下部の「この話し方にする」で確定する。
+    @State private var selectedKey: String?
 
     private var trimmedCustom: String {
         customText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// 適用対象: プリセット選択が優先。自由入力中 (selectedKey = nil) は入力テキスト
+    private var effectiveStyle: String? {
+        if let selectedKey { return selectedKey }
+        return trimmedCustom.isEmpty ? nil : trimmedCustom
+    }
+
+    /// 現在の設定と同じ選択のままなら適用ボタンは無効
+    private var canApply: Bool {
+        guard let style = effectiveStyle, !style.isEmpty else { return false }
+        return style != response?.speaking_style
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("相棒の話し方を選べます。プリセットから選ぶか、自由に入力できます。")
+                    Text("相棒の話し方を選んで「この話し方にする」を押すと反映されます。")
                         .font(.system(size: 13))
                         .foregroundColor(.gray)
 
                     if let presets = response?.presets {
                         VStack(spacing: 8) {
                             ForEach(presets) { option in
-                                Button {
-                                    Haptic.impact(.soft)
-                                    onSelect(option.key)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(option.label)
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .foregroundColor(.black)
-                                            Text(option.text)
-                                                .font(.system(size: 11))
-                                                .foregroundColor(.gray)
-                                                .lineLimit(2)
-                                                .multilineTextAlignment(.leading)
-                                        }
-                                        Spacer()
-                                        if response?.speaking_style == option.key {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundColor(.pink)
-                                        }
-                                    }
-                                    .padding(14)
-                                    .background(Color.gray.opacity(0.05))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(isSaving)
+                                presetRow(option)
                             }
                         }
                     } else {
@@ -402,33 +401,19 @@ struct SpeakingStyleSheet: View {
                             .foregroundColor(.black)
                         TextField("例: 海賊みたいに / 落語家風に", text: $customText)
                             .textFieldStyle(.roundedBorder)
-                        Button {
-                            Haptic.impact(.soft)
-                            if !trimmedCustom.isEmpty { onSelect(trimmedCustom) }
-                        } label: {
-                            Text("この話し方にする")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 11)
-                                .background(trimmedCustom.isEmpty ? Color.gray.opacity(0.3) : Color.pink)
-                                .clipShape(Capsule())
-                        }
-                        .disabled(isSaving || trimmedCustom.isEmpty)
+                            .onChange(of: customText) { _, newValue in
+                                // 入力を始めたら自由入力を選択扱いにする (プリセット選択は解除)
+                                if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    selectedKey = nil
+                                }
+                            }
                     }
                     .padding(.top, 8)
-
-                    if isSaving {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                            Text("話し方を変えて、コメントを作り直してるよ…")
-                                .font(.system(size: 12))
-                                .foregroundColor(.gray)
-                        }
-                    }
                 }
                 .padding(20)
             }
+            .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .bottom) { applyBar }
             .navigationTitle("相棒の話し方")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -437,7 +422,82 @@ struct SpeakingStyleSheet: View {
                         .foregroundColor(.black)
                 }
             }
+            .onAppear {
+                if selectedKey == nil, trimmedCustom.isEmpty {
+                    selectedKey = response?.speaking_style
+                }
+            }
+            .onChange(of: response?.speaking_style) { _, newValue in
+                // プリセット読込が開いた後に届いた場合に現在値を選択状態にする
+                if selectedKey == nil, trimmedCustom.isEmpty {
+                    selectedKey = newValue
+                }
+            }
         }
+    }
+
+    private func presetRow(_ option: PartnerSpeakingStyleOption) -> some View {
+        let isSelected = selectedKey == option.key
+        return Button {
+            Haptic.impact(.soft)
+            selectedKey = option.key
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.label)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.black)
+                    Text(option.text)
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer()
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .pink : .gray.opacity(0.35))
+            }
+            .padding(14)
+            .background(isSelected ? Color.pink.opacity(0.06) : Color.gray.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.pink.opacity(0.5) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isSaving)
+    }
+
+    // 下部固定の適用バー (選択しただけでは反映されないことを保証する唯一の確定導線)
+    private var applyBar: some View {
+        VStack(spacing: 10) {
+            Divider()
+            if isSaving {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("話し方を変えて、コメントを作り直してるよ…")
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray)
+                }
+            }
+            Button {
+                Haptic.impact(.medium)
+                if let style = effectiveStyle { onSelect(style) }
+            } label: {
+                Text("この話し方にする")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(canApply && !isSaving ? Color.pink : Color.gray.opacity(0.3))
+                    .clipShape(Capsule())
+            }
+            .disabled(!canApply || isSaving)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 6)
+        }
+        .background(.white)
     }
 }
 
