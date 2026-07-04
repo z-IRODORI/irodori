@@ -132,7 +132,7 @@ struct MainTabView: View {
         }
         .overlay(alignment: .top) {
             if let message = toastManager.message {
-                ToastView(message: message)
+                ToastView(message: message, style: toastManager.style)
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                     .transition(.asymmetric(

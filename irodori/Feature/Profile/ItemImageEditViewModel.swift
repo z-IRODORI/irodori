@@ -252,7 +252,8 @@ final class ItemImageEditViewModel {
                     deletedOldItem = true
                 }
                 if !deletedOldItem {
-                    ToastManager.shared.show("元の画像が残っています。不要な場合はクローゼットから削除してください")
+                    // 保存自体は成功しているため案内 (黒) で表示
+                    ToastManager.shared.show("元の画像が残っています。不要な場合はクローゼットから削除してください", style: .normal)
                 }
                 return ClosetItem(
                     id: registered.id,

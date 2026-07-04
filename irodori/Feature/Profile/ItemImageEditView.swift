@@ -480,7 +480,7 @@ struct ItemImageEditView: View {
                 Task {
                     if let newItem = await viewModel.save() {
                         onSaved(newItem)
-                        ToastManager.shared.show("アイテムを保存しました")
+                        ToastManager.shared.show("アイテムを保存しました", style: .normal)
                         dismiss()
                     }
                 }

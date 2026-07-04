@@ -7,10 +7,11 @@ import SwiftUI
 
 struct ToastView: View {
     let message: String
+    var style: ToastStyle = .error
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.circle.fill")
+            Image(systemName: style == .error ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white)
 
@@ -22,7 +23,7 @@ struct ToastView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.pink)
+        .background(style == .error ? Color.red : Color.black)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
     }
@@ -34,6 +35,8 @@ struct ToastView: View {
     VStack(spacing: 16) {
         ToastView(message: "通信エラーが発生しました")
         ToastView(message: "データの読み込みに失敗しました。しばらく経ってから再度お試しください。")
+        ToastView(message: "アイテムを保存しました", style: .normal)
+        ToastView(message: "コーデの配置を保存しました", style: .normal)
     }
     .padding(24)
     .frame(maxWidth: .infinity, maxHeight: .infinity)

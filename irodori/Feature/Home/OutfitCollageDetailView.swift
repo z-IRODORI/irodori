@@ -185,7 +185,7 @@ struct OutfitCollageDetailView: View {
                     Task {
                         if let response = await layoutViewModel.save() {
                             viewModel.outfitCollage = response
-                            ToastManager.shared.show("コーデの配置を保存しました")
+                            ToastManager.shared.show("コーデの配置を保存しました", style: .normal)
                         }
                     }
                 } label: {

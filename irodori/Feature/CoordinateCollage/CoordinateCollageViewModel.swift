@@ -307,7 +307,7 @@ final class CoordinateCollageViewModel {
                 Task { @MainActor in
                     if success {
                         Haptic.notify(.success)
-                        ToastManager.shared.show("写真に保存しました")
+                        ToastManager.shared.show("写真に保存しました", style: .normal)
                     } else {
                         Haptic.notify(.error)
                         ToastManager.shared.show("保存に失敗しました。もう一度お試しください")
