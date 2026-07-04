@@ -17,8 +17,9 @@ struct OutfitCollageDetailView: View {
 
     @State private var pickerSlot: PickerSlot? = nil
     @State private var showingClosetPicker = false
-    @State private var showingLayoutEditor = false
     @State private var webLink: HomeWebLink? = nil
+    // インライン配置編集 (コラージュ表示そのものが編集キャンバス)
+    @State private var layoutViewModel = OutfitCollageLayoutEditViewModel()
 
     private struct PickerSlot: Identifiable {
         let slot: String
@@ -30,11 +31,10 @@ struct OutfitCollageDetailView: View {
         ScrollView(.vertical, showsIndicators: false) {
             if let response = viewModel.outfitCollage {
                 VStack(alignment: .leading, spacing: 20) {
-                    collageImage(response)
+                    collageSection(response)
                     VStack(spacing: 10) {
                         shuffleButton
                         fromItemButton
-                        editLayoutButton
                     }
                     itemList(response)
                     recommendationsSection
@@ -70,68 +70,148 @@ struct OutfitCollageDetailView: View {
         .sheet(item: $webLink) { link in
             WebViewContainer(url: link.url)
         }
-        .sheet(isPresented: $showingLayoutEditor) {
-            OutfitCollageLayoutEditView(onSaved: { response in
-                viewModel.outfitCollage = response
-            })
+        // 表示中のコラージュに対応する編集レイヤーを取得。
+        // シャッフル/差し替えで collage_id が変わったら再取得される (保存直後は同期済みでスキップ)
+        .task(id: viewModel.outfitCollage?.collage_id) {
+            await layoutViewModel.loadIfNeeded(for: viewModel.outfitCollage?.collage_id)
         }
         .onAppear {
             Task { await viewModel.loadOutfitRecommendations() }
         }
     }
 
-    // MARK: - Collage
+    // MARK: - Collage (インライン配置編集)
 
-    private func collageImage(_ response: OutfitCollageResponse) -> some View {
-        KFImage(URL(string: response.collage_url))
-            .placeholder {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.gray.opacity(0.12))
-                    .aspectRatio(3.0 / 4.0, contentMode: .fit)
-            }
-            .resizable()
-            .aspectRatio(3.0 / 4.0, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
-            // 画像タップでも配置編集を開ける (ボタンと同じ導線)
-            .overlay(alignment: .bottomTrailing) {
-                if !viewModel.isRegeneratingOutfitCollage {
-                    HStack(spacing: 4) {
-                        Image(systemName: "square.on.square.dashed")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text("タップで編集")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(.white.opacity(0.92))
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(Color.black.opacity(0.12), lineWidth: 1))
-                    .padding(10)
+    // コラージュ表示そのものが編集キャンバス。レイヤー準備前・再生成中は合成済み画像を表示する
+    private var isCanvasActive: Bool {
+        layoutViewModel.canvasReady && !viewModel.isRegeneratingOutfitCollage
+    }
+
+    private func collageSection(_ response: OutfitCollageResponse) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ZStack {
+                if isCanvasActive {
+                    OutfitCollageLayoutCanvas(viewModel: layoutViewModel)
+                } else {
+                    KFImage(URL(string: response.collage_url))
+                        .placeholder { Color.gray.opacity(0.12) }
+                        .resizable()
+                        .scaledToFit()
                 }
             }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                guard !viewModel.isRegeneratingOutfitCollage else { return }
-                Haptic.impact(.soft)
-                showingLayoutEditor = true
-            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
             .overlay {
                 if viewModel.isRegeneratingOutfitCollage {
-                    ZStack {
-                        Color.black.opacity(0.3)
-                        VStack(spacing: 10) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            Text("コーデを組み替え中…")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    progressCover("コーデを組み替え中…")
+                } else if layoutViewModel.isSaving {
+                    progressCover("保存中…")
                 }
             }
+
+            if isCanvasActive {
+                editControls
+            } else if layoutViewModel.isLoading && !viewModel.isRegeneratingOutfitCollage {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("編集の準備をしています…")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                }
+            } else if layoutViewModel.loadFailed {
+                HStack(spacing: 8) {
+                    Text("編集を準備できませんでした")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Button {
+                        Task { await layoutViewModel.load() }
+                    } label: {
+                        Text("再試行")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .underline()
+                    }
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: layoutViewModel.hasChanges)
+    }
+
+    // キャンバス下の編集ツール: ヒント / 背面へ・元に戻す・リセット / 変更があるときだけ保存CTA
+    private var editControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("タップで最前面・ドラッグで移動・◯ハンドルで大きさを調整")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+
+            HStack(spacing: 8) {
+                OutfitCollageEditPill(
+                    label: "一段背面へ",
+                    systemImage: "square.2.layers.3d.bottom.filled",
+                    disabled: layoutViewModel.selectedLayer == nil || layoutViewModel.selectedIsBottom
+                ) {
+                    if let id = layoutViewModel.selectedId { layoutViewModel.sendBackward(id) }
+                }
+                OutfitCollageEditPill(
+                    label: "元に戻す",
+                    systemImage: "arrow.uturn.backward",
+                    disabled: !layoutViewModel.canUndo
+                ) {
+                    layoutViewModel.undo()
+                }
+                OutfitCollageEditPill(
+                    label: "リセット",
+                    systemImage: "arrow.counterclockwise",
+                    disabled: !layoutViewModel.canReset
+                ) {
+                    layoutViewModel.resetToDefault()
+                }
+                Spacer(minLength: 0)
+            }
+
+            if layoutViewModel.hasChanges {
+                Button {
+                    Haptic.impact(.medium)
+                    Task {
+                        if let response = await layoutViewModel.save() {
+                            viewModel.outfitCollage = response
+                            ToastManager.shared.show("コーデの配置を保存しました")
+                        }
+                    }
+                } label: {
+                    Label("この配置で保存", systemImage: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .disabled(layoutViewModel.isSaving)
+            }
+        }
+    }
+
+    private func progressCover(_ message: String) -> some View {
+        ZStack {
+            Color.black.opacity(0.3)
+            VStack(spacing: 10) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: - Shuffle
@@ -240,25 +320,6 @@ struct OutfitCollageDetailView: View {
             Task { await viewModel.loadClosetItemsIfNeeded() }
         } label: {
             Label("持っているアイテムから作る", systemImage: "tshirt")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.gray.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
-        }
-        .disabled(viewModel.isRegeneratingOutfitCollage)
-    }
-
-    // MARK: - 配置を編集
-
-    private var editLayoutButton: some View {
-        Button {
-            Haptic.impact(.soft)
-            showingLayoutEditor = true
-        } label: {
-            Label("大きさ・配置を編集", systemImage: "square.on.square.dashed")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity)

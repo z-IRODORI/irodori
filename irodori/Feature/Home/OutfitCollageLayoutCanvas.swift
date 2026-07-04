@@ -1,12 +1,14 @@
 //
-//  OutfitCollageLayoutEditView.swift
+//  OutfitCollageLayoutCanvas.swift
 //  irodori
 //
-//  クローゼットでコーデの配置編集画面 (シート表示)。
-//  サーバーが用意した透過レイヤー PNG を 3:4 キャンバスに重ね、
-//  ドラッグで移動・ピンチで拡大縮小・ボタンで重なり順を変更できる。
-//  「この配置で保存」でサーバーが同じレイアウトで再合成し、
-//  ホーム/詳細のコラージュ画像 (collage_url) が差し替わる。
+//  クローゼットでコーデのインライン配置編集キャンバス。
+//  詳細画面のコラージュ表示そのものが編集キャンバスになる:
+//   - タップ = 選択 + 最前面へ
+//   - ドラッグ = 移動 (中心がキャンバス内に収まるようクランプ)
+//   - 右下の◯ハンドル or ピンチ = 拡大縮小 (アスペクト維持・上下限あり)
+//  レイヤー (透過PNG) とデフォルト配置はサーバー (GET /api/outfit-collage/layout) が用意し、
+//  保存 (POST) するとサーバーが同じ配置で PNG を再合成して collage_url が差し替わる。
 //
 //  座標系: レイヤーの rect はキャンバス比の正規化値 (左上原点 0-1)。
 //  ビュー座標との変換は キャンバス実サイズ を掛ける/割るだけで済む。
@@ -44,6 +46,7 @@ final class OutfitCollageLayoutEditViewModel {
     var hasChanges: Bool { layers != baseline }
     var canUndo: Bool { !undoStack.isEmpty }
     var canReset: Bool { layers != defaultLayers }
+    var canvasReady: Bool { !isLoading && !loadFailed && !layers.isEmpty }
     var selectedLayer: OutfitCollageLayoutItem? { layers.first { $0.id == selectedId } }
 
     /// 選択中レイヤーが最背面か (背面へ ボタンの活性判定)
@@ -52,9 +55,18 @@ final class OutfitCollageLayoutEditViewModel {
         return sel.z == layers.map(\.z).min()
     }
 
+    /// 表示中コラージュに対応するレイヤーが未ロードのときだけ取得する。
+    /// シャッフル/差し替えで collage_id が変わったら再ロード、保存直後 (id 同期済み) はスキップ。
+    func loadIfNeeded(for collageId: String?) async {
+        guard let collageId, !collageId.isEmpty else { return }
+        if collageId == self.collageId, !layers.isEmpty { return }
+        await load()
+    }
+
     func load() async {
         isLoading = true
         loadFailed = false
+        selectedId = nil
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
         let gender = Gender.fromWithDefault(
             UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
@@ -66,6 +78,7 @@ final class OutfitCollageLayoutEditViewModel {
                 defaultLayers = response.default_items
                 baseline = response.items
                 collageId = response.collage_id
+                undoStack.removeAll()
             default:
                 loadFailed = true
             }
@@ -77,7 +90,7 @@ final class OutfitCollageLayoutEditViewModel {
         isLoading = false
     }
 
-    // MARK: 編集操作 (ジェスチャー中は snapshot を渡さず直接更新し、確定時に commit する)
+    // MARK: 編集操作 (ジェスチャー中は直接更新し、確定時に commitGesture で undo を積む)
 
     /// レイヤーを移動。中心がキャンバス内に留まるようクランプする
     func move(_ id: String, toX x: Double, toY y: Double) {
@@ -148,7 +161,7 @@ final class OutfitCollageLayoutEditViewModel {
         }
     }
 
-    /// z 順で隣のレイヤーと z を入れ替える (1段ずつ前面/背面へ)
+    /// z 順で隣のレイヤーと z を入れ替える (1段ずつ背面へ)
     private func swapZWithNeighbor(_ id: String, offset: Int) {
         let ordered = layers.sorted { $0.z < $1.z }
         guard let position = ordered.firstIndex(where: { $0.id == id }) else { return }
@@ -183,6 +196,8 @@ final class OutfitCollageLayoutEditViewModel {
 
     // MARK: 保存
 
+    /// 現在の配置をサーバーで再合成して保存する。成功時は新しいレスポンスを返し、
+    /// baseline / collageId を同期する (呼び出し側での再ロード不要)。
     func save() async -> OutfitCollageResponse? {
         guard hasChanges, !isSaving else { return nil }
         isSaving = true
@@ -195,6 +210,10 @@ final class OutfitCollageLayoutEditViewModel {
         do {
             switch try await client.saveLayout(uid: uid, gender: gender, collageId: collageId, items: layers) {
             case .success(let response):
+                baseline = layers
+                undoStack.removeAll()
+                collageId = response.collage_id
+                selectedId = nil
                 return response
             case .failure(let error):
                 ToastManager.shared.show(error.errorDescription ?? "配置の保存に失敗しました")
@@ -207,13 +226,10 @@ final class OutfitCollageLayoutEditViewModel {
     }
 }
 
-// MARK: - View
+// MARK: - キャンバス
 
-struct OutfitCollageLayoutEditView: View {
-    @State var viewModel = OutfitCollageLayoutEditViewModel()
-    let onSaved: (OutfitCollageResponse) -> Void
-
-    @Environment(\.dismiss) private var dismiss
+struct OutfitCollageLayoutCanvas: View {
+    let viewModel: OutfitCollageLayoutEditViewModel
 
     // ジェスチャー中の一時状態 (開始時のレイヤー状態と undo 用スナップショット)
     @State private var dragContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
@@ -221,74 +237,6 @@ struct OutfitCollageLayoutEditView: View {
     @State private var handleContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if viewModel.isLoading {
-                    VStack(spacing: 14) {
-                        ProgressView()
-                            .tint(.black)
-                        Text("アイテムを準備しています")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if viewModel.loadFailed {
-                    loadErrorView
-                } else {
-                    editView
-                }
-            }
-            .navigationTitle("配置を編集")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("閉じる") { dismiss() }
-                        .disabled(viewModel.isSaving)
-                }
-            }
-        }
-        .interactiveDismissDisabled(viewModel.isSaving)
-        .task { await viewModel.load() }
-        .overlay {
-            if viewModel.isSaving {
-                savingOverlay
-            }
-        }
-    }
-
-    // MARK: 編集
-
-    private var editView: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("アイテムをタップすると最前面に出ます。ドラッグで移動、右下の◯ハンドルかピンチで大きさを変えられます。")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-
-                canvas
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(3.0 / 4.0, contentMode: .fit)
-                    .background(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.black.opacity(0.1), lineWidth: 1)
-                    )
-
-                zOrderRow
-                toolRow
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-
-            Spacer(minLength: 0)
-        }
-        .background(Color.gray.opacity(0.05))
-        .safeAreaInset(edge: .bottom) { ctaBar }
-    }
-
-    // レイヤーを重ねる編集キャンバス
-    private var canvas: some View {
         GeometryReader { geo in
             ZStack {
                 // 何もない場所のタップで選択解除
@@ -432,56 +380,17 @@ struct OutfitCollageLayoutEditView: View {
                 pinchContext = nil
             }
     }
+}
 
-    // 重なり順: タップで最前面になるため、戻す方向 (背面へ) だけボタンで提供する
-    private var zOrderRow: some View {
-        HStack(spacing: 8) {
-            if let selected = viewModel.selectedLayer {
-                Text(slotDisplayName(selected.slot))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("アイテム未選択")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-            }
-            Spacer(minLength: 0)
-            toolButton(
-                label: "一段背面へ",
-                systemImage: "square.2.layers.3d.bottom.filled",
-                disabled: viewModel.selectedLayer == nil || viewModel.selectedIsBottom
-            ) {
-                if let id = viewModel.selectedId { viewModel.sendBackward(id) }
-            }
-        }
-    }
+// MARK: - 編集ツールピル (詳細画面のツール行で使用)
 
-    private var toolRow: some View {
-        HStack(spacing: 8) {
-            toolButton(
-                label: "元に戻す",
-                systemImage: "arrow.uturn.backward",
-                disabled: !viewModel.canUndo
-            ) {
-                viewModel.undo()
-            }
-            toolButton(
-                label: "リセット",
-                systemImage: "arrow.counterclockwise",
-                disabled: !viewModel.canReset
-            ) {
-                viewModel.resetToDefault()
-            }
-            Spacer(minLength: 0)
-        }
-    }
+struct OutfitCollageEditPill: View {
+    let label: String
+    let systemImage: String
+    var disabled: Bool = false
+    let action: () -> Void
 
-    private func toolButton(
-        label: String,
-        systemImage: String,
-        disabled: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
+    var body: some View {
         Button {
             Haptic.impact(.soft)
             action()
@@ -505,91 +414,26 @@ struct OutfitCollageLayoutEditView: View {
         .disabled(disabled)
         .opacity(disabled ? 0.4 : 1)
     }
+}
 
-    private func slotDisplayName(_ slot: String) -> String {
-        switch slot {
-        case "tops": return "トップスを選択中"
-        case "bottoms": return "ボトムスを選択中"
-        case "outer": return "アウターを選択中"
-        case "shoes": return "シューズを選択中"
-        case "bag": return "バッグを選択中"
-        case "accessory": return "アクセサリーを選択中"
-        default: return "選択中"
+// MARK: - Preview
+
+private struct OutfitCollageLayoutCanvasPreview: View {
+    @State private var viewModel = OutfitCollageLayoutEditViewModel(client: MockOutfitCollageClient())
+
+    var body: some View {
+        VStack {
+            OutfitCollageLayoutCanvas(viewModel: viewModel)
+                .aspectRatio(3.0 / 4.0, contentMode: .fit)
+                .background(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .padding(24)
         }
-    }
-
-    // MARK: 保存 CTA
-
-    private var ctaBar: some View {
-        VStack(spacing: 0) {
-            Divider()
-            Button {
-                Haptic.impact(.medium)
-                Task {
-                    if let response = await viewModel.save() {
-                        onSaved(response)
-                        ToastManager.shared.show("コーデの配置を保存しました")
-                        dismiss()
-                    }
-                }
-            } label: {
-                Text("この配置で保存")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(viewModel.hasChanges ? Color.black : Color.black.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .disabled(!viewModel.hasChanges || viewModel.isSaving)
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 6)
-        }
-        .background(.white)
-    }
-
-    // MARK: エラー / 保存中
-
-    private var loadErrorView: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "wifi.exclamationmark")
-                .font(.system(size: 24))
-                .foregroundStyle(Color.gray.opacity(0.5))
-            Text("アイテムを読み込めませんでした")
-                .font(.system(size: 14, weight: .semibold))
-            Button {
-                Task { await viewModel.load() }
-            } label: {
-                Text("再試行する")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.black)
-                    .underline()
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var savingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.4).ignoresSafeArea()
-            VStack(spacing: 16) {
-                ProgressView()
-                    .scaleEffect(1.5)
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                Text("保存中...")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white)
-            }
-            .padding(32)
-            .background(Color.black.opacity(0.7))
-            .cornerRadius(16)
-        }
+        .background(Color.gray.opacity(0.08))
+        .task { await viewModel.load() }
     }
 }
 
 #Preview {
-    OutfitCollageLayoutEditView(
-        viewModel: .init(client: MockOutfitCollageClient()),
-        onSaved: { _ in }
-    )
+    OutfitCollageLayoutCanvasPreview()
 }
