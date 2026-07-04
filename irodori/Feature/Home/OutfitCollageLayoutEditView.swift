@@ -46,11 +46,7 @@ final class OutfitCollageLayoutEditViewModel {
     var canReset: Bool { layers != defaultLayers }
     var selectedLayer: OutfitCollageLayoutItem? { layers.first { $0.id == selectedId } }
 
-    /// 選択中レイヤーが最前面/最背面か (前面へ/背面へ ボタンの活性判定)
-    var selectedIsTop: Bool {
-        guard let sel = selectedLayer else { return true }
-        return sel.z == layers.map(\.z).max()
-    }
+    /// 選択中レイヤーが最背面か (背面へ ボタンの活性判定)
     var selectedIsBottom: Bool {
         guard let sel = selectedLayer else { return true }
         return sel.z == layers.map(\.z).min()
@@ -96,10 +92,7 @@ final class OutfitCollageLayoutEditViewModel {
     /// ピンチ開始時の rect を基準に、中心固定・アスペクト維持で拡縮する
     func scale(_ id: String, from start: OutfitCollageLayoutItem, factor: Double) {
         guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
-        let maxFactor = min(maxSide / start.w, maxSide / start.h)
-        let minFactor = max(minSide / start.w, minSide / start.h)
-        guard minFactor <= maxFactor else { return }
-        let f = min(max(factor, minFactor), maxFactor)
+        let f = clampedScaleFactor(factor, start: start)
         let newW = start.w * f
         let newH = start.h * f
         layers[index].x = start.x + (start.w - newW) / 2
@@ -108,18 +101,51 @@ final class OutfitCollageLayoutEditViewModel {
         layers[index].h = newH
     }
 
+    /// 右下ハンドルのドラッグ: 左上を固定してアスペクト維持で拡縮する
+    func resizeFromTopLeft(_ id: String, from start: OutfitCollageLayoutItem, factor: Double) {
+        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        let f = clampedScaleFactor(factor, start: start)
+        layers[index].x = start.x
+        layers[index].y = start.y
+        layers[index].w = start.w * f
+        layers[index].h = start.h * f
+    }
+
+    private func clampedScaleFactor(_ factor: Double, start: OutfitCollageLayoutItem) -> Double {
+        let maxFactor = min(maxSide / start.w, maxSide / start.h)
+        let minFactor = max(minSide / start.w, minSide / start.h)
+        guard minFactor <= maxFactor else { return 1 }
+        return min(max(factor, minFactor), maxFactor)
+    }
+
     /// ジェスチャー確定。開始時 snapshot と差分があれば undo に積む
     func commitGesture(snapshot: [OutfitCollageLayoutItem]) {
         guard layers != snapshot else { return }
         pushUndo(snapshot)
     }
 
-    func bringForward(_ id: String) {
-        swapZWithNeighbor(id, offset: 1)
+    /// タップしたアイテムを最前面へ (既に最前面なら何もしない)
+    func bringToFront(_ id: String) {
+        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        let maxZ = layers.map(\.z).max() ?? 0
+        guard layers[index].z != maxZ else { return }
+        pushUndo(layers)
+        layers[index].z = maxZ + 1
+        normalizeZ()
     }
 
     func sendBackward(_ id: String) {
         swapZWithNeighbor(id, offset: -1)
+    }
+
+    /// z を表示順ランク (0..n-1) に振り直す (bringToFront で値が伸び続けないように)
+    private func normalizeZ() {
+        let orderedIds = layers.sorted { $0.z < $1.z }.map(\.id)
+        for (rank, layerId) in orderedIds.enumerated() {
+            if let i = layers.firstIndex(where: { $0.id == layerId }) {
+                layers[i].z = rank
+            }
+        }
     }
 
     /// z 順で隣のレイヤーと z を入れ替える (1段ずつ前面/背面へ)
@@ -192,6 +218,7 @@ struct OutfitCollageLayoutEditView: View {
     // ジェスチャー中の一時状態 (開始時のレイヤー状態と undo 用スナップショット)
     @State private var dragContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
     @State private var pinchContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
+    @State private var handleContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
 
     var body: some View {
         NavigationStack {
@@ -234,7 +261,7 @@ struct OutfitCollageLayoutEditView: View {
     private var editView: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("アイテムをタップして選択。ドラッグで移動、ピンチで大きさを変えられます。")
+                Text("アイテムをタップすると最前面に出ます。ドラッグで移動、右下の◯ハンドルかピンチで大きさを変えられます。")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
 
@@ -290,21 +317,76 @@ struct OutfitCollageLayoutEditView: View {
             .frame(width: width, height: height)
             .overlay {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.black.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(Color.black.opacity(0.55), lineWidth: 1.5)
                 }
             }
             .contentShape(Rectangle())
+            .onTapGesture {
+                // タップ = 選択 + 最前面へ
+                Haptic.impact(.soft)
+                viewModel.selectedId = layer.id
+                viewModel.bringToFront(layer.id)
+            }
+            .gesture(dragGesture(for: layer.id, canvasSize: canvasSize))
+            .overlay(alignment: .bottomTrailing) {
+                if isSelected {
+                    resizeHandle(for: layer.id, canvasSize: canvasSize)
+                        .offset(x: 13, y: 13)
+                }
+            }
             .position(
                 x: (layer.x + layer.w / 2) * canvasSize.width,
                 y: (layer.y + layer.h / 2) * canvasSize.height
             )
             .zIndex(Double(layer.z))
-            .onTapGesture {
-                Haptic.impact(.soft)
-                viewModel.selectedId = layer.id
+    }
+
+    // 右下のリサイズハンドル (ドラッグで左上固定・アスペクト維持の拡縮)
+    private func resizeHandle(for id: String, canvasSize: CGSize) -> some View {
+        ZStack {
+            Circle()
+                .fill(.white)
+                .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
+            Circle()
+                .stroke(Color.black.opacity(0.45), lineWidth: 1.5)
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.black)
+        }
+        .frame(width: 26, height: 26)
+        .contentShape(Circle().inset(by: -10))   // 指で掴みやすいようヒット領域を拡大
+        .gesture(handleDragGesture(for: id, canvasSize: canvasSize))
+    }
+
+    private func handleDragGesture(for id: String, canvasSize: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                if handleContext?.id != id {
+                    guard let start = viewModel.layers.first(where: { $0.id == id }) else { return }
+                    handleContext = (id: id, start: start, snapshot: viewModel.layers)
+                }
+                guard let context = handleContext, canvasSize.width > 0 else { return }
+                let start = context.start
+                // 左上 (固定点) から右下コーナーまでの対角距離の変化率 = 拡縮率
+                let fixedX = start.x * canvasSize.width
+                let fixedY = start.y * canvasSize.height
+                let cornerX = (start.x + start.w) * canvasSize.width
+                let cornerY = (start.y + start.h) * canvasSize.height
+                let startLength = hypot(cornerX - fixedX, cornerY - fixedY)
+                guard startLength > 0 else { return }
+                let newLength = hypot(
+                    cornerX + value.translation.width - fixedX,
+                    cornerY + value.translation.height - fixedY
+                )
+                viewModel.resizeFromTopLeft(id, from: start, factor: newLength / startLength)
             }
-            .gesture(dragGesture(for: layer.id, canvasSize: canvasSize))
+            .onEnded { _ in
+                if let context = handleContext {
+                    viewModel.commitGesture(snapshot: context.snapshot)
+                }
+                handleContext = nil
+            }
     }
 
     // ドラッグ移動: 開始時の rect を基準に平行移動
@@ -351,7 +433,7 @@ struct OutfitCollageLayoutEditView: View {
             }
     }
 
-    // 重なり順 (選択中のみ活性)
+    // 重なり順: タップで最前面になるため、戻す方向 (背面へ) だけボタンで提供する
     private var zOrderRow: some View {
         HStack(spacing: 8) {
             if let selected = viewModel.selectedLayer {
@@ -365,14 +447,7 @@ struct OutfitCollageLayoutEditView: View {
             }
             Spacer(minLength: 0)
             toolButton(
-                label: "前面へ",
-                systemImage: "square.2.layers.3d.top.filled",
-                disabled: viewModel.selectedLayer == nil || viewModel.selectedIsTop
-            ) {
-                if let id = viewModel.selectedId { viewModel.bringForward(id) }
-            }
-            toolButton(
-                label: "背面へ",
+                label: "一段背面へ",
                 systemImage: "square.2.layers.3d.bottom.filled",
                 disabled: viewModel.selectedLayer == nil || viewModel.selectedIsBottom
             ) {

@@ -93,6 +93,30 @@ struct OutfitCollageDetailView: View {
             .aspectRatio(3.0 / 4.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+            // 画像タップでも配置編集を開ける (ボタンと同じ導線)
+            .overlay(alignment: .bottomTrailing) {
+                if !viewModel.isRegeneratingOutfitCollage {
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.on.square.dashed")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("タップで編集")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.white.opacity(0.92))
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.black.opacity(0.12), lineWidth: 1))
+                    .padding(10)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard !viewModel.isRegeneratingOutfitCollage else { return }
+                Haptic.impact(.soft)
+                showingLayoutEditor = true
+            }
             .overlay {
                 if viewModel.isRegeneratingOutfitCollage {
                     ZStack {
