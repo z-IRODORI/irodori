@@ -24,6 +24,15 @@ protocol OutfitCollageClientProtocol {
         gender: Gender,
         items: [OutfitRecommendItem]
     ) async throws -> Result<ClosetBridgeResponse, HTTPError>
+    /// 配置編集用: 透過レイヤー PNG と配置 (正規化 rect + z) を取得
+    func getLayout(uid: String, gender: Gender) async throws -> Result<OutfitCollageLayoutResponse, HTTPError>
+    /// 編集した配置で再合成して保存。成功時は新しい collage_url を含むレスポンスを返す
+    func saveLayout(
+        uid: String,
+        gender: Gender,
+        collageId: String,
+        items: [OutfitCollageLayoutItem]
+    ) async throws -> Result<OutfitCollageResponse, HTTPError>
 }
 
 struct OutfitCollageGenerateRequest: Encodable {
@@ -41,6 +50,21 @@ struct OutfitRecommendItem: Encodable {
 struct OutfitRecommendationsRequest: Encodable {
     let gender: String
     let items: [OutfitRecommendItem]
+}
+
+struct OutfitCollageLayoutSaveRequest: Encodable {
+    struct Item: Encodable {
+        let id: String
+        let x: Double
+        let y: Double
+        let w: Double
+        let h: Double
+        let z: Int
+    }
+
+    let collage_id: String    // GET layout 時点の collage_id (再生成との競合検出)
+    let gender: String
+    let items: [Item]
 }
 
 final class OutfitCollageClient: OutfitCollageClientProtocol {
@@ -128,6 +152,69 @@ final class OutfitCollageClient: OutfitCollageClientProtocol {
         }
     }
 
+    func getLayout(uid: String, gender: Gender) async throws -> Result<OutfitCollageLayoutResponse, HTTPError> {
+        let endpoint = "api/outfit-collage/layout"
+        var components = URLComponents(string: "\(baseURL)/\(endpoint)")!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: uid),
+            URLQueryItem(name: "gender", value: gender.apiValue),
+        ]
+        guard let url = components.url else {
+            return .failure(.responseError)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 60  // 初回はレイヤー生成 (ノックアウト + アップロード) があるため長め
+
+        do {
+            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            if let httpResponse = urlResponse as? HTTPURLResponse, httpResponse.statusCode >= 400 {
+                return .failure(HTTPError.fromStatusCode(httpResponse.statusCode))
+            }
+            do {
+                let response = try JSONDecoder().decode(OutfitCollageLayoutResponse.self, from: data)
+                return .success(response)
+            } catch {
+                print("[OutfitCollageClient] layout decode error: \(error)")
+                return .failure(.decodeError)
+            }
+        } catch {
+            if let urlError = error as? URLError, urlError.code == .cancelled {
+                throw CancellationError()
+            }
+            return .failure(.responseError)
+        }
+    }
+
+    func saveLayout(
+        uid: String,
+        gender: Gender,
+        collageId: String,
+        items: [OutfitCollageLayoutItem]
+    ) async throws -> Result<OutfitCollageResponse, HTTPError> {
+        let endpoint = "api/outfit-collage/layout"
+        var components = URLComponents(string: "\(baseURL)/\(endpoint)")!
+        components.queryItems = [URLQueryItem(name: "user_id", value: uid)]
+        guard let url = components.url else {
+            return .failure(.responseError)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 60
+        let body = OutfitCollageLayoutSaveRequest(
+            collage_id: collageId,
+            gender: gender.apiValue,
+            items: items.map {
+                .init(id: $0.id, x: $0.x, y: $0.y, w: $0.w, h: $0.h, z: $0.z)
+            }
+        )
+        request.httpBody = try? JSONEncoder().encode(body)
+
+        return try await send(request)
+    }
+
     private func send(_ request: URLRequest) async throws -> Result<OutfitCollageResponse, HTTPError> {
         do {
             let (data, urlResponse) = try await URLSession.shared.data(for: request)
@@ -173,6 +260,19 @@ final class MockOutfitCollageClient: OutfitCollageClientProtocol {
         gender: Gender,
         items: [OutfitRecommendItem]
     ) async throws -> Result<ClosetBridgeResponse, HTTPError> {
+        return .success(.mock())
+    }
+
+    func getLayout(uid: String, gender: Gender) async throws -> Result<OutfitCollageLayoutResponse, HTTPError> {
+        return .success(.mock())
+    }
+
+    func saveLayout(
+        uid: String,
+        gender: Gender,
+        collageId: String,
+        items: [OutfitCollageLayoutItem]
+    ) async throws -> Result<OutfitCollageResponse, HTTPError> {
         return .success(.mock())
     }
 }

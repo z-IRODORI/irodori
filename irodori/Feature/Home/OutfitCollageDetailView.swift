@@ -17,6 +17,7 @@ struct OutfitCollageDetailView: View {
 
     @State private var pickerSlot: PickerSlot? = nil
     @State private var showingClosetPicker = false
+    @State private var showingLayoutEditor = false
     @State private var webLink: HomeWebLink? = nil
 
     private struct PickerSlot: Identifiable {
@@ -30,8 +31,11 @@ struct OutfitCollageDetailView: View {
             if let response = viewModel.outfitCollage {
                 VStack(alignment: .leading, spacing: 20) {
                     collageImage(response)
-                    shuffleButton
-                    fromItemButton
+                    VStack(spacing: 10) {
+                        shuffleButton
+                        fromItemButton
+                        editLayoutButton
+                    }
                     itemList(response)
                     recommendationsSection
                     Spacer().frame(height: 40)
@@ -65,6 +69,11 @@ struct OutfitCollageDetailView: View {
         }
         .sheet(item: $webLink) { link in
             WebViewContainer(url: link.url)
+        }
+        .sheet(isPresented: $showingLayoutEditor) {
+            OutfitCollageLayoutEditView(onSaved: { response in
+                viewModel.outfitCollage = response
+            })
         }
         .onAppear {
             Task { await viewModel.loadOutfitRecommendations() }
@@ -207,6 +216,25 @@ struct OutfitCollageDetailView: View {
             Task { await viewModel.loadClosetItemsIfNeeded() }
         } label: {
             Label("持っているアイテムから作る", systemImage: "tshirt")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.gray.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+        }
+        .disabled(viewModel.isRegeneratingOutfitCollage)
+    }
+
+    // MARK: - 配置を編集
+
+    private var editLayoutButton: some View {
+        Button {
+            Haptic.impact(.soft)
+            showingLayoutEditor = true
+        } label: {
+            Label("大きさ・配置を編集", systemImage: "square.on.square.dashed")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity)
