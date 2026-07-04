@@ -236,6 +236,11 @@ struct OutfitCollageLayoutCanvas: View {
     @State private var pinchContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
     @State private var handleContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
 
+    // ドラッグの translation を測る固定座標空間。
+    // レイヤーは .position で動くため、デフォルトの .local (レイヤー自身の空間) で測ると
+    // 「動かす → 空間ごと動く → translation が戻る」のフィードバックループで振動する。
+    private static let canvasSpaceName = "outfitCollageLayoutCanvas"
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -249,6 +254,7 @@ struct OutfitCollageLayoutCanvas: View {
                 }
             }
             .clipped()
+            .coordinateSpace(name: Self.canvasSpaceName)
             .simultaneousGesture(pinchGesture(canvasSize: geo.size))
         }
     }
@@ -308,7 +314,8 @@ struct OutfitCollageLayoutCanvas: View {
     }
 
     private func handleDragGesture(for id: String, canvasSize: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 1)
+        // ハンドルは拡縮で自分自身も動くため、キャンバス固定空間で translation を測る (振動防止)
+        DragGesture(minimumDistance: 1, coordinateSpace: .named(Self.canvasSpaceName))
             .onChanged { value in
                 if handleContext?.id != id {
                     guard let start = viewModel.layers.first(where: { $0.id == id }) else { return }
@@ -339,7 +346,8 @@ struct OutfitCollageLayoutCanvas: View {
 
     // ドラッグ移動: 開始時の rect を基準に平行移動
     private func dragGesture(for id: String, canvasSize: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 1)
+        // レイヤーは .position で動くため、キャンバス固定空間で translation を測る (振動防止)
+        DragGesture(minimumDistance: 1, coordinateSpace: .named(Self.canvasSpaceName))
             .onChanged { value in
                 if dragContext?.id != id {
                     guard let start = viewModel.layers.first(where: { $0.id == id }) else { return }

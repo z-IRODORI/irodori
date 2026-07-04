@@ -142,10 +142,12 @@ struct OutfitCollageDetailView: View {
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.15), value: layoutViewModel.hasChanges)
     }
 
     // キャンバス下の編集ツール: ヒント / 背面へ・元に戻す・リセット / 変更があるときだけ保存CTA
+    // 注意: hasChanges 連動のアニメーションはこのブロックに閉じる。
+    // キャンバスを含む親に付けると、ドラッグ1発目 (hasChanges が立つ瞬間) の
+    // 位置更新までアニメーション化されて操作がガクつく。
     private var editControls: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("タップで最前面・ドラッグで移動・◯ハンドルで大きさを調整")
@@ -198,6 +200,7 @@ struct OutfitCollageDetailView: View {
                 .disabled(layoutViewModel.isSaving)
             }
         }
+        .animation(.easeInOut(duration: 0.15), value: layoutViewModel.hasChanges)
     }
 
     private func progressCover(_ message: String) -> some View {
