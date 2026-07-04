@@ -2,7 +2,8 @@
 //  DailyRecommendationReasonSection.swift
 //  irodori
 //
-//  「明日のコーデ」セクション。
+//  「おすすめコーデ」セクション (旧: 明日のコーデ)。
+//  9件のコーデを提案するため、タイトルは「おすすめコーデ」。
 //  - 見出し (タイトル + 場所バッジ + 天気バッジ)
 //  - partner_comment ボックス
 //  - 3×3 グリッド (画像タップで詳細モーダル / ハートでお気に入り)
@@ -36,7 +37,7 @@ struct DailyRecommendationReasonSection: View {
 
     private var sectionHeader: some View {
         HStack(alignment: .center, spacing: 8) {
-            Text("明日のコーデ")
+            Text("おすすめコーデ")
                 .font(.system(size: 20, weight: .bold))
             Spacer()
             DailyLocationBadge(prefectureName: prefectureName, action: onLocationTap)

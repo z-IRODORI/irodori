@@ -35,7 +35,7 @@ struct DailyRecommendationCaptionSection: View {
 
     private var sectionHeader: some View {
         HStack(alignment: .center, spacing: 8) {
-            Text("明日のコーデ")
+            Text("おすすめコーデ")
                 .font(.system(size: 20, weight: .bold))
             Spacer()
             DailyLocationBadge(prefectureName: prefectureName, action: onLocationTap)

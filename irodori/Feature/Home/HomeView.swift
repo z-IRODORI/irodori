@@ -52,7 +52,7 @@ struct HomeView: View {
 
                     partnerCard
 
-                    // 「明日のコーデ」セクション:
+                    // 「おすすめコーデ」セクション (旧: 明日のコーデ):
                     //  - DailyRecommendationReasonSection:  3×3 グリッドのみ. 画像タップで詳細モーダル.
                     //  - DailyRecommendationCaptionSection: 各カード下にキャプションを併記する代替案.
                     DailyRecommendationReasonSection(
