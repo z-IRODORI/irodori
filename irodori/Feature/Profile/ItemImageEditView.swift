@@ -373,7 +373,8 @@ struct ItemImageEditView: View {
 
                 HStack(alignment: .top, spacing: 12) {
                     comparisonColumn(title: "変更前", image: viewModel.originalImage)
-                    comparisonColumn(title: "変更後", image: viewModel.workingImage)
+                    // 変更後は保存される最終画像 (透明余白トリム + 正方形再フィット済み) を見せる
+                    comparisonColumn(title: "変更後", image: viewModel.finalImage ?? viewModel.workingImage)
                 }
 
                 attributeChangesSummary

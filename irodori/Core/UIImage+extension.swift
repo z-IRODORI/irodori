@@ -140,6 +140,70 @@ extension UIImage {
 }
 
 extension UIImage {
+    /// 透明余白をトリムし、元画像と同じ長辺の正方形キャンバス中央にフィットさせて返す (透過保持)。
+    /// アイテム画像編集で被写体が隅に小さく残った場合に、被写体が画像領域いっぱいに
+    /// 写るよう正規化する。完全に透明な画像は nil を返す。
+    func normalizedToContentSquare(alphaThreshold: UInt8 = 8) -> UIImage? {
+        guard let cgImage = self.cgImage else { return nil }
+
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * width
+        guard width > 0, height > 0,
+              let data = calloc(height * width, bytesPerPixel) else { return nil }
+        defer { free(data) }
+
+        guard let context = CGContext(data: data,
+                                      width: width,
+                                      height: height,
+                                      bitsPerComponent: 8,
+                                      bytesPerRow: bytesPerRow,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.assumingMemoryBound(to: UInt8.self)
+
+        // アルファが閾値を超える画素のバウンディングボックスを求める
+        var minX = width, maxX = -1
+        var minY = height, maxY = -1
+        for y in 0..<height {
+            let rowOffset = y * bytesPerRow
+            for x in 0..<width {
+                if pixels[rowOffset + x * bytesPerPixel + 3] > alphaThreshold {
+                    if x < minX { minX = x }
+                    if x > maxX { maxX = x }
+                    if y < minY { minY = y }
+                    if y > maxY { maxY = y }
+                }
+            }
+        }
+        guard maxX >= minX, maxY >= minY else { return nil }   // 全透明
+
+        let cropRect = CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+        guard let croppedCG = cgImage.cropping(to: cropRect) else { return nil }
+
+        // 元画像の長辺 (ピクセル) を一辺とする正方形に、アスペクト比を保って中央フィット
+        let side = CGFloat(max(width, height))
+        let scaleFactor = min(side / cropRect.width, side / cropRect.height)
+        let drawSize = CGSize(width: cropRect.width * scaleFactor,
+                              height: cropRect.height * scaleFactor)
+        let drawOrigin = CGPoint(x: (side - drawSize.width) / 2,
+                                 y: (side - drawSize.height) / 2)
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format)
+        let cropped = UIImage(cgImage: croppedCG)
+        return renderer.image { _ in
+            cropped.draw(in: CGRect(origin: drawOrigin, size: drawSize))
+        }
+    }
+}
+
+extension UIImage {
     /// 不透明領域をクロップし、512×512の中央に配置して返す
     func croppedNonTransparentToSquare512() -> UIImage? {
         guard let cgImage = self.cgImage else { return nil }

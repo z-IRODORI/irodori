@@ -180,19 +180,34 @@ final class ItemImageEditViewModel {
 
     // MARK: - 確認 / 保存
 
+    /// 確認・保存用の最終画像。画像に変更がある場合は、透明余白をトリムして
+    /// 被写体を元と同じ大きさの正方形いっぱいに再フィットしたもの
+    /// (例: 消しゴム後に右上へ小さく残った被写体でも、画像領域が被写体に合う)。
+    var finalImage: UIImage?
+
     func goToConfirm() {
         guard hasChanges else { return }
+        if imageChanged, let current = workingImage {
+            guard let normalized = current.normalizedToContentSquare() else {
+                ToastManager.shared.show("アイテムが写っていません。消しすぎていないか確認してください")
+                return
+            }
+            finalImage = normalized
+        } else {
+            finalImage = workingImage
+        }
         step = .confirm
     }
 
     func backToEdit() {
+        finalImage = nil
         step = .edit
     }
 
     /// 編集後の画像を新アイテムとして登録し、成功したら旧アイテムを削除する (差し替え)。
     /// 透明背景を保持するため PNG でアップロードする。成功時は差し替え後の ClosetItem を返す。
     func save() async -> ClosetItem? {
-        guard let image = workingImage,
+        guard let image = finalImage ?? workingImage,
               let data = image.pngData(),
               let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else {
             ToastManager.shared.show("保存に失敗しました")
