@@ -64,6 +64,22 @@ struct CalendarView: View {
         .background(.white)
         .navigationTitle("カレンダー")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Haptic.impact(.soft)
+                    path.append(.outfitPlanner)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("まとめて提案")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(.black)
+                }
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             AnalyticsLogger.shared.log(screen: .memoryCalendarScreenView)
@@ -80,6 +96,9 @@ struct CalendarView: View {
                     viewModel.hasLoaded = false
                     await viewModel.onAppear()
                 }
+            } else if oldPath.count > newPath.count {
+                // まとめて提案などから戻ってきたら予定コーデを再取得して反映する
+                Task { await viewModel.loadPlanned() }
             }
         }
         .confirmationDialog(

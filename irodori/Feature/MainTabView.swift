@@ -84,6 +84,8 @@ struct MainTabView: View {
                         ),
                         showHeader: params.showHeader
                     )
+                case .outfitPlanner:
+                    OutfitPlannerView(path: $path)
                 case .tomorrowPlanner:
                     TomorrowPlannerView(path: $path)
                 case .generalChat(let conversationId):

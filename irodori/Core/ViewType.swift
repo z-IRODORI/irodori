@@ -10,6 +10,7 @@ import UIKit
 enum ViewType: Hashable {
     case camera
     case calendar
+    case outfitPlanner
     case tomorrowPlanner
     case generalChat(conversationId: String?)
     case chatHistoryList
