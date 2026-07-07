@@ -7,6 +7,14 @@
 
 import Foundation
 
+/// 推薦コーデに使われている手持ちアイテム (クローゼット一致)
+struct DailyOwnedItem: Decodable, Hashable {
+    let slot: String           // tops | bottoms
+    let item_id: String
+    let image_url: String
+    let label: String          // 例: "グレー スウェット"
+}
+
 struct DailyRecommendationItem: Decodable, Hashable, Identifiable {
     var id: String { "\(kind)_\(pool_id)" }
     let pool_id: String        // kind=pool: pool_id / kind=self: coordinate_id
@@ -19,14 +27,17 @@ struct DailyRecommendationItem: Decodable, Hashable, Identifiable {
     let style: String          // backend: genre
     let cleanliness: Int
     let is_favorite: Bool
+    let owned_items: [DailyOwnedItem]   // クローゼットにある一致アイテム
+    let missing_items: [String]         // 足りないアイテム (例: "黒 スラックス")
 
     var kindEnum: FavoriteKind {
         FavoriteKind(rawValue: kind) ?? .pool
     }
 
-    // 旧フィールド (kind / is_favorite) を持たない古い response との互換性
+    // 旧フィールドを持たない古い response との互換性
     enum CodingKeys: String, CodingKey {
         case pool_id, kind, image_url, reason, main_colors, items, vibe, style, cleanliness, is_favorite
+        case owned_items, missing_items
     }
 
     init(from decoder: Decoder) throws {
@@ -41,10 +52,12 @@ struct DailyRecommendationItem: Decodable, Hashable, Identifiable {
         self.style = (try? c.decode(String.self, forKey: .style)) ?? ""
         self.cleanliness = (try? c.decode(Int.self, forKey: .cleanliness)) ?? 3
         self.is_favorite = (try? c.decode(Bool.self, forKey: .is_favorite)) ?? false
+        self.owned_items = (try? c.decode([DailyOwnedItem].self, forKey: .owned_items)) ?? []
+        self.missing_items = (try? c.decode([String].self, forKey: .missing_items)) ?? []
     }
 
     // mock 用 memberwise init
-    init(pool_id: String, kind: String = "pool", image_url: String, reason: String?, main_colors: [String], items: [String: String?], vibe: String, style: String, cleanliness: Int, is_favorite: Bool = false) {
+    init(pool_id: String, kind: String = "pool", image_url: String, reason: String?, main_colors: [String], items: [String: String?], vibe: String, style: String, cleanliness: Int, is_favorite: Bool = false, owned_items: [DailyOwnedItem] = [], missing_items: [String] = []) {
         self.pool_id = pool_id
         self.kind = kind
         self.image_url = image_url
@@ -55,6 +68,8 @@ struct DailyRecommendationItem: Decodable, Hashable, Identifiable {
         self.style = style
         self.cleanliness = cleanliness
         self.is_favorite = is_favorite
+        self.owned_items = owned_items
+        self.missing_items = missing_items
     }
 }
 

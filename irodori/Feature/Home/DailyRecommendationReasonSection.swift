@@ -106,6 +106,13 @@ struct DailyRecommendationReasonSection: View {
             }
             .padding(6)
         }
+        // 手持ちアイテムの丸アイコン (このコーデに使える自分のアイテム)
+        .overlay(alignment: .bottomTrailing) {
+            if !item.owned_items.isEmpty {
+                OwnedItemCircles(items: item.owned_items, size: 20)
+                    .padding(6)
+            }
+        }
     }
 
     // MARK: - Skeleton

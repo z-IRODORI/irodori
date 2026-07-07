@@ -178,3 +178,28 @@ struct DailyGridImage: View {
     }
 }
 
+
+// MARK: - 手持ちアイテムの丸アイコン
+
+/// 推薦コーデに使われている手持ちアイテムを重ねた丸アイコンで表示する。
+/// グリッドセル (小) と詳細画面 (大) で共用。
+struct OwnedItemCircles: View {
+    let items: [DailyOwnedItem]
+    var size: CGFloat = 20
+    var maxCount: Int = 3
+
+    var body: some View {
+        HStack(spacing: -size * 0.3) {
+            ForEach(Array(items.prefix(maxCount).enumerated()), id: \.offset) { _, owned in
+                KFImage(URL(string: owned.image_url))
+                    .placeholder { Color.gray.opacity(0.25) }
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                    .shadow(color: .black.opacity(0.25), radius: 1.5, x: 0, y: 0.5)
+            }
+        }
+    }
+}

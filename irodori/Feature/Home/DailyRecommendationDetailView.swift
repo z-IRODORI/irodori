@@ -61,6 +61,11 @@ struct DailyRecommendationDetailView: View {
                     coordItemsSection
                 }
 
+                if item.kindEnum == .pool, !item.owned_items.isEmpty || !item.missing_items.isEmpty {
+                    sectionTitle("手持ちアイテムでの再現")
+                    closetMatchSection
+                }
+
                 if !item.vibe.isEmpty {
                     sectionTitle("印象")
                     Text(item.vibe)
@@ -147,6 +152,71 @@ struct DailyRecommendationDetailView: View {
                         Text(v).font(.subheadline)
                         Spacer()
                     }
+                }
+            }
+        }
+    }
+
+    // 手持ちアイテムとの一致: このコーデを自分のクローゼットで作れるか、足りないものは何か
+    private var closetMatchSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if item.missing_items.isEmpty && !item.owned_items.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13))
+                    Text("手持ちのアイテムで作れます")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(.green)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.green.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            ForEach(item.owned_items, id: \.self) { owned in
+                HStack(spacing: 10) {
+                    KFImage(URL(string: owned.image_url))
+                        .placeholder { Color.gray.opacity(0.15) }
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 36, height: 36)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.black.opacity(0.08), lineWidth: 1))
+                    Text(owned.label)
+                        .font(.system(size: 14))
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 12))
+                        Text("持っています")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(.green)
+                }
+            }
+
+            ForEach(item.missing_items, id: \.self) { label in
+                HStack(spacing: 10) {
+                    Circle()
+                        .strokeBorder(
+                            Color.gray.opacity(0.4),
+                            style: StrokeStyle(lineWidth: 1.2, dash: [3, 2.5])
+                        )
+                        .frame(width: 36, height: 36)
+                        .overlay(
+                            Image(systemName: "tshirt")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.gray.opacity(0.5))
+                        )
+                    Text(label)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("足りません")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.orange)
                 }
             }
         }
