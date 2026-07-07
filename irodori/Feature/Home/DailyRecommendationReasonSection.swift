@@ -21,6 +21,8 @@ struct DailyRecommendationReasonSection: View {
     let prefectureName: String
     let onTap: (DailyRecommendationItem) -> Void
     let onLocationTap: () -> Void
+    /// 手持ちアイテム未登録ナッジのタップ (コーデ撮影シートを開く)
+    var onRegisterItems: () -> Void = {}
 
     @Environment(FavoritesStore.self) private var favoritesStore
 
@@ -59,9 +61,55 @@ struct DailyRecommendationReasonSection: View {
                     DailyPartnerCommentBox(text: comment)
                 }
                 grid(items: r.recommendations)
+                closetHintRow(items: r.recommendations)
             }
         } else {
             emptyState
+        }
+    }
+
+    // 手持ちアイテム一致の補足行:
+    //  - 丸アイコンが1つでもあれば意味の凡例 (初見で分かるように)
+    //  - 1つも無ければ登録ナッジ (アイテムが少ないと表示されないため)
+    @ViewBuilder
+    private func closetHintRow(items: [DailyRecommendationItem]) -> some View {
+        let hasAnyOwned = items.contains { !$0.owned_items.isEmpty }
+        if hasAnyOwned {
+            HStack(spacing: 6) {
+                Image(systemName: "circle.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                Text("画像右下の◯は、そのコーデに使える手持ちのアイテムです")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            }
+        } else {
+            Button {
+                Haptic.impact(.soft)
+                onRegisterItems()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "camera")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("アイテムを登録すると、手持ちで作れるコーデが分かります")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Text("コーデを撮影するとアイテムが自動で登録されます")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(12)
+                .background(Color.gray.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
         }
     }
 

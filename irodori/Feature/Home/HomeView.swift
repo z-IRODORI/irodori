@@ -69,6 +69,10 @@ struct HomeView: View {
                             } else {
                                 ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
                             }
+                        },
+                        onRegisterItems: {
+                            // アイテム未登録ナッジ → コーデ撮影シート (撮影でアイテム自動登録)
+                            showFirstTakePhotoSheet = true
                         }
                     )
 

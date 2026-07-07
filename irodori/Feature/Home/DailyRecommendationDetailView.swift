@@ -14,6 +14,7 @@ struct DailyRecommendationDetailView: View {
     let onWear: (DailyRecommendationItem) async -> Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(FavoritesStore.self) private var favoritesStore
+    @Environment(MainTabViewModel.self) private var tabViewModel
 
     @State private var isMarking = false
     @State private var marked = false
@@ -160,6 +161,42 @@ struct DailyRecommendationDetailView: View {
     // 手持ちアイテムとの一致: このコーデを自分のクローゼットで作れるか、足りないものは何か
     private var closetMatchSection: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if item.owned_items.isEmpty {
+                // 空状態: 一致する手持ちが無い (クローゼット未登録・少ない場合を含む)。
+                // 「足りません」の羅列だけにせず、登録すると判定できることを案内する
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 13))
+                        Text("このコーデに合う手持ちアイテムは見つかりませんでした")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(.secondary)
+                    Text("コーデを撮影するとアイテムが自動で登録され、手持ちで作れるかが分かるようになります。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        Haptic.impact(.soft)
+                        openItemRegistration()
+                    } label: {
+                        Text("コーデを撮って登録する")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .background(.white)
+                            .overlay(Capsule().stroke(Color.black.opacity(0.2), lineWidth: 1))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.gray.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+
             if item.missing_items.isEmpty && !item.owned_items.isEmpty {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
@@ -219,6 +256,17 @@ struct DailyRecommendationDetailView: View {
                         .foregroundStyle(.orange)
                 }
             }
+        }
+    }
+
+    /// コーデ撮影シートへ (撮影するとアイテムが自動登録される既存フロー)。
+    /// この詳細シートを閉じてから、ホームの FirstTakePhoto シートを開く
+    /// (カレンダー空状態と同じ導線。シート二重提示を避けるため少し遅延させる)
+    private func openItemRegistration() {
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            tabViewModel.selectedTab = .home
+            tabViewModel.shouldShowFirstTakePhotoOnHome = true
         }
     }
 
@@ -294,5 +342,6 @@ struct DailyRecommendationDetailView: View {
             }
         )
         .environment(FavoritesStore(client: MockFavoriteClient()))
+        .environment(MainTabViewModel())
     }
 }
