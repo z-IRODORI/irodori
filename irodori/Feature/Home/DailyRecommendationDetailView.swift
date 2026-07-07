@@ -18,6 +18,7 @@ struct DailyRecommendationDetailView: View {
     @State private var isMarking = false
     @State private var marked = false
     @State private var errorText: String?
+    @State private var showAddToCalendar = false
 
     var body: some View {
         ScrollView {
@@ -67,6 +68,8 @@ struct DailyRecommendationDetailView: View {
                         .foregroundColor(.secondary)
                 }
 
+                addToCalendarButton
+
                 if item.kindEnum == .pool {
                     wearButton
                 }
@@ -79,6 +82,31 @@ struct DailyRecommendationDetailView: View {
         }
         .navigationTitle("詳細")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showAddToCalendar) {
+            AddToCalendarSheet(
+                kind: item.kindEnum == .self ? "self" : "pool",
+                targetId: item.pool_id,
+                imageURL: item.image_url,
+                source: "detail"
+            )
+            .presentationDetents([.height(300)])
+        }
+    }
+
+    // 予定コーデとしてカレンダーにストックする (主CTA)
+    private var addToCalendarButton: some View {
+        Button {
+            Haptic.impact(.medium)
+            showAddToCalendar = true
+        } label: {
+            Label("カレンダーに追加", systemImage: "calendar.badge.plus")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.black)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+        }
     }
 
     private var favoriteButton: some View {
@@ -171,13 +199,14 @@ struct DailyRecommendationDetailView: View {
                 }
             } label: {
                 HStack {
-                    if isMarking { ProgressView().tint(.white) }
+                    if isMarking { ProgressView().tint(.black) }
                     Text(isMarking ? "送信中…" : "これを今日着る").font(.headline)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(Color.black)
-                .foregroundColor(.white)
+                .background(Color.white)
+                .foregroundColor(.black)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black.opacity(0.2), lineWidth: 1))
                 .cornerRadius(10)
             }
             .disabled(isMarking)

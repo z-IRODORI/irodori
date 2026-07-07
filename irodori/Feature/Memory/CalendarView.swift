@@ -18,6 +18,12 @@ struct CalendarView: View {
     private let columns7 = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
     private let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
 
+    // 予定コーデのタップ操作 (詳細/削除の選択と pool 詳細シート)
+    @State private var selectedPlanned: CalendarOutfit? = nil
+    @State private var showPlannedDialog = false
+    @State private var presentedPoolItem: DailyRecommendationItem? = nil
+    @State private var isLoadingPlannedDetail = false
+
     var body: some View {
         Group {
             if viewModel.months.isEmpty || viewModel.isInitiallyLoading {
@@ -35,13 +41,17 @@ struct CalendarView: View {
                                 monthSkeletonSection(month: month)
                             case .loaded(let responses):
                                 let hasPhotos = responses.contains { $0.coodinate_image_path != nil }
-                                if hasPhotos {
+                                if hasPhotos || viewModel.hasPlanned(year: month.year, month: month.monthOfTheYear) {
                                     monthSection(month: month, responses: responses)
                                 } else {
                                     monthEmptySection(month: month)
                                 }
                             case .failed:
-                                monthEmptySection(month: month)
+                                if viewModel.hasPlanned(year: month.year, month: month.monthOfTheYear) {
+                                    monthSection(month: month, responses: [])
+                                } else {
+                                    monthEmptySection(month: month)
+                                }
                             }
                         }
                     }
@@ -72,6 +82,69 @@ struct CalendarView: View {
                 }
             }
         }
+        .confirmationDialog(
+            plannedDialogTitle,
+            isPresented: $showPlannedDialog,
+            titleVisibility: .visible,
+            presenting: selectedPlanned
+        ) { planned in
+            Button("詳細を見る") {
+                Task { await openPlannedDetail(planned) }
+            }
+            Button("予定から削除", role: .destructive) {
+                Task {
+                    if await viewModel.deletePlanned(planned) {
+                        ToastManager.shared.show("予定を削除しました", style: .normal)
+                    }
+                }
+            }
+            Button("キャンセル", role: .cancel) {}
+        }
+        .sheet(item: $presentedPoolItem) { item in
+            NavigationStack {
+                DailyRecommendationDetailView(
+                    item: item,
+                    onWear: { it in await viewModel.markWornToday(it) }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") { presentedPoolItem = nil }
+                    }
+                }
+            }
+        }
+        .overlay {
+            if isLoadingPlannedDetail {
+                ZStack {
+                    Color.black.opacity(0.25).ignoresSafeArea()
+                    ProgressView().tint(.white)
+                }
+            }
+        }
+    }
+
+    private var plannedDialogTitle: String {
+        guard let planned = selectedPlanned else { return "予定コーデ" }
+        let parts = planned.date.split(separator: "-")
+        if parts.count == 3, let m = Int(parts[1]), let d = Int(parts[2]) {
+            return "\(m)月\(d)日の予定コーデ"
+        }
+        return "予定コーデ"
+    }
+
+    private func openPlannedDetail(_ planned: CalendarOutfit) async {
+        if planned.kind == "self" {
+            path.append(.coordinateDetail(.init(
+                coordinateId: planned.target_id,
+                coordinateImageURL: planned.image_url,
+                showHeader: false
+            )))
+            return
+        }
+        isLoadingPlannedDetail = true
+        let item = await viewModel.fetchPoolItem(planned)
+        isLoadingPlannedDetail = false
+        presentedPoolItem = item
     }
 
     // MARK: - Month Section（写真あり）
@@ -167,24 +240,34 @@ struct CalendarView: View {
     // MARK: - Day Cell
 
     private func dayCell(month: Month, day: Int, responses: [CoordinateListResponse]) -> some View {
-        let coord = responses[safe: day - 1]
+        // day フィールドで突合する (旧実装の配列インデックス依存は歯抜けデータでズレるため)
+        let coord = responses.first { $0.day == day }
         let imageURL = coord?.coodinate_image_path
         let coordinateId = coord?.id
+        // 着用記録がある日は記録を優先し、無い日だけ予定コーデを表示する
+        let planned = imageURL == nil
+            ? viewModel.planned(year: month.year, month: month.monthOfTheYear, day: day)
+            : nil
         let isToday = checkIsToday(year: month.year, month: month.monthOfTheYear, day: day)
 
         return Button(action: {
-            guard let imageURL, let coordinateId, !coordinateId.isEmpty else { return }
-            let targetDateString = String(format: "%04d-%02d-%02d", month.year, month.monthOfTheYear, day)
-            AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
-                "date": targetDateString,
-                "has_coordinate": true
-            ])
-            let params = ViewType.CoordinateDetailParams(
-                coordinateId: coordinateId,
-                coordinateImageURL: imageURL,
-                showHeader: false
-            )
-            path.append(.coordinateDetail(params))
+            if let imageURL, let coordinateId, !coordinateId.isEmpty {
+                let targetDateString = String(format: "%04d-%02d-%02d", month.year, month.monthOfTheYear, day)
+                AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+                    "date": targetDateString,
+                    "has_coordinate": true
+                ])
+                let params = ViewType.CoordinateDetailParams(
+                    coordinateId: coordinateId,
+                    coordinateImageURL: imageURL,
+                    showHeader: false
+                )
+                path.append(.coordinateDetail(params))
+            } else if let planned {
+                Haptic.impact(.soft)
+                selectedPlanned = planned
+                showPlannedDialog = true
+            }
         }) {
             ZStack {
                 if let imageURL {
@@ -200,6 +283,35 @@ struct CalendarView: View {
                         .foregroundStyle(.white)
                         .shadow(color: .black.opacity(0.5), radius: 2)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(4)
+                } else if let planned {
+                    // 予定コーデ: 破線枠 + 時計アイコンで「まだ着ていない予定」を表現
+                    coordinateImage(from: planned.image_url)
+                        .scaledToFill()
+                        .frame(minWidth: 0, maxWidth: .infinity,
+                               minHeight: 0, maxHeight: .infinity)
+                        .aspectRatio(3/4, contentMode: .fill)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(
+                                    Color.black.opacity(0.4),
+                                    style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+                                )
+                        )
+
+                    Text("\(day)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.5), radius: 2)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(4)
+
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.5), radius: 2)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .padding(4)
                 } else {
                     Color.clear.aspectRatio(3/4, contentMode: .fill)
@@ -221,7 +333,7 @@ struct CalendarView: View {
             .aspectRatio(3/4, contentMode: .fill)
         }
         .buttonStyle(.plain)
-        .disabled(imageURL == nil)
+        .disabled(imageURL == nil && planned == nil)
     }
 
     // MARK: - Helpers
