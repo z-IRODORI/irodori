@@ -79,7 +79,7 @@ struct DailyRecommendationReasonSection: View {
                 Image(systemName: "circle.circle.fill")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
-                Text("画像右下: ◯=使える手持ちアイテム / 破線=手持ちと一致なし")
+                Text("画像右上: ◯=使える手持ちアイテム / 破線=手持ちと一致なし")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
@@ -137,6 +137,21 @@ struct DailyRecommendationReasonSection: View {
                     Haptic.impact(.soft)
                     onTap(item)
                 }
+            // 手持ちアイテムの一致表示 (右上): ◯ = 使える手持ちアイテム / 破線 = 一致なし。
+            // 左下のハートと同じ辺に並べると窮屈なため対角に置く
+            if item.kindEnum == .pool {
+                Group {
+                    if !item.owned_items.isEmpty {
+                        OwnedItemCircles(items: item.owned_items, size: 20)
+                    } else {
+                        NoOwnedItemBadge(size: 20)
+                    }
+                }
+                .padding(6)
+            }
+        }
+        // イチオシバッジは一致マークと重ならないよう左上へ
+        .overlay(alignment: .topLeading) {
             if idx == 0 {
                 DailyIchioshiBadge().padding(6)
             }
@@ -153,20 +168,6 @@ struct DailyRecommendationReasonSection: View {
                 }
             }
             .padding(6)
-        }
-        // 手持ちアイテムの一致表示: ◯ = 使える手持ちアイテム / 破線 = 一致なし。
-        // pool コーデには必ずどちらかが付き、カードごとの再現可否が一目で分かる
-        .overlay(alignment: .bottomTrailing) {
-            if item.kindEnum == .pool {
-                Group {
-                    if !item.owned_items.isEmpty {
-                        OwnedItemCircles(items: item.owned_items, size: 20)
-                    } else {
-                        NoOwnedItemBadge(size: 20)
-                    }
-                }
-                .padding(6)
-            }
         }
     }
 
