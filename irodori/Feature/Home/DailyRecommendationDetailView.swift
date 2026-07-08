@@ -32,8 +32,10 @@ struct DailyRecommendationDetailView: View {
                         .scaledToFit()
                         .frame(maxWidth: .infinity)
                         .cornerRadius(12)
-                    favoriteButton
-                        .padding(10)
+                    if !item.isCloset {
+                        favoriteButton
+                            .padding(10)
+                    }
                 }
 
                 if item.kindEnum == .self {
@@ -77,7 +79,8 @@ struct DailyRecommendationDetailView: View {
 
                 addToCalendarButton
 
-                if item.kindEnum == .pool {
+                // 着用記録はプールのコーデのみ (closet は faiss_idx を持たないため対象外)
+                if item.kind == "pool" {
                     wearButton
                 }
 
@@ -91,7 +94,7 @@ struct DailyRecommendationDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddToCalendar) {
             AddToCalendarSheet(
-                kind: item.kindEnum == .self ? "self" : "pool",
+                kind: item.kind,   // pool | self | closet
                 targetId: item.pool_id,
                 imageURL: item.image_url,
                 source: "detail"

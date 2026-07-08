@@ -34,6 +34,10 @@ struct DailyRecommendationItem: Codable, Hashable, Identifiable {
         FavoriteKind(rawValue: kind) ?? .pool
     }
 
+    /// 手持ちアイテムだけで組んだコーデ (kind="closet")。
+    /// お気に入り・着用記録の対象外 (pool_id がプールを指さないため)
+    var isCloset: Bool { kind == "closet" }
+
     // 旧フィールドを持たない古い response との互換性
     enum CodingKeys: String, CodingKey {
         case pool_id, kind, image_url, reason, main_colors, items, vibe, style, cleanliness, is_favorite

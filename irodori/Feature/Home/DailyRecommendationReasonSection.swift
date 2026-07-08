@@ -157,17 +157,32 @@ struct DailyRecommendationReasonSection: View {
             }
         }
         .overlay(alignment: .bottomLeading) {
-            FavoriteToggleButton(isFavorite: isFav, size: 11, padding: 6) {
-                Task {
-                    await favoritesStore.setFavorite(
-                        !isFav,
-                        kind: kind,
-                        targetId: item.pool_id,
-                        imageURL: item.image_url
-                    )
+            // 手持ちコーデ (closet) はプールを指さないためお気に入り対象外
+            if !item.isCloset {
+                FavoriteToggleButton(isFavorite: isFav, size: 11, padding: 6) {
+                    Task {
+                        await favoritesStore.setFavorite(
+                            !isFav,
+                            kind: kind,
+                            targetId: item.pool_id,
+                            imageURL: item.image_url
+                        )
+                    }
                 }
+                .padding(6)
             }
-            .padding(6)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if item.isCloset {
+                Text("手持ちコーデ")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Color.green.opacity(0.9))
+                    .clipShape(Capsule())
+                    .padding(6)
+            }
         }
     }
 
