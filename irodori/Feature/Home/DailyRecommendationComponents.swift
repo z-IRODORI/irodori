@@ -203,3 +203,26 @@ struct OwnedItemCircles: View {
         }
     }
 }
+
+/// 手持ち一致が無いコーデに付ける破線サークルバッジ。
+/// 詳細画面の「足りないアイテム」(破線サークル) と同じ視覚言語で揃える。
+struct NoOwnedItemBadge: View {
+    var size: CGFloat = 20
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.9))
+            Circle()
+                .strokeBorder(
+                    Color.gray.opacity(0.55),
+                    style: StrokeStyle(lineWidth: 1.2, dash: [2.5, 2])
+                )
+            Image(systemName: "tshirt")
+                .font(.system(size: size * 0.45))
+                .foregroundStyle(Color.gray.opacity(0.65))
+        }
+        .frame(width: size, height: size)
+        .shadow(color: .black.opacity(0.15), radius: 1, x: 0, y: 0.5)
+    }
+}
