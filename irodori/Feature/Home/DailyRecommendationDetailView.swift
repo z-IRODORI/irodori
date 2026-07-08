@@ -24,7 +24,8 @@ struct DailyRecommendationDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                ZStack(alignment: .topTrailing) {
+                // ハートは左下 (9件グリッドのカードと同じ位置に統一)
+                ZStack(alignment: .bottomLeading) {
                     KFImage(URL(string: item.image_url))
                         .resizable()
                         .placeholder { Rectangle().fill(Color.gray.opacity(0.15)) }
