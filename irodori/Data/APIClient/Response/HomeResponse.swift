@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct HomeResponse: Decodable, Hashable {
+struct HomeResponse: Codable, Hashable {
     var recent_coordinates: [RecentCoordinate]
     var analysis_summary: String
     var tags: [String]?
@@ -39,6 +39,14 @@ struct HomeResponse: Decodable, Hashable {
         self.recent_coordinates = recent_coordinates
         self.analysis_summary = analysis_summary
         self.tags = tags
+    }
+
+    // CodingKeys に後方互換キー (coordinate_analyze) が含まれるため encode は明示定義
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(recent_coordinates, forKey: .recent_coordinates)
+        try container.encode(analysis_summary, forKey: .analysis_summary)
+        try container.encodeIfPresent(tags, forKey: .tags)
     }
 }
 

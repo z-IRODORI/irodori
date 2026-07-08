@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct RecentCoordinate: Decodable, Hashable, Equatable {
+struct RecentCoordinate: Codable, Hashable, Equatable {
     var id: String
     var date: String
     var image_url: String
@@ -37,5 +37,13 @@ struct RecentCoordinate: Decodable, Hashable, Equatable {
         self.id = id
         self.date = date
         self.image_url = image_url
+    }
+
+    // CodingKeys に後方互換キー (coodinate_image_path) が含まれるため encode は明示定義
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(date, forKey: .date)
+        try container.encode(image_url, forKey: .image_url)
     }
 }

@@ -125,90 +125,136 @@ final class HomeViewModel {
     }
 
     func onAppear() async {
-        isLoadingHome = true
-        isLoadingAnalysis = true
-        isLoadingDailyRecommendation = true
-        isLoadingOutfitCollage = true
-        isLoadingClosetBridge = true
-        hasLoadError = false
-        hasDailyRecommendationError = false
-        hasOutfitCollageError = false
-        hasClosetBridgeError = false
-
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
         let gender = Gender.fromWithDefault(
             UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
         )
 
-        // 5つのAPIを同時に起動
-        async let homeResult = apiClient.get(uid: uid)
-        async let analysisResult = analyzeRecentCoordinateClient.post(uid: uid, targetDays: 7)
-        async let dailyResult = dailyRecommendationClient.get(uid: uid, gender: gender)
-        async let collageResult = outfitCollageClient.get(uid: uid, gender: gender)
-        async let closetBridgeResult = closetBridgeClient.get(uid: uid, gender: gender)
+        // 前回のレスポンスがあれば即描画 (stale-while-revalidate)。
+        // スケルトンは「表示できる内容が無いセクション」だけに出す
+        hydrateFromCache(uid: uid)
+        isLoadingHome = homeResponse.recent_coordinates.isEmpty
+        isLoadingAnalysis = recentCoordinateAnalysis.isEmpty
+        isLoadingDailyRecommendation = (dailyRecommendation == nil)
+        isLoadingOutfitCollage = (outfitCollage == nil)
+        isLoadingClosetBridge = (closetBridge == nil)
+        hasLoadError = false
+        hasDailyRecommendationError = false
+        hasOutfitCollageError = false
+        hasClosetBridgeError = false
 
-        // コーデ一覧: 完了次第スケルトンを解除して表示
+        // 各セクションを独立に取得・反映する。
+        // 旧実装は async let を固定順で await していたため、先に await される遅い呼び出し
+        // (LLM分析など) が終わるまで、完了済みの後続セクションも反映されなかった
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.loadHomeSection(uid: uid) }
+            group.addTask { await self.loadAnalysisSection(uid: uid) }
+            group.addTask { await self.loadDailySection(uid: uid, gender: gender) }
+            group.addTask { await self.loadCollageSection(uid: uid, gender: gender) }
+            group.addTask { await self.loadClosetBridgeSection(uid: uid, gender: gender) }
+        }
+    }
+
+    /// 前回成功時のレスポンスを即時反映する (無ければ何もしない)
+    private func hydrateFromCache(uid: String) {
+        if homeResponse.recent_coordinates.isEmpty,
+           let cached = HomeSectionCache.load(HomeResponse.self, section: "home", uid: uid),
+           !cached.recent_coordinates.isEmpty {
+            homeResponse = cached
+        }
+        if recentCoordinateAnalysis.isEmpty,
+           let cached = HomeSectionCache.load(String.self, section: "analysis", uid: uid),
+           !cached.isEmpty {
+            recentCoordinateAnalysis = cached
+        }
+        if dailyRecommendation == nil {
+            dailyRecommendation = HomeSectionCache.load(DailyRecommendationResponse.self, section: "daily", uid: uid)
+        }
+        if outfitCollage == nil {
+            outfitCollage = HomeSectionCache.load(OutfitCollageResponse.self, section: "collage", uid: uid)
+        }
+        if closetBridge == nil {
+            closetBridge = HomeSectionCache.load(ClosetBridgeResponse.self, section: "closetBridge", uid: uid)
+        }
+    }
+
+    // MARK: - セクション別ロード (完了したものから独立に反映)
+
+    private func loadHomeSection(uid: String) async {
         do {
-            switch try await homeResult {
+            switch try await apiClient.get(uid: uid) {
             case .success(let response):
                 homeResponse = response
+                HomeSectionCache.save(response, section: "home", uid: uid)
             case .failure:
-                hasLoadError = true
+                if homeResponse.recent_coordinates.isEmpty { hasLoadError = true }
             }
         } catch {
-            hasLoadError = true
+            if homeResponse.recent_coordinates.isEmpty { hasLoadError = true }
         }
         isLoadingHome = false
+    }
 
-        // 分析: 完了次第「今週のあなたへ」を更新（homeより遅くなることが多い）
+    private func loadAnalysisSection(uid: String) async {
         do {
-            switch try await analysisResult {
+            switch try await analyzeRecentCoordinateClient.post(uid: uid, targetDays: 7) {
             case .success(let response):
                 recentCoordinateAnalysis = response.analyze_recent_coordinate
+                HomeSectionCache.save(response.analyze_recent_coordinate, section: "analysis", uid: uid)
             case .failure:
+                if recentCoordinateAnalysis.isEmpty {
+                    recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
+                }
+            }
+        } catch {
+            if recentCoordinateAnalysis.isEmpty {
                 recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
             }
-        } catch {
-            recentCoordinateAnalysis = "コーデが存在しないため分析できませんでした"
         }
         isLoadingAnalysis = false
+    }
 
-        // 明日のコーデ：完了次第表示（キャッシュHIT時は瞬時、フォールバック時は1-2秒）
+    private func loadDailySection(uid: String, gender: Gender) async {
         do {
-            switch try await dailyResult {
+            switch try await dailyRecommendationClient.get(uid: uid, gender: gender) {
             case .success(let response):
                 dailyRecommendation = response
+                HomeSectionCache.save(response, section: "daily", uid: uid)
             case .failure:
-                hasDailyRecommendationError = true
+                if dailyRecommendation == nil { hasDailyRecommendationError = true }
             }
         } catch {
-            hasDailyRecommendationError = true
+            if dailyRecommendation == nil { hasDailyRecommendationError = true }
         }
         isLoadingDailyRecommendation = false
+    }
 
-        // コーデコラージュ：完了次第表示（当日キャッシュHIT時は瞬時、初回生成は1秒前後）
+    private func loadCollageSection(uid: String, gender: Gender) async {
         do {
-            switch try await collageResult {
+            switch try await outfitCollageClient.get(uid: uid, gender: gender) {
             case .success(let response):
                 outfitCollage = response
+                HomeSectionCache.save(response, section: "collage", uid: uid)
             case .failure:
-                hasOutfitCollageError = true
+                if outfitCollage == nil { hasOutfitCollageError = true }
             }
         } catch {
-            hasOutfitCollageError = true
+            if outfitCollage == nil { hasOutfitCollageError = true }
         }
         isLoadingOutfitCollage = false
+    }
 
-        // 買い足し提案：完了次第表示（Gemini×2 + Yahoo 検索のため数秒かかる場合がある）
+    private func loadClosetBridgeSection(uid: String, gender: Gender) async {
         do {
-            switch try await closetBridgeResult {
+            switch try await closetBridgeClient.get(uid: uid, gender: gender) {
             case .success(let response):
                 closetBridge = response
+                HomeSectionCache.save(response, section: "closetBridge", uid: uid)
             case .failure:
-                hasClosetBridgeError = true
+                if closetBridge == nil { hasClosetBridgeError = true }
             }
         } catch {
-            hasClosetBridgeError = true
+            if closetBridge == nil { hasClosetBridgeError = true }
         }
         isLoadingClosetBridge = false
     }

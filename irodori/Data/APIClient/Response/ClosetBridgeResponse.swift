@@ -9,7 +9,7 @@
 import Foundation
 
 /// LLM が提案するアイテム仕様（Yahoo 検索のクエリ元）
-struct ClosetBridgeSpec: Decodable, Hashable {
+struct ClosetBridgeSpec: Codable, Hashable {
     let category: String          // "トップス" / "ボトムス" / "アウター" / "シューズ" / "バッグ" / "アクセサリー"
     let sub_category: String      // 具体的な品目 (例: "ワイドパンツ")
     let color: String             // 色名
@@ -39,7 +39,7 @@ struct ClosetBridgeSpec: Decodable, Hashable {
 }
 
 /// Yahoo Shopping から取得した商品情報（アフィリエイト URL 含む）
-struct ClosetBridgeProduct: Decodable, Hashable {
+struct ClosetBridgeProduct: Codable, Hashable {
     let name: String
     let price: Int
     let url: String               // 商品ページ URL (アフィリエイト付き)
@@ -69,7 +69,7 @@ struct ClosetBridgeProduct: Decodable, Hashable {
 }
 
 /// 買い足しアイテムと相性の良い、ユーザー自身のクローゼットアイテム（色相性で選定）
-struct ClosetBridgeOwnedItem: Decodable, Hashable, Identifiable {
+struct ClosetBridgeOwnedItem: Codable, Hashable, Identifiable {
     let id: String
     let item_type: String
     let category: String?
@@ -99,7 +99,7 @@ struct ClosetBridgeOwnedItem: Decodable, Hashable, Identifiable {
 }
 
 /// 買い足し提案 1 アイテム（spec + 商品候補リスト + キャプション + ZOZO検索 + 相性の良い手持ち服）
-struct ClosetBridgeItem: Decodable, Hashable, Identifiable {
+struct ClosetBridgeItem: Codable, Hashable, Identifiable {
     let spec: ClosetBridgeSpec
     let products: [ClosetBridgeProduct]   // Yahoo スコア順 最大10件
     let outfit_caption: String            // 30字程度のコーデ説明文
@@ -138,9 +138,19 @@ struct ClosetBridgeItem: Decodable, Hashable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case spec, products, product, outfit_caption, zozo_search_url, owned_items
     }
+
+    // CodingKeys に後方互換キー (product 単数) が含まれるため encode は明示定義
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(spec, forKey: .spec)
+        try c.encode(products, forKey: .products)
+        try c.encode(outfit_caption, forKey: .outfit_caption)
+        try c.encode(zozo_search_url, forKey: .zozo_search_url)
+        try c.encode(owned_items, forKey: .owned_items)
+    }
 }
 
-struct ClosetBridgeResponse: Decodable, Hashable {
+struct ClosetBridgeResponse: Codable, Hashable {
     let status: String            // "success" | "partial" | "failed"
     let user_id: String
     let gender: String

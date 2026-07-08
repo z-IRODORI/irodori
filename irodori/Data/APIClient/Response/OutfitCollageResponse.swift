@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct OutfitCollageItem: Decodable, Hashable, Identifiable {
+struct OutfitCollageItem: Codable, Hashable, Identifiable {
     let id: String             // closet item id (標準アイテム補完時は standard item id)
     let slot: String           // tops / bottoms / outer / shoes / accessory / bag
     let item_type: String      // "トップス" など (表記揺れあり)
@@ -65,7 +65,7 @@ struct OutfitCollageItem: Decodable, Hashable, Identifiable {
     }
 }
 
-struct OutfitCollageResponse: Decodable, Hashable {
+struct OutfitCollageResponse: Codable, Hashable {
     let status: String                              // success | partial | failed
     let collage_id: String
     let collage_url: String

@@ -8,14 +8,14 @@
 import Foundation
 
 /// 推薦コーデに使われている手持ちアイテム (クローゼット一致)
-struct DailyOwnedItem: Decodable, Hashable {
+struct DailyOwnedItem: Codable, Hashable {
     let slot: String           // tops | bottoms
     let item_id: String
     let image_url: String
     let label: String          // 例: "グレー スウェット"
 }
 
-struct DailyRecommendationItem: Decodable, Hashable, Identifiable {
+struct DailyRecommendationItem: Codable, Hashable, Identifiable {
     var id: String { "\(kind)_\(pool_id)" }
     let pool_id: String        // kind=pool: pool_id / kind=self: coordinate_id
     let kind: String           // "pool" | "self"
@@ -73,14 +73,14 @@ struct DailyRecommendationItem: Decodable, Hashable, Identifiable {
     }
 }
 
-struct DailyRecommendationWeather: Decodable, Hashable {
+struct DailyRecommendationWeather: Codable, Hashable {
     let min_temp: Int
     let max_temp: Int
     let condition: String
     let area_code: String
 }
 
-struct DailyRecommendationResponse: Decodable, Hashable {
+struct DailyRecommendationResponse: Codable, Hashable {
     let target_date: String        // YYYY-MM-DD
     let weather: DailyRecommendationWeather
     let partner_comment: String?
@@ -88,7 +88,7 @@ struct DailyRecommendationResponse: Decodable, Hashable {
     let mode: String               // "cached" | "fallback" | "refreshing"
 }
 
-struct WearMarkResponse: Decodable {
+struct WearMarkResponse: Codable {
     let status: String
     let pool_id: String
     let worn_date: String
