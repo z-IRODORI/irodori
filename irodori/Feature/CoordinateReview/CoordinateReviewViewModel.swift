@@ -22,6 +22,9 @@ final class CoordinateReviewViewModel {
     var outputUIImage: UIImage = .init(resource: .coordinate4)
     var topsUIImage: UIImage?
     var bottomsUIImage: UIImage?
+    // 検出位置 (正規化座標)。ローディング画面の検出ボックス表示用
+    var topsBoundingRect: CGRect?
+    var bottomsBoundingRect: CGRect?
     var errroMessage: ErrorMessage?
 
     init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol) {
@@ -114,6 +117,9 @@ final class CoordinateReviewViewModel {
                 return
             }
              self.outputUIImage = outputUIImage
+             // 検出ボックスは目に見える服の位置を表すため、マスク (腕・バッグ込み) より狭い対象で計算する
+             self.topsBoundingRect = SegmentationConverter.normalizedBoundingRect(of: [.upperClothes], in: items)
+             self.bottomsBoundingRect = SegmentationConverter.normalizedBoundingRect(of: [.belt, .pants, .skirt], in: items)
              self.topsUIImage = squareTopsUIImage!   // nil にはならない
              self.bottomsUIImage = squareBottomsUIImage!   // nil にはならない
         } catch {

@@ -4,7 +4,8 @@
 //
 //  案A: AI 検出スキャン (本命).
 //  撮影した全身画像の上をスキャンラインが走り、トップス / ボトムスが
-//  バウンディングボックスで「検出」されて下のトレイに切り出し画像が溜まる。
+//  バウンディングボックスで「検出」→ 切り出し画像が写真から抜き出されて
+//  下のトレイへ飛んでいく (matchedGeometryEffect)。
 //  本実装では segment() 完了時に本物の topsUIImage / bottomsUIImage を流し込める。
 //
 
@@ -12,16 +13,26 @@ import SwiftUI
 
 struct LoadingDesignA: View {
     @State private var phase: LoadingDemoPhase = .scanning
-    @State private var scanY: CGFloat = 0   // 0...1 (写真内の縦位置)
+    @State private var scanY: CGFloat = 0        // 0...1 (写真内の縦位置)
+    @State private var topsLanded = false        // 切り出し画像がトレイに到着したか
+    @State private var bottomsLanded = false
+    @Namespace private var flyNamespace
 
-    private let darkBackground = Color(red: 0.08, green: 0.07, blue: 0.10)
+    // ダーク版に戻すときは darkBackground を Color(red: 0.08, green: 0.07, blue: 0.10) にして isDarkTheme = true にする
+    private let darkBackground = Color.clear
+    private let isDarkTheme = false
+
+    /// 写真 → トレイへの飛翔アニメーション
+    private let flightSpring = Animation.spring(response: 0.55, dampingFraction: 0.78)
+
+    private var textPrimary: Color { isDarkTheme ? .white : .black }
 
     var body: some View {
         VStack(spacing: 20) {
             LoadingDemoHeader(
                 title: "コーデを分析中...",
                 subtitle: "AIが全身写真からアイテムを検出しています",
-                foreground: .white
+                foreground: textPrimary
             )
             .padding(.top, 24)
 
@@ -31,24 +42,60 @@ struct LoadingDesignA: View {
             HStack(spacing: 12) {
                 DetectedItemSlot(
                     title: "トップス",
-                    image: phase >= .topsDetected ? LoadingSandbox.sampleTopsImage : nil
+                    image: topsLanded ? LoadingSandbox.sampleTopsImage : nil,
+                    matchedID: "tops",
+                    namespace: flyNamespace,
+                    isDarkTheme: isDarkTheme
                 )
                 DetectedItemSlot(
                     title: "ボトムス",
-                    image: phase >= .bottomsDetected ? LoadingSandbox.sampleBottomsImage : nil
+                    image: bottomsLanded ? LoadingSandbox.sampleBottomsImage : nil,
+                    matchedID: "bottoms",
+                    namespace: flyNamespace,
+                    isDarkTheme: isDarkTheme
                 )
             }
             .padding(.horizontal, 40)
 
-            LoadingDemoStepBar(phase: phase, foreground: .white)
+            LoadingDemoStepBar(phase: phase, foreground: textPrimary)
                 .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(darkBackground.ignoresSafeArea())
         .loadingDemoPhaseDriver($phase)
+        .task(id: phase) { await runExtractionSequence() }
         .onAppear {
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                 scanY = 1
+            }
+        }
+    }
+
+    // MARK: - 検出 → 抜き出し → トレイ着地 の進行
+
+    private func runExtractionSequence() async {
+        switch phase {
+        case .scanning:
+            // ループ先頭: アニメーションなしで初期化
+            topsLanded = false
+            bottomsLanded = false
+        case .topsDetected:
+            try? await Task.sleep(for: .seconds(0.75))
+            guard !Task.isCancelled else { return }
+            withAnimation(flightSpring) { topsLanded = true }
+            try? await Task.sleep(for: .seconds(0.4))
+            Haptic.impact(.soft)
+        case .bottomsDetected:
+            try? await Task.sleep(for: .seconds(0.75))
+            guard !Task.isCancelled else { return }
+            withAnimation(flightSpring) { bottomsLanded = true }
+            try? await Task.sleep(for: .seconds(0.4))
+            Haptic.impact(.soft)
+        case .analyzing:
+            // 飛翔が終わっていなければ回収しておく
+            withAnimation(flightSpring) {
+                topsLanded = true
+                bottomsLanded = true
             }
         }
     }
@@ -69,7 +116,8 @@ struct LoadingDesignA: View {
                             DetectionBox(
                                 label: "トップス",
                                 normalizedRect: LoadingSandbox.topsRect,
-                                containerSize: size
+                                containerSize: size,
+                                isExtracted: topsLanded
                             )
                             .transition(.scale(scale: 1.25).combined(with: .opacity))
                         }
@@ -77,9 +125,27 @@ struct LoadingDesignA: View {
                             DetectionBox(
                                 label: "ボトムス",
                                 normalizedRect: LoadingSandbox.bottomsRect,
-                                containerSize: size
+                                containerSize: size,
+                                isExtracted: bottomsLanded
                             )
                             .transition(.scale(scale: 1.25).combined(with: .opacity))
+                        }
+                        // 抜き出し前の切り出し画像 (飛翔の出発点)
+                        if phase >= .topsDetected, !topsLanded {
+                            extractedItemOverlay(
+                                image: LoadingSandbox.sampleTopsImage,
+                                normalizedRect: LoadingSandbox.topsRect,
+                                containerSize: size,
+                                matchedID: "tops"
+                            )
+                        }
+                        if phase >= .bottomsDetected, !bottomsLanded {
+                            extractedItemOverlay(
+                                image: LoadingSandbox.sampleBottomsImage,
+                                normalizedRect: LoadingSandbox.bottomsRect,
+                                containerSize: size,
+                                matchedID: "bottoms"
+                            )
                         }
                         if phase == .analyzing {
                             analyzingChip
@@ -92,8 +158,44 @@ struct LoadingDesignA: View {
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay {
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(.white.opacity(0.15), lineWidth: 1)
+                    .stroke(isDarkTheme ? .white.opacity(0.15) : .black.opacity(0.08), lineWidth: 1)
             }
+    }
+
+    /// 検出直後にボックス位置へ重ねる切り出し画像。
+    /// topsLanded / bottomsLanded が true になるとここから消え、
+    /// トレイ側の matchedGeometryEffect へ縮小しながら飛んでいく。
+    private func extractedItemOverlay(
+        image: UIImage,
+        normalizedRect: CGRect,
+        containerSize: CGSize,
+        matchedID: String
+    ) -> some View {
+        let frame = CGRect(
+            x: normalizedRect.minX * containerSize.width,
+            y: normalizedRect.minY * containerSize.height,
+            width: normalizedRect.width * containerSize.width,
+            height: normalizedRect.height * containerSize.height
+        )
+        return Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+            .frame(width: frame.width, height: frame.height)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(.white, lineWidth: 1.5)
+            }
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 4)
+            .matchedGeometryEffect(id: matchedID, in: flyNamespace)
+            .position(x: frame.midX, y: frame.midY)
+            .transition(
+                .asymmetric(
+                    insertion: .scale(scale: 1.12).combined(with: .opacity),
+                    removal: .opacity
+                )
+            )
+            .allowsHitTesting(false)
     }
 
     private func gridOverlay(size: CGSize) -> some View {
@@ -163,6 +265,8 @@ private struct DetectionBox: View {
     let label: String
     let normalizedRect: CGRect
     let containerSize: CGSize
+    /// 切り出し画像が抜き取られた後は内側を暗くして「抽出済み」感を出す
+    var isExtracted: Bool = false
 
     var body: some View {
         let frame = CGRect(
@@ -174,6 +278,14 @@ private struct DetectionBox: View {
         CornerBrackets()
             .stroke(LoadingSandbox.brandPink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
             .shadow(color: LoadingSandbox.brandPink.opacity(0.6), radius: 4)
+            .background {
+                if isExtracted {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(.black.opacity(0.05))
+//                        .fill(.clear)
+                        .transition(.opacity)
+                }
+            }
             .overlay(alignment: .topLeading) {
                 HStack(spacing: 3) {
                     Image(systemName: "checkmark")
@@ -225,6 +337,12 @@ private struct CornerBrackets: Shape {
 private struct DetectedItemSlot: View {
     let title: String
     let image: UIImage?
+    let matchedID: String
+    let namespace: Namespace.ID
+    let isDarkTheme: Bool
+
+    private var foreground: Color { isDarkTheme ? .white : .black }
+    private var cardFill: Color { isDarkTheme ? .white.opacity(0.08) : .gray.opacity(0.08) }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -233,24 +351,25 @@ private struct DetectedItemSlot: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                        .transition(.scale(scale: 0.3).combined(with: .opacity))
+                        .frame(width: 48, height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .matchedGeometryEffect(id: matchedID, in: namespace)
                 } else {
                     RoundedRectangle(cornerRadius: 10)
                         .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .foregroundStyle(foreground.opacity(0.3))
                         .overlay {
                             ProgressView()
-                                .tint(.white.opacity(0.5))
+                                .tint(foreground.opacity(0.5))
                         }
+                        .frame(width: 48, height: 48)
                 }
             }
-            .frame(width: 48, height: 48)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(foreground.opacity(0.9))
                 if image != nil {
                     HStack(spacing: 3) {
                         Image(systemName: "checkmark.circle.fill")
@@ -262,14 +381,14 @@ private struct DetectedItemSlot: View {
                 } else {
                     Text("検出中...")
                         .font(.system(size: 11, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(foreground.opacity(0.4))
                 }
             }
             Spacer(minLength: 0)
         }
         .padding(10)
-        .background(.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        // clipShape だと写真から飛んでくる画像がカード境界で切られるため background(_:in:) を使う
+        .background(cardFill, in: RoundedRectangle(cornerRadius: 14))
     }
 }
 

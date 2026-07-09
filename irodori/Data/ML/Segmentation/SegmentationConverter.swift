@@ -106,6 +106,30 @@ struct SegmentationConverter {
         return context?.makeImage()
     }
 
+    /// 対象アイテムが存在する領域の正規化バウンディングボックス (0...1) を返す
+    ///
+    /// items はモデル出力のピクセルごとのラベル (width * height, 行優先)。
+    /// モデル入力はアスペクト比を無視して正方形にリサイズされているため、
+    /// 正規化座標は元画像にそのまま適用できる (ローディング画面の検出ボックス表示用)。
+    static func normalizedBoundingRect(of targetItems: [FashionItemType], in items: [FashionItemType], width: Int = 512, height: Int = 512) -> CGRect? {
+        var minX = Int.max, minY = Int.max, maxX = -1, maxY = -1
+        for i in 0..<items.count where targetItems.contains(items[i]) {
+            let x = i % width
+            let y = i / width
+            if x < minX { minX = x }
+            if x > maxX { maxX = x }
+            if y < minY { minY = y }
+            if y > maxY { maxY = y }
+        }
+        guard maxX >= 0 else { return nil }
+        return CGRect(
+            x: CGFloat(minX) / CGFloat(width),
+            y: CGFloat(minY) / CGFloat(height),
+            width: CGFloat(maxX - minX + 1) / CGFloat(width),
+            height: CGFloat(maxY - minY + 1) / CGFloat(height)
+        )
+    }
+
     /// ラベルが割り当てられた領域のみを抽出する
     ///
     /// Output: UIImage, 2値マスク画像（黒: 対象, 白: 背景）

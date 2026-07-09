@@ -310,33 +310,25 @@ struct CoordinateCollageView: View {
     // MARK: ローディング
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .tint(.black)
-            VStack(spacing: 6) {
-                Text("コラージュを作成しています")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                Text("人物を切り抜いて1枚に合成しています")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-            }
-            Button {
+        CollageLoadingView(
+            thumbnails: loadingThumbnails,
+            accentColor: viewModel.backgroundColor,
+            onCancel: {
                 Haptic.impact(.soft)
                 viewModel.cancelGeneration()
-            } label: {
-                Text("キャンセル")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 10)
-                    .overlay(Capsule().stroke(Color.black.opacity(0.2), lineWidth: 1))
             }
-            .buttonStyle(.plain)
-            .padding(.top, 8)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.white)
+        )
+    }
+
+    /// 生成に使う画像のサムネイル (相棒の周りをまわす演出用、最大6枚)
+    private var loadingThumbnails: [CollageLoadingView.Thumbnail] {
+        var thumbnails: [CollageLoadingView.Thumbnail] = viewModel.registeredCoordinates
+            .filter { viewModel.selectedCoordinateIDs.contains($0.id) }
+            .compactMap { coordinate in
+                URL(string: coordinate.url).map { .remote(id: coordinate.id, url: $0) }
+            }
+        thumbnails += viewModel.pickedImages.enumerated().map { .local(id: $0.offset, image: $0.element) }
+        return Array(thumbnails.prefix(6))
     }
 
     // MARK: 結果
