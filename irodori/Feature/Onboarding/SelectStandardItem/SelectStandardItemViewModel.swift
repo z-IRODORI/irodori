@@ -60,7 +60,7 @@ final class SelectStandardItemViewModel {
                 mainCategory: selectedMainCategory,
                 subCategory: selectedSubCategory,
                 color: selectedColor,
-                limit: 100
+                limit: 300  // 標準アイテム拡充後は性別ごとに100件を超えるため
             )
 
             switch result {
