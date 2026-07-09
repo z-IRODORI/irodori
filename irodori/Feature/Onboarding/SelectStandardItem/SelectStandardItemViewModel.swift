@@ -17,11 +17,10 @@ final class SelectStandardItemViewModel {
     var isRegistering = false
     var registrationSuccess = false
 
-    // フィルター
+    // フィルター (gender はサーバー側で絞り、カテゴリ・色は取得済みリストをクライアント側で絞り込む)
     var selectedGender: String? = nil
-    var selectedMainCategory: String? = nil
-    var selectedSubCategory: String? = nil
-    var selectedColor: String? = nil
+    var filterMainCategory: String? = nil
+    var filterColor: String? = nil
 
     // 選択管理
     var selectedItems: Set<String> = []
@@ -57,9 +56,9 @@ final class SelectStandardItemViewModel {
         do {
             let result = try await client.get(
                 gender: selectedGender,
-                mainCategory: selectedMainCategory,
-                subCategory: selectedSubCategory,
-                color: selectedColor,
+                mainCategory: nil,  // カテゴリ・色はクライアント側で絞り込む
+                subCategory: nil,
+                color: nil,
                 limit: 300  // 標準アイテム拡充後は性別ごとに100件を超えるため
             )
 
@@ -89,27 +88,60 @@ final class SelectStandardItemViewModel {
         }
     }
 
-    func applyFilters(
-        gender: String? = nil,
-        mainCategory: String? = nil,
-        subCategory: String? = nil,
-        color: String? = nil
-    ) async {
-        selectedGender = gender
-        selectedMainCategory = mainCategory
-        selectedSubCategory = subCategory
-        selectedColor = color
+    // MARK: - Filtering (クライアント側)
 
+    /// 表示用: カテゴリ・色フィルタ適用後のアイテム
+    var filteredItems: [StandardItem] {
+        items.filter { item in
+            (filterMainCategory == nil || item.main_category == filterMainCategory) &&
+            (filterColor == nil || item.color == filterColor)
+        }
+    }
+
+    private static let mainCategoryOrder = ["トップス", "ボトムス", "アウター", "シューズ", "バッグ", "アクセサリー"]
+    private static let colorOrder = [
+        "ホワイト", "ブラック", "グレー", "ダークグレー", "ネイビー", "ベージュ", "ブラウン",
+        "カーキ", "オリーブグリーン", "ブルー", "ライトブルー", "インディゴ",
+        "レッド", "ピンク", "イエロー", "オレンジ", "グリーン"
+    ]
+
+    /// 取得済みアイテムに存在するカテゴリ (定番順)
+    var availableMainCategories: [String] {
+        let unique = Set(items.map(\.main_category))
+        let ordered = Self.mainCategoryOrder.filter { unique.contains($0) }
+        let others = unique.subtracting(ordered).sorted()
+        return ordered + others
+    }
+
+    /// 選択中カテゴリ内に存在する色 (定番順)
+    var availableColors: [String] {
+        let scoped = filterMainCategory == nil
+            ? items
+            : items.filter { $0.main_category == filterMainCategory }
+        let unique = Set(scoped.map(\.color))
+        let ordered = Self.colorOrder.filter { unique.contains($0) }
+        let others = unique.subtracting(ordered).sorted()
+        return ordered + others
+    }
+
+    func selectMainCategory(_ category: String?) {
+        filterMainCategory = category
+        // カテゴリ変更で存在しなくなった色の選択は解除する
+        if let color = filterColor, !availableColors.contains(color) {
+            filterColor = nil
+        }
+    }
+
+    func selectGender(_ gender: String) async {
+        guard gender != selectedGender else { return }
+        selectedGender = gender
+        resetFilters()
         await fetchItems()
     }
 
-    func clearFilters() async {
-        selectedGender = nil
-        selectedMainCategory = nil
-        selectedSubCategory = nil
-        selectedColor = nil
-
-        await fetchItems()
+    func resetFilters() {
+        filterMainCategory = nil
+        filterColor = nil
     }
 
     // MARK: - Selection Management

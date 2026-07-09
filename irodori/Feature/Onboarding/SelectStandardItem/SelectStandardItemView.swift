@@ -85,14 +85,32 @@ struct SelectStandardItemView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        ScrollView {
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(viewModel.items) { item in
-                                    itemCell(item: item)
+                        filterBar
+
+                        if viewModel.filteredItems.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(.gray.opacity(0.4))
+                                Text("条件に合うアイテムがありません")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.secondary)
+                                Button("絞り込みを解除") {
+                                    viewModel.resetFilters()
                                 }
+                                .font(.system(size: 14, weight: .medium))
                             }
-                            .padding(16)
-                            .padding(.bottom, onSelect == nil ? 80 : 0)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            ScrollView {
+                                LazyVGrid(columns: columns, spacing: 12) {
+                                    ForEach(viewModel.filteredItems) { item in
+                                        itemCell(item: item)
+                                    }
+                                }
+                                .padding(16)
+                                .padding(.bottom, onSelect == nil ? 80 : 0)
+                            }
                         }
                     }
                 }
@@ -189,6 +207,120 @@ struct SelectStandardItemView: View {
                     )
                 }
             }
+    }
+
+    // MARK: - Filter UI
+
+    private var filterBar: some View {
+        VStack(spacing: 8) {
+            Picker("性別", selection: Binding(
+                get: { viewModel.selectedGender ?? "men" },
+                set: { gender in
+                    Task { await viewModel.selectGender(gender) }
+                }
+            )) {
+                Text("メンズ").tag("men")
+                Text("レディース").tag("women")
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    filterChip(label: "すべて", isSelected: viewModel.filterMainCategory == nil) {
+                        viewModel.selectMainCategory(nil)
+                    }
+                    ForEach(viewModel.availableMainCategories, id: \.self) { category in
+                        filterChip(label: category, isSelected: viewModel.filterMainCategory == category) {
+                            viewModel.selectMainCategory(
+                                viewModel.filterMainCategory == category ? nil : category
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    filterChip(label: "全色", isSelected: viewModel.filterColor == nil) {
+                        viewModel.filterColor = nil
+                    }
+                    ForEach(viewModel.availableColors, id: \.self) { color in
+                        colorChip(color)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+
+            HStack {
+                Text("\(viewModel.filteredItems.count)件")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        .background(Color.white)
+    }
+
+    private func filterChip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(isSelected ? Color.black : Color.gray.opacity(0.12))
+                .foregroundStyle(isSelected ? .white : .primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func colorChip(_ color: String) -> some View {
+        let isSelected = viewModel.filterColor == color
+        return Button(action: {
+            viewModel.filterColor = isSelected ? nil : color
+        }) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Self.swatchColor(for: color))
+                    .frame(width: 12, height: 12)
+                    .overlay(Circle().stroke(Color.gray.opacity(0.4), lineWidth: 0.5))
+                Text(color)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(isSelected ? Color.black : Color.gray.opacity(0.12))
+            .foregroundStyle(isSelected ? .white : .primary)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private static func swatchColor(for name: String) -> Color {
+        switch name {
+        case "ホワイト", "オフホワイト": return .white
+        case "ブラック": return .black
+        case "グレー": return .gray
+        case "ダークグレー": return Color(white: 0.3)
+        case "ネイビー": return Color(red: 0.10, green: 0.15, blue: 0.35)
+        case "ベージュ": return Color(red: 0.90, green: 0.84, blue: 0.71)
+        case "ブラウン": return .brown
+        case "カーキ", "オリーブグリーン": return Color(red: 0.45, green: 0.47, blue: 0.30)
+        case "ブルー": return .blue
+        case "ライトブルー": return Color(red: 0.55, green: 0.78, blue: 0.95)
+        case "インディゴ": return Color(red: 0.20, green: 0.25, blue: 0.45)
+        case "レッド": return .red
+        case "ピンク": return .pink
+        case "イエロー": return .yellow
+        case "オレンジ": return .orange
+        case "グリーン": return .green
+        default: return .gray.opacity(0.4)
+        }
     }
 
     private func itemCell(item: StandardItem) -> some View {
