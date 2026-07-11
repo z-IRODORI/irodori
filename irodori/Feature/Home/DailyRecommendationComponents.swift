@@ -187,6 +187,8 @@ struct OwnedItemCircles: View {
     let items: [DailyOwnedItem]
     var size: CGFloat = 20
     var maxCount: Int = 3
+    /// 透過アイテム画像の下地色 (詳細画面では白でくっきり見せる)。既定は透明。
+    var background: Color = .clear
 
     var body: some View {
         HStack(spacing: -size * 0.3) {
@@ -196,6 +198,7 @@ struct OwnedItemCircles: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: size, height: size)
+                    .background(background)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(.white, lineWidth: 1.5))
                     .shadow(color: .black.opacity(0.25), radius: 1.5, x: 0, y: 0.5)

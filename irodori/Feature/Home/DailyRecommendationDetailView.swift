@@ -43,9 +43,9 @@ struct DailyRecommendationDetailView: View {
                     if item.kindEnum == .pool {
                         Group {
                             if !item.owned_items.isEmpty {
-                                OwnedItemCircles(items: item.owned_items, size: 30)
+                                OwnedItemCircles(items: item.owned_items, size: 40, background: .white)
                             } else {
-                                NoOwnedItemBadge(size: 30)
+                                NoOwnedItemBadge(size: 40)
                             }
                         }
                         .padding(10)
