@@ -10,7 +10,7 @@ import SwiftUI
 
 struct KeywordItemSearchView: View {
     @State private var viewModel = KeywordItemSearchViewModel()
-    @State private var picked: PickedImageURL?
+    @State private var picked: SearchImageResult?
     @FocusState private var searchFocused: Bool
 
     private let columns = [
@@ -27,9 +27,13 @@ struct KeywordItemSearchView: View {
         .navigationTitle("検索して追加")
         .navigationBarTitleDisplayMode(.inline)
         .background(Color.gray.opacity(0.05))
-        .sheet(item: $picked) { picked in
+        .sheet(item: $picked) { result in
             SearchedItemRegisterView(
-                viewModel: SearchedItemRegisterViewModel(imageURL: picked.url, keyword: viewModel.keyword),
+                viewModel: SearchedItemRegisterViewModel(
+                    originalURL: result.originalURL,
+                    thumbnailURL: result.thumbnailURL,
+                    keyword: viewModel.keyword
+                ),
                 onRegistered: {
                     ToastManager.shared.show("アイテムを登録しました", style: .normal)
                 }
@@ -113,8 +117,8 @@ struct KeywordItemSearchView: View {
         } else {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(viewModel.results, id: \.self) { url in
-                        resultCell(url: url)
+                    ForEach(viewModel.results) { result in
+                        resultCell(result: result)
                     }
                 }
                 .padding(16)
@@ -122,12 +126,12 @@ struct KeywordItemSearchView: View {
         }
     }
 
-    private func resultCell(url: URL) -> some View {
+    private func resultCell(result: SearchImageResult) -> some View {
         Button {
             Haptic.impact(.soft)
-            picked = PickedImageURL(url: url)
+            picked = result
         } label: {
-            CachedAsyncImage(url: url) { image in
+            CachedAsyncImage(url: result.thumbnailURL) { image in
                 image
                     .resizable()
                     .scaledToFill()
@@ -174,8 +178,3 @@ struct KeywordItemSearchView: View {
     }
 }
 
-/// sheet(item:) 用に、選択した画像URLを Identifiable でラップする。
-struct PickedImageURL: Identifiable {
-    let id = UUID()
-    let url: URL
-}

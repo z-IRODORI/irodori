@@ -14,7 +14,7 @@ import Observation
 final class KeywordItemSearchViewModel {
     var keyword: String = ""
     var isSearching = false
-    var results: [URL] = []
+    var results: [SearchImageResult] = []
     var errorMessage: String?
     /// 一度でも検索を実行したか (初期の空状態と「0件」を区別する)
     var hasSearched = false
@@ -40,9 +40,9 @@ final class KeywordItemSearchViewModel {
         let gender = UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
 
         do {
-            let urls = try await scraper.searchImageURLs(keyword: trimmed, gender: gender, limit: 15)
-            results = urls
-            if urls.isEmpty {
+            let found = try await scraper.search(keyword: trimmed, gender: gender, limit: 15)
+            results = found
+            if found.isEmpty {
                 errorMessage = ImageSearchError.noResults.errorDescription
             }
         } catch {

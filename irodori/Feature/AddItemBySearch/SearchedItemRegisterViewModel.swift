@@ -16,7 +16,8 @@ import Observation
 @MainActor
 @Observable
 final class SearchedItemRegisterViewModel {
-    let imageURL: URL
+    let originalURL: URL     // 高画質(原寸)。まずこちらを取得する
+    let thumbnailURL: URL    // 原寸が取得できないときのフォールバック
 
     var isLoading = true
     var loadFailed = false
@@ -35,11 +36,13 @@ final class SearchedItemRegisterViewModel {
     private let registerClient: BulkItemRegisterClientProtocol
 
     init(
-        imageURL: URL,
+        originalURL: URL,
+        thumbnailURL: URL,
         keyword: String,
         registerClient: BulkItemRegisterClientProtocol = BulkItemRegisterClient()
     ) {
-        self.imageURL = imageURL
+        self.originalURL = originalURL
+        self.thumbnailURL = thumbnailURL
         self.registerClient = registerClient
         self.editedItemType = Self.inferItemType(from: keyword)
         self.editedCategory = Self.inferCategory(from: keyword)
@@ -54,32 +57,45 @@ final class SearchedItemRegisterViewModel {
         loadFailed = false
         defer { isLoading = false }
 
-        do {
-            let (data, response) = try await URLSession.shared.data(from: imageURL)
-            guard let http = response as? HTTPURLResponse, http.statusCode < 400,
-                  let image = UIImage(data: data) else {
-                loadFailed = true
-                return
-            }
-            let prepared = image.fixedOrientation().resizedToFit(longEdge: 1024)
-
-            // 端末内 (Vision) で背景除去。失敗しても元画像で続行できる。
-            if let cutout = try? await ItemNoiseRemover.removeBackgroundNoise(from: prepared) {
-                workingImage = cutout
-                backgroundRemoved = true
-            } else {
-                workingImage = prepared
-                backgroundRemoved = false
-            }
-
-            // 色がキーワードから取れていなければ、切り抜き画像の平均色から推定
-            if editedColor.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               let image = workingImage,
-               let detected = Self.detectColorName(from: image) {
-                editedColor = detected
-            }
-        } catch {
+        // まず原寸(高画質)を取得。取得できなければサムネにフォールバック。
+        var downloaded = await Self.downloadImage(from: originalURL)
+        if downloaded == nil {
+            downloaded = await Self.downloadImage(from: thumbnailURL)
+        }
+        guard let image = downloaded else {
             loadFailed = true
+            return
+        }
+        let prepared = image.fixedOrientation().resizedToFit(longEdge: 1024)
+
+        // 端末内 (Vision) で背景除去。失敗しても元画像で続行できる。
+        if let cutout = try? await ItemNoiseRemover.removeBackgroundNoise(from: prepared) {
+            workingImage = cutout
+            backgroundRemoved = true
+        } else {
+            workingImage = prepared
+            backgroundRemoved = false
+        }
+
+        // 色がキーワードから取れていなければ、切り抜き画像の平均色から推定
+        if editedColor.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let image = workingImage,
+           let detected = Self.detectColorName(from: image) {
+            editedColor = detected
+        }
+    }
+
+    /// 画像を1件ダウンロードする (タイムアウト付き)。失敗時は nil。
+    private static func downloadImage(from url: URL) async -> UIImage? {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode < 400,
+                  let image = UIImage(data: data) else { return nil }
+            return image
+        } catch {
+            return nil
         }
     }
 
