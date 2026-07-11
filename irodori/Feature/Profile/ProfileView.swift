@@ -8,6 +8,7 @@ struct ProfileView: View {
     @State private var hasLoadedItems = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var itemToEdit: ClosetItem?
+    @State private var showStandardItemSheet = false
 
     let itemSpacing: CGFloat = 4
     // グリッドのレイアウト設定 (3列)
@@ -34,6 +35,7 @@ struct ProfileView: View {
 //                    tabSegmentView  // コーデタブ未実装のためコメントアウト
 
                     VStack(spacing: 16) {
+                        addItemButtons
                         categorySelector
                         itemsGrid
                             .padding(.horizontal, 24)
@@ -54,6 +56,14 @@ struct ProfileView: View {
                     viewModel.replaceItem(oldId: item.id, with: newItem)
                 }
             )
+        }
+        .sheet(isPresented: $showStandardItemSheet, onDismiss: {
+            // 追加登録後にクローゼットを再読込して反映する
+            Task { await viewModel.loadItems() }
+        }) {
+            NavigationStack {
+                SelectStandardItemView()
+            }
         }
         .alert("アイテムを削除", isPresented: $viewModel.showDeleteConfirmation) {
             Button("キャンセル", role: .cancel) {
@@ -213,6 +223,43 @@ struct ProfileView: View {
                 .background(Color.gray.opacity(0.15))
                 .foregroundStyle(.black)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    // MARK: - アイテムを追加する導線 (スタンダード選択 / Web検索)
+    private var addItemButtons: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("アイテムを追加")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 12) {
+                addItemButton(title: "スタンダードから", systemImage: "square.grid.2x2") {
+                    Haptic.impact(.soft)
+                    showStandardItemSheet = true
+                }
+                addItemButton(title: "検索して追加", systemImage: "magnifyingglass") {
+                    Haptic.impact(.soft)
+                    path.append(.addItemBySearch)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func addItemButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 14, weight: .medium))
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 11)
+            .background(Color.gray.opacity(0.15))
+            .foregroundStyle(.black)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
 
