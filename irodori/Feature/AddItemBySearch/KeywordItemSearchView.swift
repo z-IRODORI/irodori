@@ -131,21 +131,24 @@ struct KeywordItemSearchView: View {
             Haptic.impact(.soft)
             picked = result
         } label: {
-            CachedAsyncImage(url: result.thumbnailURL) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-            } placeholder: {
-                Color.gray.opacity(0.12)
-            }
-            .frame(maxWidth: .infinity)
-            .aspectRatio(1, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .clipped()
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
-            )
+            // 正方形セルは中身に依存しない Color.clear で確定させ、画像は overlay で
+            // 敷き詰めて clip する。こうすると縦長・横長どの画像でもセルの縦横比が崩れない。
+            Color.clear
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    CachedAsyncImage(url: result.thumbnailURL) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Color.gray.opacity(0.12)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
     }
