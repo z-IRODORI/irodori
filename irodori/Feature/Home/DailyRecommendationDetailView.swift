@@ -37,6 +37,20 @@ struct DailyRecommendationDetailView: View {
                             .padding(10)
                     }
                 }
+                // おすすめコーデのグリッドと同じ「使っている手持ちアイテム」アイコンを画像右上に表示。
+                // ◯ = 使える手持ちアイテム / 破線 = 手持ちと一致なし (pool コーデのみ)。
+                .overlay(alignment: .topTrailing) {
+                    if item.kindEnum == .pool {
+                        Group {
+                            if !item.owned_items.isEmpty {
+                                OwnedItemCircles(items: item.owned_items, size: 30)
+                            } else {
+                                NoOwnedItemBadge(size: 30)
+                            }
+                        }
+                        .padding(10)
+                    }
+                }
 
                 if item.kindEnum == .self {
                     HStack(spacing: 6) {
