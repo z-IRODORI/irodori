@@ -34,6 +34,7 @@ final class SearchedItemRegisterViewModel {
     var canRegister: Bool { workingImage != nil && !isRegistering }
 
     private let registerClient: BulkItemRegisterClientProtocol
+    private var preparedImage: UIImage?   // 切り抜き前(リサイズ済み)。retry時の再切り抜きに使う
 
     init(
         originalURL: URL,
@@ -67,15 +68,10 @@ final class SearchedItemRegisterViewModel {
             return
         }
         let prepared = image.fixedOrientation().resizedToFit(longEdge: 1024)
+        preparedImage = prepared
 
-        // 端末内 (Vision) で背景除去。失敗しても元画像で続行できる。
-        if let cutout = try? await ItemNoiseRemover.removeBackgroundNoise(from: prepared) {
-            workingImage = cutout
-            backgroundRemoved = true
-        } else {
-            workingImage = prepared
-            backgroundRemoved = false
-        }
+        // 端末内 (Vision) で背景除去し、正方形化する (失敗しても正方形で続行)
+        await applyCutout(to: prepared)
 
         // 色がキーワードから取れていなければ、切り抜き画像の平均色から推定
         if editedColor.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -101,13 +97,27 @@ final class SearchedItemRegisterViewModel {
 
     /// 背景除去をやり直す (元画像から再抽出)。
     func retryRemoveBackground() async {
-        guard let current = workingImage else { return }
-        if let cutout = try? await ItemNoiseRemover.removeBackgroundNoise(from: current) {
-            workingImage = cutout
-            backgroundRemoved = true
+        guard let prepared = preparedImage else { return }
+        await applyCutout(to: prepared)
+        if backgroundRemoved {
             Haptic.impact(.soft)
         } else {
             ToastManager.shared.show("アイテムを検出できませんでした")
+        }
+    }
+
+    /// 背景除去 → 正方形化して workingImage にセットする。
+    /// クローゼットのアイテム画像は正方形が要件のため、normalizedToContentSquare() で
+    /// 被写体を正方形キャンバス中央にフィットさせる (透過保持)。切り抜き失敗時も
+    /// 元画像を正方形化 (透明パディング) して要件を満たす。
+    private func applyCutout(to source: UIImage) async {
+        if let cutout = try? await ItemNoiseRemover.removeBackgroundNoise(from: source),
+           let squared = cutout.normalizedToContentSquare() {
+            workingImage = squared
+            backgroundRemoved = true
+        } else {
+            workingImage = source.normalizedToContentSquare() ?? source
+            backgroundRemoved = false
         }
     }
 
