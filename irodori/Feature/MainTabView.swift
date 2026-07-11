@@ -56,9 +56,12 @@ struct MainTabView: View {
                     },
                     collageButtonTapped: {
                         path.append(.coordinateCollage)
+                    },
+                    itemSearchButtonTapped: {
+                        path.append(.addItemBySearch)
                     }
                 )
-                .presentationDetents([.height(280)])
+                .presentationDetents([.height(340)])
                 .presentationDragIndicator(.visible)
             }
             .navigationDestination(for: ViewType.self) { viewType in
@@ -129,6 +132,8 @@ struct MainTabView: View {
                     CoordinateCollageView(viewModel: .init(), path: $path)
                 case .outfitSuggestion:
                     OutfitSuggestionView(path: $path)
+                case .addItemBySearch:
+                    KeywordItemSearchView()
                 }
             }
         }
@@ -232,6 +237,7 @@ struct AddContentModalView: View {
     @Environment(\.dismiss) var dismiss
     let cameraButtonTapped: (() -> Void)
     let collageButtonTapped: (() -> Void)
+    let itemSearchButtonTapped: (() -> Void)
 
     var body: some View {
         VStack(spacing: 12) {
@@ -245,9 +251,10 @@ struct AddContentModalView: View {
                 dismiss()
             }
 
-//            modalButton(title: "アイテムを追加", icon: "tshirt") {
-//                dismiss()
-//            }
+            modalButton(title: "検索してアイテムを追加", icon: "magnifyingglass") {
+                itemSearchButtonTapped()
+                dismiss()
+            }
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
