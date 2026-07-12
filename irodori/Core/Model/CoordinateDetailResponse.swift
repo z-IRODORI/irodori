@@ -17,6 +17,13 @@ struct CoordinateDetailResponse: Codable {
         let id: String
         let date: String
         let coodinate_image_path: String
+        let cutout_image_path: String?
+        let display_type: String?
+
+        /// 一覧/詳細に出す画像URL (display_type に応じて撮影/切り取りを選択)。
+        var displayImageURL: String {
+            CoordinateImageResolver.url(captured: coodinate_image_path, cutout: cutout_image_path, displayType: display_type) ?? coodinate_image_path
+        }
     }
 
     struct CoordinateItem: Codable {

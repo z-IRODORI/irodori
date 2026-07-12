@@ -70,7 +70,7 @@ struct RecentCoordinates: View {
         // 画像/日付ラベルそれぞれに onTapGesture を割り当て、ハートは独立した Button のままにする.
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
-                KFImage(URL(string: coordinate.image_url))
+                KFImage(URL(string: coordinate.displayImageURL))
                     .placeholder { Color.gray.opacity(0.3) }
                     .resizable()
                     .aspectRatio(3/4, contentMode: .fit)
@@ -125,7 +125,7 @@ struct RecentCoordinates: View {
                     !isFav,
                     kind: .self,
                     targetId: coordinate.id,
-                    imageURL: coordinate.image_url,
+                    imageURL: coordinate.displayImageURL,
                     date: coordinate.date
                 )
             }

@@ -261,7 +261,8 @@ struct CalendarView: View {
     private func dayCell(month: Month, day: Int, responses: [CoordinateListResponse]) -> some View {
         // day フィールドで突合する (旧実装の配列インデックス依存は歯抜けデータでズレるため)
         let coord = responses.first { $0.day == day }
-        let imageURL = coord?.coodinate_image_path
+        // display_type に応じて撮影/切り取り画像を選ぶ
+        let imageURL = coord?.displayImageURL
         let coordinateId = coord?.id
         // 着用記録がある日は記録を優先し、無い日だけ予定コーデを表示する
         let planned = imageURL == nil

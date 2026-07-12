@@ -22,6 +22,9 @@ final class CoordinateReviewViewModel {
     var outputUIImage: UIImage = .init(resource: .coordinate4)
     var topsUIImage: UIImage?
     var bottomsUIImage: UIImage?
+    // 送信前にオンデバイス(Vision)で生成する人物切り取り(背景透過)画像。
+    // これまでのコーデとして撮影画像と共に保存する。
+    var cutoutImage: UIImage?
     // 検出位置 (正規化座標)。ローディング画面の検出ボックス表示用
     var topsBoundingRect: CGRect?
     var bottomsBoundingRect: CGRect?
@@ -55,8 +58,17 @@ final class CoordinateReviewViewModel {
         await segment()
 
         if errroMessage == nil {
+            // 送信前に人物切り取りをオンデバイスで実行 (サーバー側では切り取らない)
+            await generatePersonCutout()
             await coordinateReview()
         }
+    }
+
+    /// 撮影画像から人物を背景透過で切り抜く (Vision 被写体マスク)。
+    /// 失敗しても cutoutImage は nil のままで、撮影画像のみで続行する。
+    private func generatePersonCutout() async {
+        let source = coordinateImage.correctOrientation.resizedToFit(longEdge: 1440)
+        cutoutImage = try? await ItemNoiseRemover.removeBackgroundNoise(from: source)
     }
 
     func tappedRecommendCoordinateButton() {
@@ -72,6 +84,7 @@ final class CoordinateReviewViewModel {
                 image: coordinateImage.correctOrientation,
                 topsImage: topsUIImage,
                 bottomsImage: bottomsUIImage,
+                cutoutImage: cutoutImage,
                 purposeNum: nil//tag.number
             )
             let endTime = CFAbsoluteTimeGetCurrent()

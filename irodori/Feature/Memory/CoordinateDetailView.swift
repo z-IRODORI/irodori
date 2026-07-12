@@ -17,10 +17,15 @@ struct CoordinateDetailView: View {
             VStack(spacing: 32) {
                 // fetch 結果に関わらず画像はプレースホルダとして表示する
                 LargeCoordinateCardWithURL(
-                    coordinateImageURL: viewModel.coordinateImageURL,
+                    coordinateImageURL: viewModel.displayedImageURL,
                     currentSchedule: viewModel.coordinateDetail?.current_coordinate.date ?? "",
                     aiCatchphrase: viewModel.coordinateDetail?.ai_catchphrase ?? ""
                 )
+
+                // このコーデを一覧で「撮影画像 / 切り取り」どちらで表示するか (切り取りがある時だけ)
+                if viewModel.hasCutout {
+                    displayTypePicker
+                }
 
                 if let coordinateDetail = viewModel.coordinateDetail {
                     VStack(alignment: .leading, spacing: 12) {
@@ -105,8 +110,28 @@ struct CoordinateDetailView: View {
         }
     }
     
+    // 一覧での表示画像を撮影/切り取りで切り替える (コーデごとに永続化)
+    private var displayTypePicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("一覧での表示画像")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Picker("一覧での表示画像", selection: Binding(
+                get: { viewModel.currentDisplayType },
+                set: { newValue in Task { await viewModel.setDisplayType(newValue) } }
+            )) {
+                Text("撮影画像").tag(CoordinateDisplayType.captured)
+                Text("切り取り").tag(CoordinateDisplayType.cutout)
+            }
+            .pickerStyle(.segmented)
+            .disabled(viewModel.isUpdatingDisplayType)
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func loadCoordinateImage() async {
-        guard let url = URL(string: viewModel.coordinateImageURL) else { return }
+        guard let url = URL(string: viewModel.displayedImageURL) else { return }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)

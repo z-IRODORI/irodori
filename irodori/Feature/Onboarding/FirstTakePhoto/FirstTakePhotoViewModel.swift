@@ -45,8 +45,13 @@ final class FirstTakePhotoViewModel {
 
         isLoading = true
 
+        // 送信前に人物切り取りをオンデバイスで生成 (失敗しても nil のまま撮影画像だけで続行)
+        let cutoutImage = try? await ItemNoiseRemover.removeBackgroundNoise(
+            from: image.correctOrientation.resizedToFit(longEdge: 1440)
+        )
+
         do {
-            let result = try await fashionReviewClient.post(uid: uid, image: image, topsImage: nil, bottomsImage: nil, purposeNum: nil)
+            let result = try await fashionReviewClient.post(uid: uid, image: image, topsImage: nil, bottomsImage: nil, cutoutImage: cutoutImage, purposeNum: nil)
 
             switch result {
             case .success(let response):

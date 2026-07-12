@@ -40,7 +40,7 @@ struct HomeView: View {
                             onTapCoordinate: { coordinate in
                                 path.append(.coordinateDetail(.init(
                                     coordinateId: coordinate.id,
-                                    coordinateImageURL: coordinate.image_url,
+                                    coordinateImageURL: coordinate.displayImageURL,
                                     showHeader: true
                                 )))
                             }
