@@ -31,7 +31,6 @@ struct CoordinateReviewLoadingView: View {
     }
 
     @State private var stage: Stage = .scanning
-    @State private var scanY: CGFloat = 0     // 0...1 (写真内の縦位置)
     @State private var topsLanded = false     // 切り出し画像がトレイに到着したか
     @State private var bottomsLanded = false
     @Namespace private var flyNamespace
@@ -90,11 +89,6 @@ struct CoordinateReviewLoadingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.white)
         .task(id: detectionReady) { await runDetectionSequence() }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                scanY = 1
-            }
-        }
     }
 
     // MARK: - 検出 → 抜き出し → トレイ着地 の進行
@@ -135,6 +129,25 @@ struct CoordinateReviewLoadingView: View {
                     ZStack {
                         gridOverlay(size: size)
                         scanLine(size: size)
+                        // 抜き出し前の切り出し画像 (飛翔の出発点)。
+                        // 検出ボックス + ラベルより先に敷き、ラベルを前面に出す。
+                        if stage >= .tops, !topsLanded, let topsImage {
+                            extractedItemOverlay(
+                                image: topsImage,
+                                normalizedRect: resolvedTopsRect,
+                                containerSize: size,
+                                matchedID: "tops"
+                            )
+                        }
+                        if stage >= .bottoms, !bottomsLanded, let bottomsImage {
+                            extractedItemOverlay(
+                                image: bottomsImage,
+                                normalizedRect: resolvedBottomsRect,
+                                containerSize: size,
+                                matchedID: "bottoms"
+                            )
+                        }
+                        // 検出ボックス + ラベルは最前面 (切り出し画像=四角窓 の上)
                         if stage >= .tops {
                             detectionBox(
                                 label: "トップス",
@@ -152,23 +165,6 @@ struct CoordinateReviewLoadingView: View {
                                 isExtracted: bottomsLanded
                             )
                             .transition(.scale(scale: 1.25).combined(with: .opacity))
-                        }
-                        // 抜き出し前の切り出し画像 (飛翔の出発点)
-                        if stage >= .tops, !topsLanded, let topsImage {
-                            extractedItemOverlay(
-                                image: topsImage,
-                                normalizedRect: resolvedTopsRect,
-                                containerSize: size,
-                                matchedID: "tops"
-                            )
-                        }
-                        if stage >= .bottoms, !bottomsLanded, let bottomsImage {
-                            extractedItemOverlay(
-                                image: bottomsImage,
-                                normalizedRect: resolvedBottomsRect,
-                                containerSize: size,
-                                matchedID: "bottoms"
-                            )
                         }
                         if stage == .analyzing {
                             analyzingChip
@@ -232,27 +228,38 @@ struct CoordinateReviewLoadingView: View {
     }
 
     private func scanLine(size: CGSize) -> some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        brandPink.opacity(0),
-                        brandPink.opacity(0.35),
-                        brandPink.opacity(0),
-                    ],
-                    startPoint: .top, endPoint: .bottom
+        // 経過時間から位置を算出することで、onAppear / GeometryReader のタイミングに
+        // 依存せず確実に動かす (上→下→上 の往復スキャン)。
+        let period: Double = 2.4
+        return TimelineView(.animation) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            let phase = t.truncatingRemainder(dividingBy: period) / period   // 0..1
+            let tri = phase < 0.5 ? phase * 2 : (2 - phase * 2)              // 0→1→0
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            .black.opacity(0),
+                            .black.opacity(0.12),
+                            .black.opacity(0),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
                 )
-            )
-            .frame(height: 70)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(brandGradient)
-                    .frame(height: 2)
-                    .shadow(color: brandPink, radius: 6)
-            }
-            .position(x: size.width / 2, y: scanY * size.height)
-            .opacity(stage == .analyzing ? 0.25 : 1)
-            .allowsHitTesting(false)
+                .frame(width: size.width, height: 70)
+                .overlay(alignment: .bottom) {
+                    // 黒のスキャン線 (IRODORI らしいミニマル)。暗い服の上でも視認できるよう
+                    // 白の弱いグロー + 黒のソフトシャドウを重ねる。
+                    Rectangle()
+                        .fill(.black)
+                        .frame(height: 1.5)
+                        .shadow(color: .white.opacity(0.6), radius: 2)
+                        .shadow(color: .black.opacity(0.25), radius: 5)
+                }
+                .position(x: size.width / 2, y: CGFloat(tri) * size.height)
+        }
+        .opacity(stage == .analyzing ? 0.25 : 1)
+        .allowsHitTesting(false)
     }
 
     private var analyzingChip: some View {
