@@ -23,7 +23,8 @@ final class CoordinateCollageViewModel {
     /// 登録済みコーデのサムネ (http URL)
     struct RegisteredCoordinate: Identifiable, Hashable {
         let id: String
-        let url: String
+        let url: String            // 撮影画像URL (選択グリッド表示用)
+        let cutoutURL: String?     // 人物切り取り後URL (あればコラージュ送信に使い、サーバー切り抜きを省く)
     }
 
     // ステップ
@@ -116,7 +117,8 @@ final class CoordinateCollageViewModel {
                 let id = item.id ?? path
                 if seen.contains(id) { continue }
                 seen.insert(id)
-                coordinates.append(RegisteredCoordinate(id: id, url: path))
+                let cutout = (item.cutout_image_path?.isEmpty == false) ? item.cutout_image_path : nil
+                coordinates.append(RegisteredCoordinate(id: id, url: path, cutoutURL: cutout))
             }
         }
 
@@ -241,21 +243,25 @@ final class CoordinateCollageViewModel {
 
         var imageDataList: [Data] = []
 
-        // 1. 選択した登録コーデを URL からダウンロード
-        let selectedURLs = registeredCoordinates
+        // 1. 選択した登録コーデをダウンロード。
+        //    切り取り済み画像があれば透過保持で PNG 送信し、サーバー側の人物切り抜きを省く。
+        let selectedCoords = registeredCoordinates
             .filter { selectedCoordinateIDs.contains($0.id) }
-            .map { $0.url }
-        for urlString in selectedURLs {
+        for coord in selectedCoords {
             try Task.checkCancellation()
+            let useCutout = (coord.cutoutURL?.isEmpty == false)
+            let urlString = useCutout ? (coord.cutoutURL ?? coord.url) : coord.url
             guard let url = URL(string: urlString),
                   let (data, _) = try? await URLSession.shared.data(from: url),
-                  let image = UIImage(data: data),
-                  let jpeg = image.fixedOrientation()
-                      .resizedToFit(longEdge: uploadLongEdge)
-                      .jpegData(compressionQuality: 0.8) else {
+                  let image = UIImage(data: data) else {
                 continue
             }
-            imageDataList.append(jpeg)
+            let prepared = image.fixedOrientation().resizedToFit(longEdge: uploadLongEdge)
+            // 切り取り画像は透過を保つため PNG、撮影画像は従来通り JPEG
+            let encoded = useCutout ? prepared.pngData() : prepared.jpegData(compressionQuality: 0.8)
+            if let encoded {
+                imageDataList.append(encoded)
+            }
         }
 
         // 2. 写真フォルダから選んだ画像

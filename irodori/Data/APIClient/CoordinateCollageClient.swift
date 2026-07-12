@@ -53,9 +53,13 @@ final class CoordinateCollageClient: CoordinateCollageClientProtocol {
         }
 
         for (index, data) in images.enumerated() {
+            // PNG (切り取り済み・透過) と JPEG (撮影) が混在するためマジックバイトで判定
+            let isPNG = data.starts(with: [0x89, 0x50, 0x4E, 0x47])
+            let ext = isPNG ? "png" : "jpg"
+            let mime = isPNG ? "image/png" : "image/jpeg"
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"images\"; filename=\"coord_\(index).jpg\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"images\"; filename=\"coord_\(index).\(ext)\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: \(mime)\r\n\r\n".data(using: .utf8)!)
             body.append(data)
             body.append("\r\n".data(using: .utf8)!)
         }
