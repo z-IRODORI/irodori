@@ -30,7 +30,11 @@ enum ItemNoiseRemoverError: LocalizedError {
 }
 
 enum ItemNoiseRemover {
-    static func removeBackgroundNoise(from image: UIImage) async throws -> UIImage {
+    /// 被写体 (人物 / アイテム) を背景透過で切り抜く。
+    /// - Parameter marginRatio: 切り抜きに持たせる余白。画像短辺に対する比率でマスクを
+    ///   膨張させ、周囲に少し元背景の帯を残す (サーバー `segment_person_rgba` の
+    ///   margin_ratio 相当)。0 で余白なし (アイテム切り抜きの既定)。
+    static func removeBackgroundNoise(from image: UIImage, marginRatio: CGFloat = 0) async throws -> UIImage {
         let normalized = image.fixedOrientation()
         guard let cgImage = normalized.cgImage else { throw ItemNoiseRemoverError.invalidImage }
 
@@ -51,8 +55,19 @@ enum ItemNoiseRemover {
                 croppedToInstancesExtent: false
             )
 
-            // マスク直後に軽い輪郭スムージングをかけ、階段状のギザつきを均す
-            let foreground = smoothedAlpha(of: CIImage(cvPixelBuffer: maskedBuffer), strength: 0.7)
+            let maskedCI = CIImage(cvPixelBuffer: maskedBuffer)
+            let foreground: CIImage
+            if marginRatio > 0 {
+                // 余白を持たせて切り抜く: マスクを膨張し、周囲に元背景の帯を残す
+                foreground = marginedForeground(
+                    original: CIImage(cgImage: cgImage),
+                    masked: maskedCI,
+                    marginRatio: marginRatio
+                )
+            } else {
+                // マスク直後に軽い輪郭スムージングをかけ、階段状のギザつきを均す
+                foreground = smoothedAlpha(of: maskedCI, strength: 0.7)
+            }
             let context = CIContext()
             guard let output = context.createCGImage(foreground, from: foreground.extent) else {
                 throw ItemNoiseRemoverError.renderingFailed
@@ -116,6 +131,43 @@ enum ItemNoiseRemover {
         return source.applyingFilter("CIBlendWithMask", parameters: [
             kCIInputBackgroundImageKey: clearBackground,
             kCIInputMaskImageKey: smoothMask,
+        ])
+    }
+
+    /// 被写体マスクを余白ぶん膨張させ、その膨張マスクを「元画像」に適用して返す。
+    /// サーバー `segment_person_rgba` の margin_ratio と同様、razor-tight を避けて
+    /// 人物の周囲に少し元背景の帯を残す。
+    /// - Parameters:
+    ///   - original: 元画像 (余白部分に見える背景の供給元)
+    ///   - masked: Vision の被写体マスク済み画像 (アルファがマスク)
+    ///   - marginRatio: 画像短辺に対する余白比率
+    private static func marginedForeground(original: CIImage, masked: CIImage, marginRatio: CGFloat) -> CIImage {
+        let extent = masked.extent
+        guard extent.width > 0, extent.height > 0 else { return masked }
+
+        let minSide = min(extent.width, extent.height)
+        let marginPx = max(4.0, min(60.0, minSide * marginRatio))
+
+        // 被写体アルファをグレースケールマスクとして取り出す (RGB = A, A = 1)
+        let alphaMask = masked.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+        ])
+
+        // 余白ぶんマスクを膨張 + 軽いフェザー
+        let dilatedMask = alphaMask
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: marginPx])
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: max(1.0, marginPx * 0.18)])
+            .cropped(to: extent)
+
+        // 膨張マスクを元画像に適用 → 人物 + 余白(周囲の元背景) を残し、外側は透明
+        let clearBackground = CIImage(color: .clear).cropped(to: extent)
+        return original.cropped(to: extent).applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: clearBackground,
+            kCIInputMaskImageKey: dilatedMask,
         ])
     }
 }

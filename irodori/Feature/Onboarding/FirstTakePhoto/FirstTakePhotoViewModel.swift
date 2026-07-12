@@ -45,9 +45,11 @@ final class FirstTakePhotoViewModel {
 
         isLoading = true
 
-        // 送信前に人物切り取りをオンデバイスで生成 (失敗しても nil のまま撮影画像だけで続行)
+        // 送信前に人物切り取りをオンデバイスで生成 (失敗しても nil のまま撮影画像だけで続行)。
+        // サーバー切り抜きと揃えて余白を持たせる (marginRatio)。
         let cutoutImage = try? await ItemNoiseRemover.removeBackgroundNoise(
-            from: image.correctOrientation.resizedToFit(longEdge: 1440)
+            from: image.correctOrientation.resizedToFit(longEdge: 1440),
+            marginRatio: 0.025
         )
 
         do {

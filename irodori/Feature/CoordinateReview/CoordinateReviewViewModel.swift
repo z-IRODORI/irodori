@@ -68,7 +68,8 @@ final class CoordinateReviewViewModel {
     /// 失敗しても cutoutImage は nil のままで、撮影画像のみで続行する。
     private func generatePersonCutout() async {
         let source = coordinateImage.correctOrientation.resizedToFit(longEdge: 1440)
-        cutoutImage = try? await ItemNoiseRemover.removeBackgroundNoise(from: source)
+        // サーバーの切り抜き(segment_person_rgba, margin_ratio=0.045/人物短辺)と揃えて余白を持たせる
+        cutoutImage = try? await ItemNoiseRemover.removeBackgroundNoise(from: source, marginRatio: 0.025)
     }
 
     func tappedRecommendCoordinateButton() {
