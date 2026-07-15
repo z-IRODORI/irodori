@@ -2,11 +2,11 @@
 //  AuthManager.swift
 //  irodori
 //
+//  会員登録/ログインは「電話番号 (SMS認証)」のみ (Firebase Phone Auth)。
+//
 
 import Foundation
 import FirebaseAuth
-import CryptoKit
-import AuthenticationServices
 
 @MainActor
 @Observable
@@ -26,30 +26,35 @@ final class AuthManager {
         }
     }
 
-    /// Sign in with Apple（Firebase連携）
-    func signInWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws {
-        let credential = OAuthProvider.appleCredential(
-            withIDToken: idToken,
-            rawNonce: nonce,
-            fullName: fullName
+    /// 電話番号 (E.164 形式, 例: "+819012345678") に SMS 認証コードを送る。
+    /// 成功すると、後続の signIn で使う verificationID を返す。
+    func sendVerificationCode(toPhoneNumber e164PhoneNumber: String) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            PhoneAuthProvider.provider().verifyPhoneNumber(e164PhoneNumber, uiDelegate: nil) { verificationID, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                continuation.resume(returning: verificationID ?? "")
+            }
+        }
+    }
+
+    /// verificationID と受信した 6 桁コードでサインインする (初回=会員登録 / 2回目以降=ログイン)。
+    func signIn(verificationID: String, code: String) async throws {
+        let credential = PhoneAuthProvider.provider().credential(
+            withVerificationID: verificationID,
+            verificationCode: code
         )
         let result = try await Auth.auth().signIn(with: credential)
         self.isAuthenticated = true
         self.currentUserID = result.user.uid
-
-        // Appleは初回のみ氏名を返すため、displayNameが未設定なら更新
-        if let fullName, let givenName = fullName.givenName, result.user.displayName == nil {
-            let changeRequest = result.user.createProfileChangeRequest()
-            changeRequest.displayName = [fullName.familyName, givenName].compactMap { $0 }.joined(separator: " ")
-            try? await changeRequest.commitChanges()
-        }
-
         self.authError = nil
     }
 
-    /// Apple Sign Inで認証済みかどうか
-    var isSignedInWithApple: Bool {
-        Auth.auth().currentUser?.providerData.contains(where: { $0.providerID == "apple.com" }) ?? false
+    /// サインイン済みか (電話番号認証)
+    var isSignedIn: Bool {
+        Auth.auth().currentUser != nil
     }
 
     /// ログアウト
@@ -65,22 +70,8 @@ final class AuthManager {
         }
     }
 
-    /// 現在のユーザーを取得
+    /// 現在のユーザー
     var currentUser: FirebaseAuth.User? {
-        return Auth.auth().currentUser
-    }
-
-    // MARK: - Nonce helpers（Apple Sign In用）
-
-    static func randomNonceString(length: Int = 32) -> String {
-        var randomBytes = [UInt8](repeating: 0, count: length)
-        _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
-        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
-        return String(randomBytes.map { charset[Int($0) % charset.count] })
-    }
-
-    static func sha256(_ input: String) -> String {
-        let hashedData = SHA256.hash(data: Data(input.utf8))
-        return hashedData.compactMap { String(format: "%02x", $0) }.joined()
+        Auth.auth().currentUser
     }
 }

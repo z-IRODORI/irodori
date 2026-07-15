@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreML
 import Vision
+import FirebaseAuth
 
 @main
 struct irodoriApp: App {
@@ -20,24 +21,28 @@ struct irodoriApp: App {
         WindowGroup {
 //            PartnerDesignsCompare()
 
-            LoadingDesignsCompare()
+//            LoadingDesignsCompare()
 
-//            SplashView()
-//                .onAppear {
-//                    AnalyticsLogger.shared.log(screen: .splashScreenView)
-//                }
-//                .onChange(of: scenePhase) { _, newPhase in
-//                    switch newPhase {
-//                    case .background:
-//                        AnalyticsLogger.shared.log(action: .appBackground)
-//                    case .inactive:
-//                        AnalyticsLogger.shared.log(action: .appWillResignActive)
-//                    case .active:
-//                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
-//                    @unknown default:
-//                        break
-//                    }
-//                }
+            SplashView()
+                .onAppear {
+                    AnalyticsLogger.shared.log(screen: .splashScreenView)
+                }
+                // Firebase Phone Auth (SMS認証) の reCAPTCHA リダイレクトを処理
+                .onOpenURL { url in
+                    _ = Auth.auth().canHandle(url)
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    switch newPhase {
+                    case .background:
+                        AnalyticsLogger.shared.log(action: .appBackground)
+                    case .inactive:
+                        AnalyticsLogger.shared.log(action: .appWillResignActive)
+                    case .active:
+                        AnalyticsLogger.shared.log(action: .appDidBecomeActive)
+                    @unknown default:
+                        break
+                    }
+                }
 
 //            FashionTypeIntroView(path: $path)
 //                .navigationDestination(for: ViewType.self) { viewType in

@@ -29,9 +29,9 @@ final class SplashViewModel {
             state = .termsOfService
             return
         }
-        // Appleログイン（既存ユーザー＝userInfoあり はスキップ）
+        // 電話番号ログイン（既存ユーザー＝userInfoあり はスキップ）
         if UserDefaults.standard.object(forKey: UserDefaultsKey.userInfo.rawValue) == nil {
-            if !AuthManager.shared.isSignedInWithApple {
+            if !AuthManager.shared.isSignedIn {
                 state = .login
                 return
             }
