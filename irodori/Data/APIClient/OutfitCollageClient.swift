@@ -31,6 +31,7 @@ protocol OutfitCollageClientProtocol {
         uid: String,
         gender: Gender,
         collageId: String,
+        backgroundColor: String,
         items: [OutfitCollageLayoutItem]
     ) async throws -> Result<OutfitCollageResponse, HTTPError>
 }
@@ -60,10 +61,13 @@ struct OutfitCollageLayoutSaveRequest: Encodable {
         let w: Double
         let h: Double
         let z: Int
+        let r: Double         // 回転 (度, 時計回り)
+        let hidden: Bool      // true で合成から除外
     }
 
     let collage_id: String    // GET layout 時点の collage_id (再生成との競合検出)
     let gender: String
+    let background_color: String  // "#RRGGBB"
     let items: [Item]
 }
 
@@ -191,6 +195,7 @@ final class OutfitCollageClient: OutfitCollageClientProtocol {
         uid: String,
         gender: Gender,
         collageId: String,
+        backgroundColor: String,
         items: [OutfitCollageLayoutItem]
     ) async throws -> Result<OutfitCollageResponse, HTTPError> {
         let endpoint = "api/outfit-collage/layout"
@@ -206,8 +211,10 @@ final class OutfitCollageClient: OutfitCollageClientProtocol {
         let body = OutfitCollageLayoutSaveRequest(
             collage_id: collageId,
             gender: gender.apiValue,
+            background_color: backgroundColor,
             items: items.map {
-                .init(id: $0.id, x: $0.x, y: $0.y, w: $0.w, h: $0.h, z: $0.z)
+                .init(id: $0.id, x: $0.x, y: $0.y, w: $0.w, h: $0.h, z: $0.z,
+                      r: $0.r, hidden: $0.hidden)
             }
         )
         request.httpBody = try? JSONEncoder().encode(body)
@@ -271,6 +278,7 @@ final class MockOutfitCollageClient: OutfitCollageClientProtocol {
         uid: String,
         gender: Gender,
         collageId: String,
+        backgroundColor: String,
         items: [OutfitCollageLayoutItem]
     ) async throws -> Result<OutfitCollageResponse, HTTPError> {
         return .success(.mock())

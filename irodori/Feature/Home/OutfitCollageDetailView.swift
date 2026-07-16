@@ -150,34 +150,48 @@ struct OutfitCollageDetailView: View {
     // 位置更新までアニメーション化されて操作がガクつく。
     private var editControls: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("タップで最前面・ドラッグで移動・◯ハンドルで大きさを調整")
+            Text("タップで最前面・ドラッグで移動・◯ハンドルで大きさ・2本指でまわす")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
 
-            HStack(spacing: 8) {
-                OutfitCollageEditPill(
-                    label: "一段背面へ",
-                    systemImage: "square.2.layers.3d.bottom.filled",
-                    disabled: layoutViewModel.selectedLayer == nil || layoutViewModel.selectedIsBottom
-                ) {
-                    if let id = layoutViewModel.selectedId { layoutViewModel.sendBackward(id) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    OutfitCollageEditPill(
+                        label: "一段背面へ",
+                        systemImage: "square.2.layers.3d.bottom.filled",
+                        disabled: layoutViewModel.selectedLayer == nil || layoutViewModel.selectedIsBottom
+                    ) {
+                        if let id = layoutViewModel.selectedId { layoutViewModel.sendBackward(id) }
+                    }
+                    OutfitCollageEditPill(
+                        label: "かくす",
+                        systemImage: "eye.slash",
+                        disabled: layoutViewModel.selectedLayer == nil
+                    ) {
+                        layoutViewModel.hideSelected()
+                    }
+                    OutfitCollageEditPill(
+                        label: "元に戻す",
+                        systemImage: "arrow.uturn.backward",
+                        disabled: !layoutViewModel.canUndo
+                    ) {
+                        layoutViewModel.undo()
+                    }
+                    OutfitCollageEditPill(
+                        label: "リセット",
+                        systemImage: "arrow.counterclockwise",
+                        disabled: !layoutViewModel.canReset
+                    ) {
+                        layoutViewModel.resetToDefault()
+                    }
                 }
-                OutfitCollageEditPill(
-                    label: "元に戻す",
-                    systemImage: "arrow.uturn.backward",
-                    disabled: !layoutViewModel.canUndo
-                ) {
-                    layoutViewModel.undo()
-                }
-                OutfitCollageEditPill(
-                    label: "リセット",
-                    systemImage: "arrow.counterclockwise",
-                    disabled: !layoutViewModel.canReset
-                ) {
-                    layoutViewModel.resetToDefault()
-                }
-                Spacer(minLength: 0)
             }
+
+            if !layoutViewModel.hiddenLayers.isEmpty {
+                hiddenItemsRow
+            }
+
+            backgroundColorRow
 
             if layoutViewModel.hasChanges {
                 Button {
@@ -201,6 +215,95 @@ struct OutfitCollageDetailView: View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: layoutViewModel.hasChanges)
+    }
+
+    /// かくしたアイテムを戻す行 (レイヤーサムネイルをタップで復元)
+    private var hiddenItemsRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("かくしたアイテム (タップで戻す)")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(layoutViewModel.hiddenLayers) { layer in
+                        Button {
+                            Haptic.impact(.soft)
+                            layoutViewModel.restore(layer.id)
+                        } label: {
+                            KFImage(URL(string: layer.layer_url))
+                                .placeholder { Color.gray.opacity(0.08) }
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 52, height: 52)
+                                .padding(4)
+                                .background(Color.gray.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                                )
+                                .overlay(alignment: .bottomTrailing) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white, .black)
+                                        .padding(2)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 背景色の変更行 (白 + プリセット + 自由選択)
+    private var backgroundColorRow: some View {
+        HStack(spacing: 8) {
+            Text("背景色")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+            ForEach(Array(Self.backgroundPresets.enumerated()), id: \.offset) { _, color in
+                backgroundSwatch(color)
+            }
+            ColorPicker("", selection: Binding(
+                get: { layoutViewModel.backgroundColor },
+                set: { layoutViewModel.backgroundColor = $0 }
+            ))
+            .labelsHidden()
+            .frame(width: 32, height: 32)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private static let backgroundPresets: [Color] = [
+        .white,
+        Color(red: 1.0, green: 140.0 / 255.0, blue: 66.0 / 255.0),   // オレンジ
+        Color(red: 17.0 / 255.0, green: 24.0 / 255.0, blue: 39.0 / 255.0),   // ダーク
+        Color(red: 37.0 / 255.0, green: 99.0 / 255.0, blue: 235.0 / 255.0),  // ブルー
+        Color(white: 0.96),                                           // オフホワイト
+    ]
+
+    private func backgroundSwatch(_ color: Color) -> some View {
+        let isSelected = layoutViewModel.backgroundColor.toHexString() == color.toHexString()
+        return Button {
+            Haptic.impact(.soft)
+            layoutViewModel.backgroundColor = color
+        } label: {
+            ZStack {
+                if isSelected {
+                    Circle()
+                        .stroke(Color.black, lineWidth: 2)
+                        .frame(width: 28, height: 28)
+                }
+                Circle()
+                    .fill(color)
+                    .frame(width: 20, height: 20)
+                    .overlay(Circle().stroke(Color.black.opacity(0.2), lineWidth: 1))
+            }
+            .frame(width: 32, height: 32)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func progressCover(_ message: String) -> some View {

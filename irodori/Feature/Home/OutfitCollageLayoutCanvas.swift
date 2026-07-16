@@ -7,6 +7,7 @@
 //   - タップ = 選択 + 最前面へ
 //   - ドラッグ = 移動 (中心がキャンバス内に収まるようクランプ)
 //   - 右下の◯ハンドル or ピンチ = 拡大縮小 (アスペクト維持・上下限あり)
+//   - 2本指回転 = 回転 / 「かくす」でアイテムを合成から除外 (復元可) / 背景色変更
 //  レイヤー (透過PNG) とデフォルト配置はサーバー (GET /api/outfit-collage/layout) が用意し、
 //  保存 (POST) するとサーバーが同じ配置で PNG を再合成して collage_url が差し替わる。
 //
@@ -27,10 +28,12 @@ final class OutfitCollageLayoutEditViewModel {
     var layers: [OutfitCollageLayoutItem] = []
     var selectedId: String? = nil
     var isSaving = false
+    var backgroundColor: Color = .white
 
     private(set) var collageId = ""
     private var defaultLayers: [OutfitCollageLayoutItem] = []
     private var baseline: [OutfitCollageLayoutItem] = []
+    private var baselineBackgroundHex = "#FFFFFF"
     private var undoStack: [[OutfitCollageLayoutItem]] = []
     private let maxUndoCount = 20
 
@@ -43,16 +46,20 @@ final class OutfitCollageLayoutEditViewModel {
         self.client = client
     }
 
-    var hasChanges: Bool { layers != baseline }
+    var hasChanges: Bool {
+        layers != baseline || backgroundColor.toHexString() != baselineBackgroundHex
+    }
     var canUndo: Bool { !undoStack.isEmpty }
     var canReset: Bool { layers != defaultLayers }
     var canvasReady: Bool { !isLoading && !loadFailed && !layers.isEmpty }
+    var visibleLayers: [OutfitCollageLayoutItem] { layers.filter { !$0.hidden } }
+    var hiddenLayers: [OutfitCollageLayoutItem] { layers.filter(\.hidden) }
     var selectedLayer: OutfitCollageLayoutItem? { layers.first { $0.id == selectedId } }
 
     /// 選択中レイヤーが最背面か (背面へ ボタンの活性判定)
     var selectedIsBottom: Bool {
         guard let sel = selectedLayer else { return true }
-        return sel.z == layers.map(\.z).min()
+        return sel.z == visibleLayers.map(\.z).min()
     }
 
     /// 表示中コラージュに対応するレイヤーが未ロードのときだけ取得する。
@@ -78,6 +85,8 @@ final class OutfitCollageLayoutEditViewModel {
                 defaultLayers = response.default_items
                 baseline = response.items
                 collageId = response.collage_id
+                backgroundColor = Color(hexString: response.background_color) ?? .white
+                baselineBackgroundHex = backgroundColor.toHexString()
                 undoStack.removeAll()
             default:
                 loadFailed = true
@@ -114,21 +123,43 @@ final class OutfitCollageLayoutEditViewModel {
         layers[index].h = newH
     }
 
-    /// 右下ハンドルのドラッグ: 左上を固定してアスペクト維持で拡縮する
-    func resizeFromTopLeft(_ id: String, from start: OutfitCollageLayoutItem, factor: Double) {
-        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
-        let f = clampedScaleFactor(factor, start: start)
-        layers[index].x = start.x
-        layers[index].y = start.y
-        layers[index].w = start.w * f
-        layers[index].h = start.h * f
-    }
-
     private func clampedScaleFactor(_ factor: Double, start: OutfitCollageLayoutItem) -> Double {
         let maxFactor = min(maxSide / start.w, maxSide / start.h)
         let minFactor = max(minSide / start.w, minSide / start.h)
         guard minFactor <= maxFactor else { return 1 }
         return min(max(factor, minFactor), maxFactor)
+    }
+
+    /// 回転開始時の角度を基準に delta (度) を加える (-180〜180 に正規化)
+    func rotate(_ id: String, from start: OutfitCollageLayoutItem, delta: Double) {
+        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        var angle = (start.r + delta).truncatingRemainder(dividingBy: 360)
+        if angle > 180 { angle -= 360 }
+        if angle < -180 { angle += 360 }
+        layers[index].r = angle
+    }
+
+    /// 選択中レイヤーをかくす (合成から除外。あとで戻せる)
+    func hideSelected() {
+        guard let id = selectedId,
+              let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        guard visibleLayers.count > 1 else {
+            ToastManager.shared.show("最後の1点はかくせません")
+            return
+        }
+        pushUndo(layers)
+        layers[index].hidden = true
+        selectedId = nil
+    }
+
+    /// かくしたレイヤーを戻す (最前面に出す)
+    func restore(_ id: String) {
+        guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
+        pushUndo(layers)
+        layers[index].hidden = false
+        layers[index].z = (layers.map(\.z).max() ?? 0) + 1
+        normalizeZ()
+        selectedId = id
     }
 
     /// ジェスチャー確定。開始時 snapshot と差分があれば undo に積む
@@ -185,6 +216,7 @@ final class OutfitCollageLayoutEditViewModel {
         guard canReset else { return }
         pushUndo(layers)
         layers = defaultLayers
+        backgroundColor = .white
     }
 
     private func pushUndo(_ snapshot: [OutfitCollageLayoutItem]) {
@@ -208,9 +240,13 @@ final class OutfitCollageLayoutEditViewModel {
             UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
         )
         do {
-            switch try await client.saveLayout(uid: uid, gender: gender, collageId: collageId, items: layers) {
+            switch try await client.saveLayout(
+                uid: uid, gender: gender, collageId: collageId,
+                backgroundColor: backgroundColor.toHexString(), items: layers
+            ) {
             case .success(let response):
                 baseline = layers
+                baselineBackgroundHex = backgroundColor.toHexString()
                 undoStack.removeAll()
                 collageId = response.collage_id
                 selectedId = nil
@@ -234,6 +270,7 @@ struct OutfitCollageLayoutCanvas: View {
     // ジェスチャー中の一時状態 (開始時のレイヤー状態と undo 用スナップショット)
     @State private var dragContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
     @State private var pinchContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
+    @State private var rotateContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
     @State private var handleContext: (id: String, start: OutfitCollageLayoutItem, snapshot: [OutfitCollageLayoutItem])?
 
     // ドラッグの translation を測る固定座標空間。
@@ -245,17 +282,18 @@ struct OutfitCollageLayoutCanvas: View {
         GeometryReader { geo in
             ZStack {
                 // 何もない場所のタップで選択解除
-                Color.white
+                viewModel.backgroundColor
                     .contentShape(Rectangle())
                     .onTapGesture { viewModel.selectedId = nil }
 
-                ForEach(viewModel.layers) { layer in
+                ForEach(viewModel.visibleLayers) { layer in
                     layerView(layer, canvasSize: geo.size)
                 }
             }
             .clipped()
             .coordinateSpace(name: Self.canvasSpaceName)
             .simultaneousGesture(pinchGesture(canvasSize: geo.size))
+            .simultaneousGesture(rotationGesture())
         }
     }
 
@@ -289,6 +327,7 @@ struct OutfitCollageLayoutCanvas: View {
                         .offset(x: 13, y: 13)
                 }
             }
+            .rotationEffect(.degrees(layer.r))
             .position(
                 x: (layer.x + layer.w / 2) * canvasSize.width,
                 y: (layer.y + layer.h / 2) * canvasSize.height
@@ -323,18 +362,13 @@ struct OutfitCollageLayoutCanvas: View {
                 }
                 guard let context = handleContext, canvasSize.width > 0 else { return }
                 let start = context.start
-                // 左上 (固定点) から右下コーナーまでの対角距離の変化率 = 拡縮率
-                let fixedX = start.x * canvasSize.width
-                let fixedY = start.y * canvasSize.height
-                let cornerX = (start.x + start.w) * canvasSize.width
-                let cornerY = (start.y + start.h) * canvasSize.height
-                let startLength = hypot(cornerX - fixedX, cornerY - fixedY)
-                guard startLength > 0 else { return }
-                let newLength = hypot(
-                    cornerX + value.translation.width - fixedX,
-                    cornerY + value.translation.height - fixedY
-                )
-                viewModel.resizeFromTopLeft(id, from: start, factor: newLength / startLength)
+                // 中心 (固定点) からの距離の変化率 = 拡縮率 (回転していても安定)
+                let centerX = (start.x + start.w / 2) * canvasSize.width
+                let centerY = (start.y + start.h / 2) * canvasSize.height
+                let startDist = hypot(value.startLocation.x - centerX, value.startLocation.y - centerY)
+                guard startDist > 1 else { return }
+                let newDist = hypot(value.location.x - centerX, value.location.y - centerY)
+                viewModel.scale(id, from: start, factor: newDist / startDist)
             }
             .onEnded { _ in
                 if let context = handleContext {
@@ -387,6 +421,43 @@ struct OutfitCollageLayoutCanvas: View {
                 }
                 pinchContext = nil
             }
+    }
+
+    // 2本指回転: 選択中レイヤーに適用
+    private func rotationGesture() -> some Gesture {
+        RotateGesture()
+            .onChanged { value in
+                guard let selectedId = viewModel.selectedId else { return }
+                if rotateContext?.id != selectedId {
+                    guard let start = viewModel.layers.first(where: { $0.id == selectedId }) else { return }
+                    rotateContext = (id: selectedId, start: start, snapshot: viewModel.layers)
+                }
+                guard let context = rotateContext else { return }
+                viewModel.rotate(context.id, from: context.start, delta: value.rotation.degrees)
+            }
+            .onEnded { _ in
+                if let context = rotateContext {
+                    viewModel.commitGesture(snapshot: context.snapshot)
+                }
+                rotateContext = nil
+            }
+    }
+}
+
+// MARK: - Hex → Color
+
+extension Color {
+    /// "#RRGGBB" / "RRGGBB" から Color を作る (不正な文字列は nil)
+    init?(hexString: String) {
+        var s = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+        s = s.hasPrefix("#") ? String(s.dropFirst()) : s
+        if s.count == 3 { s = s.map { "\($0)\($0)" }.joined() }
+        guard s.count == 6, let value = UInt64(s, radix: 16) else { return nil }
+        self.init(
+            red: Double((value >> 16) & 0xFF) / 255.0,
+            green: Double((value >> 8) & 0xFF) / 255.0,
+            blue: Double(value & 0xFF) / 255.0
+        )
     }
 }
 
