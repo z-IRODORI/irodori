@@ -331,7 +331,7 @@ struct CoordinateCollageView: View {
         return Array(thumbnails.prefix(6))
     }
 
-    // MARK: 結果
+    // MARK: 結果 (そのまま編集キャンバス)
 
     private var resultView: some View {
         ScrollView(showsIndicators: false) {
@@ -350,11 +350,10 @@ struct CoordinateCollageView: View {
                         }
                     }
 
-                    // コラージュ本体 (シャッフル中は上に半透明オーバーレイ)
+                    // コラージュ本体 = 編集キャンバス (シャッフル中は上に半透明オーバーレイ)
                     ZStack {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
+                        PersonCollageCanvas(viewModel: viewModel)
+                            .aspectRatio(3.0 / 4.0, contentMode: .fit)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -372,6 +371,17 @@ struct CoordinateCollageView: View {
                             }
                         }
                     }
+
+                    Text("人物をタップしてえらび、ドラッグで移動 / ピンチで拡大縮小 / 2本指でまわせます")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+
+                    // 編集ツール
+                    editToolsRow
+                    if !viewModel.hiddenLayers.isEmpty {
+                        hiddenLayersRow
+                    }
+                    editColorRow
 
                     // シェア / 保存
                     HStack(spacing: 10) {
@@ -439,14 +449,7 @@ struct CoordinateCollageView: View {
                     viewModel.backToInput()
                 } label: {
                     Text("条件を変えて作り直す")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.black.opacity(0.2), lineWidth: 1)
-                        )
+                        .modifier(ResultFooterLabelStyle())
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 20)
@@ -455,5 +458,137 @@ struct CoordinateCollageView: View {
             }
             .background(.white)
         }
+    }
+
+    /// 編集ツール行 (元に戻す / はじめの配置 / 背面へ / かくす)
+    private var editToolsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                OutfitCollageEditPill(
+                    label: "元に戻す",
+                    systemImage: "arrow.uturn.backward",
+                    disabled: !viewModel.canUndo
+                ) { viewModel.undo() }
+                OutfitCollageEditPill(
+                    label: "はじめの配置",
+                    systemImage: "arrow.counterclockwise",
+                    disabled: !viewModel.canReset
+                ) { viewModel.resetToDefault() }
+                OutfitCollageEditPill(
+                    label: "背面へ",
+                    systemImage: "square.stack.3d.down.right",
+                    disabled: viewModel.selectedLayer == nil || viewModel.selectedIsBottom
+                ) {
+                    if let id = viewModel.selectedLayerId {
+                        viewModel.sendBackward(id)
+                    }
+                }
+                OutfitCollageEditPill(
+                    label: "かくす",
+                    systemImage: "eye.slash",
+                    disabled: viewModel.selectedLayer == nil
+                ) { viewModel.hideSelectedLayer() }
+            }
+        }
+    }
+
+    /// かくした人物を戻す行 (サムネイルをタップで復元)
+    private var hiddenLayersRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("かくした人物 (タップで戻す)")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(viewModel.hiddenLayers) { layer in
+                        Button {
+                            Haptic.impact(.soft)
+                            viewModel.restoreLayer(layer.id)
+                        } label: {
+                            Group {
+                                if let sticker = viewModel.stickerImages[layer.id] {
+                                    Image(uiImage: sticker)
+                                        .resizable()
+                                        .scaledToFit()
+                                } else {
+                                    Color.gray.opacity(0.1)
+                                }
+                            }
+                            .frame(width: 56, height: 72)
+                            .background(Color.gray.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                            )
+                            .overlay(alignment: .bottomTrailing) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(.white, .black)
+                                    .padding(3)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 背景色の変更行 (変更するとロゴの白黒も切り替わる)
+    private var editColorRow: some View {
+        FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+            ForEach(Array(presetColors.enumerated()), id: \.offset) { _, color in
+                editColorSwatch(color)
+            }
+            ColorPicker("", selection: editBackgroundBinding)
+                .labelsHidden()
+                .frame(width: 44, height: 44)
+        }
+    }
+
+    private var editBackgroundBinding: Binding<Color> {
+        Binding(
+            get: { viewModel.backgroundColor },
+            set: { viewModel.updateBackgroundColor($0) }
+        )
+    }
+
+    private func editColorSwatch(_ color: Color) -> some View {
+        let isSelected = viewModel.backgroundColor.toHexString() == color.toHexString()
+        return Button {
+            Haptic.impact(.soft)
+            viewModel.updateBackgroundColor(color)
+        } label: {
+            ZStack {
+                if isSelected {
+                    Circle()
+                        .stroke(Color.black, lineWidth: 2)
+                        .frame(width: 40, height: 40)
+                }
+                Circle()
+                    .fill(color)
+                    .frame(width: 30, height: 30)
+                    .overlay(Circle().stroke(Color.black.opacity(0.15), lineWidth: 1))
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// 結果画面フッター CTA のラベルスタイル
+private struct ResultFooterLabelStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.black.opacity(0.2), lineWidth: 1)
+            )
     }
 }
