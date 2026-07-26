@@ -4,6 +4,10 @@
 //
 //  Created by yuki.hamada on 2025/11/30.
 //
+//  2026-07: ファーストビューを「明日のコーデ」3案カルーセル (TomorrowPickSection) に刷新。
+//  旧・相棒カード(週間分析)と3×3グリッドはカルーセル+アクションカードに集約した。
+//  デザイン検証の経緯は Feature/Sandbox/HomeDesignD.swift を参照。
+//
 
 import SwiftUI
 
@@ -25,43 +29,9 @@ struct HomeView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 32) {
-                    if viewModel.isLoadingHome {
-                        recentCoordinatesSkeleton
-                    } else if viewModel.hasLoadError {
-                        recentCoordinatesError
-                    } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
-                        RecentCoordinates(
-                            recentCoordinates: viewModel.homeResponse.recent_coordinates,
-                            isEditMode: viewModel.isEditMode,
-                            onToggleEditMode: { viewModel.toggleEditMode() },
-                            onDeleteRequest: { coordinateId in
-                                viewModel.requestDelete(coordinateId: coordinateId)
-                            },
-                            onTapCoordinate: { coordinate in
-                                path.append(.coordinateDetail(.init(
-                                    coordinateId: coordinate.id,
-                                    coordinateImageURL: coordinate.displayImageURL,
-                                    showHeader: true
-                                )))
-                            }
-                        )
-                        .padding(.horizontal, -24)
-                    } else {
-                        coordinateEmptyState
-                    }
-
-                    partnerCard
-
-                    // 「おすすめコーデ」セクション (旧: 明日のコーデ):
-                    //  - DailyRecommendationReasonSection:  3×3 グリッドのみ. 画像タップで詳細モーダル.
-                    //  - DailyRecommendationCaptionSection: 各カード下にキャプションを併記する代替案.
-                    DailyRecommendationReasonSection(
-                        response: viewModel.dailyRecommendation,
-                        isLoading: viewModel.isLoadingDailyRecommendation,
-                        prefectureName: viewModel.currentPrefectureName,
-                        onTap: { item in
-                            viewModel.selectedDailyRecommendation = item
-                        },
+                    // ヒーロー: 明日のコーデ (3案カルーセル + 構成アイテム比較 + これにする)
+                    TomorrowPickSection(
+                        viewModel: viewModel,
                         onLocationTap: {
                             Haptic.impact(.soft)
                             if viewModel.canChangePrefectureToday {
@@ -69,12 +39,43 @@ struct HomeView: View {
                             } else {
                                 ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
                             }
-                        },
-                        onRegisterItems: {
-                            // アイテム未登録ナッジ → コーデ撮影シート (撮影でアイテム自動登録)
-                            showFirstTakePhotoSheet = true
                         }
                     )
+                    .padding(.horizontal, -24)
+
+                    // 別ルートの提案導線 (旧・相棒カードの2ボタンを継承)
+                    actionsCard
+
+                    // 直近コーデ
+                    if viewModel.isLoadingHome {
+                        recentCoordinatesSkeleton
+                    } else if viewModel.hasLoadError {
+                        recentCoordinatesError
+                    } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("直近のコーデ")
+                                .font(.system(size: 20, weight: .bold))
+                            RecentCoordinates(
+                                recentCoordinates: viewModel.homeResponse.recent_coordinates,
+                                isEditMode: viewModel.isEditMode,
+                                onToggleEditMode: { viewModel.toggleEditMode() },
+                                onDeleteRequest: { coordinateId in
+                                    viewModel.requestDelete(coordinateId: coordinateId)
+                                },
+                                onTapCoordinate: { coordinate in
+                                    path.append(.coordinateDetail(.init(
+                                        coordinateId: coordinate.id,
+                                        coordinateImageURL: coordinate.displayImageURL,
+                                        showHeader: true
+                                    )))
+                                }
+                            )
+                            .padding(.horizontal, -24)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        coordinateEmptyState
+                    }
 
                     // 「クローゼットでコーデ」セクション:
                     //  クローゼットのアイテムをバックエンドで合成したコーデコラージュ.
@@ -167,26 +168,6 @@ struct HomeView: View {
                     Task { await viewModel.selectAndRecommend(closetItem: closetItem) }
                 }
             )
-        }
-        .sheet(item: Binding(
-            get: { viewModel.selectedDailyRecommendation },
-            set: { viewModel.selectedDailyRecommendation = $0 }
-        )) { item in
-            NavigationStack {
-                DailyRecommendationDetailView(
-                    item: item,
-                    onWear: { item in
-                        await viewModel.markWorn(item: item)
-                    }
-                )
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("閉じる") {
-                            viewModel.selectedDailyRecommendation = nil
-                        }
-                    }
-                }
-            }
         }
         .sheet(isPresented: Binding(
             get: { viewModel.showingOutfitCollageDetail },
@@ -301,61 +282,28 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - 相棒カード（統合）
+    // MARK: - 別ルートの提案導線 (旧・相棒カードの2ボタンを継承)
 
-    private var partnerCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                PartnerIconImage(size: 44)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("今週のあなたへ")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    Text("相棒からのメッセージ")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.gray.opacity(0.6))
-                }
-                Spacer()
+    private var actionsCard: some View {
+        HStack(spacing: 10) {
+            Button(action: { path.append(.outfitSuggestion) }) {
+                Label("アイテムから", systemImage: "tshirt")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .padding(.bottom, 14)
-
-            if viewModel.isLoadingAnalysis {
-                VStack(spacing: 8) {
-                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
-                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(height: 14)
-                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15)).frame(width: 200, height: 14).frame(maxWidth: .infinity, alignment: .leading)
-                }
-            } else {
-                Text(.init(viewModel.recentCoordinateAnalysis.isEmpty
-                    ? "コーデが登録されると分析が表示されます。"
-                    : viewModel.recentCoordinateAnalysis))
-                    .font(.system(size: 14, weight: .regular))
-                    .lineSpacing(5)
-                    .foregroundStyle(.primary)
-            }
-
-            Divider().padding(.vertical, 16)
-
-            HStack(spacing: 10) {
-                Button(action: { path.append(.outfitSuggestion) }) {
-                    Label("コーデ提案して", systemImage: "wand.and.stars")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                Button(action: { path.append(.generalChat(conversationId: nil)) }) {
-                    Label("質問する", systemImage: "bubble.left")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.gray.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
-                }
+            Button(action: { path.append(.generalChat(conversationId: nil)) }) {
+                Label("相棒に相談", systemImage: "bubble.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.gray.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
             }
         }
         .padding(20)
@@ -460,7 +408,6 @@ struct HomeView: View {
     private var coordinateEmptyState: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 12) {
-//                PartnerIconImage(size: 44)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("コーデを記録しましょう")
                         .font(.system(size: 15, weight: .semibold))
@@ -513,7 +460,11 @@ struct HomeView: View {
 #Preview {
     HomeView(
         path: .constant([]),
-        viewModel: HomeViewModel(apiClient: MockHomeClient())
+        viewModel: HomeViewModel(
+            apiClient: MockHomeClient(),
+            dailyRecommendationClient: MockDailyRecommendationClient()
+        )
     )
     .environment(MainTabViewModel())
+    .environment(FavoritesStore())
 }
