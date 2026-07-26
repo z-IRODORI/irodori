@@ -14,17 +14,47 @@ import Kingfisher
 
 // MARK: - 小部品 (IRODORI 視覚言語)
 
-/// TagsView と同系のカプセルチップ (足りないアイテム用)
-private struct CapsuleChip: View {
+/// 買い足し候補の円形バッジ。既存の NoOwnedItemBadge (破線サークル=未所持) と
+/// 同じ視覚言語に「+」を載せ、タップで購入先検索が開くことを示す。
+private struct BuyItemCircle: View {
+    var size: CGFloat = 28
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.9))
+            Circle()
+                .strokeBorder(
+                    Color.gray.opacity(0.55),
+                    style: StrokeStyle(lineWidth: 1.2, dash: [2.5, 2])
+                )
+            Image(systemName: "plus")
+                .font(.system(size: size * 0.4, weight: .semibold))
+                .foregroundStyle(Color.gray.opacity(0.75))
+        }
+        .frame(width: size, height: size)
+        .shadow(color: .black.opacity(0.15), radius: 1, x: 0, y: 0.5)
+        .contentShape(Circle())
+    }
+}
+
+/// 買い足し候補チップ (タップでZOZOTOWN検索を開く)
+private struct BuyChip: View {
     let text: String
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 13))
-            .foregroundStyle(.black)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .overlay(Capsule().stroke(Color.gray.opacity(0.35), lineWidth: 1))
+        HStack(spacing: 5) {
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundStyle(.black)
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .overlay(Capsule().stroke(Color.gray.opacity(0.35), lineWidth: 1))
+        .contentShape(Capsule())
     }
 }
 
@@ -92,6 +122,10 @@ struct HomeDesignD: View {
     @State private var showReasonSheet = false
     /// 着用記録中のカードid (記録中は全カードのボタンを無効化)
     @State private var markingWornID: String? = nil
+    /// カード上の買い足し導線から開くWebページ (シート表示)
+    @State private var webLink: HomeWebLink? = nil
+    /// 理由シート内の買い足し導線から開くWebページ (シート内プッシュ)
+    @State private var reasonWebLink: HomeWebLink? = nil
     /// サンドボックス単体では FavoritesStore が無いため、お気に入りは見た目のみのローカルトグル
     @State private var favoriteOverrides: [String: Bool] = [:]
     private let toastManager = ToastManager.shared
@@ -132,6 +166,9 @@ struct HomeDesignD: View {
         .task { await viewModel.onAppear() }
         .sheet(isPresented: $showReasonSheet) { reasonSheet }
         .sheet(isPresented: $showPlanListSheet) { planListSheet }
+        .sheet(item: $webLink) { link in
+            WebViewContainer(url: link.url)
+        }
         .overlay(alignment: .top) {
             // ToastView は通常 MainTabView 側に付くため、単体表示のサンドボックスでは自前で重ねる
             if let message = toastManager.message {
@@ -277,13 +314,13 @@ struct HomeDesignD: View {
                         .font(.system(size: 15, weight: .bold))
                         .lineLimit(1)
                     Spacer()
-                    if itemsCount(for: card) > 0 {
-                        Text("アイテム\(itemsCount(for: card))点")
+                    if usedItemsCount(for: card) > 0 {
+                        Text("アイテム\(usedItemsCount(for: card))点")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
                 }
-                itemCirclesRow(card)
+                itemsRow(card)
 
                 Button {
                     markWornTapped(card)
@@ -309,23 +346,34 @@ struct HomeDesignD: View {
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
     }
 
+    /// コーデの使用アイテムを1行で表示する。
+    /// 手持ち = 写真の重なり円形 (OwnedItemCircles) / 未所持 = 破線円+「+」(タップで購入先検索)
     @ViewBuilder
-    private func itemCirclesRow(_ card: DailyRecommendationItem) -> some View {
-        let shown = min(4, card.owned_items.count)
-        let overflow = max(0, itemsCount(for: card) - shown)
-        HStack(spacing: 6) {
-            if card.owned_items.isEmpty {
-                NoOwnedItemBadge(size: 28)
-                Text("手持ち一致なし")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            } else {
-                OwnedItemCircles(items: card.owned_items, size: 28, maxCount: 4, background: .white)
-                if overflow > 0 {
-                    Text("+\(overflow)")
+    private func itemsRow(_ card: DailyRecommendationItem) -> some View {
+        let buys = buyCandidates(for: card)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                if !card.owned_items.isEmpty {
+                    OwnedItemCircles(items: card.owned_items, size: 28, maxCount: 4, background: .white)
+                }
+                ForEach(Array(buys.prefix(4).enumerated()), id: \.offset) { _, label in
+                    Button {
+                        openBuySearch(label, from: .card)
+                    } label: {
+                        BuyItemCircle(size: 28)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if buys.count > 4 {
+                    Text("+\(buys.count - 4)")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
+            }
+            if !buys.isEmpty {
+                Text("点線タップで足りないアイテムを探せます")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -542,13 +590,22 @@ struct HomeDesignD: View {
                                 }
                             }
                         }
-                        if !card.missing_items.isEmpty {
-                            sectionLabel("足りないアイテム")
+                        let buys = buyCandidates(for: card)
+                        if !buys.isEmpty {
+                            sectionLabel("買い足すなら")
                             FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
-                                ForEach(card.missing_items, id: \.self) { missing in
-                                    CapsuleChip(text: missing)
+                                ForEach(buys, id: \.self) { label in
+                                    Button {
+                                        openBuySearch(label, from: .reasonSheet)
+                                    } label: {
+                                        BuyChip(text: label)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
+                            Text("タップするとZOZOTOWNの検索結果を開きます")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -562,6 +619,11 @@ struct HomeDesignD: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("閉じる") { showReasonSheet = false }
                 }
+            }
+            .navigationDestination(item: $reasonWebLink) { link in
+                WebViewContainer(url: link.url)
+                    .navigationTitle("ZOZOTOWNで探す")
+                    .navigationBarTitleDisplayMode(.inline)
             }
         }
         .presentationDetents([.medium, .large])
@@ -625,10 +687,81 @@ struct HomeDesignD: View {
         return "おすすめコーデ"
     }
 
-    private func itemsCount(for card: DailyRecommendationItem) -> Int {
-        let named = card.items.compactMapValues { $0 }.count
-        if named > 0 { return named }
-        return card.owned_items.count + card.missing_items.count
+    /// コーデで使っているが手持ちに無い (=買い足し候補) アイテム名。
+    /// missing_items を正とし、items 辞書にだけ現れる使用アイテム (outer 等) を
+    /// 正規化 (空白除去) した上で重複を除いて追加する。
+    private func buyCandidates(for card: DailyRecommendationItem) -> [String] {
+        func normalize(_ s: String) -> String {
+            s.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "　", with: "")
+        }
+        let ownedSlots = Set(card.owned_items.map(\.slot))
+        var seen = Set(card.owned_items.map { normalize($0.label) })
+        var result: [String] = []
+        func append(_ label: String) {
+            let key = normalize(label)
+            guard !key.isEmpty,
+                  !seen.contains(where: { $0.contains(key) || key.contains($0) }) else { return }
+            seen.insert(key)
+            result.append(label)
+        }
+        card.missing_items.forEach(append)
+        let slotOrder = ["tops", "bottoms", "outer", "shoes", "bag", "accessory"]
+        let orderedSlots = slotOrder.filter { card.items.keys.contains($0) }
+            + card.items.keys.filter { !slotOrder.contains($0) }.sorted()
+        for slot in orderedSlots where !ownedSlots.contains(slot) {
+            if let name = card.items[slot] ?? nil {
+                append(name)
+            }
+        }
+        return result
+    }
+
+    /// カードに表示する「アイテムn点」= 手持ち + 買い足し候補の合計
+    private func usedItemsCount(for card: DailyRecommendationItem) -> Int {
+        card.owned_items.count + buyCandidates(for: card).count
+    }
+
+    // MARK: - 買い足し導線 (ZOZOTOWN検索)
+
+    private enum BuySearchSource {
+        case card          // カード上の破線円 → シートでWebを開く
+        case reasonSheet   // 理由シート内のチップ → シート内プッシュで開く
+    }
+
+    private func openBuySearch(_ label: String, from source: BuySearchSource) {
+        Haptic.selection()
+        guard let url = zozoSearchURL(for: label) else { return }
+        switch source {
+        case .card: webLink = HomeWebLink(url: url)
+        case .reasonSheet: reasonWebLink = HomeWebLink(url: url)
+        }
+    }
+
+    /// ZOZOTOWN のアイテム検索URLを生成する。
+    /// p_keyv は UTF-8 ではなく Shift_JIS 系のパーセントエンコードを期待するため
+    /// (UTF-8 だと検索欄で文字化けする)、バックエンド closet_bridge_service と同じ仕様で
+    /// Shift_JIS に変換してからエンコードする。
+    private func zozoSearchURL(for label: String) -> URL? {
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
+        let genderKW = gender == .male ? "メンズ" : "レディース"
+        var query = label
+        if !query.contains(genderKW) {
+            query += " " + genderKW
+        }
+        guard let data = query.data(using: .shiftJIS, allowLossyConversion: true), !data.isEmpty else {
+            return URL(string: "https://zozo.jp/")
+        }
+        let encoded = data.map { byte -> String in
+            switch byte {
+            case 0x30...0x39, 0x41...0x5A, 0x61...0x7A, 0x2D, 0x2E, 0x5F, 0x7E:
+                return String(UnicodeScalar(byte))
+            default:
+                return String(format: "%%%02X", byte)
+            }
+        }.joined()
+        return URL(string: "https://zozo.jp/search/?p_keyv=\(encoded)")
     }
 }
 
