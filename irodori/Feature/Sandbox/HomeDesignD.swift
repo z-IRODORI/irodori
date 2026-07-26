@@ -14,9 +14,11 @@ import Kingfisher
 
 // MARK: - 小部品 (IRODORI 視覚言語)
 
-/// 買い足し候補の円形バッジ。既存の NoOwnedItemBadge (破線サークル=未所持) と
-/// 同じ視覚言語に「+」を載せ、タップで購入先検索が開くことを示す。
+/// 買い足し候補の集約バッジ。既存の NoOwnedItemBadge (破線サークル=未所持) と
+/// 同じ視覚言語に「+n」(足りない点数) を載せ、常に1個だけ表示する。
+/// タップで理由シートの「買い足すなら」(名前付き一覧) を開く。
 private struct BuyItemCircle: View {
+    let count: Int
     var size: CGFloat = 28
 
     var body: some View {
@@ -28,9 +30,9 @@ private struct BuyItemCircle: View {
                     Color.gray.opacity(0.55),
                     style: StrokeStyle(lineWidth: 1.2, dash: [2.5, 2])
                 )
-            Image(systemName: "plus")
-                .font(.system(size: size * 0.4, weight: .semibold))
-                .foregroundStyle(Color.gray.opacity(0.75))
+            Text("+\(count)")
+                .font(.system(size: size * 0.38, weight: .semibold))
+                .foregroundStyle(Color.gray.opacity(0.8))
         }
         .frame(width: size, height: size)
         .shadow(color: .black.opacity(0.15), radius: 1, x: 0, y: 0.5)
@@ -122,8 +124,6 @@ struct HomeDesignD: View {
     @State private var showReasonSheet = false
     /// 着用記録中のカードid (記録中は全カードのボタンを無効化)
     @State private var markingWornID: String? = nil
-    /// カード上の買い足し導線から開くWebページ (シート表示)
-    @State private var webLink: HomeWebLink? = nil
     /// 理由シート内の買い足し導線から開くWebページ (シート内プッシュ)
     @State private var reasonWebLink: HomeWebLink? = nil
     /// サンドボックス単体では FavoritesStore が無いため、お気に入りは見た目のみのローカルトグル
@@ -166,9 +166,6 @@ struct HomeDesignD: View {
         .task { await viewModel.onAppear() }
         .sheet(isPresented: $showReasonSheet) { reasonSheet }
         .sheet(isPresented: $showPlanListSheet) { planListSheet }
-        .sheet(item: $webLink) { link in
-            WebViewContainer(url: link.url)
-        }
         .overlay(alignment: .top) {
             // ToastView は通常 MainTabView 側に付くため、単体表示のサンドボックスでは自前で重ねる
             if let message = toastManager.message {
@@ -347,31 +344,39 @@ struct HomeDesignD: View {
     }
 
     /// コーデの使用アイテムを1行で表示する。
-    /// 手持ち = 写真の重なり円形 (OwnedItemCircles) / 未所持 = 破線円+「+」(タップで購入先検索)
+    /// 手持ち = 写真の重なり円形 (OwnedItemCircles) /
+    /// 未所持 = 集約バッジ1個「+n」(タップで理由シートの「買い足すなら」一覧へ)。
+    /// 手持ちゼロのときはバッジ横にアイテム名を1行添えて構成が分かるようにする。
     @ViewBuilder
     private func itemsRow(_ card: DailyRecommendationItem) -> some View {
         let buys = buyCandidates(for: card)
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 if !card.owned_items.isEmpty {
                     OwnedItemCircles(items: card.owned_items, size: 28, maxCount: 4, background: .white)
                 }
-                ForEach(Array(buys.prefix(4).enumerated()), id: \.offset) { _, label in
+                if !buys.isEmpty {
                     Button {
-                        openBuySearch(label, from: .card)
+                        Haptic.selection()
+                        withAnimation { currentCardID = card.id }
+                        showReasonSheet = true
                     } label: {
-                        BuyItemCircle(size: 28)
+                        BuyItemCircle(count: buys.count, size: 28)
                     }
                     .buttonStyle(.plain)
-                }
-                if buys.count > 4 {
-                    Text("+\(buys.count - 4)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                    if card.owned_items.isEmpty {
+                        Text(buys.joined(separator: "・"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                 }
             }
             if !buys.isEmpty {
-                Text("点線タップで足りないアイテムを探せます")
+                Text(card.owned_items.isEmpty
+                     ? "タップで買い足しアイテムを探せます"
+                     : "あと\(buys.count)点そろえれば完成")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
@@ -596,7 +601,7 @@ struct HomeDesignD: View {
                             FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
                                 ForEach(buys, id: \.self) { label in
                                     Button {
-                                        openBuySearch(label, from: .reasonSheet)
+                                        openBuySearch(label)
                                     } label: {
                                         BuyChip(text: label)
                                     }
@@ -723,18 +728,11 @@ struct HomeDesignD: View {
 
     // MARK: - 買い足し導線 (ZOZOTOWN検索)
 
-    private enum BuySearchSource {
-        case card          // カード上の破線円 → シートでWebを開く
-        case reasonSheet   // 理由シート内のチップ → シート内プッシュで開く
-    }
-
-    private func openBuySearch(_ label: String, from source: BuySearchSource) {
+    /// 理由シート内のチップから、シート内プッシュでZOZOTOWN検索を開く
+    private func openBuySearch(_ label: String) {
         Haptic.selection()
         guard let url = zozoSearchURL(for: label) else { return }
-        switch source {
-        case .card: webLink = HomeWebLink(url: url)
-        case .reasonSheet: reasonWebLink = HomeWebLink(url: url)
-        }
+        reasonWebLink = HomeWebLink(url: url)
     }
 
     /// ZOZOTOWN のアイテム検索URLを生成する。
