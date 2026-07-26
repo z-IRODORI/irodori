@@ -98,6 +98,12 @@ struct WearMarkResponse: Codable {
     let worn_date: String
 }
 
+struct RecommendationFeedbackResponse: Codable {
+    let status: String
+    let pool_id: String
+    let rating: String
+}
+
 // MARK: - Mock
 
 extension DailyRecommendationResponse {

@@ -926,6 +926,10 @@ private final class PendingDailyRecommendationClient: DailyRecommendationClientP
     func markWorn(uid: String, poolId: String, wornDate: String) async throws -> Result<WearMarkResponse, HTTPError> {
         .success(.init(status: "ok", pool_id: poolId, worn_date: wornDate))
     }
+
+    func postFeedback(uid: String, poolId: String, rating: String, reasons: [String], targetDate: String?) async throws -> Result<RecommendationFeedbackResponse, HTTPError> {
+        .success(.init(status: "ok", pool_id: poolId, rating: rating))
+    }
 }
 
 #Preview("案D - ローディング(シマー)") {

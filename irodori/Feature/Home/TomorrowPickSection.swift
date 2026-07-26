@@ -260,7 +260,13 @@ struct TomorrowPickSection: View {
         }
         .sheet(item: $reasonItem) { item in
             NavigationStack {
-                TomorrowCompositionView(item: item)
+                TomorrowCompositionView(
+                    item: item,
+                    initialRating: viewModel.feedbackRating(for: item),
+                    onFeedback: { rating, reasons in
+                        await viewModel.sendFeedback(item: item, rating: rating, reasons: reasons)
+                    }
+                )
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button("閉じる") { reasonItem = nil }
@@ -421,6 +427,15 @@ struct TomorrowPickSection: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+        .contextMenu {
+            if !card.isCloset {
+                Button(role: .destructive) {
+                    quickDislike(card)
+                } label: {
+                    Label("このコーデに興味がない", systemImage: "hand.thumbsdown")
+                }
+            }
+        }
     }
 
     private func favoriteButton(_ card: DailyRecommendationItem) -> some View {
@@ -635,6 +650,22 @@ struct TomorrowPickSection: View {
         }
     }
 
+    /// カード長押しからのワンタップ「興味なし」(理由なし送信)。
+    /// サーバでテイスト負シグナル+候補除外に反映され、表示からも即時消える。
+    private func quickDislike(_ card: DailyRecommendationItem) {
+        Haptic.impact(.light)
+        Task { @MainActor in
+            let ok = await viewModel.sendFeedback(item: card, rating: .dislike)
+            if ok {
+                Haptic.notify(.success)
+                ToastManager.shared.show("このようなコーデの表示を減らします", style: .normal)
+                withAnimation { currentCardID = nil }
+            } else {
+                ToastManager.shared.show("送信に失敗しました。時間をおいて再度お試しください")
+            }
+        }
+    }
+
     // MARK: - 一覧シート
 
     private var planListSheet: some View {
@@ -669,7 +700,13 @@ struct TomorrowPickSection: View {
                 }
             }
             .navigationDestination(item: $listPushItem) { item in
-                TomorrowCompositionView(item: item)
+                TomorrowCompositionView(
+                    item: item,
+                    initialRating: viewModel.feedbackRating(for: item),
+                    onFeedback: { rating, reasons in
+                        await viewModel.sendFeedback(item: item, rating: rating, reasons: reasons)
+                    }
+                )
             }
         }
     }
@@ -691,9 +728,21 @@ struct TomorrowPickSection: View {
 
 fileprivate struct TomorrowCompositionView: View {
     let item: DailyRecommendationItem
+    var initialRating: PickFeedbackRating? = nil
+    /// フィードバック送信 (VM の sendFeedback へ委譲)。nil なら評価UI非表示
+    var onFeedback: ((PickFeedbackRating, [String]) async -> Bool)? = nil
 
     /// 買い足し導線から開くWebページ (ナビゲーションスタック内プッシュ)
     @State private var webLink: HomeWebLink? = nil
+    @State private var rating: PickFeedbackRating? = nil
+    @State private var showDislikeReasons = false
+    @State private var selectedReasons: Set<String> = []
+    @State private var isSendingFeedback = false
+    @Environment(\.dismiss) private var dismiss
+
+    private static let dislikeReasonOptions = [
+        "色が好みじゃない", "系統が違う", "季節に合わない", "手持ちと合わせにくい",
+    ]
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -710,10 +759,16 @@ fileprivate struct TomorrowCompositionView: View {
                         .lineSpacing(6)
                 }
                 compositionList
+                if !item.isCloset, onFeedback != nil {
+                    feedbackSection
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
+        }
+        .onAppear {
+            if rating == nil { rating = initialRating }
         }
         .navigationTitle("このコーデ")
         .navigationBarTitleDisplayMode(.inline)
@@ -803,6 +858,141 @@ fileprivate struct TomorrowCompositionView: View {
             Text("手持ち")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - フィードバック (パーソナライズ改善)
+
+    @ViewBuilder
+    private var feedbackSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("この提案は好みでしたか？")
+                .font(.system(size: 15, weight: .semibold))
+            HStack(spacing: 10) {
+                thumbButton(.like, icon: "hand.thumbsup")
+                thumbButton(.dislike, icon: "hand.thumbsdown")
+            }
+            if showDislikeReasons {
+                Text("近い理由があれば教えてください（任意）")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                    ForEach(Self.dislikeReasonOptions, id: \.self) { reason in
+                        reasonChip(reason)
+                    }
+                }
+                HStack(spacing: 14) {
+                    Button {
+                        submitDislike(reasons: Array(selectedReasons))
+                    } label: {
+                        Text(isSendingFeedback ? "送信中..." : "送信")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 10)
+                            .background(.black)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSendingFeedback)
+                    Button {
+                        submitDislike(reasons: [])
+                    } label: {
+                        Text("スキップして送信")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .underline()
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSendingFeedback)
+                }
+            } else if rating == .like {
+                Text("ありがとうございます。今後の提案に反映します")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func thumbButton(_ value: PickFeedbackRating, icon: String) -> some View {
+        let isSelected = rating == value
+        return Button {
+            Haptic.selection()
+            if value == .like {
+                submitLike()
+            } else {
+                rating = .dislike
+                showDislikeReasons = true
+            }
+        } label: {
+            Image(systemName: isSelected ? icon + ".fill" : icon)
+                .font(.system(size: 16))
+                .foregroundStyle(isSelected ? .white : .black)
+                .frame(width: 48, height: 40)
+                .background(isSelected ? Color.black : Color.white)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Color.gray.opacity(isSelected ? 0 : 0.3), lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isSendingFeedback || (value == .like && rating == .like))
+    }
+
+    private func reasonChip(_ reason: String) -> some View {
+        let isSelected = selectedReasons.contains(reason)
+        return Button {
+            Haptic.selection()
+            if isSelected {
+                selectedReasons.remove(reason)
+            } else {
+                selectedReasons.insert(reason)
+            }
+        } label: {
+            Text(reason)
+                .font(.system(size: 13))
+                .foregroundStyle(isSelected ? .white : .black)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.black : Color.white)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Color.gray.opacity(isSelected ? 0 : 0.35), lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func submitLike() {
+        guard let onFeedback, rating != .like else { return }
+        showDislikeReasons = false
+        isSendingFeedback = true
+        Task { @MainActor in
+            let ok = await onFeedback(.like, [])
+            isSendingFeedback = false
+            if ok {
+                rating = .like
+                Haptic.notify(.success)
+                ToastManager.shared.show("フィードバックを反映しました", style: .normal)
+            } else {
+                rating = initialRating
+                ToastManager.shared.show("送信に失敗しました。時間をおいて再度お試しください")
+            }
+        }
+    }
+
+    private func submitDislike(reasons: [String]) {
+        guard let onFeedback else { return }
+        isSendingFeedback = true
+        Task { @MainActor in
+            let ok = await onFeedback(.dislike, reasons)
+            isSendingFeedback = false
+            if ok {
+                Haptic.notify(.success)
+                ToastManager.shared.show("このようなコーデの表示を減らします", style: .normal)
+                dismiss()
+            } else {
+                ToastManager.shared.show("送信に失敗しました。時間をおいて再度お試しください")
+            }
         }
     }
 

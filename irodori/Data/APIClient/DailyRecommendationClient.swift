@@ -11,6 +11,8 @@ protocol DailyRecommendationClientProtocol {
     /// targetDate: 対象日 (JST, yyyy-MM-dd)。nil はサーバ既定の「明日」
     func get(uid: String, gender: Gender, targetDate: String?) async throws -> Result<DailyRecommendationResponse, HTTPError>
     func markWorn(uid: String, poolId: String, wornDate: String) async throws -> Result<WearMarkResponse, HTTPError>
+    /// フィードバック (rating: "like" | "dislike") を送信。サーバ側でパーソナライズに反映される
+    func postFeedback(uid: String, poolId: String, rating: String, reasons: [String], targetDate: String?) async throws -> Result<RecommendationFeedbackResponse, HTTPError>
 }
 
 extension DailyRecommendationClientProtocol {
@@ -96,6 +98,40 @@ final class DailyRecommendationClient: DailyRecommendationClientProtocol {
             return .failure(.responseError)
         }
     }
+
+    func postFeedback(uid: String, poolId: String, rating: String, reasons: [String], targetDate: String?) async throws -> Result<RecommendationFeedbackResponse, HTTPError> {
+        let endpoint = "api/home/daily-recommendation/feedback"
+        var components = URLComponents(string: "\(baseURL)/\(endpoint)")!
+        components.queryItems = [URLQueryItem(name: "user_id", value: uid)]
+        guard let url = components.url else {
+            return .failure(.responseError)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body = RecommendationFeedbackRequest(
+            pool_id: poolId, rating: rating, reasons: reasons, target_date: targetDate
+        )
+        request.httpBody = try? JSONEncoder().encode(body)
+
+        do {
+            let (data, urlResponse) = try await URLSession.shared.data(for: request)
+            if let httpResponse = urlResponse as? HTTPURLResponse {
+                let statusCode = httpResponse.statusCode
+                if statusCode >= 400 {
+                    return .failure(HTTPError.fromStatusCode(statusCode))
+                }
+            }
+            do {
+                let response = try JSONDecoder().decode(RecommendationFeedbackResponse.self, from: data)
+                return .success(response)
+            } catch {
+                return .failure(.decodeError)
+            }
+        } catch {
+            return .failure(.responseError)
+        }
+    }
 }
 
 // MARK: - Mock
@@ -120,5 +156,9 @@ final class MockDailyRecommendationClient: DailyRecommendationClientProtocol {
 
     func markWorn(uid: String, poolId: String, wornDate: String) async throws -> Result<WearMarkResponse, HTTPError> {
         return .success(.init(status: "ok", pool_id: poolId, worn_date: wornDate))
+    }
+
+    func postFeedback(uid: String, poolId: String, rating: String, reasons: [String], targetDate: String?) async throws -> Result<RecommendationFeedbackResponse, HTTPError> {
+        return .success(.init(status: "ok", pool_id: poolId, rating: rating))
     }
 }

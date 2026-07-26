@@ -9,6 +9,12 @@ import Foundation
 import SwiftUI
 
 /// WebView シートで開く URL のラッパー（.sheet(item:) 用に Identifiable）
+/// おすすめコーデへのフィードバック評価
+enum PickFeedbackRating: String {
+    case like
+    case dislike
+}
+
 struct HomeWebLink: Identifiable, Hashable {
     let url: URL
     var id: String { url.absoluteString }
@@ -50,6 +56,8 @@ final class HomeViewModel {
     private var dailyInFlight: Set<PickScope> = []
     /// このセッションでサーバ再検証済みのスコープ (ディスクキャッシュの地域陳腐化対策)
     private var dailyRevalidated: Set<PickScope> = []
+    /// このセッションで送信したフィードバック (pool_id → 評価)。UI状態の即時反映用
+    private(set) var feedbackByPool: [String: PickFeedbackRating] = [:]
 
     // 互換アクセサ (選択中スコープのデータをビューへ)
     var dailyRecommendation: DailyRecommendationResponse? { dailyByScope[selectedPickScope] }
@@ -520,6 +528,63 @@ final class HomeViewModel {
             }
         } catch {
             return false
+        }
+    }
+
+    // MARK: - おすすめコーデへのフィードバック (パーソナライズ改善)
+
+    func feedbackRating(for item: DailyRecommendationItem) -> PickFeedbackRating? {
+        feedbackByPool[item.pool_id]
+    }
+
+    /// フィードバックを送信する。dislike は成功時に全スコープの表示からも即時除去する
+    /// (サーバ側でもキャッシュ除去+候補ハード除外+テイスト負シグナルに反映される)
+    func sendFeedback(
+        item: DailyRecommendationItem,
+        rating: PickFeedbackRating,
+        reasons: [String] = []
+    ) async -> Bool {
+        // closet 種別は pool_id がプールを指さないため対象外
+        guard !item.isCloset else { return false }
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let targetDate = dailyRecommendation?.target_date
+        do {
+            switch try await dailyRecommendationClient.postFeedback(
+                uid: uid,
+                poolId: item.pool_id,
+                rating: rating.rawValue,
+                reasons: reasons,
+                targetDate: targetDate
+            ) {
+            case .success:
+                feedbackByPool[item.pool_id] = rating
+                if rating == .dislike {
+                    removeRecommendationEverywhere(poolID: item.pool_id)
+                }
+                return true
+            case .failure:
+                return false
+            }
+        } catch {
+            return false
+        }
+    }
+
+    /// dislike されたコーデを全スコープの表示・ローカルキャッシュから取り除く
+    private func removeRecommendationEverywhere(poolID: String) {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        for (scope, response) in dailyByScope {
+            let filtered = response.recommendations.filter { $0.pool_id != poolID }
+            guard filtered.count != response.recommendations.count else { continue }
+            let updated = DailyRecommendationResponse(
+                target_date: response.target_date,
+                weather: response.weather,
+                partner_comment: response.partner_comment,
+                recommendations: filtered,
+                mode: response.mode
+            )
+            dailyByScope[scope] = updated
+            HomeSectionCache.save(updated, section: "daily_\(scope.rawValue)", uid: uid)
         }
     }
 
