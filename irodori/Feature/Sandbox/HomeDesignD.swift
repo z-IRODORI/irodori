@@ -90,7 +90,8 @@ struct HomeDesignD: View {
     @State private var currentCardID: String? = nil
     @State private var showPlanListSheet = false
     @State private var showReasonSheet = false
-    @State private var isMarkingWorn = false
+    /// 着用記録中のカードid (記録中は全カードのボタンを無効化)
+    @State private var markingWornID: String? = nil
     /// サンドボックス単体では FavoritesStore が無いため、お気に入りは見た目のみのローカルトグル
     @State private var favoriteOverrides: [String: Bool] = [:]
     private let toastManager = ToastManager.shared
@@ -126,8 +127,6 @@ struct HomeDesignD: View {
                 }
                 .padding(.top, 20)
             }
-
-            bottomCTABar
         }
         .background(Color.gray.opacity(0.08))
         .task { await viewModel.onAppear() }
@@ -285,6 +284,22 @@ struct HomeDesignD: View {
                     }
                 }
                 itemCirclesRow(card)
+
+                Button {
+                    markWornTapped(card)
+                } label: {
+                    Text(markingWornID == card.id ? "記録中..." : "これにする")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(markingWornID != nil)
+                .padding(.top, 4)
             }
             .padding(12)
         }
@@ -385,6 +400,11 @@ struct HomeDesignD: View {
                             .frame(width: 28, height: 28)
                     }
                 }
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.gray.opacity(0.12))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .padding(.top, 4)
             }
             .padding(12)
         }
@@ -467,66 +487,20 @@ struct HomeDesignD: View {
         .padding(.horizontal, 24)
     }
 
-    // MARK: - 下部CTA
+    // MARK: - 着用記録 (カード内「これにする」)
 
-    private var bottomCTABar: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(spacing: 10) {
-                Button {
-                    Haptic.selection()
-                    showReasonSheet = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 15))
-                        Text("理由")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 18)
-                    .frame(height: 48)
-                    .background(Color.gray.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    markWornTapped()
-                } label: {
-                    Text(isMarkingWorn ? "記録中..." : "これにする")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 10)
-            .opacity(currentCard == nil ? 0.4 : 1)
-            .disabled(currentCard == nil || isMarkingWorn)
-        }
-        .background(.white)
-    }
-
-    private func markWornTapped() {
-        guard let card = currentCard, !isMarkingWorn else { return }
+    private func markWornTapped(_ card: DailyRecommendationItem) {
+        guard markingWornID == nil else { return }
         // closet 種別は pool_id がプールを指さないため着用記録の対象外
         if card.isCloset {
             toastManager.show("このコーデは記録対象外です")
             return
         }
         Haptic.impact(.medium)
-        isMarkingWorn = true
+        markingWornID = card.id
         Task { @MainActor in
             let ok = await viewModel.markWorn(item: card)
-            isMarkingWorn = false
+            markingWornID = nil
             if ok {
                 Haptic.notify(.success)
                 toastManager.show("明日のコーデに決定しました", style: .normal)
