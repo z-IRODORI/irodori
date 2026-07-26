@@ -27,6 +27,7 @@ struct DailyRecommendationItem: Codable, Hashable, Identifiable {
     let style: String          // backend: genre
     let cleanliness: Int
     let is_favorite: Bool
+    let is_discovery: Bool              // 発見枠 (テイスト圏外からの挑戦提案) か
     let owned_items: [DailyOwnedItem]   // クローゼットにある一致アイテム
     let missing_items: [String]         // 足りないアイテム (例: "黒 スラックス")
 
@@ -41,7 +42,7 @@ struct DailyRecommendationItem: Codable, Hashable, Identifiable {
     // 旧フィールドを持たない古い response との互換性
     enum CodingKeys: String, CodingKey {
         case pool_id, kind, image_url, reason, main_colors, items, vibe, style, cleanliness, is_favorite
-        case owned_items, missing_items
+        case owned_items, missing_items, is_discovery
     }
 
     init(from decoder: Decoder) throws {
@@ -56,12 +57,13 @@ struct DailyRecommendationItem: Codable, Hashable, Identifiable {
         self.style = (try? c.decode(String.self, forKey: .style)) ?? ""
         self.cleanliness = (try? c.decode(Int.self, forKey: .cleanliness)) ?? 3
         self.is_favorite = (try? c.decode(Bool.self, forKey: .is_favorite)) ?? false
+        self.is_discovery = (try? c.decode(Bool.self, forKey: .is_discovery)) ?? false
         self.owned_items = (try? c.decode([DailyOwnedItem].self, forKey: .owned_items)) ?? []
         self.missing_items = (try? c.decode([String].self, forKey: .missing_items)) ?? []
     }
 
     // mock 用 memberwise init
-    init(pool_id: String, kind: String = "pool", image_url: String, reason: String?, main_colors: [String], items: [String: String?], vibe: String, style: String, cleanliness: Int, is_favorite: Bool = false, owned_items: [DailyOwnedItem] = [], missing_items: [String] = []) {
+    init(pool_id: String, kind: String = "pool", image_url: String, reason: String?, main_colors: [String], items: [String: String?], vibe: String, style: String, cleanliness: Int, is_favorite: Bool = false, is_discovery: Bool = false, owned_items: [DailyOwnedItem] = [], missing_items: [String] = []) {
         self.pool_id = pool_id
         self.kind = kind
         self.image_url = image_url
@@ -72,6 +74,7 @@ struct DailyRecommendationItem: Codable, Hashable, Identifiable {
         self.style = style
         self.cleanliness = cleanliness
         self.is_favorite = is_favorite
+        self.is_discovery = is_discovery
         self.owned_items = owned_items
         self.missing_items = missing_items
     }
@@ -121,7 +124,8 @@ extension DailyRecommendationResponse {
                     items: ["tops": "白Tシャツ", "bottoms": "ネイビーパンツ", "outer": nil, "accessory": nil],
                     vibe: "Sample vibe \(i)",
                     style: "casual",
-                    cleanliness: (i % 5) + 1
+                    cleanliness: (i % 5) + 1,
+                    is_discovery: i % 3 == 0
                 )
             },
             mode: "cached"

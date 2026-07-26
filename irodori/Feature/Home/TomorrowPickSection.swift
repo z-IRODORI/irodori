@@ -142,6 +142,29 @@ fileprivate struct SearchPill: View {
     }
 }
 
+/// 発見枠 (テイスト圏外からの挑戦提案) バッジ。
+/// DailyIchioshiBadge と同じ控えめな視覚言語 (白カプセル+細縁) のティール版。
+fileprivate struct DiscoveryBadge: View {
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 8, weight: .semibold))
+            Text("挑戦")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(0.2)
+        }
+        .foregroundStyle(Color.teal)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3.5)
+        .background(.white)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule().stroke(Color.teal.opacity(0.35), lineWidth: 0.8)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 2, x: 0, y: 1)
+    }
+}
+
 /// 構成リストの未所持サムネ (破線サークル=未所持の視覚言語)
 fileprivate struct MissingItemThumb: View {
     var size: CGFloat = 44
@@ -373,10 +396,15 @@ struct TomorrowPickSection: View {
                 .frame(width: 272, height: 340)
                 .clipped()
                 .overlay(alignment: .topLeading) {
-                    if isBest {
-                        DailyIchioshiBadge()
-                            .padding(10)
+                    VStack(alignment: .leading, spacing: 4) {
+                        if isBest {
+                            DailyIchioshiBadge()
+                        }
+                        if card.is_discovery {
+                            DiscoveryBadge()
+                        }
                     }
+                    .padding(10)
                 }
                 .overlay(alignment: .topTrailing) {
                     if !card.isCloset {
@@ -749,6 +777,15 @@ fileprivate struct TomorrowCompositionView: View {
             VStack(alignment: .leading, spacing: 20) {
                 Text(styleName)
                     .font(.system(size: 20, weight: .bold))
+                if item.is_discovery {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("いつもと違う系統の挑戦枠です")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.teal)
+                }
                 if let reason = item.reason, !reason.isEmpty {
                     Text(reason)
                         .font(.system(size: 14))
