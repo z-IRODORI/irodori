@@ -41,9 +41,20 @@ final class HomeViewModel {
     var isDeletingCoordinate: Bool = false
 
     // 明日のコーデ推薦
-    var dailyRecommendation: DailyRecommendationResponse? = nil
-    var isLoadingDailyRecommendation: Bool = false
-    var hasDailyRecommendationError: Bool = false
+    // 今日/明日/週末 タブ (コーデ提案)
+    var pickTabs: [PickTab] = PickTabBuilder.visibleTabs()
+    var selectedPickScope: PickScope = PickTabBuilder.defaultScope()
+    private(set) var dailyByScope: [PickScope: DailyRecommendationResponse] = [:]
+    private var dailyLoadingScopes: Set<PickScope> = []
+    private var dailyErrorScopes: Set<PickScope> = []
+    private var dailyInFlight: Set<PickScope> = []
+    /// このセッションでサーバ再検証済みのスコープ (ディスクキャッシュの地域陳腐化対策)
+    private var dailyRevalidated: Set<PickScope> = []
+
+    // 互換アクセサ (選択中スコープのデータをビューへ)
+    var dailyRecommendation: DailyRecommendationResponse? { dailyByScope[selectedPickScope] }
+    var isLoadingDailyRecommendation: Bool { dailyLoadingScopes.contains(selectedPickScope) }
+    var hasDailyRecommendationError: Bool { dailyErrorScopes.contains(selectedPickScope) }
     var selectedDailyRecommendation: DailyRecommendationItem? = nil
 
     // コーデコラージュ (クローゼットでコーデ)
@@ -132,14 +143,17 @@ final class HomeViewModel {
 
         // 前回のレスポンスがあれば即描画 (stale-while-revalidate)。
         // スケルトンは「表示できる内容が無いセクション」だけに出す
+        refreshPickTabsIfNeeded()
         hydrateFromCache(uid: uid)
         isLoadingHome = homeResponse.recent_coordinates.isEmpty
         isLoadingAnalysis = recentCoordinateAnalysis.isEmpty
-        isLoadingDailyRecommendation = (dailyRecommendation == nil)
+        if dailyByScope[selectedPickScope] == nil {
+            dailyLoadingScopes.insert(selectedPickScope)
+        }
         isLoadingOutfitCollage = (outfitCollage == nil)
         isLoadingClosetBridge = (closetBridge == nil)
         hasLoadError = false
-        hasDailyRecommendationError = false
+        dailyErrorScopes.remove(selectedPickScope)
         hasOutfitCollageError = false
         hasClosetBridgeError = false
 
@@ -149,7 +163,7 @@ final class HomeViewModel {
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadHomeSection(uid: uid) }
             group.addTask { await self.loadAnalysisSection(uid: uid) }
-            group.addTask { await self.loadDailySection(uid: uid, gender: gender) }
+            group.addTask { await self.loadDaily(scope: self.selectedPickScope, force: true) }
             group.addTask { await self.loadCollageSection(uid: uid, gender: gender) }
             group.addTask { await self.loadClosetBridgeSection(uid: uid, gender: gender) }
         }
@@ -167,8 +181,8 @@ final class HomeViewModel {
            !cached.isEmpty {
             recentCoordinateAnalysis = cached
         }
-        if dailyRecommendation == nil {
-            dailyRecommendation = HomeSectionCache.load(DailyRecommendationResponse.self, section: "daily", uid: uid)
+        if dailyByScope[selectedPickScope] == nil {
+            hydrateDailyCache(scope: selectedPickScope, uid: uid)
         }
         if outfitCollage == nil {
             outfitCollage = HomeSectionCache.load(OutfitCollageResponse.self, section: "collage", uid: uid)
@@ -214,19 +228,80 @@ final class HomeViewModel {
         isLoadingAnalysis = false
     }
 
-    private func loadDailySection(uid: String, gender: Gender) async {
+    // MARK: - 今日/明日/週末 タブ (コーデ提案)
+
+    /// 日付が変わった場合にタブ構成を再計算する (選択中スコープが消えたら既定に戻す)
+    private func refreshPickTabsIfNeeded() {
+        let tabs = PickTabBuilder.visibleTabs()
+        if tabs.map(\.dateString) != pickTabs.map(\.dateString) {
+            pickTabs = tabs
+            dailyByScope.removeAll()
+            dailyRevalidated.removeAll()
+        }
+        if !tabs.contains(where: { $0.scope == selectedPickScope }) {
+            selectedPickScope = PickTabBuilder.defaultScope()
+        }
+    }
+
+    /// スコープ別ディスクキャッシュを (対象日が一致する場合のみ) 反映する
+    private func hydrateDailyCache(scope: PickScope, uid: String) {
+        guard dailyByScope[scope] == nil,
+              let tab = pickTabs.first(where: { $0.scope == scope }),
+              let cached = HomeSectionCache.load(
+                DailyRecommendationResponse.self,
+                section: "daily_\(scope.rawValue)",
+                uid: uid
+              ),
+              cached.target_date == tab.dateString else { return }
+        dailyByScope[scope] = cached
+    }
+
+    /// タブ選択。未取得スコープのみ遅延ロードする (先読みはしない:
+    /// サーバの表示履歴 record_shown を見ていないタブで汚さないため)
+    func selectPickScope(_ scope: PickScope) {
+        guard scope != selectedPickScope else { return }
+        selectedPickScope = scope
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        // 対象日がずれた既存データは破棄 (日付跨ぎ対策)
+        if let tab = pickTabs.first(where: { $0.scope == scope }),
+           let existing = dailyByScope[scope], existing.target_date != tab.dateString {
+            dailyByScope[scope] = nil
+        }
+        hydrateDailyCache(scope: scope, uid: uid)
+        let needsFetch = dailyByScope[scope] == nil
+        // ディスクキャッシュ由来のデータは1セッション1回だけサーバ再検証する
+        let needsRevalidate = !dailyRevalidated.contains(scope)
+        guard needsFetch || needsRevalidate else { return }
+        if needsFetch { dailyLoadingScopes.insert(scope) }
+        Task { await loadDaily(scope: scope, force: true) }
+    }
+
+    /// スコープ単位で daily-recommendation を取得する
+    private func loadDaily(scope: PickScope, force: Bool = false) async {
+        guard let tab = pickTabs.first(where: { $0.scope == scope }) else { return }
+        if dailyInFlight.contains(scope) { return }
+        if !force, let existing = dailyByScope[scope], existing.target_date == tab.dateString { return }
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
+        dailyInFlight.insert(scope)
+        if dailyByScope[scope] == nil { dailyLoadingScopes.insert(scope) }
+        dailyErrorScopes.remove(scope)
         do {
-            switch try await dailyRecommendationClient.get(uid: uid, gender: gender) {
+            switch try await dailyRecommendationClient.get(uid: uid, gender: gender, targetDate: tab.dateString) {
             case .success(let response):
-                dailyRecommendation = response
-                HomeSectionCache.save(response, section: "daily", uid: uid)
+                dailyByScope[scope] = response
+                dailyRevalidated.insert(scope)
+                HomeSectionCache.save(response, section: "daily_\(scope.rawValue)", uid: uid)
             case .failure:
-                if dailyRecommendation == nil { hasDailyRecommendationError = true }
+                if dailyByScope[scope] == nil { dailyErrorScopes.insert(scope) }
             }
         } catch {
-            if dailyRecommendation == nil { hasDailyRecommendationError = true }
+            if dailyByScope[scope] == nil { dailyErrorScopes.insert(scope) }
         }
-        isLoadingDailyRecommendation = false
+        dailyLoadingScopes.remove(scope)
+        dailyInFlight.remove(scope)
     }
 
     private func loadCollageSection(uid: String, gender: Gender) async {
@@ -416,42 +491,28 @@ final class HomeViewModel {
         if !uid.isEmpty {
             _ = try? await updatePrefectureClient.put(uid: uid, prefectureCode: prefecture.code)
         }
+        // 地域が変わると全スコープの天気・提案が変わるため作り直す
+        dailyByScope.removeAll()
+        dailyRevalidated.removeAll()
         await refreshDailyRecommendation()
     }
 
-    /// daily-recommendation のみ再取得 (recent_coordinates 等はそのまま)
+    /// 選択中スコープの daily-recommendation のみ再取得 (エラー再試行・地域変更用)
     func refreshDailyRecommendation() async {
-        isLoadingDailyRecommendation = true
-        hasDailyRecommendationError = false
-
-        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
-        let gender = Gender.fromWithDefault(
-            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
-        )
-        do {
-            switch try await dailyRecommendationClient.get(uid: uid, gender: gender) {
-            case .success(let response):
-                dailyRecommendation = response
-            case .failure:
-                hasDailyRecommendationError = true
-            }
-        } catch {
-            hasDailyRecommendationError = true
-        }
-        isLoadingDailyRecommendation = false
+        await loadDaily(scope: selectedPickScope, force: true)
     }
 
-    /// 「これを今日着る」マーク
+    /// 「これを着る」マーク。選択中タブの対象日 (今日/明日/週末) に記録する
     func markWorn(item: DailyRecommendationItem) async -> Bool {
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        let today = formatter.string(from: Date())
+        let fallbackFormatter = DateFormatter()
+        fallbackFormatter.dateFormat = "yyyy-MM-dd"
+        fallbackFormatter.locale = Locale(identifier: "en_US_POSIX")
+        fallbackFormatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        let wornDate = dailyRecommendation?.target_date ?? fallbackFormatter.string(from: Date())
         do {
             let result = try await dailyRecommendationClient.markWorn(
-                uid: uid, poolId: item.pool_id, wornDate: today
+                uid: uid, poolId: item.pool_id, wornDate: wornDate
             )
             switch result {
             case .success: return true

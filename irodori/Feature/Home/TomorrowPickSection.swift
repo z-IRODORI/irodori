@@ -250,9 +250,13 @@ struct TomorrowPickSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            scopeSegments
             sectionHeader
             partnerRow
             contentArea
+        }
+        .onChange(of: viewModel.selectedPickScope) { _, _ in
+            currentCardID = nil
         }
         .sheet(item: $reasonItem) { item in
             NavigationStack {
@@ -268,41 +272,48 @@ struct TomorrowPickSection: View {
         .sheet(isPresented: $showPlanListSheet) { planListSheet }
     }
 
-    // MARK: - セクション見出し (タイトル + 日付 + 地域 + 天気)
+    // MARK: - 今日/明日/週末 セグメント + 見出し (日付 + 地域 + 天気)
 
-    private var tomorrowShort: String {
-        guard let daily else { return "" }
-        let inFmt = DateFormatter()
-        inFmt.locale = Locale(identifier: "en_US_POSIX")
-        inFmt.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        inFmt.dateFormat = "yyyy-MM-dd"
-        guard let date = inFmt.date(from: daily.target_date) else { return daily.target_date }
-        let outFmt = DateFormatter()
-        outFmt.locale = Locale(identifier: "ja_JP")
-        outFmt.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        outFmt.dateFormat = "M/d(E)"
-        return outFmt.string(from: date)
+    private var currentTab: PickTab? {
+        viewModel.pickTabs.first { $0.scope == viewModel.selectedPickScope }
+    }
+
+    private var scopeSegments: some View {
+        HStack(spacing: 8) {
+            ForEach(viewModel.pickTabs) { tab in
+                let isSelected = tab.scope == viewModel.selectedPickScope
+                Button {
+                    Haptic.selection()
+                    viewModel.selectPickScope(tab.scope)
+                } label: {
+                    Text(tab.label)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(isSelected ? .white : .black)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(isSelected ? Color.black : Color.white)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.gray.opacity(isSelected ? 0 : 0.3), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 24)
     }
 
     private var sectionHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("明日のコーデ")
-                    .font(.system(size: 20, weight: .bold))
-                if !tomorrowShort.isEmpty {
-                    Text(tomorrowShort)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
+        HStack(spacing: 8) {
+            if let tab = currentTab {
+                Text(tab.shortDate)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
             }
-            HStack(spacing: 8) {
-                DailyLocationBadge(prefectureName: viewModel.currentPrefectureName, action: onLocationTap)
-                if let weather = daily?.weather {
-                    DailyMiniWeatherBadge(weather: weather)
-                }
-                Spacer()
+            DailyLocationBadge(prefectureName: viewModel.currentPrefectureName, action: onLocationTap)
+            if let weather = daily?.weather {
+                DailyMiniWeatherBadge(weather: weather)
             }
+            Spacer()
         }
         .padding(.horizontal, 24)
     }
@@ -312,7 +323,7 @@ struct TomorrowPickSection: View {
     private var partnerRow: some View {
         HStack(alignment: .top, spacing: 10) {
             PartnerIconImage(size: 44)
-            DailyPartnerCommentBox(text: daily?.partner_comment ?? "明日のコーデ、3案そろえたよ。")
+            DailyPartnerCommentBox(text: daily?.partner_comment ?? "\(viewModel.selectedPickScope.displayName)のコーデ、3案そろえたよ。")
         }
         .padding(.horizontal, 24)
     }
@@ -588,7 +599,7 @@ struct TomorrowPickSection: View {
 
     private var emptyCard: some View {
         HStack {
-            Text("明日の提案はまだありません")
+            Text("\(viewModel.selectedPickScope.displayName)の提案はまだありません")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Spacer()
@@ -616,7 +627,7 @@ struct TomorrowPickSection: View {
             markingWornID = nil
             if ok {
                 Haptic.notify(.success)
-                ToastManager.shared.show("明日のコーデに決定しました", style: .normal)
+                ToastManager.shared.show("\(viewModel.selectedPickScope.displayName)のコーデに決定しました", style: .normal)
             } else {
                 Haptic.notify(.error)
                 ToastManager.shared.show("記録に失敗しました。時間をおいて再度お試しください")
