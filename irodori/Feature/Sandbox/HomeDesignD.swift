@@ -45,6 +45,44 @@ private struct CircleThumb: View {
     }
 }
 
+// MARK: - シマー (メルカリ風スケルトン)
+// グレーのプレースホルダの上を、斜めの光の帯が左→右へ流れ続ける。
+// 参考: https://engineering.mercari.com/blog/entry/2020-07-14-101026/
+
+private struct ShimmerModifier: ViewModifier {
+    /// 光帯の位置。-bandRatio(完全に左外) → 1.0(完全に右外) を繰り返す
+    @State private var phase: CGFloat = ShimmerModifier.startPhase
+    private static let bandRatio: CGFloat = 0.55
+    private static let startPhase: CGFloat = -0.55
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                GeometryReader { geo in
+                    LinearGradient(
+                        colors: [.clear, .white.opacity(0.6), .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(width: geo.size.width * Self.bandRatio, height: geo.size.height)
+                    .offset(x: geo.size.width * phase)
+                }
+                .allowsHitTesting(false)
+            }
+            .onAppear {
+                withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
+                    phase = 1.0
+                }
+            }
+    }
+}
+
+extension View {
+    fileprivate func shimmering() -> some View {
+        modifier(ShimmerModifier())
+    }
+}
+
 // MARK: - 本体
 
 struct HomeDesignD: View {
@@ -310,36 +348,51 @@ struct HomeDesignD: View {
 
     // MARK: - 状態表示 (ローディング / エラー / 空)
 
+    // 実カルーセルと同一の構造(横ScrollView + contentMargins)に載せることで、
+    // 固定幅カードのHStackが画面幅を超えてオーバーフローするのを防ぐ。
     private var loadingCarousel: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ForEach(0..<2, id: \.self) { _ in
-                VStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.12))
-                        .frame(width: 272, height: 340)
-                    VStack(alignment: .leading, spacing: 8) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.12))
-                            .frame(width: 120, height: 14)
-                        HStack(spacing: 6) {
-                            ForEach(0..<4, id: \.self) { _ in
-                                Circle()
-                                    .fill(Color.gray.opacity(0.12))
-                                    .frame(width: 28, height: 28)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(alignment: .top, spacing: 12) {
+                ForEach(0..<3, id: \.self) { _ in
+                    skeletonCard
                 }
-                .frame(width: 272)
-                .background(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
             }
         }
-        .padding(.leading, 24)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentMargins(.horizontal, 24, for: .scrollContent)
+        .scrollDisabled(true)
+    }
+
+    /// 実カード(planCard)と同じ骨格のスケルトン + シマー
+    private var skeletonCard: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.gray.opacity(0.12))
+                .frame(width: 272, height: 340)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.12))
+                        .frame(width: 120, height: 14)
+                    Spacer()
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.12))
+                        .frame(width: 56, height: 10)
+                }
+                HStack(spacing: 6) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        Circle()
+                            .fill(Color.gray.opacity(0.12))
+                            .frame(width: 28, height: 28)
+                    }
+                }
+            }
+            .padding(12)
+        }
+        .frame(width: 272)
+        .background(.white)
+        .shimmering()
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
     }
 
     private var errorCard: some View {
@@ -609,6 +662,28 @@ struct HomeDesignD: View {
     HomeDesignD(viewModel: HomeViewModel(
         apiClient: MockHomeClient(),
         dailyRecommendationClient: MockDailyRecommendationClient()
+    ))
+    .environment(MainTabViewModel())
+}
+
+// MARK: - ローディング(スケルトン)プレビュー
+
+/// スケルトン確認用: 日次レコメンドを返さず、ローディング状態を維持するクライアント
+private final class PendingDailyRecommendationClient: DailyRecommendationClientProtocol {
+    func get(uid: String, gender: Gender) async throws -> Result<DailyRecommendationResponse, HTTPError> {
+        try await Task.sleep(nanoseconds: 3_600_000_000_000)   // 1時間 (実質返らない)
+        return .success(.mock())
+    }
+
+    func markWorn(uid: String, poolId: String, wornDate: String) async throws -> Result<WearMarkResponse, HTTPError> {
+        .success(.init(status: "ok", pool_id: poolId, worn_date: wornDate))
+    }
+}
+
+#Preview("案D - ローディング(シマー)") {
+    HomeDesignD(viewModel: HomeViewModel(
+        apiClient: MockHomeClient(),
+        dailyRecommendationClient: PendingDailyRecommendationClient()
     ))
     .environment(MainTabViewModel())
 }
