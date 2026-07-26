@@ -3,101 +3,45 @@
 //  irodori
 //
 //  案D: 「2A ホーム/明日の提案」(Claude Design 明日の相棒ファーストビュー) の再現サンドボックス。
-//  Modernist の作法 = 角丸ゼロ・2px罫線・スクエアサムネ。写真はカラーのまま表示する。
+//  情報設計(3案カルーセル+下部固定CTA+理由/一覧シート)は 2A のまま、
+//  視覚言語は IRODORI の既存デザイン(角丸16白カード・薄影・黒プライマリ・カプセルバッジ・
+//  円形アイテムサムネ・日本語ラベル)に寄せている。Modernist 版は git 履歴 (00d7320) を参照。
 //  データは既存ホームAPI(日次レコメンド)を流用。確認は Xcode Preview で行う。
 //
 
 import SwiftUI
 import Kingfisher
 
-// MARK: - デザイントークン (Modernist)
+// MARK: - 小部品 (IRODORI 視覚言語)
 
-private enum DTokens {
-    static let accent = Color(red: 232 / 255, green: 56 / 255, blue: 13 / 255)  // これにする / BEST MATCH / 通知ドットのみ
-    static let ink = Color.black
-    static let paper = Color.white
-    static let neutral200 = Color(white: 0.92)
-    static let neutral300 = Color(white: 0.84)
-    static let neutral500 = Color(white: 0.60)
-    static let sub = Color(white: 0.40)
-    static let rule: CGFloat = 2
-    static let brandTracking: CGFloat = 2.7   // 0.14em × 19pt
-}
-
-// MARK: - 小部品
-
-private struct RuleLine: View {
-    var color: Color = DTokens.ink
+/// TagsView と同系のカプセルチップ (足りないアイテム用)
+private struct CapsuleChip: View {
+    let text: String
 
     var body: some View {
-        Rectangle()
-            .fill(color)
-            .frame(height: DTokens.rule)
+        Text(text)
+            .font(.system(size: 13))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .overlay(Capsule().stroke(Color.gray.opacity(0.35), lineWidth: 1))
     }
 }
 
-/// デザインの斜めストライプ。画像プレースホルダ兼ローディングスケルトン。
-private struct StripePlaceholder: View {
-    var body: some View {
-        Canvas { context, size in
-            let step: CGFloat = 10
-            var x = -size.height
-            var i = 0
-            while x < size.width + size.height {
-                var path = Path()
-                path.move(to: CGPoint(x: x, y: 0))
-                path.addLine(to: CGPoint(x: x + size.height, y: size.height))
-                context.stroke(
-                    path,
-                    with: .color(i % 2 == 0 ? DTokens.neutral300 : DTokens.neutral200),
-                    lineWidth: step * 0.7
-                )
-                x += step
-                i += 1
-            }
-        }
-        .background(DTokens.neutral200)
-        .clipped()
-    }
-}
-
-private struct SquareThumb: View {
+/// 理由シートの手持ちアイテム行で使う円形サムネ
+private struct CircleThumb: View {
     let url: String
     var size: CGFloat = 44
 
     var body: some View {
         KFImage(URL(string: url))
             .resizable()
-            .placeholder { StripePlaceholder() }
+            .placeholder { Color.gray.opacity(0.15) }
             .scaledToFill()
             .frame(width: size, height: size)
-            .clipped()
-            .border(DTokens.neutral300, width: 1)
-    }
-}
-
-private struct OverflowSquare: View {
-    let count: Int
-
-    var body: some View {
-        Text("+\(count)")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(DTokens.sub)
-            .frame(width: 44, height: 44)
-            .background(DTokens.neutral200)
-    }
-}
-
-private struct ModernistChip: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 12))
-            .foregroundStyle(DTokens.ink)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .border(DTokens.neutral300, width: 1)
+            .background(.white)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
     }
 }
 
@@ -109,6 +53,8 @@ struct HomeDesignD: View {
     @State private var showPlanListSheet = false
     @State private var showReasonSheet = false
     @State private var isMarkingWorn = false
+    /// サンドボックス単体では FavoritesStore が無いため、お気に入りは見た目のみのローカルトグル
+    @State private var favoriteOverrides: [String: Bool] = [:]
     private let toastManager = ToastManager.shared
 
     @MainActor
@@ -126,24 +72,26 @@ struct HomeDesignD: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            headerBar
-            RuleLine()
-            weatherBar
-            RuleLine()
+            headerView
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+                .background(.white)
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 0) {
-                    partnerCommentRow
+                VStack(spacing: 20) {
+                    sectionHeader
+                    partnerRow
                     contentArea
-                    twoSplitBlock
+                    actionsCard
                     Spacer().frame(height: 24)
                 }
+                .padding(.top, 20)
             }
 
             bottomCTABar
         }
-        .foregroundStyle(DTokens.ink)
-        .background(DTokens.paper)
+        .background(Color.gray.opacity(0.08))
         .task { await viewModel.onAppear() }
         .sheet(isPresented: $showReasonSheet) { reasonSheet }
         .sheet(isPresented: $showPlanListSheet) { planListSheet }
@@ -162,89 +110,70 @@ struct HomeDesignD: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: toastManager.message)
     }
 
-    // MARK: - ヘッダー
+    // MARK: - ヘッダー (既存ホームと同型)
 
-    private var headerBar: some View {
-        HStack {
-            Text("IRODORI")
-                .font(.system(size: 19, weight: .heavy))
-                .tracking(DTokens.brandTracking)
-            Spacer()
-            HStack(spacing: 16) {
-                Image(systemName: "magnifyingglass")
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "bell")
-                    Circle()
-                        .fill(DTokens.accent)
-                        .frame(width: 6, height: 6)
-                        .offset(x: 1, y: -1)
+    private var headerView: some View {
+        ZStack {
+            Text("ホーム")
+                .font(.system(size: 18, weight: .semibold))
+            HStack(spacing: 20) {
+                Spacer()
+                Button(action: { Haptic.selection() }) {
+                    Image(systemName: "heart")
+                }
+                Button(action: { Haptic.selection() }) {
+                    Image(systemName: "calendar")
+                }
+                Button(action: { Haptic.selection() }) {
+                    Image(systemName: "questionmark.circle")
                 }
             }
-            .font(.system(size: 18, weight: .medium))
+            .font(.system(size: 20))
+            .foregroundStyle(.black)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 48)
     }
 
-    // MARK: - 天気バー
+    // MARK: - セクション見出し (明日のコーデ + 日付 + 天気バッジ)
 
-    private var tomorrowLabel: String {
-        guard let daily else { return "TOMORROW --" }
+    private var tomorrowShort: String {
+        guard let daily else { return "" }
         let inFmt = DateFormatter()
         inFmt.locale = Locale(identifier: "en_US_POSIX")
         inFmt.timeZone = TimeZone(identifier: "Asia/Tokyo")
         inFmt.dateFormat = "yyyy-MM-dd"
-        guard let date = inFmt.date(from: daily.target_date) else {
-            return "TOMORROW \(daily.target_date)"
-        }
+        guard let date = inFmt.date(from: daily.target_date) else { return daily.target_date }
         let outFmt = DateFormatter()
-        outFmt.locale = Locale(identifier: "en_US_POSIX")
+        outFmt.locale = Locale(identifier: "ja_JP")
         outFmt.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        outFmt.dateFormat = "M/d EEE"
-        return "TOMORROW " + outFmt.string(from: date).uppercased()
+        outFmt.dateFormat = "M/d(E)"
+        return outFmt.string(from: date)
     }
 
-    private var weatherBar: some View {
-        HStack(spacing: 12) {
-            Image(systemName: daily.map { DailyWeatherDisplay.style(for: $0.weather.condition).iconName } ?? "sun.max")
-                .symbolRenderingMode(.monochrome)
-                .font(.system(size: 13))
-                .foregroundStyle(DTokens.sub)
-            Text(tomorrowLabel)
-                .font(.system(size: 12, weight: .bold))
-                .tracking(1.2)
-            if let weather = daily?.weather {
-                HStack(spacing: 0) {
-                    Text("\(weather.max_temp)°")
-                        .foregroundStyle(DTokens.ink)
-                    Text("/\(weather.min_temp)°")
-                        .foregroundStyle(DTokens.sub)
-                }
-                .font(.system(size: 13, weight: .bold))
+    private var sectionHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("明日のコーデ")
+                .font(.system(size: 20, weight: .bold))
+            if !tomorrowShort.isEmpty {
+                Text(tomorrowShort)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
             }
             Spacer()
+            if let weather = daily?.weather {
+                DailyMiniWeatherBadge(weather: weather)
+            }
         }
-        .padding(.horizontal, 16)
-        .frame(height: 38)
-        .background(DTokens.neutral200)
+        .padding(.horizontal, 24)
     }
 
     // MARK: - 相棒コメント
 
-    private var partnerCommentRow: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                Rectangle().fill(DTokens.ink)
-                Rectangle().fill(DTokens.paper).frame(width: 10, height: 10)
-            }
-            .frame(width: 34, height: 34)
-            Text(daily?.partner_comment ?? "明日のコーデ、3案そろえたよ。")
-                .font(.system(size: 13))
-                .lineSpacing(4)
-                .frame(maxWidth: .infinity, alignment: .leading)
+    private var partnerRow: some View {
+        HStack(alignment: .top, spacing: 10) {
+            PartnerIconImage(size: 44)
+            DailyPartnerCommentBox(text: daily?.partner_comment ?? "明日のコーデ、3案そろえたよ。")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 24)
     }
 
     // MARK: - コンテンツ (カルーセル / 状態)
@@ -257,22 +186,22 @@ struct HomeDesignD: View {
         } else if viewModel.isLoadingDailyRecommendation {
             loadingCarousel
         } else if viewModel.hasDailyRecommendationError {
-            errorBlock
+            errorCard
         } else {
-            emptyBlock
+            emptyCard
         }
     }
 
     private var cardCarousel: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(alignment: .top, spacing: 10) {
+            LazyHStack(alignment: .top, spacing: 12) {
                 ForEach(cards) { card in
                     planCard(card, isBest: card.id == cards.first?.id)
                 }
             }
             .scrollTargetLayout()
         }
-        .contentMargins(.horizontal, 16, for: .scrollContent)
+        .contentMargins(.horizontal, 24, for: .scrollContent)
         .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $currentCardID)
     }
@@ -281,63 +210,68 @@ struct HomeDesignD: View {
         VStack(spacing: 0) {
             KFImage(URL(string: card.image_url))
                 .resizable()
-                .placeholder { StripePlaceholder() }
+                .placeholder { Color.gray.opacity(0.15) }
                 .scaledToFill()
-                .frame(width: 272, height: 366)
+                .frame(width: 272, height: 340)
                 .clipped()
                 .overlay(alignment: .topLeading) {
                     if isBest {
-                        Text("BEST MATCH")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1)
-                            .foregroundStyle(DTokens.paper)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(DTokens.accent)
+                        DailyIchioshiBadge()
+                            .padding(10)
                     }
                 }
-
-            RuleLine()
+                .overlay(alignment: .topTrailing) {
+                    FavoriteToggleButton(isFavorite: isFavorite(card), size: 14) {
+                        favoriteOverrides[card.id] = !isFavorite(card)
+                    }
+                    .padding(8)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // 既存ホームの「画像タップ → 詳細モーダル」パターンに合わせる
+                    Haptic.selection()
+                    withAnimation { currentCardID = card.id }
+                    showReasonSheet = true
+                }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(styleName(card))
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .lineLimit(1)
                     Spacer()
                     if itemsCount(for: card) > 0 {
-                        Text("\(itemsCount(for: card)) ITEMS")
-                            .font(.system(size: 11, weight: .semibold))
-                            .tracking(1)
-                            .foregroundStyle(DTokens.sub)
+                        Text("アイテム\(itemsCount(for: card))点")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                thumbnailRow(card)
+                itemCirclesRow(card)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(12)
         }
         .frame(width: 272)
-        .background(DTokens.paper)
-        .border(DTokens.ink, width: DTokens.rule)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
     }
 
     @ViewBuilder
-    private func thumbnailRow(_ card: DailyRecommendationItem) -> some View {
-        let owned = Array(card.owned_items.prefix(4))
-        let total = itemsCount(for: card)
-        let overflow = max(0, total - owned.count)
-        if owned.isEmpty {
-            if total > 0 {
-                HStack { OverflowSquare(count: total) }
-            }
-        } else {
-            HStack(spacing: 5) {
-                ForEach(owned, id: \.item_id) { item in
-                    SquareThumb(url: item.image_url)
-                }
+    private func itemCirclesRow(_ card: DailyRecommendationItem) -> some View {
+        let shown = min(4, card.owned_items.count)
+        let overflow = max(0, itemsCount(for: card) - shown)
+        HStack(spacing: 6) {
+            if card.owned_items.isEmpty {
+                NoOwnedItemBadge(size: 28)
+                Text("手持ち一致なし")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else {
+                OwnedItemCircles(items: card.owned_items, size: 28, maxCount: 4, background: .white)
                 if overflow > 0 {
-                    OverflowSquare(count: overflow)
+                    Text("+\(overflow)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -345,148 +279,147 @@ struct HomeDesignD: View {
 
     private var paginationRow: some View {
         HStack(spacing: 10) {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 ForEach(cards.indices, id: \.self) { i in
-                    Rectangle()
-                        .fill(i == currentIndex ? DTokens.ink : DTokens.neutral300)
-                        .frame(width: 18, height: 3)
+                    Circle()
+                        .fill(i == currentIndex ? Color.black : Color.gray.opacity(0.3))
+                        .frame(width: 6, height: 6)
                 }
             }
             .animation(.easeOut(duration: 0.15), value: currentIndex)
-            Text("\(currentIndex + 1) / \(cards.count) PLANS")
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(1)
-                .foregroundStyle(DTokens.sub)
+            Text("\(currentIndex + 1) / \(cards.count)")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
             Spacer()
             Button {
                 Haptic.selection()
                 showPlanListSheet = true
             } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 12, weight: .semibold))
+                HStack(spacing: 4) {
                     Text("一覧で見る")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 13, weight: .semibold))
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                 }
-                .foregroundStyle(DTokens.ink)
+                .foregroundStyle(.black)
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 14)
+        .padding(.horizontal, 24)
     }
 
     // MARK: - 状態表示 (ローディング / エラー / 空)
 
     private var loadingCarousel: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             ForEach(0..<2, id: \.self) { _ in
                 VStack(spacing: 0) {
-                    StripePlaceholder()
-                        .frame(width: 272, height: 366)
-                    RuleLine(color: DTokens.neutral300)
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.12))
+                        .frame(width: 272, height: 340)
                     VStack(alignment: .leading, spacing: 8) {
-                        Rectangle()
-                            .fill(DTokens.neutral200)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.12))
                             .frame(width: 120, height: 14)
-                        HStack(spacing: 5) {
+                        HStack(spacing: 6) {
                             ForEach(0..<4, id: \.self) { _ in
-                                Rectangle()
-                                    .fill(DTokens.neutral200)
-                                    .frame(width: 44, height: 44)
+                                Circle()
+                                    .fill(Color.gray.opacity(0.12))
+                                    .frame(width: 28, height: 28)
                             }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+                    .padding(12)
                 }
                 .frame(width: 272)
-                .border(DTokens.neutral300, width: DTokens.rule)
+                .background(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
             }
         }
-        .padding(.leading, 16)
-        .padding(.bottom, 14)
+        .padding(.leading, 24)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var errorBlock: some View {
-        VStack(spacing: 14) {
-            Text("提案を読み込めませんでした")
+    private var errorCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 20))
+                .foregroundStyle(Color.gray.opacity(0.5))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("提案を読み込めませんでした")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.black)
+                Button {
+                    Task { await viewModel.refreshDailyRecommendation() }
+                } label: {
+                    Text("再試行する")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.black)
+                        .underline()
+                }
+            }
+            Spacer()
+        }
+        .padding(16)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+        .padding(.horizontal, 24)
+    }
+
+    private var emptyCard: some View {
+        HStack {
+            Text("明日の提案はまだありません")
                 .font(.system(size: 13))
-                .foregroundStyle(DTokens.sub)
-            Button {
-                Task { await viewModel.refreshDailyRecommendation() }
-            } label: {
-                Text("再試行")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(DTokens.ink)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .border(DTokens.ink, width: DTokens.rule)
-            }
-            .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            Spacer()
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 48)
+        .padding(16)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+        .padding(.horizontal, 24)
     }
 
-    private var emptyBlock: some View {
-        Text("明日の提案はまだありません")
-            .font(.system(size: 13))
-            .foregroundStyle(DTokens.sub)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 48)
-    }
+    // MARK: - 別ルート導線 (相棒カードの2ボタンと同型)
 
-    // MARK: - 2分割ブロック
-
-    private var twoSplitBlock: some View {
-        VStack(spacing: 0) {
-            RuleLine()
-            HStack(spacing: 0) {
-                splitCell(icon: "archivebox", title: "アイテムから")
-                Rectangle()
-                    .fill(DTokens.ink)
-                    .frame(width: DTokens.rule)
-                splitCell(icon: "bubble.left", title: "相棒に相談")
+    private var actionsCard: some View {
+        HStack(spacing: 10) {
+            Button(action: { Haptic.selection() }) {
+                Label("アイテムから", systemImage: "tshirt")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .fixedSize(horizontal: false, vertical: true)
-            RuleLine()
-        }
-    }
-
-    private func splitCell(icon: String, title: String) -> some View {
-        Button {
-            Haptic.selection()
-        } label: {
-            HStack(spacing: 9) {
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .medium))
-                Text(title)
-                    .font(.system(size: 13, weight: .bold))
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(DTokens.neutral500)
+            Button(action: { Haptic.selection() }) {
+                Label("相棒に相談", systemImage: "bubble.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.gray.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
             }
-            .foregroundStyle(DTokens.ink)
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .padding(20)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+        .padding(.horizontal, 24)
     }
 
     // MARK: - 下部CTA
 
     private var bottomCTABar: some View {
         VStack(spacing: 0) {
-            RuleLine()
-            HStack(spacing: 8) {
+            Divider()
+            HStack(spacing: 10) {
                 Button {
                     Haptic.selection()
                     showReasonSheet = true
@@ -495,39 +428,38 @@ struct HomeDesignD: View {
                         Image(systemName: "info.circle")
                             .font(.system(size: 15))
                         Text("理由")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 14, weight: .semibold))
                     }
-                    .foregroundStyle(DTokens.ink)
-                    .padding(.horizontal, 14)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 18)
                     .frame(height: 48)
+                    .background(Color.gray.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .border(DTokens.ink, width: DTokens.rule)
 
                 Button {
                     markWornTapped()
                 } label: {
-                    HStack {
-                        Text(isMarkingWorn ? "記録中..." : "これにする")
-                            .font(.system(size: 16, weight: .bold))
-                        Spacer()
-                    }
-                    .foregroundStyle(DTokens.paper)
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(DTokens.accent)
-                    .contentShape(Rectangle())
+                    Text(isMarkingWorn ? "記録中..." : "これにする")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 24)
             .padding(.vertical, 10)
             .opacity(currentCard == nil ? 0.4 : 1)
             .disabled(currentCard == nil || isMarkingWorn)
         }
-        .background(DTokens.paper)
+        .background(.white)
     }
 
     private func markWornTapped() {
@@ -555,23 +487,7 @@ struct HomeDesignD: View {
     // MARK: - 理由シート
 
     private var reasonSheet: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("このコーデの理由")
-                    .font(.system(size: 13, weight: .bold))
-                    .tracking(0.5)
-                Spacer()
-                Button {
-                    showReasonSheet = false
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DTokens.ink)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(16)
-            RuleLine()
+        NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 20) {
                     if let card = currentCard {
@@ -591,7 +507,7 @@ struct HomeDesignD: View {
                             VStack(spacing: 10) {
                                 ForEach(card.owned_items, id: \.item_id) { owned in
                                     HStack(spacing: 10) {
-                                        SquareThumb(url: owned.image_url)
+                                        CircleThumb(url: owned.image_url)
                                         Text(owned.label)
                                             .font(.system(size: 13))
                                         Spacer()
@@ -603,72 +519,56 @@ struct HomeDesignD: View {
                             sectionLabel("足りないアイテム")
                             FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
                                 ForEach(card.missing_items, id: \.self) { missing in
-                                    ModernistChip(text: missing)
+                                    CapsuleChip(text: missing)
                                 }
                             }
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+            }
+            .navigationTitle("このコーデ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("閉じる") { showReasonSheet = false }
+                }
             }
         }
-        .foregroundStyle(DTokens.ink)
-        .background(DTokens.paper)
         .presentationDetents([.medium, .large])
     }
 
     // MARK: - 一覧シート
 
     private var planListSheet: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Text("ALL PLANS")
-                    .font(.system(size: 13, weight: .bold))
-                    .tracking(1.2)
-                Text("\(daily?.recommendations.count ?? 0)")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(DTokens.sub)
-                Spacer()
-                Button {
-                    showPlanListSheet = false
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DTokens.ink)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(16)
-            RuleLine()
+        NavigationStack {
             ScrollView(showsIndicators: false) {
                 LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3),
-                    spacing: 2
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
+                    spacing: 8
                 ) {
                     ForEach(daily?.recommendations ?? []) { item in
                         Button {
                             selectFromList(item)
                         } label: {
-                            Color.clear
-                                .aspectRatio(1, contentMode: .fit)
-                                .overlay {
-                                    KFImage(URL(string: item.image_url))
-                                        .resizable()
-                                        .placeholder { StripePlaceholder() }
-                                        .scaledToFill()
-                                }
-                                .clipped()
-                                .contentShape(Rectangle())
+                            DailyGridImage(imageURL: item.image_url)
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(2)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+            }
+            .navigationTitle("すべての提案")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("閉じる") { showPlanListSheet = false }
+                }
             }
         }
-        .foregroundStyle(DTokens.ink)
-        .background(DTokens.paper)
     }
 
     private func selectFromList(_ item: DailyRecommendationItem) {
@@ -684,9 +584,12 @@ struct HomeDesignD: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: .bold))
-            .tracking(0.5)
-            .foregroundStyle(DTokens.sub)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.black)
+    }
+
+    private func isFavorite(_ card: DailyRecommendationItem) -> Bool {
+        favoriteOverrides[card.id] ?? card.is_favorite
     }
 
     private func styleName(_ card: DailyRecommendationItem) -> String {
@@ -702,7 +605,7 @@ struct HomeDesignD: View {
     }
 }
 
-#Preview("案D - 明日の提案ファーストビュー(2A)") {
+#Preview("案D - 明日の提案ファーストビュー(IRODORI版)") {
     HomeDesignD(viewModel: HomeViewModel(
         apiClient: MockHomeClient(),
         dailyRecommendationClient: MockDailyRecommendationClient()
