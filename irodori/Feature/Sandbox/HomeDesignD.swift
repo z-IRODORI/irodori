@@ -40,23 +40,58 @@ private struct BuyItemCircle: View {
     }
 }
 
-/// 買い足し候補チップ (タップでZOZOTOWN検索を開く)
-private struct BuyChip: View {
-    let text: String
-
+/// 買い足し行の「探す」ピル (購入導線)
+private struct SearchPill: View {
     var body: some View {
-        HStack(spacing: 5) {
-            Text(text)
-                .font(.system(size: 13))
-                .foregroundStyle(.black)
+        HStack(spacing: 4) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+            Text("探す")
+                .font(.system(size: 12, weight: .semibold))
         }
+        .foregroundStyle(.black)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .overlay(Capsule().stroke(Color.gray.opacity(0.35), lineWidth: 1))
         .contentShape(Capsule())
+    }
+}
+
+/// 構成リストの未所持サムネ (破線サークル=未所持の視覚言語)
+private struct MissingItemThumb: View {
+    var size: CGFloat = 44
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.9))
+            Circle()
+                .strokeBorder(
+                    Color.gray.opacity(0.55),
+                    style: StrokeStyle(lineWidth: 1.2, dash: [2.5, 2])
+                )
+            Image(systemName: "plus")
+                .font(.system(size: size * 0.35, weight: .semibold))
+                .foregroundStyle(Color.gray.opacity(0.7))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// 達成度セグメントバー。構成アイテム数ぶんの区画を手持ち数だけ塗り、
+/// 「あと少しで完成」の感覚を一目で伝える。
+private struct CompletionSegments: View {
+    let owned: Int
+    let total: Int
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<max(total, 1), id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(i < owned ? Color.black : Color.gray.opacity(0.22))
+                    .frame(height: 4)
+            }
+        }
     }
 }
 
@@ -312,7 +347,7 @@ struct HomeDesignD: View {
                         .lineLimit(1)
                     Spacer()
                     if usedItemsCount(for: card) > 0 {
-                        Text("アイテム\(usedItemsCount(for: card))点")
+                        Text("手持ち \(card.owned_items.count)/\(usedItemsCount(for: card))")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -343,13 +378,13 @@ struct HomeDesignD: View {
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
     }
 
-    /// コーデの使用アイテムを1行で表示する。
-    /// 手持ち = 写真の重なり円形 (OwnedItemCircles) /
-    /// 未所持 = 集約バッジ1個「+n」(タップで理由シートの「買い足すなら」一覧へ)。
-    /// 手持ちゼロのときはバッジ横にアイテム名を1行添えて構成が分かるようにする。
+    /// コーデの構成アイテムを手持ちと比較して1ブロックで表示する。
+    /// 手持ち = 写真の重なり円形 / 未所持 = 集約バッジ「+n」(タップで構成リストへ)。
+    /// 達成度セグメントバー + 状況別コピーで「あと少しで作れる」を伝える。
     @ViewBuilder
     private func itemsRow(_ card: DailyRecommendationItem) -> some View {
         let buys = buyCandidates(for: card)
+        let total = card.owned_items.count + buys.count
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 if !card.owned_items.isEmpty {
@@ -373,10 +408,17 @@ struct HomeDesignD: View {
                     }
                 }
             }
+            if total > 0 {
+                CompletionSegments(owned: card.owned_items.count, total: total)
+            }
             if !buys.isEmpty {
                 Text(card.owned_items.isEmpty
-                     ? "タップで買い足しアイテムを探せます"
+                     ? "\(buys.count)点そろえると作れます"
                      : "あと\(buys.count)点そろえれば完成")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            } else if total > 0 {
+                Text("手持ちだけで作れます")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
@@ -582,35 +624,48 @@ struct HomeDesignD: View {
                                 .font(.system(size: 14))
                                 .lineSpacing(6)
                         }
-                        if !card.owned_items.isEmpty {
-                            sectionLabel("手持ちアイテム")
-                            VStack(spacing: 10) {
-                                ForEach(card.owned_items, id: \.item_id) { owned in
-                                    HStack(spacing: 10) {
-                                        CircleThumb(url: owned.image_url)
-                                        Text(owned.label)
-                                            .font(.system(size: 13))
-                                        Spacer()
+                        // コーデの構成アイテムを手持ちと突き合わせた統一チェックリスト。
+                        // ✓(手持ち) と +(買い足し) が同じリストに並ぶことで「比較」を伝える。
+                        let buys = buyCandidateItems(for: card)
+                        let total = card.owned_items.count + buys.count
+                        if total > 0 {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    sectionLabel("コーデの構成アイテム")
+                                    Spacer()
+                                    Text("手持ち \(card.owned_items.count)/\(total)")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                CompletionSegments(owned: card.owned_items.count, total: total)
+                                VStack(spacing: 12) {
+                                    ForEach(card.owned_items, id: \.item_id) { owned in
+                                        ownedRow(owned)
+                                    }
+                                    ForEach(buys, id: \.self) { candidate in
+                                        missingRow(candidate)
                                     }
                                 }
-                            }
-                        }
-                        let buys = buyCandidates(for: card)
-                        if !buys.isEmpty {
-                            sectionLabel("買い足すなら")
-                            FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
-                                ForEach(buys, id: \.self) { label in
-                                    Button {
-                                        openBuySearch(label)
-                                    } label: {
-                                        BuyChip(text: label)
+                                .padding(.top, 4)
+                                if buys.isEmpty {
+                                    Text("手持ちのアイテムだけで作れます")
+                                        .font(.system(size: 12, weight: .semibold))
+                                } else {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(card.owned_items.isEmpty
+                                             ? "\(buys.count)点そろえると、このコーデがつくれます"
+                                             : "あと\(buys.count)点そろえると、このコーデがつくれます")
+                                            .font(.system(size: 12, weight: .semibold))
+                                        Text("「探す」からZOZOTOWNの検索結果を開けます")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
                                     }
-                                    .buttonStyle(.plain)
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.gray.opacity(0.06))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }
                             }
-                            Text("タップするとZOZOTOWNの検索結果を開きます")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -692,38 +747,126 @@ struct HomeDesignD: View {
         return "おすすめコーデ"
     }
 
-    /// コーデで使っているが手持ちに無い (=買い足し候補) アイテム名。
-    /// missing_items を正とし、items 辞書にだけ現れる使用アイテム (outer 等) を
-    /// 正規化 (空白除去) した上で重複を除いて追加する。
-    private func buyCandidates(for card: DailyRecommendationItem) -> [String] {
+    /// 買い足し候補 (ラベル + 推定スロット)
+    private struct BuyCandidate: Hashable {
+        let label: String
+        let slot: String?
+    }
+
+    /// コーデで使っているが手持ちに無い (=買い足し候補) アイテム。
+    /// missing_items を正とし (スロットは items 辞書との名寄せで推定)、
+    /// items 辞書にだけ現れる使用アイテム (outer 等) を重複を除いて追加する。
+    private func buyCandidateItems(for card: DailyRecommendationItem) -> [BuyCandidate] {
         func normalize(_ s: String) -> String {
             s.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "　", with: "")
         }
         let ownedSlots = Set(card.owned_items.map(\.slot))
         var seen = Set(card.owned_items.map { normalize($0.label) })
-        var result: [String] = []
-        func append(_ label: String) {
+        var result: [BuyCandidate] = []
+        func append(_ label: String, slot: String?) {
             let key = normalize(label)
             guard !key.isEmpty,
                   !seen.contains(where: { $0.contains(key) || key.contains($0) }) else { return }
             seen.insert(key)
-            result.append(label)
+            result.append(.init(label: label, slot: slot))
         }
-        card.missing_items.forEach(append)
+        func inferSlot(for label: String) -> String? {
+            let key = normalize(label)
+            return card.items.first { slot, name in
+                guard !ownedSlots.contains(slot), let name, !name.isEmpty else { return false }
+                let n = normalize(name)
+                return n.contains(key) || key.contains(n)
+            }?.key
+        }
+        for label in card.missing_items {
+            append(label, slot: inferSlot(for: label))
+        }
         let slotOrder = ["tops", "bottoms", "outer", "shoes", "bag", "accessory"]
         let orderedSlots = slotOrder.filter { card.items.keys.contains($0) }
             + card.items.keys.filter { !slotOrder.contains($0) }.sorted()
         for slot in orderedSlots where !ownedSlots.contains(slot) {
             if let name = card.items[slot] ?? nil {
-                append(name)
+                append(name, slot: slot)
             }
         }
         return result
     }
 
-    /// カードに表示する「アイテムn点」= 手持ち + 買い足し候補の合計
+    private func buyCandidates(for card: DailyRecommendationItem) -> [String] {
+        buyCandidateItems(for: card).map(\.label)
+    }
+
+    /// カードに表示する構成点数 = 手持ち + 買い足し候補の合計
     private func usedItemsCount(for card: DailyRecommendationItem) -> Int {
         card.owned_items.count + buyCandidates(for: card).count
+    }
+
+    private func slotDisplayName(_ slot: String) -> String {
+        switch slot {
+        case "tops": return "トップス"
+        case "bottoms": return "ボトムス"
+        case "outer": return "アウター"
+        case "shoes": return "シューズ"
+        case "bag": return "バッグ"
+        case "accessory": return "小物"
+        default: return slot
+        }
+    }
+
+    // MARK: - 構成アイテム行 (理由シート)
+
+    /// 手持ち行: 写真+✓バッジ / スロット名 / 「手持ち」
+    private func ownedRow(_ owned: DailyOwnedItem) -> some View {
+        HStack(spacing: 10) {
+            CircleThumb(url: owned.image_url)
+                .overlay(alignment: .bottomTrailing) {
+                    ZStack {
+                        Circle().fill(Color.black)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 14, height: 14)
+                    .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(owned.label)
+                    .font(.system(size: 13))
+                Text(slotDisplayName(owned.slot))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text("手持ち")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 買い足し行: 破線サムネ / スロット名 / 「探す」ピル (タップでZOZO検索)
+    private func missingRow(_ candidate: BuyCandidate) -> some View {
+        Button {
+            openBuySearch(candidate.label)
+        } label: {
+            HStack(spacing: 10) {
+                MissingItemThumb()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(candidate.label)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.black)
+                        .multilineTextAlignment(.leading)
+                    if let slot = candidate.slot {
+                        Text(slotDisplayName(slot))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                SearchPill()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 買い足し導線 (ZOZOTOWN検索)
