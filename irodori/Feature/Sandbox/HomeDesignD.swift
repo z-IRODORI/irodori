@@ -612,3 +612,37 @@ struct HomeDesignD: View {
     ))
     .environment(MainTabViewModel())
 }
+
+// MARK: - 実API接続プレビュー
+
+/// Preview プロセスの UserDefaults は実機アプリと別コンテナで空のため、
+/// 未設定の場合のみ検証用の uid / 性別を書き込む (ログイン済み環境の値は上書きしない)。
+/// ログイン中ユーザーのデータで確認したい場合は uid を実際の値に書き換える。
+private func configureRealAPIPreviewUser() {
+    let ud = UserDefaults.standard
+    if (ud.string(forKey: UserDefaultsKey.userId.rawValue) ?? "").isEmpty {
+        ud.set("ios-sandbox-preview", forKey: UserDefaultsKey.userId.rawValue)
+    }
+    if (ud.string(forKey: UserDefaultsKey.gender.rawValue) ?? "").isEmpty {
+        // 推薦プールは性別で分かれるため、未設定 (=その他扱い) を避けて明示する
+        ud.set(Gender.female.rawValue, forKey: UserDefaultsKey.gender.rawValue)
+    }
+}
+
+/// 実通信は日次レコメンド GET と「これにする」の wear POST のみ。
+/// 他セクションのクライアントは Mock 化し、本番 (Render) への不要な呼び出しを避ける。
+/// 初回はサーバ側生成で数秒〜数十秒かかることがある (以降は日次キャッシュで高速)。
+#Preview("案D - 実API接続(日次レコメンドのみ実通信)") {
+    configureRealAPIPreviewUser()
+    return HomeDesignD(viewModel: HomeViewModel(
+        apiClient: MockHomeClient(),
+        coordinateRecommendClient: MockCoordinateRecommendClient(),
+        analyzeRecentCoordinateClient: MockAnalyzeRecentCoordinateClient(),
+        closetClient: MockClosetClient(),
+        deleteCoordinateClient: MockDeleteCoordinateClient(),
+        dailyRecommendationClient: DailyRecommendationClient(),
+        closetBridgeClient: MockClosetBridgeClient(),
+        outfitCollageClient: MockOutfitCollageClient()
+    ))
+    .environment(MainTabViewModel())
+}
