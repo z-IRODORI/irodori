@@ -192,15 +192,9 @@ struct ProfileView: View {
                 }
 
                 if !viewModel.locationNames.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.system(size: 11))
-                        Text(viewModel.locationNames.joined(separator: "・"))
-                            .font(.system(size: 12))
-                    }
-                    .foregroundStyle(.gray)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("場所、\(viewModel.locationNames.joined(separator: "、"))")
+                    Text("場所: \(viewModel.locationNames.joined(separator: "・"))")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.gray)
                 }
             }
             Spacer()
