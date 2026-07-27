@@ -9,6 +9,8 @@
 //  - B 事実引用コメント: 相棒コメントが行動を引用+帰属行+仕組みシート
 //  - C 思考ローディング: 待ち時間に「天気を確認中…」等の思考ステップ
 //  - D 今日の見立てカード: カルーセル先頭に観察サマリカード
+//  - E コーデ別の理由: サーバ生成の reason (なぜこのコーデか) をカードに表示。
+//    実APIでは新規生成分から理由が入る (デプロイ前の当日キャッシュには無い)
 //
 //  本番実装との差分: A/B はサーバ側で着用履歴・フィードバック履歴から判定/合成するが、
 //  サンドボックスでは response から得られる実データ (owned_items / is_discovery /
@@ -21,10 +23,11 @@ import Kingfisher
 // MARK: - 候補トグル
 
 private struct VoiceCandidates {
-    var evidence = true       // A: 根拠キャプション
-    var quoteComment = true   // B: 事実引用コメント
-    var thinking = true       // C: 思考ローディング
+    var evidence = false      // A: 根拠キャプション
+    var quoteComment = false  // B: 事実引用コメント
+    var thinking = false      // C: 思考ローディング
     var briefCard = false     // D: 今日の見立てカード
+    var reasonOnCard = true   // E: コーデ別の理由 (サーバ生成 reason)
 }
 
 // MARK: - 小部品
@@ -133,11 +136,14 @@ struct PartnerVoiceSandbox: View {
         VStack(spacing: 10) {
             Text("相棒ボイス比較")
                 .font(.system(size: 16, weight: .semibold))
-            HStack(spacing: 8) {
-                toggleChip("A 根拠", isOn: $candidates.evidence)
-                toggleChip("B 引用", isOn: $candidates.quoteComment)
-                toggleChip("C 思考", isOn: $candidates.thinking)
-                toggleChip("D 見立て", isOn: $candidates.briefCard)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    toggleChip("E 理由", isOn: $candidates.reasonOnCard)
+                    toggleChip("A 根拠", isOn: $candidates.evidence)
+                    toggleChip("B 引用", isOn: $candidates.quoteComment)
+                    toggleChip("C 思考", isOn: $candidates.thinking)
+                    toggleChip("D 見立て", isOn: $candidates.briefCard)
+                }
             }
         }
         .padding(.horizontal, 24)
@@ -420,6 +426,15 @@ struct PartnerVoiceSandbox: View {
                 Text(card.style.isEmpty ? (card.vibe.isEmpty ? "おすすめコーデ" : card.vibe) : card.style)
                     .font(.system(size: 15, weight: .bold))
                     .lineLimit(1)
+                // E: サーバ生成の「なぜこのコーデか」(2行まで。全文は本番では構成シートに)
+                if candidates.reasonOnCard, let reason = card.reason, !reason.isEmpty {
+                    Text(reason)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(3)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if !card.owned_items.isEmpty {
                     OwnedItemCircles(items: card.owned_items, size: 28, maxCount: 4, background: .white)
                 }
