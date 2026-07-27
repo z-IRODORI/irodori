@@ -17,6 +17,8 @@ final class ProfileViewModel {
     var isLoading = false
     var profileInfo: ProfileInfo?
     var isLoadingProfile = false
+    /// 登録済みの場所 (メイン先頭 + 追加)。プロフィールヘッダー表示用
+    var locationNames: [String] = []
 
     // MARK: - Delete State
     var isEditMode: Bool = false
@@ -35,6 +37,7 @@ final class ProfileViewModel {
         self.closetClient = closetClient
         self.deleteClosetItemClient = deleteClosetItemClient
         loadProfileFromDefaults()
+        loadLocationNames()
     }
 
     // フィルタリング済みアイテム
@@ -145,6 +148,20 @@ final class ProfileViewModel {
 
     func reloadProfile() {
         loadProfileFromDefaults()
+        loadLocationNames()
+    }
+
+    private func loadLocationNames() {
+        var names: [String] = []
+        let mainCode = UserDefaults.standard.string(forKey: UserDefaultsKey.prefectureCode.rawValue)
+        if let main = Prefecture.find(byCode: mainCode) {
+            names.append(main.name)
+        }
+        let additionalCodes = UserDefaults.standard.stringArray(
+            forKey: UserDefaultsKey.additionalPrefectureCodes.rawValue
+        ) ?? []
+        names.append(contentsOf: additionalCodes.compactMap { Prefecture.find(byCode: $0)?.name })
+        locationNames = names
     }
 
     private func loadProfileFromDefaults() {

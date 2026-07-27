@@ -105,57 +105,186 @@ struct ProfileEditView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
-            prefectureRow
+            locationsSection
         }
     }
 
-    private var prefectureRow: some View {
+    // MARK: - 場所 (複数登録)
+
+    /// メイン行 (先頭固定・削除不可) + 追加行 + 「場所を追加」行を1セクションに縦積み.
+    /// 連絡先編集の複数値フィールドと同じパターン。メインのみ天気コーデ提案に使われる.
+    private var locationsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("お住まいの地域")
+            Text("場所")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.gray)
 
+            mainLocationRow
+
+            ForEach(viewModel.additionalPrefectureCodes, id: \.self) { code in
+                additionalLocationRow(code: code)
+            }
+
+            addLocationRow
+
+            Text(locationsFooterText)
+                .font(.system(size: 12))
+                .foregroundStyle(.gray)
+                .padding(.horizontal, 4)
+        }
+    }
+
+    private var locationsFooterText: String {
+        var text = "コーデ提案の天気にはメインの場所が使われます。メインは1日1回まで変更できます。"
+        if !viewModel.canAddLocation {
+            text += "\n登録できる場所は最大\(ProfileEditViewModel.maxLocationCount)件です。"
+        }
+        return text
+    }
+
+    private var mainLocationRow: some View {
+        Group {
             if viewModel.canChangePrefectureToday {
                 NavigationLink {
                     PrefecturePickerView(
                         selectedCode: viewModel.prefectureCode,
+                        registeredCodes: viewModel.allLocationCodes,
                         onSelect: { prefecture in
                             viewModel.prefectureCode = prefecture.code
                         }
                     )
-                } label: { prefectureRowLabel }
+                } label: { mainLocationRowLabel }
                 .buttonStyle(.plain)
             } else {
                 Button {
-                    ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
-                } label: { prefectureRowLabel }
+                    ToastManager.shared.show("メインの場所は1日1回まで変更できます")
+                } label: { mainLocationRowLabel }
                 .buttonStyle(.plain)
             }
         }
     }
 
-    private var prefectureRowLabel: some View {
-        HStack {
+    private var mainLocationRowLabel: some View {
+        HStack(spacing: 8) {
             Text(viewModel.prefectureDisplayName)
                 .foregroundStyle(.primary)
+            Text("メイン")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.orange.opacity(0.15)))
             Spacer()
-            Image(systemName: "chevron.right")
+            Image(systemName: viewModel.canChangePrefectureToday ? "chevron.right" : "lock.fill")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.tertiary)
         }
         .padding()
         .background(Color.gray.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("メインの場所、\(viewModel.prefectureDisplayName)")
+        .accessibilityHint(viewModel.canChangePrefectureToday ? "ダブルタップで変更できます" : "本日は変更できません")
+    }
+
+    private func additionalLocationRow(code: String) -> some View {
+        let name = Prefecture.find(byCode: code)?.name ?? ""
+        return HStack(spacing: 12) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.removeLocation(code: code)
+                }
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(name)を削除")
+
+            NavigationLink {
+                PrefecturePickerView(
+                    selectedCode: code,
+                    registeredCodes: viewModel.allLocationCodes,
+                    title: "場所を変更",
+                    onSelect: { prefecture in
+                        viewModel.changeLocation(from: code, to: prefecture.code)
+                    }
+                )
+            } label: {
+                HStack {
+                    Text(name)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .contextMenu {
+            Button {
+                viewModel.promoteToMain(code: code)
+            } label: {
+                Label("メインにする", systemImage: "star")
+            }
+            Button(role: .destructive) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.removeLocation(code: code)
+                }
+            } label: {
+                Label("削除", systemImage: "trash")
+            }
+        }
+    }
+
+    private var addLocationRow: some View {
+        NavigationLink {
+            PrefecturePickerView(
+                selectedCode: nil,
+                registeredCodes: viewModel.allLocationCodes,
+                title: "場所を追加",
+                onSelect: { prefecture in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.addLocation(code: prefecture.code)
+                    }
+                }
+            )
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.orange)
+                Text("場所を追加")
+                    .foregroundStyle(.orange)
+                Spacer()
+            }
+            .padding()
+            .background(Color.gray.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .disabled(!viewModel.canAddLocation)
+        .opacity(viewModel.canAddLocation ? 1 : 0.4)
     }
 }
 
 @MainActor
 @Observable
 final class ProfileEditViewModel {
+    /// メイン含む登録可能な場所の合計上限
+    static let maxLocationCount = 5
+
     var username: String
     var profileImageUrl: String?
     var isUploadingImage = false
     var prefectureCode: String?
+    /// メイン以外の追加場所 (端末ローカルのみ。サーバはメイン1値しか持たない)
+    var additionalPrefectureCodes: [String]
 
     private var profileInfo: ProfileInfo?
     private let prefectureClient: UpdateUserPrefectureClientProtocol
@@ -172,6 +301,9 @@ final class ProfileEditViewModel {
         let stored = UserDefaults.standard.string(forKey: UserDefaultsKey.prefectureCode.rawValue)
         self.prefectureCode = stored
         self.lastSyncedPrefectureCode = stored
+        self.additionalPrefectureCodes = UserDefaults.standard.stringArray(
+            forKey: UserDefaultsKey.additionalPrefectureCodes.rawValue
+        ) ?? []
     }
 
     var prefectureDisplayName: String {
@@ -179,6 +311,65 @@ final class ProfileEditViewModel {
             return p.name
         }
         return "未設定 (\(Prefecture.default.name))"
+    }
+
+    // MARK: - 複数場所の管理
+
+    /// メイン + 追加のすべての登録済みコード (ピッカーの重複防止用)
+    var allLocationCodes: Set<String> {
+        var codes = Set(additionalPrefectureCodes)
+        if let main = prefectureCode { codes.insert(main) }
+        return codes
+    }
+
+    /// メイン枠は未設定でも1枠として数える
+    var canAddLocation: Bool {
+        additionalPrefectureCodes.count < Self.maxLocationCount - 1
+    }
+
+    func addLocation(code: String) {
+        guard !allLocationCodes.contains(code) else {
+            ToastManager.shared.show("すでに登録されている場所です")
+            return
+        }
+        // メイン未設定なら最初の1件をメインにする (追加のみの状態を作らない)
+        guard prefectureCode != nil else {
+            prefectureCode = code
+            return
+        }
+        guard canAddLocation else { return }
+        additionalPrefectureCodes.append(code)
+    }
+
+    func removeLocation(code: String) {
+        additionalPrefectureCodes.removeAll { $0 == code }
+    }
+
+    func changeLocation(from oldCode: String, to newCode: String) {
+        guard oldCode != newCode else { return }
+        guard !allLocationCodes.contains(newCode) else {
+            ToastManager.shared.show("すでに登録されている場所です")
+            return
+        }
+        if let index = additionalPrefectureCodes.firstIndex(of: oldCode) {
+            additionalPrefectureCodes[index] = newCode
+        }
+    }
+
+    /// 追加の場所をメインへ昇格。メイン変更なので1日1回制限に従う.
+    func promoteToMain(code: String) {
+        guard canChangePrefectureToday else {
+            ToastManager.shared.show("メインの場所は1日1回まで変更できます")
+            return
+        }
+        guard let index = additionalPrefectureCodes.firstIndex(of: code) else { return }
+        if let oldMain = prefectureCode {
+            // 位置を保ったまま旧メインと入れ替え
+            additionalPrefectureCodes[index] = oldMain
+        } else {
+            additionalPrefectureCodes.remove(at: index)
+        }
+        prefectureCode = code
     }
 
     /// 居住地は JST カレンダー日で 1日1回まで変更可能 (コーデ無限再生成防止).
@@ -192,10 +383,12 @@ final class ProfileEditViewModel {
     }
 
     func save() {
-        guard var profile = profileInfo else {
+        defer {
             persistPrefectureIfChanged()
-            return
+            persistAdditionalPrefectures()
         }
+
+        guard var profile = profileInfo else { return }
 
         // ユーザー名を更新し、表示名もユーザー名と同じにする
         profile.username = username.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -213,8 +406,6 @@ final class ProfileEditViewModel {
         } catch {
             print("Failed to save profile: \(error)")
         }
-
-        persistPrefectureIfChanged()
     }
 
     private func persistPrefectureIfChanged() {
@@ -222,7 +413,7 @@ final class ProfileEditViewModel {
         guard code != lastSyncedPrefectureCode else { return }
         guard canChangePrefectureToday else {
             // 1日1回制限。選択は破棄して直近 sync 済みに戻す.
-            ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
+            ToastManager.shared.show("メインの場所は1日1回まで変更できます")
             prefectureCode = lastSyncedPrefectureCode
             return
         }
@@ -236,6 +427,16 @@ final class ProfileEditViewModel {
         Task {
             _ = try? await client.put(uid: uid, prefectureCode: code)
         }
+    }
+
+    /// 追加場所を保存する。メイン変更が巻き戻された場合に備え、メインとの重複を除いて正規化する.
+    private func persistAdditionalPrefectures() {
+        let normalized = additionalPrefectureCodes.filter { $0 != prefectureCode }
+        additionalPrefectureCodes = normalized
+        UserDefaults.standard.set(
+            normalized,
+            forKey: UserDefaultsKey.additionalPrefectureCodes.rawValue
+        )
     }
 
     func uploadProfileImage(_ image: UIImage) async {
