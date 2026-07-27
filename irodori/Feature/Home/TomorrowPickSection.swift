@@ -432,15 +432,15 @@ struct TomorrowPickSection: View {
                     }
                 }
                 // なぜこのコーデをおすすめしたか (サーバ生成。全文は構成シートで)
-                if let reason = card.reason, !reason.isEmpty {
-                    Text(reason)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineSpacing(3)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                // 理由なし/1行でも2行ぶんの高さを常に確保し、カード内の要素位置を揃える
+                Text(card.reason ?? "")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(3)
+                    .lineLimit(2, reservesSpace: true)
                 itemsRow(card)
+
+                Spacer(minLength: 0)
 
                 Button {
                     markWornTapped(card)
@@ -460,7 +460,8 @@ struct TomorrowPickSection: View {
             }
             .padding(12)
         }
-        .frame(width: 272)
+        // 種類 (理由の行数・手持ち有無・キャプション有無) によらず高さを統一する
+        .frame(width: 272, height: 548, alignment: .top)
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
@@ -614,6 +615,7 @@ struct TomorrowPickSection: View {
                             .frame(width: 28, height: 28)
                     }
                 }
+                Spacer(minLength: 0)
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.gray.opacity(0.12))
                     .frame(maxWidth: .infinity)
@@ -622,7 +624,7 @@ struct TomorrowPickSection: View {
             }
             .padding(12)
         }
-        .frame(width: 272)
+        .frame(width: 272, height: 548, alignment: .top)
         .background(.white)
         .shimmering()
         .clipShape(RoundedRectangle(cornerRadius: 16))
