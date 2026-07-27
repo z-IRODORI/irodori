@@ -431,6 +431,15 @@ struct TomorrowPickSection: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                // なぜこのコーデをおすすめしたか (サーバ生成。全文は構成シートで)
+                if let reason = card.reason, !reason.isEmpty {
+                    Text(reason)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(3)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 itemsRow(card)
 
                 Button {
@@ -591,6 +600,13 @@ struct TomorrowPickSection: View {
                         .fill(Color.gray.opacity(0.12))
                         .frame(width: 56, height: 10)
                 }
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.gray.opacity(0.12))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 10)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.gray.opacity(0.12))
+                    .frame(width: 170, height: 10)
                 HStack(spacing: 6) {
                     ForEach(0..<4, id: \.self) { _ in
                         Circle()
