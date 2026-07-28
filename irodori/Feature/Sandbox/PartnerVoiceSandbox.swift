@@ -643,7 +643,7 @@ private func configureSandboxAPIUser() {
 
 /// C (思考演出) 確認用: 4秒待ってからモックを返すクライアント
 private final class SlowMockDailyRecommendationClient: DailyRecommendationClientProtocol {
-    func get(uid: String, gender: Gender, targetDate: String?) async throws -> Result<DailyRecommendationResponse, HTTPError> {
+    func get(uid: String, gender: Gender, targetDate: String?, forceRegenerate: Bool) async throws -> Result<DailyRecommendationResponse, HTTPError> {
         try await Task.sleep(nanoseconds: 4_000_000_000)
         return .success(.mock())
     }

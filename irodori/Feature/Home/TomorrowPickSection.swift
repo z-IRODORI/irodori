@@ -266,15 +266,30 @@ struct TomorrowPickSection: View {
     @State private var showPlanListSheet = false
     @State private var listPushItem: DailyRecommendationItem? = nil
     @State private var markingWornID: String? = nil
+    #if DEBUG
+    /// 開発ビルド専用: カルーセルの表示件数 (1〜9、リリースは常に3)
+    @AppStorage("debug.pickCardLimit") private var debugCardLimit: Int = 3
+    #endif
+
+    private var cardDisplayLimit: Int {
+        #if DEBUG
+        return max(1, min(debugCardLimit, 9))
+        #else
+        return 3
+        #endif
+    }
 
     private var daily: DailyRecommendationResponse? { viewModel.dailyRecommendation }
-    private var cards: [DailyRecommendationItem] { Array((daily?.recommendations ?? []).prefix(3)) }
+    private var cards: [DailyRecommendationItem] { Array((daily?.recommendations ?? []).prefix(cardDisplayLimit)) }
     private var currentIndex: Int { cards.firstIndex { $0.id == currentCardID } ?? 0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             scopeSegments
             sectionHeader
+            #if DEBUG
+            debugBar
+            #endif
             partnerRow
             contentArea
         }
@@ -346,6 +361,56 @@ struct TomorrowPickSection: View {
         }
         .padding(.horizontal, 24)
     }
+
+    #if DEBUG
+    /// 開発ビルド専用: 表示件数の変更と、キャッシュ無視の再生成リロード
+    private var debugBar: some View {
+        HStack(spacing: 10) {
+            Text("DEBUG")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Color.orange)
+                .clipShape(Capsule())
+            Menu {
+                ForEach(1...9, id: \.self) { n in
+                    Button("\(n)件") { debugCardLimit = n }
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    Text("表示 \(cardDisplayLimit)件")
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 8))
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .overlay(Capsule().stroke(Color.gray.opacity(0.35), lineWidth: 1))
+            }
+            Button {
+                Haptic.impact(.light)
+                Task { await viewModel.reloadDailyRecommendation() }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("再生成")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(.black)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .overlay(Capsule().stroke(Color.gray.opacity(0.35), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isLoadingDailyRecommendation)
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+    }
+    #endif
 
     // MARK: - 相棒コメント
 

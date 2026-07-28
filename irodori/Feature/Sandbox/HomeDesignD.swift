@@ -918,7 +918,7 @@ struct HomeDesignD: View {
 
 /// スケルトン確認用: 日次レコメンドを返さず、ローディング状態を維持するクライアント
 private final class PendingDailyRecommendationClient: DailyRecommendationClientProtocol {
-    func get(uid: String, gender: Gender, targetDate: String?) async throws -> Result<DailyRecommendationResponse, HTTPError> {
+    func get(uid: String, gender: Gender, targetDate: String?, forceRegenerate: Bool) async throws -> Result<DailyRecommendationResponse, HTTPError> {
         try await Task.sleep(nanoseconds: 3_600_000_000_000)   // 1時間 (実質返らない)
         return .success(.mock())
     }

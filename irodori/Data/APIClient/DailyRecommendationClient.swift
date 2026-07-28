@@ -9,7 +9,8 @@ import Foundation
 
 protocol DailyRecommendationClientProtocol {
     /// targetDate: 対象日 (JST, yyyy-MM-dd)。nil はサーバ既定の「明日」
-    func get(uid: String, gender: Gender, targetDate: String?) async throws -> Result<DailyRecommendationResponse, HTTPError>
+    /// forceRegenerate: 開発用。サーバキャッシュを無視して再生成させる
+    func get(uid: String, gender: Gender, targetDate: String?, forceRegenerate: Bool) async throws -> Result<DailyRecommendationResponse, HTTPError>
     func markWorn(uid: String, poolId: String, wornDate: String) async throws -> Result<WearMarkResponse, HTTPError>
     /// フィードバック (rating: "like" | "dislike") を送信。サーバ側でパーソナライズに反映される
     func postFeedback(uid: String, poolId: String, rating: String, reasons: [String], targetDate: String?) async throws -> Result<RecommendationFeedbackResponse, HTTPError>
@@ -17,14 +18,18 @@ protocol DailyRecommendationClientProtocol {
 
 extension DailyRecommendationClientProtocol {
     func get(uid: String, gender: Gender) async throws -> Result<DailyRecommendationResponse, HTTPError> {
-        try await get(uid: uid, gender: gender, targetDate: nil)
+        try await get(uid: uid, gender: gender, targetDate: nil, forceRegenerate: false)
+    }
+
+    func get(uid: String, gender: Gender, targetDate: String?) async throws -> Result<DailyRecommendationResponse, HTTPError> {
+        try await get(uid: uid, gender: gender, targetDate: targetDate, forceRegenerate: false)
     }
 }
 
 final class DailyRecommendationClient: DailyRecommendationClientProtocol {
     private let baseURL = "https://irodori-api.onrender.com"
 
-    func get(uid: String, gender: Gender, targetDate: String?) async throws -> Result<DailyRecommendationResponse, HTTPError> {
+    func get(uid: String, gender: Gender, targetDate: String?, forceRegenerate: Bool) async throws -> Result<DailyRecommendationResponse, HTTPError> {
         let endpoint = "api/home/daily-recommendation"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")!
         var items: [URLQueryItem] = [
@@ -33,6 +38,9 @@ final class DailyRecommendationClient: DailyRecommendationClientProtocol {
         ]
         if let targetDate, !targetDate.isEmpty {
             items.append(URLQueryItem(name: "target_date", value: targetDate))
+        }
+        if forceRegenerate {
+            items.append(URLQueryItem(name: "force_regenerate", value: "true"))
         }
         if let prefectureCode = UserDefaults.standard.string(forKey: UserDefaultsKey.prefectureCode.rawValue),
            !prefectureCode.isEmpty {
@@ -137,11 +145,15 @@ final class DailyRecommendationClient: DailyRecommendationClientProtocol {
 // MARK: - Mock
 
 final class MockDailyRecommendationClient: DailyRecommendationClientProtocol {
-    func get(uid: String, gender: Gender, targetDate: String?) async throws -> Result<DailyRecommendationResponse, HTTPError> {
+    /// 再生成リロードのたびに並びが変わって見えるようにするカウンタ (Preview用)
+    private static var regenerateCount = 0
+
+    func get(uid: String, gender: Gender, targetDate: String?, forceRegenerate: Bool) async throws -> Result<DailyRecommendationResponse, HTTPError> {
+        if forceRegenerate { Self.regenerateCount += 1 }
         var mock = DailyRecommendationResponse.mock()
-        // Preview でタブ切替の違いが見えるよう、日付ごとに並びを回転して返す
+        // Preview でタブ切替・再生成の違いが見えるよう、並びを回転して返す
         if let targetDate, !targetDate.isEmpty {
-            let shift = abs(targetDate.hashValue) % max(mock.recommendations.count, 1)
+            let shift = (abs(targetDate.hashValue) + Self.regenerateCount) % max(mock.recommendations.count, 1)
             let rotated = Array(mock.recommendations[shift...] + mock.recommendations[..<shift])
             mock = DailyRecommendationResponse(
                 target_date: targetDate,

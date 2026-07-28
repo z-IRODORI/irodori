@@ -284,8 +284,15 @@ final class HomeViewModel {
         Task { await loadDaily(scope: scope, force: true) }
     }
 
+    /// 開発用: サーバキャッシュを無視して選択中スコープを再生成する
+    /// (最新のフィードバック/クローゼット/天気が即時反映される)
+    func reloadDailyRecommendation() async {
+        dailyByScope[selectedPickScope] = nil
+        await loadDaily(scope: selectedPickScope, force: true, regenerate: true)
+    }
+
     /// スコープ単位で daily-recommendation を取得する
-    private func loadDaily(scope: PickScope, force: Bool = false) async {
+    private func loadDaily(scope: PickScope, force: Bool = false, regenerate: Bool = false) async {
         guard let tab = pickTabs.first(where: { $0.scope == scope }) else { return }
         if dailyInFlight.contains(scope) { return }
         if !force, let existing = dailyByScope[scope], existing.target_date == tab.dateString { return }
@@ -297,7 +304,9 @@ final class HomeViewModel {
         if dailyByScope[scope] == nil { dailyLoadingScopes.insert(scope) }
         dailyErrorScopes.remove(scope)
         do {
-            switch try await dailyRecommendationClient.get(uid: uid, gender: gender, targetDate: tab.dateString) {
+            switch try await dailyRecommendationClient.get(
+                uid: uid, gender: gender, targetDate: tab.dateString, forceRegenerate: regenerate
+            ) {
             case .success(let response):
                 dailyByScope[scope] = response
                 dailyRevalidated.insert(scope)
