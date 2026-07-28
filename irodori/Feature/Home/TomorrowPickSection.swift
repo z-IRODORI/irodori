@@ -280,7 +280,10 @@ struct TomorrowPickSection: View {
     }
 
     private var daily: DailyRecommendationResponse? { viewModel.dailyRecommendation }
-    private var cards: [DailyRecommendationItem] { Array((daily?.recommendations ?? []).prefix(cardDisplayLimit)) }
+    private var cards: [DailyRecommendationItem] {
+        // 他タブが表示中のコーデ・自分の登録コーデを除いたリストから上位を表示
+        Array(viewModel.displayRecommendations(for: viewModel.selectedPickScope).prefix(cardDisplayLimit))
+    }
     private var currentIndex: Int { cards.firstIndex { $0.id == currentCardID } ?? 0 }
 
     var body: some View {

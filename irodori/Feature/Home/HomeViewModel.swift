@@ -58,6 +58,9 @@ final class HomeViewModel {
     private var dailyRevalidated: Set<PickScope> = []
     /// このセッションで送信したフィードバック (pool_id → 評価)。UI状態の即時反映用
     private(set) var feedbackByPool: [String: PickFeedbackRating] = [:]
+    /// タブ間で表示上位が重複しないよう、先着スコープが表示枠 (上位3件) を確保する台帳。
+    /// サーバ側の兄弟日付除外の保険 (修正前に生成された旧キャッシュ対策)
+    private var claimedDisplayIDs: [PickScope: [String]] = [:]
 
     // 互換アクセサ (選択中スコープのデータをビューへ)
     var dailyRecommendation: DailyRecommendationResponse? { dailyByScope[selectedPickScope] }
@@ -245,6 +248,7 @@ final class HomeViewModel {
             pickTabs = tabs
             dailyByScope.removeAll()
             dailyRevalidated.removeAll()
+            claimedDisplayIDs.removeAll()
         }
         if !tabs.contains(where: { $0.scope == selectedPickScope }) {
             selectedPickScope = PickTabBuilder.defaultScope()
@@ -261,7 +265,43 @@ final class HomeViewModel {
                 uid: uid
               ),
               cached.target_date == tab.dateString else { return }
-        dailyByScope[scope] = cached
+        let cleaned = sanitizedDaily(cached)
+        dailyByScope[scope] = cleaned
+        claimDisplaySlots(scope: scope, response: cleaned)
+    }
+
+    /// 自分が登録したコーデ (kind=self) はおすすめに表示しない。
+    /// サーバ側でも注入を止めたが、修正前に生成されたキャッシュにも即効させる
+    private func sanitizedDaily(_ response: DailyRecommendationResponse) -> DailyRecommendationResponse {
+        let filtered = response.recommendations.filter { $0.kind != "self" }
+        guard filtered.count != response.recommendations.count else { return response }
+        return DailyRecommendationResponse(
+            target_date: response.target_date,
+            weather: response.weather,
+            partner_comment: response.partner_comment,
+            recommendations: filtered,
+            mode: response.mode
+        )
+    }
+
+    /// 到着したスコープが表示上位3件の枠を確保する (先着優先・セッション内で安定)。
+    /// 他スコープが確保済みのコーデは飛ばして次点を繰り上げる
+    private func claimDisplaySlots(scope: PickScope, response: DailyRecommendationResponse) {
+        let othersClaimed = Set(
+            claimedDisplayIDs.filter { $0.key != scope }.values.flatMap { $0 }
+        )
+        let visible = response.recommendations.filter { !othersClaimed.contains($0.pool_id) }
+        claimedDisplayIDs[scope] = visible.prefix(3).map(\.pool_id)
+    }
+
+    /// 表示用: 他タブが表示枠を確保したコーデを除いたリスト。
+    /// タブ3つ×上位3枚の計9枚に同じコーデが2枚以上出ないことを保証する
+    func displayRecommendations(for scope: PickScope) -> [DailyRecommendationItem] {
+        guard let response = dailyByScope[scope] else { return [] }
+        let othersClaimed = Set(
+            claimedDisplayIDs.filter { $0.key != scope }.values.flatMap { $0 }
+        )
+        return response.recommendations.filter { !othersClaimed.contains($0.pool_id) }
     }
 
     /// タブ選択。未取得スコープのみ遅延ロードする (先読みはしない:
@@ -308,9 +348,11 @@ final class HomeViewModel {
                 uid: uid, gender: gender, targetDate: tab.dateString, forceRegenerate: regenerate
             ) {
             case .success(let response):
-                dailyByScope[scope] = response
+                let cleaned = sanitizedDaily(response)
+                dailyByScope[scope] = cleaned
+                claimDisplaySlots(scope: scope, response: cleaned)
                 dailyRevalidated.insert(scope)
-                HomeSectionCache.save(response, section: "daily_\(scope.rawValue)", uid: uid)
+                HomeSectionCache.save(cleaned, section: "daily_\(scope.rawValue)", uid: uid)
             case .failure:
                 if dailyByScope[scope] == nil { dailyErrorScopes.insert(scope) }
             }
@@ -511,6 +553,7 @@ final class HomeViewModel {
         // 地域が変わると全スコープの天気・提案が変わるため作り直す
         dailyByScope.removeAll()
         dailyRevalidated.removeAll()
+        claimedDisplayIDs.removeAll()
         await refreshDailyRecommendation()
     }
 
