@@ -52,27 +52,23 @@ struct HomeView: View {
                     } else if viewModel.hasLoadError {
                         recentCoordinatesError
                     } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("直近のコーデ")
-                                .font(.system(size: 20, weight: .bold))
-                            RecentCoordinates(
-                                recentCoordinates: viewModel.homeResponse.recent_coordinates,
-                                isEditMode: viewModel.isEditMode,
-                                onToggleEditMode: { viewModel.toggleEditMode() },
-                                onDeleteRequest: { coordinateId in
-                                    viewModel.requestDelete(coordinateId: coordinateId)
-                                },
-                                onTapCoordinate: { coordinate in
-                                    path.append(.coordinateDetail(.init(
-                                        coordinateId: coordinate.id,
-                                        coordinateImageURL: coordinate.displayImageURL,
-                                        showHeader: true
-                                    )))
-                                }
-                            )
-                            .padding(.horizontal, -24)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        // タイトルは RecentCoordinates 内部のヘッダー (見出し+編集ボタン) に一本化
+                        RecentCoordinates(
+                            recentCoordinates: viewModel.homeResponse.recent_coordinates,
+                            isEditMode: viewModel.isEditMode,
+                            onToggleEditMode: { viewModel.toggleEditMode() },
+                            onDeleteRequest: { coordinateId in
+                                viewModel.requestDelete(coordinateId: coordinateId)
+                            },
+                            onTapCoordinate: { coordinate in
+                                path.append(.coordinateDetail(.init(
+                                    coordinateId: coordinate.id,
+                                    coordinateImageURL: coordinate.displayImageURL,
+                                    showHeader: true
+                                )))
+                            }
+                        )
+                        .padding(.horizontal, -24)
                     } else {
                         coordinateEmptyState
                     }

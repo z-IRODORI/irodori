@@ -799,6 +799,20 @@ struct TomorrowPickSection: View {
                             listPushItem = item
                         } label: {
                             DailyGridImage(imageURL: item.image_url)
+                                // コーデに使っている手持ちアイテムを丸アイコンで右上に表示
+                                // (◯ = 使える手持ちアイテム / 破線 = 手持ちと一致なし)
+                                .overlay(alignment: .topTrailing) {
+                                    if item.kindEnum == .pool {
+                                        Group {
+                                            if !item.owned_items.isEmpty {
+                                                OwnedItemCircles(items: item.owned_items, size: 20)
+                                            } else {
+                                                NoOwnedItemBadge(size: 20)
+                                            }
+                                        }
+                                        .padding(6)
+                                    }
+                                }
                         }
                         .buttonStyle(.plain)
                     }
@@ -861,6 +875,17 @@ fileprivate struct TomorrowCompositionView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 20) {
+                // コーデ画像: どのコーデの詳細かを最初に見せる。
+                // 全身 (靴まで) が切れないよう fit 表示とし、左右の余白は薄グレーで馴染ませる
+                KFImage(URL(string: item.image_url))
+                    .resizable()
+                    .placeholder { Color.gray.opacity(0.15) }
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 320)
+                    .background(Color.gray.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
                 Text(styleName)
                     .font(.system(size: 20, weight: .bold))
                 if item.is_discovery {
@@ -893,12 +918,13 @@ fileprivate struct TomorrowCompositionView: View {
         .onAppear {
             if rating == nil { rating = initialRating }
         }
-        .navigationTitle("このコーデ")
+        .navigationTitle("コーデ詳細")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $webLink) { link in
+            // WebViewContainer 自身のヘッダー (ページタイトル=商品名+ナビボタン) に一本化するため
+            // システムのナビゲーションバーは表示しない
             WebViewContainer(url: link.url)
-                .navigationTitle("ZOZOTOWNで探す")
-                .navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .navigationBar)
         }
     }
 

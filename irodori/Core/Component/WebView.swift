@@ -15,6 +15,8 @@ struct WebView: UIViewRepresentable {
     @Binding var canGoBack: Bool
     @Binding var canGoForward: Bool
     @Binding var isLoading: Bool
+    /// 表示中ページのタイトル (商品名など)。ヘッダーのタイトル表示に使う
+    @Binding var pageTitle: String
     // WebViewProxyパターンを参考に、外部からWebViewを操作するための仕組み
     let webViewStore: WebViewStore
 
@@ -22,6 +24,7 @@ struct WebView: UIViewRepresentable {
         let webView = WKWebView()
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
+        context.coordinator.observeTitle(of: webView)
         webView.load(URLRequest(url: url))
 
         // WebViewStoreに参照を保持
@@ -38,9 +41,19 @@ struct WebView: UIViewRepresentable {
 
     class Coordinator: NSObject, WKNavigationDelegate {
         let parent: WebView
+        private var titleObservation: NSKeyValueObservation?
 
         init(_ parent: WebView) {
             self.parent = parent
+        }
+
+        /// ページ内遷移 (SPA含む) でもヘッダーのタイトルが追従するよう KVO で監視する
+        func observeTitle(of webView: WKWebView) {
+            titleObservation = webView.observe(\.title, options: [.new]) { [weak self] webView, _ in
+                DispatchQueue.main.async {
+                    self?.parent.pageTitle = webView.title ?? ""
+                }
+            }
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -127,6 +140,7 @@ struct WebViewContainer: View {
     @State private var canGoBack = false
     @State private var canGoForward = false
     @State private var isLoading = false
+    @State private var pageTitle = ""
     @State private var webViewStore = WebViewStore()
     @Environment(\.dismiss) var dismiss
     @Environment(\.openURL) private var openURL
@@ -142,6 +156,7 @@ struct WebViewContainer: View {
                 canGoBack: $canGoBack,
                 canGoForward: $canGoForward,
                 isLoading: $isLoading,
+                pageTitle: $pageTitle,
                 webViewStore: webViewStore
             )
         }
@@ -163,13 +178,13 @@ struct WebViewContainer: View {
                     .foregroundColor(.primary)
             }
 
-            Spacer()
-
-            // Title
-            Text(url.host ?? "")
-                .font(.headline)
-
-            Spacer()
+            // Title: ページタイトル (商品名など)。取得できるまではホスト名を表示
+            Text(pageTitle.isEmpty ? (url.host ?? "") : pageTitle)
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 8)
 
             // Navigation buttons
             HStack(spacing: 16) {
