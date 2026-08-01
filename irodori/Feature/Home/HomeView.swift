@@ -280,7 +280,8 @@ struct HomeView: View {
                 Button(action: { path.append(.favorites) }) {
                     Image(systemName: "heart")
                 }
-                Button(action: { path.append(.calendar) }) {
+                // カレンダーはタブに昇格したため、プッシュではなくタブ切り替えで開く
+                Button(action: { tabViewModel.selectedTab = .calendar }) {
                     Image(systemName: "calendar")
                 }
                 Button(action: { showTutorialSheet = true }) {

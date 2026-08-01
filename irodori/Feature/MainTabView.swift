@@ -28,6 +28,11 @@ struct MainTabView: View {
                     }
                 }
 
+                // カレンダー (着用記録・予定コーデのふりかえり)
+                Tab("カレンダー", systemImage: "calendar", value: MainTabViewModel.Tab.calendar) {
+                    CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
+                }
+
                 // クローゼット
                 Tab("クローゼット", systemImage: "person.fill", value: MainTabViewModel.Tab.profile) {
                     ProfileView(path: $path)
@@ -225,7 +230,7 @@ final class MainTabViewModel {
     enum Tab {
         case home
         case partner
-        case planner
+        case calendar
         case profile
         case plus
     }

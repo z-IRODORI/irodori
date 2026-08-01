@@ -3,6 +3,7 @@ import PhotosUI
 
 struct ProfileView: View {
     @Binding var path: [ViewType]
+    @Environment(MainTabViewModel.self) private var tabViewModel
     @State private var viewModel = ProfileViewModel()
 //    @State private var selectedTab = 0  // コーデタブ未実装のためコメントアウト
     @State private var hasLoadedItems = false
@@ -122,7 +123,8 @@ struct ProfileView: View {
 
             HStack {
                 Spacer()
-                Button(action: { path.append(.calendar) }) {
+                // カレンダーはタブに昇格したため、プッシュではなくタブ切り替えで開く
+                Button(action: { tabViewModel.selectedTab = .calendar }) {
                     Image(systemName: "calendar")
                 }
                 .font(.system(size: 20))
