@@ -110,17 +110,25 @@ struct DailyMiniWeatherBadge: View {
 
 struct DailyPartnerCommentBox: View {
     let text: String
+    /// 朝いち演出 (1日1回) 用: true のとき1文字ずつ表示する
+    var typewriter: Bool = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "quote.opening")
                 .font(.system(size: 13))
                 .foregroundStyle(Color.orange.opacity(0.75))
-            Text(text)
-                .font(.system(size: 13))
-                .foregroundStyle(.primary)
-                .lineSpacing(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Group {
+                if typewriter {
+                    TypewriterText(text: text, lineSpacing: 3)
+                } else {
+                    Text(text)
+                        .lineSpacing(3)
+                }
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -130,6 +138,36 @@ struct DailyPartnerCommentBox: View {
                 .stroke(Color.orange.opacity(0.18), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// MARK: - タイプライター表示 (朝いち演出)
+
+/// 全文ぶんのスペースを透明テキストで確保したまま1文字ずつ重ね描きする
+/// (表示中にレイアウトが動かない)。text が変わると最初から再生する。
+struct TypewriterText: View {
+    let text: String
+    var lineSpacing: CGFloat = 0
+    /// 1文字あたりの表示間隔 (ナノ秒)。既定 ~18ms で 50字 ≈ 0.9秒
+    var interval: UInt64 = 18_000_000
+
+    @State private var visibleCount = 0
+
+    var body: some View {
+        Text(text)
+            .lineSpacing(lineSpacing)
+            .opacity(0)
+            .overlay(alignment: .topLeading) {
+                Text(String(text.prefix(visibleCount)))
+                    .lineSpacing(lineSpacing)
+            }
+            .task(id: text) {
+                visibleCount = 0
+                while visibleCount < text.count {
+                    try? await Task.sleep(nanoseconds: interval)
+                    visibleCount += 1
+                }
+            }
     }
 }
 

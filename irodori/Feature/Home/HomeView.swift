@@ -27,6 +27,7 @@ struct HomeView: View {
                 .padding(.bottom, 12)
                 .background(.white)
 
+            ScrollViewReader { scrollProxy in
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 32) {
                     // ヒーロー: 明日のコーデ (3案カルーセル + 構成アイテム比較 + これにする)
@@ -42,6 +43,7 @@ struct HomeView: View {
                         }
                     )
                     .padding(.horizontal, -24)
+                    .id("hero")
 
                     // 別ルートの提案導線 (旧・相棒カードの2ボタンを継承)
                     actionsCard
@@ -112,6 +114,17 @@ struct HomeView: View {
                         }
                     )
 
+                    // 20時以降の「明日の先取り」ティザー (夜→朝ループのトリガー)
+                    DailyTeaserSection(
+                        viewModel: viewModel,
+                        onOpenTomorrow: {
+                            viewModel.selectPickScope(.tomorrow)
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                scrollProxy.scrollTo("hero", anchor: .top)
+                            }
+                        }
+                    )
+
                     if let tags = viewModel.homeResponse.tags, !tags.isEmpty {
                         tagsSection
                     }
@@ -123,6 +136,7 @@ struct HomeView: View {
             }
             .refreshable {
                 await viewModel.onAppear()
+            }
             }
         }
         .background(Color.gray.opacity(0.08))

@@ -87,12 +87,25 @@ struct DailyRecommendationWeather: Codable, Hashable {
     let area_code: String
 }
 
+/// 翌日レスポンス: 昨日の👍👎への「反映したよ」バッジ (新サーバのみ返す)
+struct DailyFeedbackAck: Codable, Hashable {
+    let date: String?
+    let message: String
+    let reasons: [String]?
+    let likes: Int?
+    let dislikes: Int?
+}
+
 struct DailyRecommendationResponse: Codable, Hashable {
     let target_date: String        // YYYY-MM-DD
     let weather: DailyRecommendationWeather
     let partner_comment: String?
     let recommendations: [DailyRecommendationItem]
     let mode: String               // "cached" | "fallback" | "refreshing"
+    // 追加フィールド (旧サーバ応答には無いためすべて Optional + 既定 nil)
+    var feedback_ack: DailyFeedbackAck? = nil
+    var signal_count: Int? = nil
+    var signal_caption: String? = nil
 }
 
 struct WearMarkResponse: Codable {

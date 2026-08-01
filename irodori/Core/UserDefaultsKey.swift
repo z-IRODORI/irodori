@@ -33,4 +33,10 @@ enum UserDefaultsKey: String {
     case additionalPrefectureCodes
     case outfitWithWhoHistory
     case outfitWhereHistory
+    /// 「これにする」決定の記録 (対象日 yyyy-MM-dd → pool_id の辞書。翌朝は日付が変わり自然リセット)
+    case dailyDecisionRecord
+    /// 朝いち演出を再生した JST 日付 (1日1回だけ再生)
+    case dailyRitualPlayedDate
+    /// 通知許可の文脈付きプリプロンプトを表示済みか (見送り画面で1回だけ出す)
+    case notificationPromptShown
 }

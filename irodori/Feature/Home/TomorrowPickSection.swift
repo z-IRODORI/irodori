@@ -142,6 +142,38 @@ fileprivate struct SearchPill: View {
     }
 }
 
+/// 翌日レスポンス: 「昨日の声、反映したよ」バッジ (フィードバックした翌日だけ出る)。
+/// 相棒コメントボックスと同じ視覚言語のティール版。
+fileprivate struct FeedbackAckBadge: View {
+    let ack: DailyFeedbackAck
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "checkmark.bubble.fill")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.teal)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("昨日の声、反映したよ")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.black)
+                Text(ack.message)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.teal.opacity(0.07))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.teal.opacity(0.2), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
 /// 発見枠 (テイスト圏外からの挑戦提案) バッジ。
 /// DailyIchioshiBadge と同じ控えめな視覚言語 (白カプセル+細縁) のティール版。
 fileprivate struct DiscoveryBadge: View {
@@ -266,6 +298,12 @@ struct TomorrowPickSection: View {
     @State private var showPlanListSheet = false
     @State private var listPushItem: DailyRecommendationItem? = nil
     @State private var markingWornID: String? = nil
+    /// 「これにする」直後の見送り画面 (決定の儀式)
+    @State private var sendoffItem: DailyRecommendationItem? = nil
+    /// 朝いち演出 (1日1回): false の間はカルーセルを隠し、フェードインで登場させる
+    @State private var ritualRevealed = true
+    /// 朝いち演出中は相棒コメントをタイプライター表示する
+    @State private var ritualTypewriter = false
     #if DEBUG
     /// 開発ビルド専用: カルーセルの表示件数 (1〜9、リリースは常に3)
     @AppStorage("debug.pickCardLimit") private var debugCardLimit: Int = 3
@@ -294,10 +332,30 @@ struct TomorrowPickSection: View {
             debugBar
             #endif
             partnerRow
+            // 翌日レスポンス: 昨日の👍👎への「反映したよ」バッジ
+            if let ack = daily?.feedback_ack {
+                FeedbackAckBadge(ack: ack)
+                    .padding(.horizontal, 24)
+            }
+            if decidedPoolIdForCurrentTab != nil {
+                decidedBanner
+            }
             contentArea
+        }
+        .onAppear { playMorningRitualIfNeeded() }
+        .onChange(of: cards.count) { _, _ in
+            playMorningRitualIfNeeded()
         }
         .onChange(of: viewModel.selectedPickScope) { _, _ in
             currentCardID = nil
+        }
+        .sheet(item: $sendoffItem) { item in
+            DecisionSendoffView(
+                item: item,
+                partnerComment: daily?.partner_comment,
+                weather: daily?.weather,
+                scopeName: viewModel.selectedPickScope.displayName
+            )
         }
         .sheet(item: $reasonItem) { item in
             NavigationStack {
@@ -420,7 +478,45 @@ struct TomorrowPickSection: View {
     private var partnerRow: some View {
         HStack(alignment: .top, spacing: 10) {
             PartnerIconImage(size: 44)
-            DailyPartnerCommentBox(text: daily?.partner_comment ?? "\(viewModel.selectedPickScope.displayName)のコーデ、3案そろえたよ。")
+            DailyPartnerCommentBox(
+                text: daily?.partner_comment ?? "\(viewModel.selectedPickScope.displayName)のコーデ、3案そろえたよ。",
+                typewriter: ritualTypewriter
+            )
+        }
+        .padding(.horizontal, 24)
+    }
+
+    // MARK: - 朝いち演出 (1日1回だけ: フェードイン + タイプライター)
+
+    private func playMorningRitualIfNeeded() {
+        guard !cards.isEmpty else { return }
+        let today = HomeViewModel.jstTodayString()
+        let key = UserDefaultsKey.dailyRitualPlayedDate.rawValue
+        guard UserDefaults.standard.string(forKey: key) != today else { return }
+        UserDefaults.standard.set(today, forKey: key)
+        ritualRevealed = false
+        ritualTypewriter = true
+        withAnimation(.easeOut(duration: 0.7).delay(0.2)) {
+            ritualRevealed = true
+        }
+    }
+
+    // MARK: - 決定済み状態 (これにする済みのタブ)
+
+    /// 表示中タブの対象日に「これにする」済みの pool_id
+    private var decidedPoolIdForCurrentTab: String? {
+        currentTab.flatMap { viewModel.decidedPoolId(forDate: $0.dateString) }
+    }
+
+    private var decidedBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(.black)
+            Text("\(viewModel.selectedPickScope.displayName)のコーデは決定ずみ。変えたくなったら選び直せるよ")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Spacer()
         }
         .padding(.horizontal, 24)
     }
@@ -431,7 +527,13 @@ struct TomorrowPickSection: View {
     private var contentArea: some View {
         if !cards.isEmpty {
             cardCarousel
+                .opacity(ritualRevealed ? 1 : 0)
+                .offset(y: ritualRevealed ? 0 : 16)
             paginationRow
+            // 根拠バッジ: 「あなたの◯回の記録から」/ 逆マイルストーン
+            if let caption = daily?.signal_caption, !caption.isEmpty {
+                signalCaptionRow(caption)
+            }
         } else if viewModel.isLoadingDailyRecommendation {
             loadingCarousel
         } else if viewModel.hasDailyRecommendationError {
@@ -510,20 +612,29 @@ struct TomorrowPickSection: View {
 
                 Spacer(minLength: 0)
 
+                let isDecided = card.pool_id == decidedPoolIdForCurrentTab
                 Button {
                     markWornTapped(card)
                 } label: {
-                    Text(markingWornID == card.id ? "記録中..." : "これにする")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .contentShape(Rectangle())
+                    HStack(spacing: 6) {
+                        if isDecided {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                        }
+                        Text(isDecided
+                             ? "これで決まり"
+                             : (markingWornID == card.id ? "記録中..." : "これにする"))
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(isDecided ? Color.black.opacity(0.5) : .black)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(markingWornID != nil)
+                .disabled(markingWornID != nil || isDecided)
                 .padding(.top, 4)
             }
             .padding(12)
@@ -740,7 +851,7 @@ struct TomorrowPickSection: View {
         .padding(.horizontal, 24)
     }
 
-    // MARK: - 着用記録 (これにする)
+    // MARK: - 着用記録 (これにする → 見送りの儀式)
 
     private func markWornTapped(_ card: DailyRecommendationItem) {
         guard markingWornID == nil else { return }
@@ -756,12 +867,27 @@ struct TomorrowPickSection: View {
             markingWornID = nil
             if ok {
                 Haptic.notify(.success)
-                ToastManager.shared.show("\(viewModel.selectedPickScope.displayName)のコーデに決定しました", style: .normal)
+                if let tab = currentTab {
+                    viewModel.recordDecision(poolId: card.pool_id, targetDate: tab.dateString)
+                }
+                // 決定の直後を無音にしない: トーストではなく見送り画面で送り出す
+                sendoffItem = card
             } else {
                 Haptic.notify(.error)
                 ToastManager.shared.show("記録に失敗しました。時間をおいて再度お試しください")
             }
         }
+    }
+
+    private func signalCaptionRow(_ caption: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(size: 10, weight: .semibold))
+            Text(caption)
+                .font(.system(size: 11))
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 24)
     }
 
     /// カード長押しからのワンタップ「興味なし」(理由なし送信)。

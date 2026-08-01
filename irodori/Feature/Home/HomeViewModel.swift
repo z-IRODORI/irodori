@@ -58,6 +58,8 @@ final class HomeViewModel {
     private var dailyRevalidated: Set<PickScope> = []
     /// このセッションで送信したフィードバック (pool_id → 評価)。UI状態の即時反映用
     private(set) var feedbackByPool: [String: PickFeedbackRating] = [:]
+    /// 「これにする」決定の記録 (対象日 → pool_id + 最終決定操作日)。UserDefaults 永続化
+    private var decisionRecord = DecisionRecord.load()
     /// タブ間で表示上位が重複しないよう、先着スコープが表示枠 (上位3件) を確保する台帳。
     /// サーバ側の兄弟日付除外の保険 (修正前に生成された旧キャッシュ対策)
     private var claimedDisplayIDs: [PickScope: [String]] = [:]
@@ -177,6 +179,10 @@ final class HomeViewModel {
             group.addTask { await self.loadDaily(scope: self.selectedPickScope, force: true) }
             group.addTask { await self.loadCollageSection(uid: uid, gender: gender) }
             group.addTask { await self.loadClosetBridgeSection(uid: uid, gender: gender) }
+            // 夜→朝ループ: 20時以降なら明日タブを先読み (ティザー表示用) し、
+            // 21時のローカル通知を予約 (許可済みの場合のみ)
+            group.addTask { await self.loadTomorrowTeaserIfNeeded() }
+            group.addTask { await NotificationManager.shared.scheduleEveningTeaserIfNeeded() }
         }
     }
 
@@ -280,7 +286,10 @@ final class HomeViewModel {
             weather: response.weather,
             partner_comment: response.partner_comment,
             recommendations: filtered,
-            mode: response.mode
+            mode: response.mode,
+            feedback_ack: response.feedback_ack,
+            signal_count: response.signal_count,
+            signal_caption: response.signal_caption
         )
     }
 
@@ -353,6 +362,10 @@ final class HomeViewModel {
                 claimDisplaySlots(scope: scope, response: cleaned)
                 dailyRevalidated.insert(scope)
                 HomeSectionCache.save(cleaned, section: "daily_\(scope.rawValue)", uid: uid)
+                // 明日タブが取れたら、21時のローカル通知の文言を相棒コメントに差し替える
+                if scope == .tomorrow {
+                    Task { await NotificationManager.shared.scheduleEveningTeaser(body: cleaned.partner_comment) }
+                }
             case .failure:
                 if dailyByScope[scope] == nil { dailyErrorScopes.insert(scope) }
             }
@@ -583,6 +596,79 @@ final class HomeViewModel {
         }
     }
 
+    // MARK: - 「これにする」決定の記録 (決定の儀式・ティザー解放)
+
+    /// 対象日 → pool_id と最終決定操作日。翌朝は日付が変わることで自然リセットされる
+    private struct DecisionRecord: Codable {
+        var byDate: [String: String] = [:]
+        var lastActionDate: String? = nil
+
+        static func load() -> DecisionRecord {
+            guard let data = UserDefaults.standard.data(
+                forKey: UserDefaultsKey.dailyDecisionRecord.rawValue
+            ), let record = try? JSONDecoder().decode(DecisionRecord.self, from: data) else {
+                return DecisionRecord()
+            }
+            return record
+        }
+
+        func save() {
+            if let data = try? JSONEncoder().encode(self) {
+                UserDefaults.standard.set(data, forKey: UserDefaultsKey.dailyDecisionRecord.rawValue)
+            }
+        }
+    }
+
+    static func jstTodayString(now: Date = Date()) -> String {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        return fmt.string(from: now)
+    }
+
+    /// 対象日に「これにする」済みの pool_id (無ければ nil)
+    func decidedPoolId(forDate dateString: String) -> String? {
+        decisionRecord.byDate[dateString]
+    }
+
+    /// 今日 (JST) にどれかのタブで決定操作をしたか (ティザーのぼかし解放に使う)
+    var hasDecidedToday: Bool {
+        decisionRecord.lastActionDate == Self.jstTodayString()
+    }
+
+    /// 「これにする」成功時に呼ぶ。決定を永続化する (再決定は上書き)
+    func recordDecision(poolId: String, targetDate: String) {
+        decisionRecord.byDate[targetDate] = poolId
+        decisionRecord.lastActionDate = Self.jstTodayString()
+        // 過去日のエントリは自然に不要になるため間引く (直近14日ぶんだけ保持)
+        if decisionRecord.byDate.count > 14 {
+            let sorted = decisionRecord.byDate.keys.sorted(by: >)
+            for key in sorted.dropFirst(14) {
+                decisionRecord.byDate.removeValue(forKey: key)
+            }
+        }
+        decisionRecord.save()
+    }
+
+    // MARK: - 20時ティザー (夜→朝ループ)
+
+    /// JST 20時以降か (ティザーの表示条件)
+    var isEveningTeaserTime: Bool {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+        return cal.component(.hour, from: Date()) >= 20
+    }
+
+    /// ティザーに使う明日タブのレスポンス (未取得なら nil)
+    var teaserResponse: DailyRecommendationResponse? { dailyByScope[.tomorrow] }
+
+    /// 20時以降にホームを開いたとき、明日タブ未取得なら先読みする (ティザー表示用)
+    func loadTomorrowTeaserIfNeeded() async {
+        guard isEveningTeaserTime, dailyByScope[.tomorrow] == nil else { return }
+        await loadDaily(scope: .tomorrow)
+    }
+
     // MARK: - おすすめコーデへのフィードバック (パーソナライズ改善)
 
     func feedbackRating(for item: DailyRecommendationItem) -> PickFeedbackRating? {
@@ -633,7 +719,10 @@ final class HomeViewModel {
                 weather: response.weather,
                 partner_comment: response.partner_comment,
                 recommendations: filtered,
-                mode: response.mode
+                mode: response.mode,
+                feedback_ack: response.feedback_ack,
+                signal_count: response.signal_count,
+                signal_caption: response.signal_caption
             )
             dailyByScope[scope] = updated
             HomeSectionCache.save(updated, section: "daily_\(scope.rawValue)", uid: uid)
