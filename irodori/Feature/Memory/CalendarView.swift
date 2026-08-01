@@ -31,7 +31,6 @@ struct CalendarView: View {
     /// 表示中の月 (viewModel.months への索引。months は新しい順)。nil は今月で未初期化
     @State private var selectedMonthIndex: Int? = nil
 
-    private let columns7 = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
     private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
     private let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
 
@@ -286,33 +285,48 @@ struct CalendarView: View {
         withAnimation(.easeOut(duration: 0.2)) { selectedMonthIndex = monthIndex - 1 }
     }
 
+    /// 1ヶ月が必ず1画面に収まるレイアウト (スクロールなし)。
+    /// グリッドは残り高さを GeometryReader で受け、セル高を行数から逆算する。
     private var monthPager: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 14) {
-                if let month = selectedMonth {
-                    statsRow(for: month)
-                    switch monthState {
-                    case .loading:
-                        monthSkeletonGrid
-                    case .loaded(let responses):
-                        monthGrid(month: month, responses: responses)
-                        if !hasAnyEntry(month: month, responses: responses) {
-                            emptyMonthHint
-                        }
-                    case .failed:
-                        // 失敗時も日付グリッドは描画し、予定コーデだけでも見せる (従来挙動の踏襲)
-                        monthGrid(month: month, responses: [])
-                        if !viewModel.hasPlanned(year: month.year, month: month.monthOfTheYear) {
-                            emptyMonthHint
-                        }
+        VStack(alignment: .leading, spacing: 10) {
+            if let month = selectedMonth {
+                statsRow(for: month)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                switch monthState {
+                case .loading:
+                    weekdayHeader
+                        .padding(.horizontal, 16)
+                    monthSkeletonGrid
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 10)
+                case .loaded(let responses):
+                    if !hasAnyEntry(month: month, responses: responses) {
+                        emptyMonthHint
+                            .padding(.horizontal, 16)
                     }
+                    weekdayHeader
+                        .padding(.horizontal, 16)
+                    gridArea(month: month, responses: responses)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 10)
+                case .failed:
+                    // 失敗時も日付グリッドは描画し、予定コーデだけでも見せる (従来挙動の踏襲)
+                    if !viewModel.hasPlanned(year: month.year, month: month.monthOfTheYear) {
+                        emptyMonthHint
+                            .padding(.horizontal, 16)
+                    }
+                    weekdayHeader
+                        .padding(.horizontal, 16)
+                    gridArea(month: month, responses: [])
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 10)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 40)
         }
-        // 左右スワイプでも月を移動できるようにする (縦スクロールとは干渉しない閾値)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .contentShape(Rectangle())
+        // 左右スワイプでも月を移動できるようにする
         .simultaneousGesture(
             DragGesture(minimumDistance: 30)
                 .onEnded { value in
@@ -361,24 +375,55 @@ struct CalendarView: View {
         .foregroundStyle(.secondary)
     }
 
-    private func monthGrid(month: Month, responses: [CoordinateListResponse]) -> some View {
-        LazyVGrid(columns: columns7, spacing: 5) {
+    private var weekdayHeader: some View {
+        HStack(spacing: 5) {
             ForEach(Array(weekdays.enumerated()), id: \.offset) { i, wd in
                 Text(wd)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(weekdayColor(i))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 3)
-            }
-
-            ForEach(0..<(month.spacesBeforeFirst - 1), id: \.self) { _ in
-                Color.clear.aspectRatio(3/4, contentMode: .fill)
-            }
-
-            ForEach(1...month.amountOfDays, id: \.self) { day in
-                dayCell(month: month, day: day, responses: responses)
             }
         }
+    }
+
+    /// 月を週単位の行 ([Int?] の7要素、nil = 月外の空セル) に分割する
+    private func weeks(for month: Month) -> [[Int?]] {
+        let leadingBlanks = max(month.spacesBeforeFirst - 1, 0)
+        var cells: [Int?] = Array(repeating: nil, count: leadingBlanks)
+        cells.append(contentsOf: (1...month.amountOfDays).map { Optional($0) })
+        while cells.count % 7 != 0 { cells.append(nil) }
+        return stride(from: 0, to: cells.count, by: 7).map { Array(cells[$0..<($0 + 7)]) }
+    }
+
+    /// 週を横1行 (7日) とし、行高 = 残り高さ ÷ 週数 で均等分割する。
+    /// 月全体が必ず1画面に収まり、画面をちょうど使い切るカレンダー形式。
+    private func gridArea(month: Month, responses: [CoordinateListResponse]) -> some View {
+        GeometryReader { geo in
+            let spacing: CGFloat = 5
+            let weekRows = weeks(for: month)
+            let rowHeight = max(
+                30,
+                (geo.size.height - spacing * CGFloat(weekRows.count - 1)) / CGFloat(weekRows.count)
+            )
+
+            VStack(spacing: spacing) {
+                ForEach(Array(weekRows.enumerated()), id: \.offset) { _, week in
+                    HStack(spacing: spacing) {
+                        ForEach(Array(week.enumerated()), id: \.offset) { _, day in
+                            if let day {
+                                dayCell(month: month, day: day, responses: responses, cellHeight: rowHeight)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Color.clear
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                    .frame(height: rowHeight)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// 日=赤 / 土=青 (日本のカレンダー慣習)。それ以外はグレー
@@ -418,23 +463,30 @@ struct CalendarView: View {
     // MARK: - 月スケルトン (ロード中)
 
     private var monthSkeletonGrid: some View {
-        LazyVGrid(columns: columns7, spacing: 5) {
-            ForEach(0..<7, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.gray.opacity(0.10))
-                    .frame(height: 10)
-            }
-            ForEach(0..<35, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.gray.opacity(0.09))
-                    .aspectRatio(3/4, contentMode: .fill)
+        GeometryReader { geo in
+            let spacing: CGFloat = 5
+            let rows = 6
+            let rowHeight = max(30, (geo.size.height - spacing * CGFloat(rows - 1)) / CGFloat(rows))
+
+            VStack(spacing: spacing) {
+                ForEach(0..<rows, id: \.self) { _ in
+                    HStack(spacing: spacing) {
+                        ForEach(0..<7, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.gray.opacity(0.09))
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .frame(height: rowHeight)
+                }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Day Cell
 
-    private func dayCell(month: Month, day: Int, responses: [CoordinateListResponse]) -> some View {
+    private func dayCell(month: Month, day: Int, responses: [CoordinateListResponse], cellHeight: CGFloat) -> some View {
         // day フィールドで突合する (旧実装の配列インデックス依存は歯抜けデータでズレるため)
         let coord = responses.first { $0.day == day }
         // display_type に応じて撮影/切り取り画像を選ぶ
@@ -469,9 +521,8 @@ struct CalendarView: View {
                 if let imageURL {
                     coordinateImage(from: imageURL)
                         .scaledToFill()
-                        .frame(minWidth: 0, maxWidth: .infinity,
-                               minHeight: 0, maxHeight: .infinity)
-                        .aspectRatio(3/4, contentMode: .fill)
+                        .frame(minWidth: 0, maxWidth: .infinity)
+                        .frame(height: cellHeight)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
 
                     Text("\(day)")
@@ -484,9 +535,8 @@ struct CalendarView: View {
                     // 予定コーデ: 破線枠 + 時計アイコンで「まだ着ていない予定」を表現
                     coordinateImage(from: planned.image_url)
                         .scaledToFill()
-                        .frame(minWidth: 0, maxWidth: .infinity,
-                               minHeight: 0, maxHeight: .infinity)
-                        .aspectRatio(3/4, contentMode: .fill)
+                        .frame(minWidth: 0, maxWidth: .infinity)
+                        .frame(height: cellHeight)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
@@ -510,7 +560,7 @@ struct CalendarView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .padding(4)
                 } else {
-                    Color.clear.aspectRatio(3/4, contentMode: .fill)
+                    Color.clear
 
                     if isToday {
                         Circle()
@@ -526,7 +576,7 @@ struct CalendarView: View {
                     }
                 }
             }
-            .aspectRatio(3/4, contentMode: .fill)
+            .frame(height: cellHeight)
         }
         .buttonStyle(.plain)
         .disabled(imageURL == nil && planned == nil)
