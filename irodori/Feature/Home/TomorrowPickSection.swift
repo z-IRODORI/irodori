@@ -548,21 +548,23 @@ struct TomorrowPickSection: View {
                     .foregroundStyle(.secondary)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
+                // ホームの他の主要ボタン (コーデ未登録の空状態カード) と同じスタイルに揃える
                 Button {
                     Haptic.impact(.soft)
                     tabViewModel.shouldShowFirstTakePhotoOnHome = true
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "camera")
-                            .font(.system(size: 12, weight: .semibold))
+                    HStack {
                         Text("コーデを撮って登録する")
+                            .font(.system(size: 14, weight: .semibold))
+                        Spacer()
+                        Image(systemName: "arrow.right")
                             .font(.system(size: 13, weight: .semibold))
                     }
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
                     .background(.black)
-                    .clipShape(Capsule())
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 4)
