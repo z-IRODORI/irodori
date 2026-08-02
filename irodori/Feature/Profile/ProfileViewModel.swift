@@ -88,6 +88,11 @@ final class ProfileViewModel {
         await loadTask?.value
     }
 
+    /// 撮影切り抜き画像のままのアイテム (商品画像への差し替え導線の対象)
+    var photoCropItems: [ClosetItem] {
+        closetItems.filter { $0.isPhotoCropImage }
+    }
+
     /// 画像編集で差し替えたアイテムをローカル一覧へ反映する (位置を保ったまま置換)
     func replaceItem(oldId: String, with newItem: ClosetItem) {
         if let index = closetItems.firstIndex(where: { $0.id == oldId }) {
