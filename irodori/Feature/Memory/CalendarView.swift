@@ -169,8 +169,8 @@ struct CalendarView: View {
         let upcoming = viewModel.upcomingPlannedCount
         let (title, subtitle): (String, String) = {
             if upcoming == 0 {
-                return ("1週間分のコーデをまとめて仕込む",
-                        "相棒が天気と手持ちに合わせて先の分まで提案します")
+                return ("相棒にコーデプランを考えてもらう",
+                        "天気と手持ちに合わせて、1週間分まで先取り提案します")
             }
             if upcoming <= 2 {
                 return ("予定コーデが残り\(upcoming)日分",
@@ -185,12 +185,8 @@ struct CalendarView: View {
             path.append(.outfitPlanner)
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: "wand.and.stars")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background(.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                // 「相棒が考える」ことが伝わるよう、機能アイコンではなく相棒の顔を出す
+                PartnerIconImage(size: 38)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)

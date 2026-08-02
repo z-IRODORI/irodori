@@ -293,6 +293,7 @@ struct TomorrowPickSection: View {
     let onLocationTap: () -> Void
 
     @Environment(FavoritesStore.self) private var favoritesStore
+    @Environment(MainTabViewModel.self) private var tabViewModel
     @State private var currentCardID: String? = nil
     @State private var reasonItem: DailyRecommendationItem? = nil
     @State private var showPlanListSheet = false
@@ -341,6 +342,10 @@ struct TomorrowPickSection: View {
                 decidedBanner
             }
             contentArea
+            // クローゼットが少ないと手持ちベースのパーソナライズが効かないため、登録導線を出す
+            if shouldShowItemNudge {
+                itemRegistrationNudge
+            }
         }
         .onAppear { playMorningRitualIfNeeded() }
         .onChange(of: cards.count) { _, _ in
@@ -518,6 +523,56 @@ struct TomorrowPickSection: View {
                 .foregroundStyle(.secondary)
             Spacer()
         }
+        .padding(.horizontal, 24)
+    }
+
+    // MARK: - アイテム登録促進 (クローゼットが少ないユーザー向け)
+
+    /// クローゼット登録が少なく、手持ちベースのパーソナライズが効いていない状態か。
+    /// 取得成功前 (hasLoadedCloset=false) は誤表示を避けるため出さない
+    private var shouldShowItemNudge: Bool {
+        !cards.isEmpty && viewModel.hasLoadedCloset && viewModel.closetItems.count < 3
+    }
+
+    private var itemRegistrationNudge: some View {
+        let count = viewModel.closetItems.count
+        return HStack(alignment: .top, spacing: 12) {
+            // 破線サークル = 「未所持/未登録」の視覚言語をここでも使う
+            NoOwnedItemBadge(size: 40)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(count == 0 ? "手持ちアイテムを登録しよう" : "手持ちアイテムがまだ\(count)点だけ")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.black)
+                Text("アイテムが増えるほど、手持ちの服で作れるコーデを優先して提案できるようになるよ。コーデを撮ると自動で登録される！")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    Haptic.impact(.soft)
+                    tabViewModel.shouldShowFirstTakePhotoOnHome = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "camera")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("コーデを撮って登録する")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .background(.black)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
         .padding(.horizontal, 24)
     }
 
@@ -1046,11 +1101,10 @@ fileprivate struct TomorrowCompositionView: View {
         }
         .navigationTitle("コーデ詳細")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(item: $webLink) { link in
-            // WebViewContainer 自身のヘッダー (ページタイトル=商品名+ナビボタン) に一本化するため
-            // システムのナビゲーションバーは表示しない
+        // medium ディテントのシート内に push すると Web ページが画面半分しか使えないため、
+        // 全画面カバーで開いて表示領域を最大化する
+        .fullScreenCover(item: $webLink) { link in
             WebViewContainer(url: link.url)
-                .toolbar(.hidden, for: .navigationBar)
         }
     }
 

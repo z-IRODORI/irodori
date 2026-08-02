@@ -37,6 +37,8 @@ final class HomeViewModel {
     // クローゼットアイテムピッカー
     var closetItems: [ClosetItem] = []
     var isLoadingCloset = false
+    /// クローゼット取得が一度成功したか。アイテム登録促進バナーの誤表示 (取得前/失敗時) を防ぐ
+    var hasLoadedCloset = false
     var showingItemPicker = false
     private var pickerTargetDateID: Int? = nil
 
@@ -179,6 +181,8 @@ final class HomeViewModel {
             group.addTask { await self.loadDaily(scope: self.selectedPickScope, force: true) }
             group.addTask { await self.loadCollageSection(uid: uid, gender: gender) }
             group.addTask { await self.loadClosetBridgeSection(uid: uid, gender: gender) }
+            // アイテム登録促進バナーの判定用 (登録済みなら件数はほぼ変わらないため未取得時のみ)
+            group.addTask { await self.loadClosetItemsIfNeeded() }
             // 夜→朝ループ: 20時以降なら明日タブを先読み (ティザー表示用) し、
             // 21時のローカル通知を予約 (許可済みの場合のみ)
             group.addTask { await self.loadTomorrowTeaserIfNeeded() }
@@ -844,6 +848,7 @@ final class HomeViewModel {
                 self.closetItems = response.items.filter {
                     $0.item_type == "トップス" || $0.item_type == "ボトムス"
                 }
+                self.hasLoadedCloset = true
             case .failure:
                 break
             }
