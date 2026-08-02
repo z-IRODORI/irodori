@@ -40,6 +40,11 @@ struct CalendarView: View {
     @State private var presentedPoolItem: DailyRecommendationItem? = nil
     @State private var isLoadingPlannedDetail = false
 
+    #if DEBUG
+    /// 週間コーデプランナー計画書の検証画面 (Sandbox)。実uidのまま実APIを叩いて確認する
+    @State private var showWeeklyPlannerSandbox = false
+    #endif
+
     var body: some View {
         Group {
             if viewModel.months.isEmpty || viewModel.isInitiallyLoading {
@@ -78,8 +83,33 @@ struct CalendarView: View {
                     .foregroundStyle(.black)
                 }
             }
+            #if DEBUG
+            // 週間コーデプランナーの検証画面 (Sandbox)。Release ビルドには入らない
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Haptic.impact(.soft)
+                    showWeeklyPlannerSandbox = true
+                } label: {
+                    Image(systemName: "flask")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.black)
+                }
+            }
+            #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if DEBUG
+        .sheet(isPresented: $showWeeklyPlannerSandbox) {
+            NavigationStack {
+                WeeklyPlannerSandboxView()
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("閉じる") { showWeeklyPlannerSandbox = false }
+                        }
+                    }
+            }
+        }
+        #endif
         .task {
             AnalyticsLogger.shared.log(screen: .memoryCalendarScreenView)
             await viewModel.onAppear()
