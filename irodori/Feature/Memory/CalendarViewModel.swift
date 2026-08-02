@@ -80,6 +80,17 @@ final class CalendarViewModel {
         return plannedByDate.keys.contains { $0.hasPrefix(prefix) }
     }
 
+    /// 今日以降の予定コーデ日数 (プランナー導線の残弾表示用)。
+    /// "YYYY-MM-DD" は辞書順 = 日付順なので文字列比較で数えられる
+    var upcomingPlannedCount: Int {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        let today = formatter.string(from: Date())
+        return plannedByDate.keys.filter { $0 >= today }.count
+    }
+
     /// 予定コーデを取得 (先月〜来月の3ヶ月分。予定は近い日付にしか存在しない想定)
     func loadPlanned() async {
         guard !uid.isEmpty else { return }

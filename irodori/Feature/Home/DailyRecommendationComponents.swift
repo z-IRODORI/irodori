@@ -48,6 +48,61 @@ enum DailyWeatherDisplay {
     }
 }
 
+extension DailyWeatherDisplay {
+    /// 天気そのものを表す語 (完全一致で拾う。「雷を伴い」等の修飾句は落とす)
+    private static let weatherTerms: Set<String> = [
+        "晴れ", "晴", "くもり", "曇り", "曇", "雨", "大雨", "雪", "大雪", "みぞれ", "雷雨", "雷",
+    ]
+    private static let weatherConnectives: Set<String> = ["後", "のち", "時々", "一時"]
+
+    /// 気象庁の condition は「晴れ 後 くもり 夜 雨 所により 昼過ぎ まで…」のような長文が
+    /// 入るため、UIに収まるよう主要語だけに短縮する (サーバ側 compact_weather_condition と同仕様)
+    static func compactCondition(_ condition: String) -> String {
+        let tokens = condition
+            .replacingOccurrences(of: "　", with: " ")
+            .split(separator: " ")
+            .map(String.init)
+
+        var kept: [String] = []
+        for token in tokens where kept.count < 4 {
+            if weatherConnectives.contains(token) {
+                if let last = kept.last, !weatherConnectives.contains(last) {
+                    kept.append(token)
+                }
+            } else if weatherTerms.contains(token) {
+                kept.append(token)
+            }
+        }
+        while let last = kept.last, weatherConnectives.contains(last) {
+            kept.removeLast()
+        }
+        if kept.isEmpty {
+            let trimmed = condition.replacingOccurrences(of: "　", with: "")
+            return trimmed.count > 8 ? String(trimmed.prefix(8)) + "…" : trimmed
+        }
+        return kept.joined()
+    }
+}
+
+// MARK: - 系統 (genre) の日本語表示
+
+/// API の `style` は母集団CSV由来の英語値 (casual / korean / office_casual / sporty など) が
+/// そのまま返るため、表示用に日本語へ直す。未知の値は原文のまま出す
+enum GenreDisplay {
+    private static let japanese: [String: String] = [
+        "casual": "カジュアル", "korean": "韓国っぽい", "office_casual": "オフィスカジュアル",
+        "sporty": "スポーティ", "vintage": "ヴィンテージ", "minimal": "ミニマル",
+        "mode": "モード", "street": "ストリート", "natural": "ナチュラル",
+        "kirei": "きれいめ", "kireime": "きれいめ", "feminine": "フェミニン",
+        "girly": "ガーリー", "american": "アメカジ", "amekaji": "アメカジ",
+    ]
+
+    static func ja(_ raw: String) -> String {
+        guard !raw.isEmpty else { return "" }
+        return japanese[raw] ?? raw
+    }
+}
+
 // MARK: - 場所バッジ (天気の左に配置)
 
 struct DailyLocationBadge: View {

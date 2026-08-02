@@ -39,4 +39,6 @@ enum UserDefaultsKey: String {
     case dailyRitualPlayedDate
     /// 通知許可の文脈付きプリプロンプトを表示済みか (見送り画面で1回だけ出す)
     case notificationPromptShown
+    /// まとめて提案の開封リビールを縮退するか (「一気に開ける」を選んだ人は次回から開封済みで着地)
+    case plannerRevealCollapsed
 }

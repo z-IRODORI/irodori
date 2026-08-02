@@ -56,6 +56,9 @@ struct CalendarView: View {
                 VStack(spacing: 0) {
                     headerBar
                     hairline
+                    plannerEntryCard
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
                     switch displayMode {
                     case .calendar:
                         monthPager
@@ -68,23 +71,10 @@ struct CalendarView: View {
         .background(.white)
         .navigationTitle("カレンダー")
         .navigationBarTitleDisplayMode(.inline)
+        // 「まとめて提案」の導線はヘッダー下の plannerEntryCard に一本化した
+        #if DEBUG
+        // 週間コーデプランナーの検証画面 (Sandbox)。Release ビルドには入らない
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    Haptic.impact(.soft)
-                    path.append(.outfitPlanner)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "wand.and.stars")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("まとめて提案")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .foregroundStyle(.black)
-                }
-            }
-            #if DEBUG
-            // 週間コーデプランナーの検証画面 (Sandbox)。Release ビルドには入らない
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     Haptic.impact(.soft)
@@ -95,8 +85,8 @@ struct CalendarView: View {
                         .foregroundStyle(.black)
                 }
             }
-            #endif
         }
+        #endif
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         #if DEBUG
         .sheet(isPresented: $showWeeklyPlannerSandbox) {
@@ -171,6 +161,66 @@ struct CalendarView: View {
         }
     }
 
+    // MARK: - プランナー導線 (まとめて提案)
+
+    /// 予定コーデの残弾で文言が変わる常設の導線カード。
+    /// 残り2日以下で「仕込む?」と促す (残弾駆動 — 固定曜日の儀式にせずユーザーのペースに追従)
+    private var plannerEntryCard: some View {
+        let upcoming = viewModel.upcomingPlannedCount
+        let (title, subtitle): (String, String) = {
+            if upcoming == 0 {
+                return ("1週間分のコーデをまとめて仕込む",
+                        "相棒が天気と手持ちに合わせて先の分まで提案します")
+            }
+            if upcoming <= 2 {
+                return ("予定コーデが残り\(upcoming)日分",
+                        "次の1週間ぶんを仕込みませんか？")
+            }
+            return ("予定コーデを\(upcoming)日分ストック中",
+                    "タップで追加の提案が作れます")
+        }()
+
+        return Button {
+            Haptic.impact(.soft)
+            path.append(.outfitPlanner)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.black)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.gray.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.gray.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.black.opacity(0.07), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - ヘッダー (月スイッチャー + 今日 + 表示切替)
 
     /// 今月の索引 (months は新しい順で来月が先頭のことが多い)
@@ -227,7 +277,8 @@ struct CalendarView: View {
             .buttonStyle(.plain)
             .disabled(!canGoPast)
 
-            Text(selectedMonth.map { "\($0.year)年\($0.monthOfTheYear)月" } ?? "")
+            // Text("") が LocalizedStringKey に解決されると年が「2,026」と桁区切りされるため verbatim 指定
+            Text(verbatim: selectedMonth.map { "\($0.year)年\($0.monthOfTheYear)月" } ?? "")
                 .font(.system(size: 16, weight: .bold))
                 .monospacedDigit()
                 .frame(minWidth: 108)
