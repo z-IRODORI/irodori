@@ -7,10 +7,10 @@
 //
 //  この画面でできること:
 //   1. 実API (POST /api/recommendation/plan) を叩き、計画書 §7 の追加予定フィールドが
-//      実際に届いているかを診断パネルで一覧確認する (未着は「サーバ未実装」と表示)
+//      実際に届いているかを診断パネルで一覧確認する (届いていない項目は「—」で表示)
 //   2. 実データのまま体験フローを通す:
 //      配り演出(§1-2) → 開封リビール(§1-1) → 対照的3択(§2-2) → 栞(§1-3)
-//   3. サーバ未実装ぶんは端末内テンプレ(§3-4 フォールバック)で埋めて体験を評価し、
+//   3. 届かない項目は端末内テンプレ(§3-4 フォールバック)で埋めて体験を評価し、
 //      「モック(実装後)」と見比べて実装後の姿とのギャップを確認する
 //
 //  非破壊: この画面は書き込みAPIを一切呼ばない。
@@ -490,7 +490,7 @@ enum WPSAxisAssign {
 struct WPSDiagnosticRow: Identifiable {
     enum Status {
         case ok       // 実装済み・値あり
-        case missing  // サーバ未実装 (値が来ていない)
+        case missing  // 値が届いていない
         case warn     // 値はあるが計画書の条件を満たさない
         case info     // 参考値
 
@@ -577,13 +577,13 @@ enum WPSDiagnostics {
                 title: "理由文 (reason)",
                 value: "\(reasonCount)/\(total)日",
                 status: reasonCount > 0 ? .ok : .missing,
-                note: "§2-1 generate_for_user が計算済みの理由文を詰め替えるだけ"
+                note: "§2-1 理由文の貫通。0件ならサーバ側の詰め替え漏れ"
             ),
             .init(
                 title: "発見枠 (is_discovery)",
                 value: discoveryCount > 0 ? "\(discoveryCount)/\(total)日" : "全日 false",
                 status: discoveryCount > 0 ? .ok : .missing,
-                note: "§2-1 items_meta.discovery が捨てられている"
+                note: "§2-1 発見枠の可視化。本命は発見枠にならないので入替候補側に出る"
             ),
             .init(
                 title: "1日あたりの候補数",
@@ -607,7 +607,7 @@ enum WPSDiagnostics {
                 title: "週テーマ (week_title)",
                 value: response.week_title ?? "未着 (端末テンプレで代替)",
                 status: response.week_title != nil ? .ok : .missing,
-                note: "§3-1 週ナラティブ flash-lite 1コール"
+                note: "§3-1 週ナラティブ flash-lite 1コール。未着なら LLM 失敗→端末テンプレ"
             ),
             .init(
                 title: "週の宣言 (week_comment)",
@@ -625,13 +625,13 @@ enum WPSDiagnostics {
                 title: "3択ラベル (alt_tag)",
                 value: altTagCount > 0 ? "\(altTagCount)/\(total)日" : "未着 (端末側で導出)",
                 status: altTagCount > 0 ? .ok : .missing,
-                note: "§2-2 サーバが軸を決めるまでは端末導出でも体験は成立する"
+                note: "§2-2 サーバ側 assign_alt_tags。未着なら端末導出にフォールバック"
             ),
             .init(
                 title: "反映宣言 (plan_ack)",
                 value: response.plan_ack ?? "未着",
                 status: response.plan_ack != nil ? .ok : .missing,
-                note: "§5-2 steering が効いた時だけ宣言する (嘘バッジ禁止)"
+                note: "§5-2 👎チップの操舵が効いた時だけ出る。フィードバック無しなら未着が正しい"
             ),
             .init(
                 title: "根拠バッジ (signal_count)",
@@ -1494,7 +1494,7 @@ struct WeeklyPlannerSandboxView: View {
                         } else if let reason = item.reason, !reason.isEmpty {
                             Text(reason)
                         } else {
-                            Text("理由文なし（§2-1 未実装）")
+                            Text("理由文なし（サーバから届いていない）")
                                 .foregroundStyle(Color.orange.opacity(0.9))
                         }
                     }
@@ -1579,7 +1579,7 @@ struct WeeklyPlannerSandboxView: View {
                     Text("\(WPSDate.monthDay(day.date))(\(WPSDate.weekday(day.date))) のコーデ")
                         .font(.system(size: 15, weight: .bold))
                     Text("候補\(day.candidates.count)件 / 軸ラベル\(Set(axes.values).count)件"
-                         + (usesServerTag ? "・サーバの alt_tag" : "・端末側で導出（§2-2 未実装）"))
+                         + (usesServerTag ? "・サーバの alt_tag" : "・端末側で導出（alt_tag 未着）"))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
@@ -1738,7 +1738,7 @@ struct WeeklyPlannerSandboxView: View {
     private var diagnosticsSheet: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("計画書のフィールドが実際に届いているかの確認結果です。「—」はサーバ未実装を意味します。")
+                Text("計画書のフィールドが実際に届いているかの確認結果です。「—」は値が届いていないことを意味します。")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 4)
