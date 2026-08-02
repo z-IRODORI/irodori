@@ -680,14 +680,14 @@ final class HomeViewModel {
     }
 
     /// フィードバックを送信する。dislike は成功時に全スコープの表示からも即時除去する
-    /// (サーバ側でもキャッシュ除去+候補ハード除外+テイスト負シグナルに反映される)
+    /// (サーバ側でもキャッシュ除去+候補ハード除外+テイスト負シグナルに反映される)。
+    /// closet 種別 (クローゼットから作ったコーデ) も評価可能 (サーバはプール外IDを
+    /// faiss 無しで記録し、除外・理由チップ・翌日の「反映したよ」に反映する)
     func sendFeedback(
         item: DailyRecommendationItem,
         rating: PickFeedbackRating,
         reasons: [String] = []
     ) async -> Bool {
-        // closet 種別は pool_id がプールを指さないため対象外
-        guard !item.isCloset else { return false }
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
         let targetDate = dailyRecommendation?.target_date
         do {

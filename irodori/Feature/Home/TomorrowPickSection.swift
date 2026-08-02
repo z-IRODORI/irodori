@@ -700,12 +700,11 @@ struct TomorrowPickSection: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
         .contextMenu {
-            if !card.isCloset {
-                Button(role: .destructive) {
-                    quickDislike(card)
-                } label: {
-                    Label("このコーデに興味がない", systemImage: "hand.thumbsdown")
-                }
+            // closet 種別 (クローゼットから作ったコーデ) も評価対象
+            Button(role: .destructive) {
+                quickDislike(card)
+            } label: {
+                Label("このコーデに興味がない", systemImage: "hand.thumbsdown")
             }
         }
     }
@@ -1088,7 +1087,8 @@ fileprivate struct TomorrowCompositionView: View {
                         .lineSpacing(6)
                 }
                 compositionList
-                if !item.isCloset, onFeedback != nil {
+                // closet 種別 (クローゼットから作ったコーデ) も評価対象
+                if onFeedback != nil {
                     feedbackSection
                 }
             }
