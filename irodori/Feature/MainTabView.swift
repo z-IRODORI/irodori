@@ -19,7 +19,7 @@ struct MainTabView: View {
 
                 // 相棒
                 Tab(value: MainTabViewModel.Tab.partner) {
-                    PartnerView()
+                    PartnerView(path: $path)
                 } label: {
                     Label {
                         Text("相棒")

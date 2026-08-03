@@ -45,8 +45,9 @@ struct HomeView: View {
                     .padding(.horizontal, -24)
                     .id("hero")
 
-                    // 別ルートの提案導線 (旧・相棒カードの2ボタンを継承)
-                    actionsCard
+                    // 別ルートの提案導線 (旧・相棒カードの2ボタンを継承) は非表示にした。
+                    // 「相棒に相談」は相棒タブ (PartnerPattern3GrowthView の円ゲージ下) に移設
+//                    actionsCard
 
                     // 直近コーデ
                     if viewModel.isLoadingHome {
@@ -294,34 +295,35 @@ struct HomeView: View {
     }
 
     // MARK: - 別ルートの提案導線 (旧・相棒カードの2ボタンを継承)
-
-    private var actionsCard: some View {
-        HStack(spacing: 10) {
-            Button(action: { path.append(.outfitSuggestion) }) {
-                Label("アイテムから", systemImage: "tshirt")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            Button(action: { path.append(.generalChat(conversationId: nil)) }) {
-                Label("相棒に相談", systemImage: "bubble.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.gray.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
-            }
-        }
-        .padding(20)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
-    }
+    // 2026-08: ホームの整理のため非表示化。「相棒に相談」は相棒タブへ移設した。
+    // 「アイテムから」(.outfitSuggestion) を復活させる場合はこのカードごと戻す。
+//    private var actionsCard: some View {
+//        HStack(spacing: 10) {
+//            Button(action: { path.append(.outfitSuggestion) }) {
+//                Label("アイテムから", systemImage: "tshirt")
+//                    .font(.system(size: 14, weight: .semibold))
+//                    .foregroundStyle(.white)
+//                    .frame(maxWidth: .infinity)
+//                    .padding(.vertical, 12)
+//                    .background(.black)
+//                    .clipShape(RoundedRectangle(cornerRadius: 10))
+//            }
+//            Button(action: { path.append(.generalChat(conversationId: nil)) }) {
+//                Label("相棒に相談", systemImage: "bubble.left")
+//                    .font(.system(size: 14, weight: .semibold))
+//                    .foregroundStyle(.black)
+//                    .frame(maxWidth: .infinity)
+//                    .padding(.vertical, 12)
+//                    .background(Color.gray.opacity(0.1))
+//                    .clipShape(RoundedRectangle(cornerRadius: 10))
+//                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+//            }
+//        }
+//        .padding(20)
+//        .background(.white)
+//        .clipShape(RoundedRectangle(cornerRadius: 16))
+//        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+//    }
 
     // MARK: - コーデコラージュ導線
 

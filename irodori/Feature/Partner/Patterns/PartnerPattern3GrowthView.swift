@@ -14,6 +14,8 @@
 import SwiftUI
 
 struct PartnerPattern3GrowthView: View {
+    /// 「相棒に相談」タップ時 (チャットへの遷移は呼び出し元が担う)。nil ならボタン非表示
+    var onConsultTap: (() -> Void)? = nil
     @State private var viewModel = PartnerPattern3ViewModel()
     @State private var showAllEvents = false
 
@@ -111,6 +113,30 @@ struct PartnerPattern3GrowthView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.black)
                 }
+                .padding(.top, 2)
+            }
+
+            // 相棒への相談導線 (ホームの「相棒に相談」から移設)。
+            // プロフィールUIの定石「アバター→ステータス→主アクション」に合わせ、
+            // 円ゲージとLv/連続記録のまとまりの直下に主CTAとして置く
+            if let onConsultTap {
+                Button {
+                    Haptic.impact(.soft)
+                    onConsultTap()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bubble.left.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("相棒に相談")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 13)
+                    .background(Color.black)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
                 .padding(.top, 2)
             }
         }

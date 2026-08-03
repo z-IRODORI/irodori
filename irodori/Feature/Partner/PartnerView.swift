@@ -10,6 +10,9 @@
 import SwiftUI
 
 struct PartnerView: View {
+    /// タブ全体を包む共有 NavigationStack の path (相棒に相談 → generalChat への push に使う)
+    @Binding var path: [ViewType]
+
     var body: some View {
         VStack(spacing: 0) {
             // ヘッダー
@@ -21,11 +24,13 @@ struct PartnerView: View {
                 .padding(.vertical, 10)
 
             // ベースUI: 育つ相棒
-            PartnerPattern3GrowthView()
+            PartnerPattern3GrowthView(onConsultTap: {
+                path.append(.generalChat(conversationId: nil))
+            })
         }
     }
 }
 
 #Preview {
-    PartnerView()
+    PartnerView(path: .constant([]))
 }
