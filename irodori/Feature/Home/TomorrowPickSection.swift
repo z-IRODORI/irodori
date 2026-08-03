@@ -607,40 +607,42 @@ struct TomorrowPickSection: View {
 
     private var itemRegistrationNudge: some View {
         let count = viewModel.closetItems.count
-        return HStack(alignment: .top, spacing: 12) {
-            // 破線サークル = 「未所持/未登録」の視覚言語をここでも使う
-            NoOwnedItemBadge(size: 40)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(count == 0 ? "手持ちアイテムを登録しよう" : "手持ちアイテムがまだ\(count)点だけ")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.black)
-                Text("アイテムが増えるほど、手持ちの服で作れるコーデを優先して提案できるようになるよ。コーデを撮ると自動で登録される！")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                // ホームの他の主要ボタン (コーデ未登録の空状態カード) と同じスタイルに揃える
-                Button {
-                    Haptic.impact(.soft)
-                    tabViewModel.shouldShowFirstTakePhotoOnHome = true
-                } label: {
-                    HStack {
-                        Text("コーデを撮って登録する")
-                            .font(.system(size: 14, weight: .semibold))
-                        Spacer()
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
-                    .background(.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+        return VStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                // 破線サークル = 「未所持/未登録」の視覚言語をここでも使う
+                NoOwnedItemBadge(size: 40)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(count == 0 ? "手持ちアイテムを登録しよう" : "手持ちアイテムがまだ\(count)点だけ")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.black)
+                    Text("アイテムが増えるほど、手持ちの服で作れるコーデを優先して提案できるようになるよ。コーデを撮ると自動で登録される！")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 4)
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            // ボタンはバッジ列に揃えず、カード全幅で中央に配置する。
+            // ホームの他の主要ボタン (コーデ未登録の空状態カード) と同じスタイルに揃える
+            Button {
+                Haptic.impact(.soft)
+                tabViewModel.shouldShowFirstTakePhotoOnHome = true
+            } label: {
+                HStack {
+                    Text("コーデを撮って登録する")
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(.black)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
         }
         .padding(16)
         .background(.white)
