@@ -34,11 +34,17 @@ struct CalendarView: View {
     private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
     private let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
 
-    // 予定コーデのタップ操作 (詳細/削除の選択と pool 詳細シート)
-    @State private var selectedPlanned: CalendarOutfit? = nil
-    @State private var showPlannedDialog = false
-    @State private var presentedPoolItem: DailyRecommendationItem? = nil
+    // 予定コーデのタップ操作。ダイアログを挟まず詳細を直接開き、削除は詳細画面内で行う
+    @State private var presentedPlannedPool: PresentedPlannedPool? = nil
+    @State private var presentedSelfPlanned: CalendarOutfit? = nil
     @State private var isLoadingPlannedDetail = false
+
+    /// pool の予定コーデ詳細シートに渡す組 (削除に予定日が要るため item と一緒に保持する)
+    private struct PresentedPlannedPool: Identifiable {
+        let outfit: CalendarOutfit
+        let item: DailyRecommendationItem
+        var id: String { outfit.date }
+    }
 
     #if DEBUG
     /// Sandbox 検証画面の入口 (週間プランナー / 同日複数コーデUI)。実uidのまま実APIを叩いて確認する
@@ -130,33 +136,62 @@ struct CalendarView: View {
                 Task { await viewModel.loadPlanned() }
             }
         }
-        .confirmationDialog(
-            plannedDialogTitle,
-            isPresented: $showPlannedDialog,
-            titleVisibility: .visible,
-            presenting: selectedPlanned
-        ) { planned in
-            Button("詳細を見る") {
-                Task { await openPlannedDetail(planned) }
-            }
-            Button("予定から削除", role: .destructive) {
-                Task {
-                    if await viewModel.deletePlanned(planned) {
-                        ToastManager.shared.show("予定を削除しました", style: .normal)
-                    }
-                }
-            }
-            Button("キャンセル", role: .cancel) {}
-        }
-        .sheet(item: $presentedPoolItem) { item in
+        // pool の予定コーデ詳細。削除は詳細画面内の「予定から削除」で行う。
+        // シート閉鎖では onChange(path) が発火しないため、削除は必ず viewModel.deletePlanned を
+        // 経由してローカルの plannedByDate を即時更新する
+        .sheet(item: $presentedPlannedPool) { presented in
             NavigationStack {
                 DailyRecommendationDetailView(
-                    item: item,
-                    onWear: { it in await viewModel.markWornToday(it) }
+                    item: presented.item,
+                    onWear: { it in await viewModel.markWornToday(it) },
+                    plannedDate: presented.outfit.date,
+                    onDeletePlanned: {
+                        let ok = await viewModel.deletePlanned(presented.outfit)
+                        if ok {
+                            ToastManager.shared.show("予定を削除しました", style: .normal)
+                        }
+                        return ok
+                    }
                 )
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("閉じる") { presentedPoolItem = nil }
+                        Button("閉じる") { presentedPlannedPool = nil }
+                    }
+                }
+            }
+        }
+        // self (自分のコーデ) の予定コーデ詳細。pool と同じくシートで直接開き、
+        // 削除はツールバーのメニューから行う (画面本体は既存の CoordinateDetailView を無改修で流用)
+        .sheet(item: $presentedSelfPlanned) { planned in
+            NavigationStack {
+                CoordinateDetailView(
+                    viewModel: .init(
+                        coordinateId: planned.target_id,
+                        coordinateImageURL: planned.image_url,
+                        coordinateDetailClient: CoordinateDetailClient()
+                    ),
+                    showHeader: false
+                )
+                .navigationTitle(plannedTitle(planned))
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("閉じる") { presentedSelfPlanned = nil }
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Menu {
+                            Button("予定から削除", role: .destructive) {
+                                Task {
+                                    if await viewModel.deletePlanned(planned) {
+                                        ToastManager.shared.show("予定を削除しました", style: .normal)
+                                        presentedSelfPlanned = nil
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.black)
+                        }
                     }
                 }
             }
@@ -600,8 +635,7 @@ struct CalendarView: View {
                 path.append(.coordinateDetail(params))
             } else if let planned {
                 Haptic.impact(.soft)
-                selectedPlanned = planned
-                showPlannedDialog = true
+                Task { await openPlannedDetail(planned) }
             }
         }) {
             ZStack {
@@ -763,8 +797,7 @@ struct CalendarView: View {
 
     // MARK: - Helpers
 
-    private var plannedDialogTitle: String {
-        guard let planned = selectedPlanned else { return "予定コーデ" }
+    private func plannedTitle(_ planned: CalendarOutfit) -> String {
         let parts = planned.date.split(separator: "-")
         if parts.count == 3, let m = Int(parts[1]), let d = Int(parts[2]) {
             return "\(m)月\(d)日の予定コーデ"
@@ -772,19 +805,16 @@ struct CalendarView: View {
         return "予定コーデ"
     }
 
+    /// 予定コーデのセルタップで詳細を直接開く (以前の 詳細/削除 ダイアログは廃止し、削除は詳細画面内に移した)
     private func openPlannedDetail(_ planned: CalendarOutfit) async {
         if planned.kind == "self" {
-            path.append(.coordinateDetail(.init(
-                coordinateId: planned.target_id,
-                coordinateImageURL: planned.image_url,
-                showHeader: false
-            )))
+            presentedSelfPlanned = planned
             return
         }
         isLoadingPlannedDetail = true
         let item = await viewModel.fetchPoolItem(planned)
         isLoadingPlannedDetail = false
-        presentedPoolItem = item
+        presentedPlannedPool = PresentedPlannedPool(outfit: planned, item: item)
     }
 
     @ViewBuilder

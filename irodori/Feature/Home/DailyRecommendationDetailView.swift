@@ -2,8 +2,17 @@
 //  DailyRecommendationDetailView.swift
 //  irodori
 //
-//  推薦コーデの詳細モーダル。kind=pool は「これを今日着る」ボタンで着用記録を送信、
+//  推薦コーデの詳細モーダル。kind=pool は「今日これを着た」ボタンで着用記録を送信、
 //  kind=self は自分のお気に入りコーデなので着用ボタンは出さない。
+//
+//  2アクションの役割 (混同防止のためラベルとキャプションで結果を明示する):
+//  - 着る日を決める   = 未来の意図。予定コーデとしてカレンダーに可視化される
+//  - 今日これを着た   = 過去の事実。worn_coordinates に記録され相棒の学習に使われる
+//    (カレンダーには表示されない)
+//
+//  カレンダーの予定コーデから開いた場合 (plannedDate != nil) は文脈が変わる:
+//  既にカレンダーにあるので「着る日を決める」を出さず「予定から削除」を出し、
+//  着用ボタンは予定日が今日のときだけ出す (未来の予定に「今日着た」は意図が混線するため)。
 //
 
 import SwiftUI
@@ -12,6 +21,11 @@ import Kingfisher
 struct DailyRecommendationDetailView: View {
     let item: DailyRecommendationItem
     let onWear: (DailyRecommendationItem) async -> Bool
+    /// カレンダーの予定コーデから開いた場合の予定日 (YYYY-MM-DD)。nil なら通常文脈
+    var plannedDate: String? = nil
+    /// 予定から削除 (カレンダー文脈のみ)。CalendarViewModel.deletePlanned を包み、
+    /// ローカルの plannedByDate も即時更新されるようにする (シート閉鎖では再取得されないため)
+    var onDeletePlanned: (() async -> Bool)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(FavoritesStore.self) private var favoritesStore
     @Environment(MainTabViewModel.self) private var tabViewModel
@@ -20,6 +34,9 @@ struct DailyRecommendationDetailView: View {
     @State private var marked = false
     @State private var errorText: String?
     @State private var showAddToCalendar = false
+    @State private var showDeleteConfirm = false
+    @State private var isDeleting = false
+    @State private var webLink: HomeWebLink? = nil
 
     var body: some View {
         ScrollView {
@@ -50,6 +67,23 @@ struct DailyRecommendationDetailView: View {
                         }
                         .padding(10)
                     }
+                }
+
+                if let plannedDate {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("\(displayDate(plannedDate))の予定コーデ")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.gray.opacity(0.08))
+                    .overlay(
+                        Capsule().stroke(Color.black.opacity(0.12), lineWidth: 1)
+                    )
+                    .clipShape(Capsule())
                 }
 
                 if item.kindEnum == .self {
@@ -91,11 +125,19 @@ struct DailyRecommendationDetailView: View {
                         .foregroundColor(.secondary)
                 }
 
-                addToCalendarButton
+                // 予定コーデ文脈では出さない (既にカレンダーにあり「追加」は意味を成さないため)
+                if plannedDate == nil {
+                    addToCalendarButton
+                }
 
-                // 着用記録はプールのコーデのみ (closet は faiss_idx を持たないため対象外)
-                if item.kind == "pool" {
+                // 着用記録はプールのコーデのみ (closet は faiss_idx を持たないため対象外)。
+                // 予定コーデ文脈では予定日が今日のときだけ (予定→着た実績への転換として意味を持つ瞬間)
+                if item.kind == "pool", plannedDate == nil || plannedDate == todayString {
                     wearButton
+                }
+
+                if plannedDate != nil, onDeletePlanned != nil {
+                    deletePlannedButton
                 }
 
                 if let e = errorText {
@@ -115,22 +157,90 @@ struct DailyRecommendationDetailView: View {
             )
             .presentationDetents([.height(300)])
         }
+        // ZOZO検索は medium シート内 push だと表示領域が半分になるため全画面カバーで開く
+        .fullScreenCover(item: $webLink) { link in
+            WebViewContainer(url: link.url)
+        }
+        .alert(deleteConfirmTitle, isPresented: $showDeleteConfirm) {
+            Button("削除する", role: .destructive) {
+                Task { await deletePlanned() }
+            }
+            Button("キャンセル", role: .cancel) {}
+        }
     }
 
-    // 予定コーデとしてカレンダーにストックする (主CTA)
+    // 予定コーデとしてカレンダーにストックする (主CTA)。
+    // 着用記録ボタンとの混同を防ぐため「未来形のラベル + 行き先のキャプション」で結果を明示する
     private var addToCalendarButton: some View {
         Button {
             Haptic.impact(.medium)
             showAddToCalendar = true
         } label: {
-            Label("カレンダーに追加", systemImage: "calendar.badge.plus")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.black)
-                .foregroundColor(.white)
-                .cornerRadius(10)
+            VStack(spacing: 3) {
+                Label("着る日を決める", systemImage: "calendar.badge.plus")
+                    .font(.headline)
+                Text("カレンダーに予定コーデとして入ります")
+                    .font(.system(size: 11))
+                    .opacity(0.75)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Color.black)
+            .foregroundColor(.white)
+            .cornerRadius(10)
         }
+    }
+
+    // 予定から削除 (カレンダーの予定コーデ文脈のみ)。
+    // ダイアログを挟まず詳細を直接開く導線になったぶん、誤タップ防止の確認アラートを挟む
+    private var deletePlannedButton: some View {
+        Button {
+            Haptic.impact(.medium)
+            showDeleteConfirm = true
+        } label: {
+            HStack {
+                if isDeleting { ProgressView().tint(.red) }
+                Label("予定から削除", systemImage: "trash")
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .foregroundColor(.red)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.red.opacity(0.3), lineWidth: 1))
+        }
+        .disabled(isDeleting)
+    }
+
+    private var deleteConfirmTitle: String {
+        guard let plannedDate else { return "予定から削除しますか？" }
+        return "\(displayDate(plannedDate))の予定から削除しますか？"
+    }
+
+    private func deletePlanned() async {
+        guard let onDeletePlanned else { return }
+        isDeleting = true
+        let ok = await onDeletePlanned()
+        isDeleting = false
+        if ok {
+            Haptic.notify(.success)
+            dismiss()
+        }
+    }
+
+    /// "YYYY-MM-DD" -> "M月d日" (パース不能ならそのまま返す)
+    private func displayDate(_ date: String) -> String {
+        let parts = date.split(separator: "-")
+        guard parts.count == 3, let m = Int(parts[1]), let d = Int(parts[2]) else { return date }
+        return "\(m)月\(d)日"
+    }
+
+    /// 今日 (JST) の YYYY-MM-DD。予定日が今日かの判定に使う
+    private var todayString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        return formatter.string(from: Date())
     }
 
     private var favoriteButton: some View {
@@ -252,27 +362,57 @@ struct DailyRecommendationDetailView: View {
                 }
             }
 
+            // 足りないアイテムは行タップで ZOZOTOWN 検索へ (TomorrowPickSection の買い足し行と同じ導線)
             ForEach(item.missing_items, id: \.self) { label in
-                HStack(spacing: 10) {
-                    Circle()
-                        .strokeBorder(
-                            Color.gray.opacity(0.4),
-                            style: StrokeStyle(lineWidth: 1.2, dash: [3, 2.5])
-                        )
-                        .frame(width: 36, height: 36)
-                        .overlay(
-                            Image(systemName: "tshirt")
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color.gray.opacity(0.5))
-                        )
-                    Text(label)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("足りません")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.orange)
+                Button {
+                    Haptic.selection()
+                    if let url = ZOZOSearchURL.url(for: label) {
+                        webLink = HomeWebLink(url: url)
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Circle()
+                            .strokeBorder(
+                                Color.gray.opacity(0.4),
+                                style: StrokeStyle(lineWidth: 1.2, dash: [3, 2.5])
+                            )
+                            .frame(width: 36, height: 36)
+                            .overlay(
+                                Image(systemName: "tshirt")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Color.gray.opacity(0.5))
+                            )
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(label)
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.leading)
+                            Text("足りません")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.orange)
+                        }
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("探す")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .overlay(Capsule().stroke(Color.black.opacity(0.25), lineWidth: 1))
+                        .clipShape(Capsule())
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+            }
+
+            if !item.missing_items.isEmpty {
+                Text("「探す」からZOZOTOWNの検索結果を開けます")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -305,12 +445,14 @@ struct DailyRecommendationDetailView: View {
         }
     }
 
+    // 着用記録 (worn_coordinates への学習シグナル)。カレンダーには表示されないため、
+    // 完了形のラベル + 「相棒が学習する」キャプションで押した結果を予測できるようにする
     @ViewBuilder
     private var wearButton: some View {
         if marked {
             HStack {
                 Image(systemName: "checkmark.circle.fill")
-                Text("今日のコーデに記録しました")
+                Text("相棒に伝えました。次の提案に活かします")
             }
             .foregroundColor(.green)
             .padding(.vertical, 10)
@@ -334,12 +476,17 @@ struct DailyRecommendationDetailView: View {
                     }
                 }
             } label: {
-                HStack {
-                    if isMarking { ProgressView().tint(.black) }
-                    Text(isMarking ? "送信中…" : "これを今日着る").font(.headline)
+                VStack(spacing: 3) {
+                    HStack {
+                        if isMarking { ProgressView().tint(.black) }
+                        Text(isMarking ? "送信中…" : "今日これを着た").font(.headline)
+                    }
+                    Text("相棒が覚えて、次のコーデ提案に活かします")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
                 .background(Color.white)
                 .foregroundColor(.black)
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black.opacity(0.2), lineWidth: 1))
@@ -350,7 +497,7 @@ struct DailyRecommendationDetailView: View {
     }
 }
 
-#Preview {
+#Preview("通常 (ホーム/お気に入り)") {
     NavigationStack {
         DailyRecommendationDetailView(
             item: DailyRecommendationResponse.mock().recommendations[0],
@@ -358,6 +505,39 @@ struct DailyRecommendationDetailView: View {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 return true
             }
+        )
+        .environment(FavoritesStore(client: MockFavoriteClient()))
+        .environment(MainTabViewModel())
+    }
+}
+
+#Preview("予定コーデ (今日) - 削除+着用あり") {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+    return NavigationStack {
+        DailyRecommendationDetailView(
+            item: DailyRecommendationResponse.mock().recommendations[0],
+            onWear: { _ in true },
+            plannedDate: formatter.string(from: Date()),
+            onDeletePlanned: {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                return true
+            }
+        )
+        .environment(FavoritesStore(client: MockFavoriteClient()))
+        .environment(MainTabViewModel())
+    }
+}
+
+#Preview("予定コーデ (未来日) - 着用なし") {
+    NavigationStack {
+        DailyRecommendationDetailView(
+            item: DailyRecommendationResponse.mock().recommendations[0],
+            onWear: { _ in true },
+            plannedDate: "2030-01-01",
+            onDeletePlanned: { true }
         )
         .environment(FavoritesStore(client: MockFavoriteClient()))
         .environment(MainTabViewModel())
