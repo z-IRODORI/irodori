@@ -41,8 +41,8 @@ struct CalendarView: View {
     @State private var isLoadingPlannedDetail = false
 
     #if DEBUG
-    /// 週間コーデプランナー計画書の検証画面 (Sandbox)。実uidのまま実APIを叩いて確認する
-    @State private var showWeeklyPlannerSandbox = false
+    /// Sandbox 検証画面の入口 (週間プランナー / 同日複数コーデUI)。実uidのまま実APIを叩いて確認する
+    @State private var showSandboxMenu = false
     #endif
 
     var body: some View {
@@ -73,12 +73,12 @@ struct CalendarView: View {
         .navigationBarTitleDisplayMode(.inline)
         // 「まとめて提案」の導線はヘッダー下の plannerEntryCard に一本化した
         #if DEBUG
-        // 週間コーデプランナーの検証画面 (Sandbox)。Release ビルドには入らない
+        // Sandbox 検証画面の入口。Release ビルドには入らない
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     Haptic.impact(.soft)
-                    showWeeklyPlannerSandbox = true
+                    showSandboxMenu = true
                 } label: {
                     Image(systemName: "flask")
                         .font(.system(size: 14, weight: .semibold))
@@ -89,14 +89,24 @@ struct CalendarView: View {
         #endif
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         #if DEBUG
-        .sheet(isPresented: $showWeeklyPlannerSandbox) {
+        .sheet(isPresented: $showSandboxMenu) {
             NavigationStack {
-                WeeklyPlannerSandboxView()
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("閉じる") { showWeeklyPlannerSandbox = false }
-                        }
+                List {
+                    NavigationLink("週間コーデプランナー") { WeeklyPlannerSandboxView() }
+                    NavigationLink("同日複数コーデUI (Mock)") {
+                        CalendarMultiCoordSandboxView(dataSource: .mock(delay: 0))
                     }
+                    NavigationLink("同日複数コーデUI (実API)") {
+                        CalendarMultiCoordSandboxView(dataSource: .real)
+                    }
+                }
+                .navigationTitle("Sandbox")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("閉じる") { showSandboxMenu = false }
+                    }
+                }
             }
         }
         #endif
