@@ -42,6 +42,15 @@ struct DecisionSendoffView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .shadow(color: .black.opacity(0.10), radius: 10, x: 0, y: 4)
 
+                    // 決定はカレンダーの予定コーデにも反映される (HomeViewModel.markWorn)
+                    HStack(spacing: 5) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("カレンダーにも入れておいたよ")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundStyle(.secondary)
+
                     HStack(alignment: .top, spacing: 8) {
                         PartnerIconImage(size: 36)
                         DailyPartnerCommentBox(text: sendoffComment)

@@ -39,6 +39,9 @@ final class HomeViewModel {
     var isLoadingCloset = false
     /// クローゼット取得が一度成功したか。アイテム登録促進バナーの誤表示 (取得前/失敗時) を防ぐ
     var hasLoadedCloset = false
+
+    /// カレンダーの予定コーデ (日付 → 予定)。おすすめコーデのタブに「予定あり」を示すために持つ
+    var plannedByDate: [String: CalendarOutfit] = [:]
     var showingItemPicker = false
     private var pickerTargetDateID: Int? = nil
 
@@ -123,6 +126,7 @@ final class HomeViewModel {
     let closetBridgeClient: ClosetBridgeClientProtocol
     let updatePrefectureClient: UpdateUserPrefectureClientProtocol
     let outfitCollageClient: OutfitCollageClientProtocol
+    let calendarOutfitClient: CalendarOutfitClientProtocol
     private let plannerCacheRepository: HomePlannerCacheRepositoryProtocol
 
     init(
@@ -135,6 +139,7 @@ final class HomeViewModel {
         closetBridgeClient: ClosetBridgeClientProtocol = ClosetBridgeClient(),
         updatePrefectureClient: UpdateUserPrefectureClientProtocol = UpdateUserPrefectureClient(),
         outfitCollageClient: OutfitCollageClientProtocol = OutfitCollageClient(),
+        calendarOutfitClient: CalendarOutfitClientProtocol = CalendarOutfitClient(),
         plannerCacheRepository: HomePlannerCacheRepositoryProtocol = HomePlannerCacheRepository()
     ) {
         self.apiClient = apiClient
@@ -146,6 +151,7 @@ final class HomeViewModel {
         self.closetBridgeClient = closetBridgeClient
         self.updatePrefectureClient = updatePrefectureClient
         self.outfitCollageClient = outfitCollageClient
+        self.calendarOutfitClient = calendarOutfitClient
         self.plannerCacheRepository = plannerCacheRepository
         loadPlannerCache()
     }
@@ -183,6 +189,8 @@ final class HomeViewModel {
             group.addTask { await self.loadClosetBridgeSection(uid: uid, gender: gender) }
             // アイテム登録促進バナーの判定用 (登録済みなら件数はほぼ変わらないため未取得時のみ)
             group.addTask { await self.loadClosetItemsIfNeeded() }
+            // カレンダーの予定コーデ: おすすめコーデのタブに「予定あり」を示す
+            group.addTask { await self.loadPlannedOutfits(uid: uid) }
             // 夜→朝ループ: 20時以降なら明日タブを先読み (ティザー表示用) し、
             // 21時のローカル通知を予約 (許可済みの場合のみ)
             group.addTask { await self.loadTomorrowTeaserIfNeeded() }
@@ -592,11 +600,71 @@ final class HomeViewModel {
                 uid: uid, poolId: item.pool_id, wornDate: wornDate
             )
             switch result {
-            case .success: return true
+            case .success:
+                // 決定をカレンダーの予定コーデにも自動反映する (ホーム⇄カレンダーの往復を保つ)。
+                // 見送り画面を待たせないため非同期・ベストエフォート
+                Task { await self.stockDecisionToCalendar(item: item, date: wornDate) }
+                return true
             case .failure: return false
             }
         } catch {
             return false
+        }
+    }
+
+    // MARK: - カレンダーの予定コーデ連携
+
+    /// 対象日の予定コーデ (カレンダー由来 + これにする由来)。無ければ nil
+    func plannedOutfit(forDate dateString: String) -> CalendarOutfit? {
+        plannedByDate[dateString]
+    }
+
+    /// 今月+来月の予定コーデを読み込む (今日/明日/週末タブの対象日をカバーする)
+    private func loadPlannedOutfits(uid: String) async {
+        guard !uid.isEmpty else { return }
+        let calendar = Calendar(identifier: .gregorian)
+        var merged: [String: CalendarOutfit] = [:]
+        for offset in 0...1 {
+            guard let target = calendar.date(byAdding: .month, value: offset, to: Date()) else { continue }
+            let comps = calendar.dateComponents([.year, .month], from: target)
+            guard let year = comps.year, let month = comps.month else { continue }
+            if let result = try? await calendarOutfitClient.list(uid: uid, year: year, month: month),
+               case .success(let response) = result {
+                for item in response.items {
+                    merged[item.date] = item
+                }
+            }
+        }
+        plannedByDate = merged
+    }
+
+    /// ホームタブ復帰時などに予定コーデだけ再読込する (カレンダー側の追加/削除を反映)
+    func refreshPlannedOutfits() async {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        await loadPlannedOutfits(uid: uid)
+    }
+
+    /// ホームの詳細シートから「カレンダーに追加」された予定をローカルにも即時反映する
+    func notePlanned(date: String, item: DailyRecommendationItem, source: String) {
+        plannedByDate[date] = CalendarOutfit(
+            date: date, kind: item.kind, target_id: item.pool_id,
+            image_url: item.image_url, source: source
+        )
+    }
+
+    /// 「これにする」の決定をカレンダーの予定コーデに upsert する (ベストエフォート)。
+    /// 失敗しても決定自体は成立しているため、リトライやエラー表示はしない
+    private func stockDecisionToCalendar(item: DailyRecommendationItem, date: String) async {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        guard !uid.isEmpty else { return }
+        if let result = try? await calendarOutfitClient.put(
+            uid: uid, date: date, kind: item.kind, targetId: item.pool_id,
+            imageURL: item.image_url, source: "home_decision"
+        ), case .success = result {
+            plannedByDate[date] = CalendarOutfit(
+                date: date, kind: item.kind, target_id: item.pool_id,
+                image_url: item.image_url, source: "home_decision"
+            )
         }
     }
 

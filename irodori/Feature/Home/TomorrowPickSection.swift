@@ -340,6 +340,9 @@ struct TomorrowPickSection: View {
             }
             if decidedPoolIdForCurrentTab != nil {
                 decidedBanner
+            } else if let planned = plannedForCurrentTab {
+                // カレンダー側で予定したコーデをホームでも認知させる (ホーム⇄カレンダーの往復)
+                plannedBanner(planned)
             }
             contentArea
             // クローゼットが少ないと手持ちベースのパーソナライズが効かないため、登録導線を出す
@@ -347,7 +350,11 @@ struct TomorrowPickSection: View {
                 itemRegistrationNudge
             }
         }
-        .onAppear { playMorningRitualIfNeeded() }
+        .onAppear {
+            playMorningRitualIfNeeded()
+            // カレンダー側での予定追加/削除をタブ復帰時に反映する
+            Task { await viewModel.refreshPlannedOutfits() }
+        }
         .onChange(of: cards.count) { _, _ in
             playMorningRitualIfNeeded()
         }
@@ -369,6 +376,9 @@ struct TomorrowPickSection: View {
                     initialRating: viewModel.feedbackRating(for: item),
                     onFeedback: { rating, reasons in
                         await viewModel.sendFeedback(item: item, rating: rating, reasons: reasons)
+                    },
+                    onAddedToCalendar: { date in
+                        viewModel.notePlanned(date: date, item: item, source: "home")
                     }
                 )
                     .toolbar {
@@ -513,17 +523,78 @@ struct TomorrowPickSection: View {
         currentTab.flatMap { viewModel.decidedPoolId(forDate: $0.dateString) }
     }
 
+    /// 表示中タブの対象日にカレンダーの予定コーデがあればそれ
+    private var plannedForCurrentTab: CalendarOutfit? {
+        currentTab.flatMap { viewModel.plannedOutfit(forDate: $0.dateString) }
+    }
+
     private var decidedBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(.black)
-            Text("\(viewModel.selectedPickScope.displayName)のコーデは決定ずみ。変えたくなったら選び直せるよ")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-            Spacer()
+        Button {
+            Haptic.impact(.soft)
+            tabViewModel.selectedTab = .calendar
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.black)
+                Text("\(viewModel.selectedPickScope.displayName)のコーデは決定ずみ。変えたくなったら選び直せるよ")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 8)
+                calendarLinkLabel
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, 24)
+    }
+
+    /// カレンダー由来の予定コーデがある日のバナー。タップでカレンダータブへ
+    private func plannedBanner(_ planned: CalendarOutfit) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            tabViewModel.selectedTab = .calendar
+        } label: {
+            HStack(spacing: 10) {
+                KFImage(URL(string: planned.image_url))
+                    .resizable()
+                    .placeholder { Color.gray.opacity(0.15) }
+                    .scaledToFill()
+                    .frame(width: 36, height: 45)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(viewModel.selectedPickScope.displayName)は予定コーデが決まってるよ")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.black)
+                    Text("変えたいときは下の提案から選び直せるよ")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                calendarLinkLabel
+            }
+            .padding(10)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 24)
+    }
+
+    private var calendarLinkLabel: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "calendar")
+                .font(.system(size: 11, weight: .semibold))
+            Text("カレンダー")
+                .font(.system(size: 11, weight: .semibold))
+            Image(systemName: "chevron.right")
+                .font(.system(size: 9, weight: .semibold))
+        }
+        .foregroundStyle(.black)
     }
 
     // MARK: - アイテム登録促進 (クローゼットが少ないユーザー向け)
@@ -1015,6 +1086,9 @@ struct TomorrowPickSection: View {
                     initialRating: viewModel.feedbackRating(for: item),
                     onFeedback: { rating, reasons in
                         await viewModel.sendFeedback(item: item, rating: rating, reasons: reasons)
+                    },
+                    onAddedToCalendar: { date in
+                        viewModel.notePlanned(date: date, item: item, source: "home")
                     }
                 )
             }
@@ -1041,9 +1115,12 @@ fileprivate struct TomorrowCompositionView: View {
     var initialRating: PickFeedbackRating? = nil
     /// フィードバック送信 (VM の sendFeedback へ委譲)。nil なら評価UI非表示
     var onFeedback: ((PickFeedbackRating, [String]) async -> Bool)? = nil
+    /// 「カレンダーに追加」成功時 (追加した日付 YYYY-MM-DD)。nil なら追加ボタン非表示
+    var onAddedToCalendar: ((String) -> Void)? = nil
 
     /// 買い足し導線から開くWebページ (ナビゲーションスタック内プッシュ)
     @State private var webLink: HomeWebLink? = nil
+    @State private var showAddToCalendar = false
     @State private var rating: PickFeedbackRating? = nil
     @State private var showDislikeReasons = false
     @State private var selectedReasons: Set<String> = []
@@ -1089,6 +1166,11 @@ fileprivate struct TomorrowCompositionView: View {
                         .lineSpacing(6)
                 }
                 compositionList
+                // 気に入ったら先の日の予定にストックできる (カレンダー詳細と同じ導線をホームにも)。
+                // closet 種別はカレンダー側の詳細取得がプール前提のため対象外
+                if !item.isCloset, onAddedToCalendar != nil {
+                    addToCalendarButton
+                }
                 // closet 種別 (クローゼットから作ったコーデ) も評価対象
                 if onFeedback != nil {
                     feedbackSection
@@ -1108,6 +1190,33 @@ fileprivate struct TomorrowCompositionView: View {
         .fullScreenCover(item: $webLink) { link in
             WebViewContainer(url: link.url)
         }
+        .sheet(isPresented: $showAddToCalendar) {
+            AddToCalendarSheet(
+                kind: item.kind,
+                targetId: item.pool_id,
+                imageURL: item.image_url,
+                source: "home",
+                onSaved: { date in onAddedToCalendar?(date) }
+            )
+            .presentationDetents([.height(300)])
+        }
+    }
+
+    // 予定コーデとしてカレンダーにストックする (カレンダー/お気に入りの詳細と同じ導線)
+    private var addToCalendarButton: some View {
+        Button {
+            Haptic.impact(.medium)
+            showAddToCalendar = true
+        } label: {
+            Label("カレンダーに追加", systemImage: "calendar.badge.plus")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(.black)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
     }
 
     private var styleName: String {
