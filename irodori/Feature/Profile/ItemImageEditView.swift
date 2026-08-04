@@ -6,6 +6,10 @@
 //  「ノイズ除去」(Vision 被写体マスク) と消しゴム (なぞって透明にする) で画像を整え、
 //  確認ステップ「この画像で良いですか？」で OK されたら透過 PNG として保存する。
 //
+//  自分で直しきれない撮影切り抜きのために、ツールの下に
+//  「きれいな商品画像に差し替える」(ItemImageReplaceView) への導線を置く。
+//  差し替え後はそのまま新しいアイテムで編集画面を開き直す。
+//
 //  UI は OutfitSuggestionView と同じミニマル言語:
 //  白背景・黒の主CTA・白 + hairline の副CTA・ピル型ツールボタン。
 //
@@ -19,13 +23,18 @@ private let colorSuggestions = ["ブラック", "ホワイト", "グレー", "�
 
 struct ItemImageEditView: View {
     @State var viewModel: ItemImageEditViewModel
-    let onSaved: (ClosetItem) -> Void
+    /// 保存・差し替えで別アイテムに置き換わったことを親へ通知する (差し替え前の id を必ず渡す)
+    let onSaved: (_ oldId: String, _ newItem: ClosetItem) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
     // 消しゴム描画中のストローク (ビュー座標)
     @State private var currentStroke: [CGPoint] = []
     @State private var brushSize: CGFloat = 24
+
+    // 商品画像への差し替え
+    @State private var showReplacePicker = false
+    @State private var showReplaceConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -52,6 +61,25 @@ struct ItemImageEditView: View {
                     Button("閉じる") { dismiss() }
                         .disabled(viewModel.isSaving)
                 }
+            }
+            .navigationDestination(isPresented: $showReplacePicker) {
+                ItemImageReplaceView(
+                    viewModel: .init(item: viewModel.item),
+                    onReplaced: { oldId, newItem in
+                        // 差し替えはこの時点でサーバに反映済み。クローゼット一覧へ伝えたうえで、
+                        // 戻り先の編集画面も新しいアイテムで開き直す (続けて消しゴム等で微調整できる)
+                        onSaved(oldId, newItem)
+                        currentStroke = []
+                        viewModel = .init(item: newItem)
+                        Task { await viewModel.loadImage() }
+                    }
+                )
+            }
+            .alert("編集中の内容があります", isPresented: $showReplaceConfirmation) {
+                Button("キャンセル", role: .cancel) {}
+                Button("差し替えに進む") { showReplacePicker = true }
+            } message: {
+                Text("商品画像に差し替えると、いまの編集内容は反映されません。")
             }
         }
         .interactiveDismissDisabled(viewModel.isSaving)
@@ -94,6 +122,11 @@ struct ItemImageEditView: View {
                         .stroke(Color.black.opacity(0.3), lineWidth: 1)
                         .frame(width: brushSize / 2, height: brushSize / 2)
                         .frame(width: 30, height: 30)
+                }
+
+                // 撮影切り抜きのアイテムだけに、自分で直しきれないときの逃げ道を出す
+                if viewModel.item.isPhotoCropImage {
+                    replaceEntryCard
                 }
 
                 attributesSection
@@ -340,6 +373,60 @@ struct ItemImageEditView: View {
         .opacity(disabled ? 0.4 : 1)
     }
 
+    // MARK: - 商品画像への差し替え導線
+
+    /// ノイズ除去・消しゴムで直しきれないときの別ルート。
+    /// 主CTA (保存する) と競合しないよう、副次的なカード + chevron で置く。
+    private var replaceEntryCard: some View {
+        Button {
+            Haptic.impact(.soft)
+            // 編集中の内容は差し替えに引き継がれないため、変更がある時だけ確認する
+            if viewModel.hasChanges {
+                showReplaceConfirmation = true
+            } else {
+                showReplacePicker = true
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("きれいな商品画像に差し替える")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.black)
+                    Text("うまく切り抜けないときは、ネットの商品画像から選べます")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.gray.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.black.opacity(0.07), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isRemovingNoise || viewModel.isSmoothingEdges)
+    }
+
     private var editCtaBar: some View {
         VStack(spacing: 0) {
             Divider()
@@ -478,8 +565,9 @@ struct ItemImageEditView: View {
             Button {
                 Haptic.impact(.medium)
                 Task {
+                    let oldId = viewModel.item.id
                     if let newItem = await viewModel.save() {
-                        onSaved(newItem)
+                        onSaved(oldId, newItem)
                         ToastManager.shared.show("アイテムを保存しました", style: .normal)
                         dismiss()
                     }
@@ -618,6 +706,6 @@ private struct CheckerboardBackground: View {
             registerClient: MockBulkItemRegisterClient(),
             deleteClient: MockDeleteClosetItemClient()
         ),
-        onSaved: { _ in }
+        onSaved: { _, _ in }
     )
 }
