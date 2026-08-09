@@ -61,4 +61,5 @@ enum GAEventError: String {
     case apiError
     case cameraError
     case mlError
+    case phoneAuthError = "phone_auth_error"
 }
