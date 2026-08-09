@@ -70,7 +70,7 @@ struct DecisionSendoffView: View {
                 Haptic.impact(.soft)
                 dismiss()
             } label: {
-                Text("また明日")
+                Text("ホームに戻る")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)

@@ -41,8 +41,13 @@ final class SelectStandardItemViewModel {
         self.client = client
         self.bulkRegisterClient = bulkRegisterClient
         self.bulkCoordinateClient = bulkCoordinateClient
-        // UserDefaultsからgenderを取得
-        self.selectedGender = UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue) ?? "men"
+        // UserDefaults の gender は日本語 rawValue ("男性" 等) で保存されているため、
+        // API が期待する値 ("men"/"women") へ変換する。そのまま送ると0件になる。
+        // "その他" はスタンダードアイテムが男女別のため men にフォールバックする
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
+        self.selectedGender = gender == .female ? "women" : "men"
     }
 
     func fetchItems() async {

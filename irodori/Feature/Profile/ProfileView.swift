@@ -58,8 +58,9 @@ struct ProfileView: View {
         .sheet(item: $itemToEdit) { item in
             ItemImageEditView(
                 viewModel: .init(item: item),
-                onSaved: { newItem in
-                    viewModel.replaceItem(oldId: item.id, with: newItem)
+                onSaved: { oldId, newItem in
+                    // 編集画面内で差し替えを繰り返せるため、置換元は毎回 oldId で受け取る
+                    viewModel.replaceItem(oldId: oldId, with: newItem)
                 }
             )
         }

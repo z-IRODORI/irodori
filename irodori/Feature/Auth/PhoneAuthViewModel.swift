@@ -79,6 +79,7 @@ final class PhoneAuthViewModel {
             step = .verificationCode
             startResendCooldown()
         } catch {
+            Self.logError(error, context: "send_code")
             errorMessage = Self.message(for: error)
         }
         isLoading = false
@@ -94,6 +95,7 @@ final class PhoneAuthViewModel {
             codeText = ""
             startResendCooldown()
         } catch {
+            Self.logError(error, context: "resend_code")
             errorMessage = Self.message(for: error)
         }
         isLoading = false
@@ -110,6 +112,7 @@ final class PhoneAuthViewModel {
             countdownTask?.cancel()
             return true
         } catch {
+            Self.logError(error, context: "verify_code")
             errorMessage = Self.message(for: error)
             codeText = ""
             isLoading = false
@@ -138,23 +141,42 @@ final class PhoneAuthViewModel {
         }
     }
 
+    /// 原因特定用: 実エラーコードを Analytics とコンソールに記録する
+    private static func logError(_ error: Error, context: String) {
+        let nsError = error as NSError
+        let errorName = nsError.userInfo["FIRAuthErrorUserInfoNameKey"] as? String ?? "unknown"
+        print("🔴 [PhoneAuth] \(context) failed: domain=\(nsError.domain) code=\(nsError.code) name=\(errorName) desc=\(nsError.localizedDescription)")
+        AnalyticsLogger.shared.log(error: .phoneAuthError, parameters: [
+            "context": context,
+            "error_domain": nsError.domain,
+            "error_code": nsError.code,
+            "error_name": errorName,
+        ])
+    }
+
     private static func message(for error: Error) -> String {
         let nsError = error as NSError
+        let message: String
         switch AuthErrorCode(rawValue: nsError.code) {
         case .invalidPhoneNumber, .missingPhoneNumber:
-            return "電話番号の形式が正しくありません。もう一度ご確認ください。"
+            message = "電話番号の形式が正しくありません。もう一度ご確認ください。"
         case .invalidVerificationCode:
-            return "認証コードが正しくありません。もう一度入力してください。"
+            message = "認証コードが正しくありません。もう一度入力してください。"
         case .sessionExpired:
-            return "認証コードの有効期限が切れました。再送信してください。"
+            message = "認証コードの有効期限が切れました。再送信してください。"
         case .tooManyRequests, .quotaExceeded:
-            return "リクエストが多すぎます。しばらく時間をおいてお試しください。"
+            message = "リクエストが多すぎます。しばらく時間をおいてお試しください。"
         case .networkError:
-            return "通信エラーが発生しました。電波の良い場所でお試しください。"
+            message = "通信エラーが発生しました。電波の良い場所でお試しください。"
         case .captchaCheckFailed:
-            return "認証に失敗しました。もう一度お試しください。"
+            message = "認証に失敗しました。もう一度お試しください。"
         default:
-            return "エラーが発生しました。もう一度お試しください。"
+            message = "エラーが発生しました。もう一度お試しください。"
         }
+        #if DEBUG
+        return message + "（コード: \(nsError.code)）"
+        #else
+        return message
+        #endif
     }
 }

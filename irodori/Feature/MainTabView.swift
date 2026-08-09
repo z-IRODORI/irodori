@@ -4,7 +4,6 @@ struct MainTabView: View {
     @State private var path: [ViewType] = []
     @State private var viewModel: MainTabViewModel = .init()
     @State private var favoritesStore: FavoritesStore = .init()
-    @State private var isSheetPresented = false
     @State private var previousTab: MainTabViewModel.Tab = .home
     private let toastManager = ToastManager.shared
 
@@ -28,6 +27,11 @@ struct MainTabView: View {
                     }
                 }
 
+                // コーデ追加 (中央の + ボタン。タップでカメラ画面へ直行)
+                Tab("", systemImage: "plus.circle.fill", value: MainTabViewModel.Tab.plus) {
+                    EmptyView()
+                }
+
                 // カレンダー (着用記録・予定コーデのふりかえり)
                 Tab("カレンダー", systemImage: "calendar", value: MainTabViewModel.Tab.calendar) {
                     CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
@@ -37,37 +41,18 @@ struct MainTabView: View {
                 Tab("クローゼット", systemImage: "person.fill", value: MainTabViewModel.Tab.profile) {
                     ProfileView(path: $path)
                 }
-
-                // コーデ追加
-                Tab("", systemImage: "plus.circle.fill", value: MainTabViewModel.Tab.plus) {
-                    EmptyView()
-                }
             }
             .environment(viewModel)
             .environment(favoritesStore)
             .task { await favoritesStore.refresh() }
             .onChange(of: viewModel.selectedTab) { oldTab, newTab in
                 if newTab == .plus {
-                    isSheetPresented = true
+                    // + はタブとして留まらず、カメラ画面を直接開く
                     viewModel.selectedTab = previousTab
+                    path.append(.camera)
                 } else {
                     previousTab = newTab
                 }
-            }
-            .sheet(isPresented: $isSheetPresented) {
-                AddContentModalView(
-                    cameraButtonTapped: {
-                        path.append(.camera)
-                    },
-                    collageButtonTapped: {
-                        path.append(.coordinateCollage)
-                    },
-                    itemSearchButtonTapped: {
-                        path.append(.addItemBySearch)
-                    }
-                )
-                .presentationDetents([.height(340)])
-                .presentationDragIndicator(.visible)
             }
             .navigationDestination(for: ViewType.self) { viewType in
                 switch viewType {
@@ -236,55 +221,3 @@ final class MainTabViewModel {
     }
 }
 
-// MARK: - AddContentModalView
-
-struct AddContentModalView: View {
-    @Environment(\.dismiss) var dismiss
-    let cameraButtonTapped: (() -> Void)
-    let collageButtonTapped: (() -> Void)
-    let itemSearchButtonTapped: (() -> Void)
-
-    var body: some View {
-        VStack(spacing: 12) {
-            modalButton(title: "コーディネートを追加", icon: "figure") {
-                cameraButtonTapped()
-                dismiss()
-            }
-
-            modalButton(title: "コーデコラージュを作る", icon: "square.grid.2x2") {
-                collageButtonTapped()
-                dismiss()
-            }
-
-            modalButton(title: "検索してアイテムを追加", icon: "magnifyingglass") {
-                itemSearchButtonTapped()
-                dismiss()
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 40)
-    }
-
-    private func modalButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .frame(width: 40)
-
-                Text(title)
-                    .font(.system(size: 16, weight: .medium))
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.gray)
-            }
-            .padding()
-            .background(.gray.opacity(0.2))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .foregroundStyle(.black)
-        }
-    }
-}
