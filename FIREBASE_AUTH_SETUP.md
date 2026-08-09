@@ -1,174 +1,137 @@
-# Firebase Authentication セットアップ手順
+# Firebase 電話番号認証 (Phone Auth) セットアップガイド
 
-Firebase Storage の画像にアクセスするために、匿名認証を使用します。
-ユーザーはメールアドレスやパスワードなど、何の情報も入力する必要がありません。
+IRODORI の会員登録・ログインは **電話番号 (SMS認証) のみ** です。
+このドキュメントは、実装の全体像と、Firebase / Apple Developer コンソールで必要な手作業をまとめたものです。
 
-## 実装内容
+- Firebase プロジェクト: `irodori-e5c71`
+- Bundle ID: `com.gmail.yuukirinnma.irodori`
+- Apple Developer Team ID: `BR3T8YBB5L`
 
-### 1. AuthManager.swift（新規作成）
-認証状態を管理するシングルトンクラス
-- `isAuthenticated`: 認証状態を監視
-- `currentUserID`: 現在のユーザーID
-- `signInAnonymously()`: 匿名ログインを実行
-- `signOut()`: ログアウト
-- 認証状態の変更を自動的に監視
+---
 
-### 2. AppDelegate.swift（更新）
-アプリ起動時に自動的に匿名ログインを実行
-- `AuthManager.shared.signInAnonymously()` を使用
-- 既にログイン済みの場合はスキップ
-- エラーが発生してもアプリは継続
+## 1. 実装概要 (コード側・対応済み)
 
-### 3. FirebaseStorageImage.swift（更新）
-認証チェックとリトライ機能を追加
-- 認証が完了するまで最大3回リトライ（各0.5秒待機）
-- 認証されていない場合でも画像読み込みを試行
-- エラー時にわかりやすいプレースホルダーを表示
+| 役割 | ファイル |
+|---|---|
+| 認証マネージャ (送信/サインイン/ログアウト) | `irodori/Core/Auth/AuthManager.swift` |
+| 電話番号入力 + SMS 6桁コード入力 UI | `irodori/Feature/Auth/PhoneAuthView.swift` |
+| 認証の状態管理 (整形・再送60秒・エラー日本語化) | `irodori/Feature/Auth/PhoneAuthViewModel.swift` |
+| ログイン入口 | `irodori/Feature/Auth/LoginView.swift` |
+| 起動時の認証ゲート (**全ユーザー必須**) | `irodori/Feature/Splash/SplashViewModel.swift` |
+| ログアウト (確認アラート付き) | `irodori/Feature/Profile/ProfileEditView.swift` |
+| APNs トークン連携 / reCAPTCHA リダイレクト | `irodori/AppDelegate.swift` |
 
-### 4. irodoriApp.swift（更新）
-AuthManagerをEnvironmentに追加
-- `environment(AuthManager.shared)` で全画面からアクセス可能
-
-## Firebase Console での設定
-
-### 1. Authentication を有効化
-
-1. [Firebase Console](https://console.firebase.google.com/) にアクセス
-2. プロジェクト「irodori-e5c71」を選択
-3. 左メニューから **Authentication** を選択
-4. **始める** ボタンをクリック
-
-### 2. 匿名認証を有効化
-
-1. **Sign-in method** タブをクリック
-2. 「匿名」の行を探してクリック
-3. **有効にする** トグルをONにする
-4. **保存** ボタンをクリック
-
-### 3. Storage Rules を更新
-
-1. 左メニューから **Storage** を選択
-2. **Rules** タブをクリック
-3. 以下のルールに変更:
+### フロー
 
 ```
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    // items フォルダ: 認証済みユーザーのみ読み取り可能、書き込みは禁止
-    match /items/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-
-    // coordinates フォルダ: 認証済みユーザーのみ読み取り可能、書き込みは禁止
-    match /coordinates/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-
-    // その他のファイル: 認証済みユーザーのみアクセス可能
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
+起動 → 利用規約 → [未サインインなら] ログイン画面
+  → 電話番号入力 → SMS送信 → 6桁コード検証 → サインイン完了
+  → (新規のみ) ユーザー情報入力 → オンボーディング → ホーム
 ```
 
-4. **公開** ボタンをクリックして保存
+- 既存ユーザー (userInfo 保持者) はサインイン後、ユーザー情報入力をスキップしてホームへ直行。
+  **UserDefaults の `userId` は変更しない**ため、既存データ (クローゼット・コーデ等) はそのまま。
+- ログアウトは Firebase のサインアウトのみで、UserDefaults は消さない。
+  同じ電話番号で再ログインすれば同じ Firebase UID に戻り、データも引き継がれる。
 
-## 動作確認
+### アプリ検証の経路 (SMS を送ってよい正規アプリかの確認)
 
-### 1. アプリをビルド・実行
+1. **実機**: APNs サイレントプッシュ (無音・通知許可不要) — 下記 §3 の設定が完了していれば reCAPTCHA は出ない
+2. **シミュレータ / APNs 未設定**: reCAPTCHA (SFSafariViewController) に自動フォールバック。
+   Info.plist の URL scheme `app-1-816472842049-ios-85f57fcd9a9019d8a04bc0` (Encoded App ID) で復帰する
 
-### 2. Xcodeのコンソールで確認
+> ⚠️ `Auth.auth().settings.isAppVerificationDisabledForTesting = true` は使わないこと。
+> このフラグは Firebase Console に**事前登録したテスト番号でしか動かず**、
+> 未登録番号では `ERROR_MISSING_CLIENT_IDENTIFIER` で必ず失敗する (NoMuu で踏んだ罠)。
 
-以下のようなログが表示されれば成功:
+---
 
-```
-Firebase Auth: 匿名ログイン成功 (UID: AbCdEf123456...)
-```
+## 2. Firebase Console — Phone プロバイダ (必須・初回のみ)
 
-または既にログイン済みの場合:
+1. [Firebase Console](https://console.firebase.google.com/) → `irodori-e5c71` → **Authentication → Sign-in method**
+2. 「電話番号」プロバイダを **有効化**
+3. 同ページ下部「**テスト用の電話番号**」に検証用の架空番号を登録する (シミュレータ検証・App Store 審査用):
+   - 例: 電話番号 `+81 90 0000 0001` / 確認コード `123456`
+   - テスト番号には実SMSは送信されず、登録したコードで常にサインインできる
 
-```
-Firebase Auth: 既にログイン済み (UID: AbCdEf123456...)
-```
+---
 
-### 3. 画像が表示されることを確認
+## 3. APNs サイレント検証の有効化 (実機で reCAPTCHA を出さないために必要)
 
-「コーデを追加」ボタンをタップして、Firebase Storage から画像が正常に表示されることを確認してください。
+> 🔥 **NoMuu 本番障害の教訓**: この登録を忘れると、コード側が完璧でもサイレント検証は永遠に効かず、
+> 全ユーザーに毎回 reCAPTCHA の Web 画面が表示され続ける。
 
-## セキュリティについて
+### 3-1. Apple Developer — APNs 認証キー (.p8)
 
-### 匿名認証の特徴
+1. [Apple Developer](https://developer.apple.com/account/) → **Certificates, Identifiers & Profiles → Keys**
+2. 既存の APNs キーがあればそれを使う (**NoMuu で作成したチーム共通キーを流用可** — APNs キーはチーム内全アプリで共有される)
+3. 無ければ「+」→ 名前入力 → **Apple Push Notifications service (APNs)** にチェック → 作成 → `.p8` をダウンロード
+   (ダウンロードは1回きり。**Key ID** を控える)
 
-**メリット:**
-- ユーザー登録不要
-- メールアドレスやパスワード不要
-- 自動的に認証される
+### 3-2. Firebase Console — キーのアップロード
 
-**セキュリティ:**
-- 認証済みユーザー（匿名含む）のみが Storage にアクセス可能
-- 書き込みは完全に禁止（`allow write: if false`）
-- 認証トークンがないと画像にアクセスできない
+1. `irodori-e5c71` → ⚙️ **プロジェクトの設定 → Cloud Messaging** タブ
+2. 「Apple アプリの構成」→ iOS アプリ (`com.gmail.yuukirinnma.irodori`) の **APNs 認証キー** にアップロード
+3. `.p8` ファイル + **Key ID** + **Team ID (`BR3T8YBB5L`)** を入力して保存
 
-### 匿名ユーザーの永続性
+### 3-3. Xcode 側 (対応済み・確認のみ)
 
-- 匿名ユーザーIDはデバイスに保存されます
-- アプリを削除するまで同じUIDが使用されます
-- アプリを再インストールすると新しいUIDが発行されます
+- `irodori/irodori.entitlements`: `aps-environment = development`
+  (Archive → App Store 配布時は Xcode が自動で `production` に差し替える)
+- `irodori/Info.plist`: `UIBackgroundModes = [remote-notification]`
+- `AppDelegate`: 起動時に `registerForRemoteNotifications()` を無条件呼び出し (許可ダイアログは出ない) →
+  `didRegisterForRemoteNotificationsWithDeviceToken` で `Auth.auth().setAPNSToken(_:type: .unknown)`
+- Signing は Automatic のため、実機ビルド時に Xcode が App ID へ Push Notifications capability を自動追加する。
+  初回実機ビルドで署名エラーが出た場合は Xcode → Signing & Capabilities で Team を選び直す
 
-## トラブルシューティング
+---
 
-### エラー: "Permission denied (403)"
+## 4. SMS の日本語化 (対応済み)
 
-**原因:**
-- Storage Rules が更新されていない
-- Authentication が有効化されていない
-- 匿名認証が有効化されていない
+`AppDelegate` で `Auth.auth().languageCode = "ja"` を設定済み。
+これが無いと認証SMSが英語文面で届く。
 
-**解決方法:**
-1. Firebase Console で Authentication > Sign-in method を確認
-2. 「匿名」が有効になっているか確認
-3. Storage Rules が正しく設定されているか確認
+---
 
-### エラー: "Failed to sign in anonymously"
+## 5. 動作確認
 
-**原因:**
-- ネットワークエラー
-- Firebase の設定ミス
+### シミュレータ
 
-**解決方法:**
-1. インターネット接続を確認
-2. `GoogleService-Info.plist` が正しく配置されているか確認
-3. Firebase Console でプロジェクトが正しく設定されているか確認
+- APNs が使えないため reCAPTCHA 経路になる。**§2 のテスト番号を使うのが最速**
+  (実番号を使うと reCAPTCHA → 実SMS 送信となり、クォータを消費する)
+- 確認事項: 電話番号入力 → コード入力 → サインイン → ホーム到達
 
-### アプリ起動時にログインが遅い
+### 実機 (§3 完了後)
 
-**説明:**
-匿名ログインは非同期で実行されるため、アプリ起動直後は認証が完了していない場合があります。
-通常、1-2秒で完了します。
+- 実番号で SMS 送信時に **reCAPTCHA が表示されない**こと
+- SMS が**日本語**で届くこと
+- Xcode コンソールに `🔴 [APNs] register failed` が出ないこと
 
-**対策（必要に応じて）:**
-ログイン完了を待つ必要がある場合は、以下のように実装できます:
+### 回帰確認 (認証必須化まわり)
 
-```swift
-// 例: ViewModelで認証完了を待つ
-@Published var isAuthenticated = false
+1. 新規: アプリ削除 → 起動 → 規約 → ログイン → 認証 → ユーザー情報入力 → ホーム
+2. 既存ユーザー: ログアウト → ログイン画面に「認証が必要になりました」の文言 → 再認証 → ユーザー情報入力を**スキップして**ホーム
+3. ログアウト前後で `userId` (UserDefaults) が変わらないこと
 
-init() {
-    Auth.auth().addStateDidChangeListener { auth, user in
-        self.isAuthenticated = (user != nil)
-    }
-}
-```
+---
 
-## まとめ
+## 6. トラブルシューティング
 
-1. ✅ `AppDelegate.swift` に匿名認証のコードを追加（実装済み）
-2. ⬜ Firebase Console で匿名認証を有効化
-3. ⬜ Storage Rules を更新
-4. ⬜ アプリをビルドして動作確認
+| 症状 | 原因と対処 |
+|---|---|
+| 常に reCAPTCHA が出る (実機) | §3 の APNs キー未登録が最有力。次に entitlements / UIBackgroundModes の欠落、通知の Capability 不整合を確認 |
+| `ERROR_MISSING_CLIENT_IDENTIFIER` (17993) | reCAPTCHA トークンも APNs も検証できていない。URL scheme (Encoded App ID) が Info.plist にあるか、GoogleService-Info.plist が最新か確認 |
+| エラーコード 17999 / internal error | Firebase Console で Phone プロバイダが無効のまま、または App ID/APNs 設定の不整合 |
+| SMS が英語で届く | `Auth.auth().languageCode = "ja"` が呼ばれていない (AppDelegate を確認) |
+| `tooManyRequests` / `quotaExceeded` | 同一番号・同一IPへの送信超過。時間を置く。開発中はテスト番号を使う |
+| コード入力後 `sessionExpired` | verificationID の期限切れ。再送信ボタンから新しいコードを取得 |
+| シミュレータで reCAPTCHA 後に戻らない | URL scheme の欠落。Info.plist の `app-1-816472842049-ios-85f57fcd9a9019d8a04bc0` を確認 |
 
-上記の手順を完了すれば、403エラーが解消され、画像が表示されます。
+---
+
+## 7. App Store 審査時の注意
+
+- 審査員は日本のSMSを受信できないため、**App Review 情報に §2 のテスト番号と確認コードを記載**すること
+  (例: 「Test phone number: +81 90 0000 0001 / Verification code: 123456」)
+- アカウント作成があるため、Apple は原則アプリ内の**アカウント削除機能** (5.1.1(v)) を求める。
+  現状は未実装 (今後の課題)。指摘された場合はサーバ側のデータ削除 API と合わせて対応する

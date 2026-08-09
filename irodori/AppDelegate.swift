@@ -14,6 +14,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         FirebaseApp.configure()
 
+        // Phone Auth の APNs サイレント検証用トークンを取得する (通知許可ダイアログは出ない)
+        application.registerForRemoteNotifications()
+        // Firebase が送る SMS 本文を日本語にする
+        Auth.auth().languageCode = "ja"
+
         // アプリ起動時のログを送信
         AnalyticsLogger.shared.log(screen: .appLaunch)
 
@@ -29,6 +34,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Auth.auth().setAPNSToken(deviceToken, type: .unknown)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // APNs 未設定 (キー未登録・シミュレータ等) の場合は reCAPTCHA にフォールバックされる
+        print("🔴 [APNs] register failed: \(error.localizedDescription)")
     }
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
