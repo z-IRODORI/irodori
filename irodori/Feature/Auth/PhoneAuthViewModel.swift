@@ -50,9 +50,17 @@ final class PhoneAuthViewModel {
         resendRemainingSeconds == 0 && !isLoading
     }
 
-    /// 電話番号入力を数字のみ・11桁までに整形し、3-4-4 でハイフンを入れる
+    /// 電話番号入力を数字のみ・11桁までに整形し、3-4-4 でハイフンを入れる。
+    /// "+81 90-1234-5678" のような国際形式のペーストは 0 始まりの国内形式に正規化する。
     func formatPhoneNumberText(_ newValue: String) {
-        let digits = String(newValue.filter { $0.isNumber }.prefix(11))
+        var allDigits = newValue.filter { $0.isNumber }
+        // 11桁に切り詰める前に判定しないと "8190..." 12桁の 81 プレフィックスを見失う
+        if allDigits.hasPrefix("81"), allDigits.count >= 12 {
+            // "+81 090-..." のようにトランクの 0 を残した表記は 0 を重ねない
+            let rest = allDigits.dropFirst(2)
+            allDigits = rest.hasPrefix("0") ? String(rest) : "0" + rest
+        }
+        let digits = String(allDigits.prefix(11))
         var formatted = String(digits.prefix(3))
         if digits.count > 3 {
             formatted += "-" + digits.dropFirst(3).prefix(4)
