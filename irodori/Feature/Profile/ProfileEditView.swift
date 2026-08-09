@@ -5,6 +5,7 @@ struct ProfileEditView: View {
     @Binding var path: [ViewType]
     @State private var viewModel: ProfileEditViewModel
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showLogoutConfirmation = false
 
     init(path: Binding<[ViewType]>, profileInfo: ProfileInfo?) {
         self._path = path
@@ -16,6 +17,7 @@ struct ProfileEditView: View {
             VStack(spacing: 24) {
                 profileImageSection
                 userInfoSection
+                logoutSection
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -39,6 +41,19 @@ struct ProfileEditView: View {
                     await viewModel.uploadProfileImage(uiImage)
                 }
             }
+        }
+        .alert("ログアウトしますか？", isPresented: $showLogoutConfirmation) {
+            Button("キャンセル", role: .cancel) {}
+            Button("ログアウト", role: .destructive) {
+                do {
+                    try AuthManager.shared.signOut()
+                    AnalyticsLogger.shared.log(action: .logout)
+                } catch {
+                    ToastManager.shared.show("ログアウトに失敗しました。もう一度お試しください。")
+                }
+            }
+        } message: {
+            Text("登録したデータは端末に残ります。同じ電話番号で再ログインすると引き続き利用できます。")
         }
     }
 
@@ -107,6 +122,22 @@ struct ProfileEditView: View {
 
             locationsSection
         }
+    }
+
+    private var logoutSection: some View {
+        Button {
+            showLogoutConfirmation = true
+        } label: {
+            Text("ログアウト")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.red)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 16)
     }
 
     // MARK: - 場所 (複数登録)

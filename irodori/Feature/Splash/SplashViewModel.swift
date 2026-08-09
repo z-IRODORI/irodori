@@ -29,12 +29,10 @@ final class SplashViewModel {
             state = .termsOfService
             return
         }
-        // 電話番号ログイン（既存ユーザー＝userInfoあり はスキップ）
-        if UserDefaults.standard.object(forKey: UserDefaultsKey.userInfo.rawValue) == nil {
-            if !AuthManager.shared.isSignedIn {
-                state = .login
-                return
-            }
+        // 電話番号ログイン (全ユーザー必須。未サインインなら既存ユーザーにも認証を求める)
+        if !AuthManager.shared.isSignedIn {
+            state = .login
+            return
         }
         // ユーザー情報設定
         if UserDefaults.standard.object(forKey: UserDefaultsKey.userInfo.rawValue) == nil {
@@ -70,6 +68,8 @@ final class SplashViewModel {
 
     func nextButtonTapped() {
         UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue)
-        state = .login
+        // 直接 .login にセットしない: 再インストールでキーチェーンに Firebase セッションが
+        // 残っている場合はログインをスキップして次のステップへ進めるため、ルーティングに任せる
+        updateState()
     }
 }

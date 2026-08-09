@@ -31,6 +31,7 @@ enum GAEventAction: String {
     case calendarDateSelected
     case userInfoSubmitted
     case termsAccepted
+    case logout
     
     // Navigation Actions
     case goHome = "go_home"
@@ -62,4 +63,5 @@ enum GAEventError: String {
     case cameraError
     case mlError
     case phoneAuthError = "phone_auth_error"
+    case userIdFallback = "user_id_fallback_uuid"
 }

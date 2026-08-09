@@ -39,8 +39,12 @@ final class InputUserInfoViewModel {
     }
 
     func okButtonTapped() async {
-        let createUserClient: CreateUserClient = CreateUserClient()
-        let uid = Auth.auth().currentUser?.uid ?? UUID().uuidString
+        let firebaseUID = Auth.auth().currentUser?.uid
+        if firebaseUID == nil {
+            // 認証必須化後は到達しない想定。発生したら計測で検知する
+            AnalyticsLogger.shared.log(error: .userIdFallback, parameters: ["context": "input_user_info"])
+        }
+        let uid = firebaseUID ?? UUID().uuidString
         userDefaults.set(uid, forKey: UserDefaultsKey.userId.rawValue)
 
         // 居住地を UD に先行保存し、サーバへ送信 (失敗してもオンボーディングは進める)
@@ -65,10 +69,6 @@ final class InputUserInfoViewModel {
             userDefaults.set(month, forKey: UserDefaultsKey.birthMonth.rawValue)
             userDefaults.set(day, forKey: UserDefaultsKey.birthDay.rawValue)
         }
-
-        do {
-            let _ = try await createUserClient.post(createUserRequest: .init(id: uid, cognito_id: uid, user_name: username, year: year, month: month, day: day, gender: selectedGender.number))
-        } catch {}
 
         // 生年月日が入力済みの場合、動物占いAPIを呼び出す
         if isBirthdayComplete {

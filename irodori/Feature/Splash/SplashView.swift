@@ -14,6 +14,7 @@ struct SplashView: View {
     let viewModel: SplashViewModel = .init()
     let cameraViewModel: CameraViewModel = .init()
     private let toastManager = ToastManager.shared
+    private let authManager = AuthManager.shared
     private var isHomeState: Bool {
         if case .home = viewModel.state { return true }
         return false
@@ -109,6 +110,12 @@ struct SplashView: View {
                 // フラグをリセット（次のフレームで）
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isStateChanging = false
+                }
+            }
+            .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
+                // ログアウト / トークン失効時のみ .login へ戻す (サインイン時は onSignInSuccess 側で遷移済み)
+                if !isAuthenticated {
+                    viewModel.updateState()
                 }
             }
 //        case .userInfo:
