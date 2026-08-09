@@ -299,6 +299,9 @@ struct TomorrowPickSection: View {
     @State private var showPlanListSheet = false
     @State private var listPushItem: DailyRecommendationItem? = nil
     @State private var markingWornID: String? = nil
+    /// 提案セット全体への「合っていない」フィードバック (確認ダイアログ + 送信中)
+    @State private var showSetMismatchDialog = false
+    @State private var isSendingSetMismatch = false
     /// 「これにする」直後の見送り画面 (決定の儀式)
     @State private var sendoffItem: DailyRecommendationItem? = nil
     /// 朝いち演出 (1日1回): false の間はカルーセルを隠し、フェードインで登場させる
@@ -369,7 +372,8 @@ struct TomorrowPickSection: View {
                 scopeName: viewModel.selectedPickScope.displayName
             )
         }
-        .sheet(item: $reasonItem) { item in
+        // コーデ詳細は半モーダルではなく全画面で見せる (画像・構成リストの視認性優先)
+        .fullScreenCover(item: $reasonItem) { item in
             NavigationStack {
                 TomorrowCompositionView(
                     item: item,
@@ -387,9 +391,64 @@ struct TomorrowPickSection: View {
                         }
                     }
             }
-            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showPlanListSheet) { planListSheet }
+        .confirmationDialog(
+            "表示中の\(cards.count)案を「合っていない」として記録し、別の提案に切り替えます",
+            isPresented: $showSetMismatchDialog,
+            titleVisibility: .visible
+        ) {
+            Button("合っていないと伝える", role: .destructive) {
+                sendSetMismatch()
+            }
+            Button("キャンセル", role: .cancel) {}
+        }
+    }
+
+    // MARK: - 提案セット全体への「合っていない」フィードバック
+
+    private var setMismatchRow: some View {
+        HStack {
+            Spacer()
+            Button {
+                Haptic.selection()
+                showSetMismatchDialog = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "hand.thumbsdown")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(isSendingSetMismatch ? "切り替え中..." : "全体的に合っていない")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .overlay(Capsule().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(isSendingSetMismatch)
+        }
+        .padding(.horizontal, 24)
+    }
+
+    /// 表示中のカード全部に dislike (理由: 全体的に合っていない) を送り、次の候補に切り替える
+    private func sendSetMismatch() {
+        guard !isSendingSetMismatch, !cards.isEmpty else { return }
+        isSendingSetMismatch = true
+        let targets = cards
+        Task { @MainActor in
+            let ok = await viewModel.sendSetMismatchFeedback(items: targets)
+            isSendingSetMismatch = false
+            if ok {
+                Haptic.notify(.success)
+                withAnimation { currentCardID = nil }
+                ToastManager.shared.show("教えてくれてありがとう。別の提案に切り替えるね", style: .normal)
+            } else {
+                Haptic.notify(.error)
+                ToastManager.shared.show("送信に失敗しました。時間をおいて再度お試しください")
+            }
+        }
     }
 
     // MARK: - 今日/明日/週末 セグメント + 見出し (日付 + 地域 + 天気)
@@ -656,6 +715,8 @@ struct TomorrowPickSection: View {
     @ViewBuilder
     private var contentArea: some View {
         if !cards.isEmpty {
+            // 提案が全体的に外れていた時の逃げ道: セットごと dislike して次の候補に切り替える
+            setMismatchRow
             cardCarousel
                 .opacity(ritualRevealed ? 1 : 0)
                 .offset(y: ritualRevealed ? 0 : 16)
@@ -753,7 +814,7 @@ struct TomorrowPickSection: View {
                         }
                         Text(isDecided
                              ? "これで決まり"
-                             : (markingWornID == card.id ? "記録中..." : "これにする"))
+                             : (markingWornID == card.id ? "記録中..." : wearButtonTitle))
                             .font(.system(size: 14, weight: .semibold))
                     }
                     .foregroundStyle(.white)
@@ -1098,6 +1159,15 @@ struct TomorrowPickSection: View {
     }
 
     // MARK: - ヘルパー
+
+    /// 着るボタンの文言。対象日が伝わるようタブに合わせて変える (今日着る / 明日着る / 週末に着る)
+    private var wearButtonTitle: String {
+        switch viewModel.selectedPickScope {
+        case .today: return "今日着る"
+        case .tomorrow: return "明日着る"
+        case .weekend: return "週末に着る"
+        }
+    }
 
     private func styleName(_ card: DailyRecommendationItem) -> String {
         if !card.style.isEmpty { return card.style }

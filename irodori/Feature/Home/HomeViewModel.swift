@@ -780,6 +780,20 @@ final class HomeViewModel {
         }
     }
 
+    /// 表示中の提案セット全体への「合っていない」フィードバック。
+    /// 表示中の各カードに dislike (理由: 全体的に合っていない) を送る。成功したカードは
+    /// 表示から即時除去されるため、カルーセルは次の候補に切り替わる (次に繋がる体験)。
+    /// 1件でも成功すれば true
+    func sendSetMismatchFeedback(items: [DailyRecommendationItem]) async -> Bool {
+        var anySuccess = false
+        for item in items {
+            if await sendFeedback(item: item, rating: .dislike, reasons: ["全体的に合っていない"]) {
+                anySuccess = true
+            }
+        }
+        return anySuccess
+    }
+
     /// dislike されたコーデを全スコープの表示・ローカルキャッシュから取り除く
     private func removeRecommendationEverywhere(poolID: String) {
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
