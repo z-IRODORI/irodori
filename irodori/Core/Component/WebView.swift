@@ -145,11 +145,12 @@ struct WebViewContainer: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.openURL) private var openURL
 
+    // Web ページの表示領域を最大化するため、上部はタイトル+閉じるの最小構成にし、
+    // ナビゲーション操作 (戻る/進む/リロード/Safari) は片手で届く下部バーへ置く (Safari の文法)
     var body: some View {
         VStack(spacing: 0) {
-            Header()
-                .padding()
-                .background(Color(UIColor.systemBackground))
+            header
+            Divider()
 
             WebView(
                 url: url,
@@ -159,70 +160,88 @@ struct WebViewContainer: View {
                 pageTitle: $pageTitle,
                 webViewStore: webViewStore
             )
-        }
-        .overlay(alignment: .center) {
-            if isLoading {
-                ProgressView()
+            .overlay(alignment: .center) {
+                if isLoading {
+                    ProgressView()
+                }
             }
+
+            Divider()
+            bottomBar
         }
+        .background(Color(UIColor.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func Header() -> some View {
-        HStack {
-            // Close
-            Button(action: {
-                dismiss()
-            }) {
+    private var header: some View {
+        HStack(spacing: 8) {
+            Button(action: { dismiss() }) {
                 Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.primary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("閉じる")
 
-            // Title: ページタイトル (商品名など)。取得できるまではホスト名を表示
+            // ページタイトル (商品名など)。取得できるまではホスト名を表示
             Text(pageTitle.isEmpty ? (url.host ?? "") : pageTitle)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 8)
 
-            // Navigation buttons
-            HStack(spacing: 16) {
-                Button(action: {
-                    webViewStore.goBack()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(canGoBack ? .primary : .gray)
-                }
-                .disabled(!canGoBack)
-
-                Button(action: {
-                    webViewStore.goForward()
-                }) {
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(canGoForward ? .primary : .gray)
-                }
-                .disabled(!canGoForward)
-
-                // Reload
-                Button(action: {
-                    webViewStore.reload()
-                }) {
-                    Image(systemName: "arrow.clockwise")
-                        .foregroundColor(isLoading ? .gray : .primary)
-                }
-                .disabled(isLoading)
-
-                // ブラウザ(Safari)で開く: WebView 内で遷移した先があればその URL を優先
-                Button(action: {
-                    openURL(webViewStore.currentURL ?? url)
-                }) {
-                    Image(systemName: "safari")
-                        .foregroundColor(.primary)
-                }
-                .accessibilityLabel("ブラウザで開く")
-            }
+            // タイトルを中央に保つための xmark と同幅のバランサー
+            Color.clear.frame(width: 36, height: 36)
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .background(Color(UIColor.systemBackground))
+    }
+
+    private var bottomBar: some View {
+        HStack {
+            Button(action: { webViewStore.goBack() }) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(canGoBack ? .primary : Color.gray.opacity(0.4))
+                    .frame(width: 44, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .disabled(!canGoBack)
+
+            Button(action: { webViewStore.goForward() }) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(canGoForward ? .primary : Color.gray.opacity(0.4))
+                    .frame(width: 44, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .disabled(!canGoForward)
+
+            Spacer()
+
+            Button(action: { webViewStore.reload() }) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(isLoading ? Color.gray.opacity(0.4) : .primary)
+                    .frame(width: 44, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .disabled(isLoading)
+
+            // ブラウザ(Safari)で開く: WebView 内で遷移した先があればその URL を優先
+            Button(action: { openURL(webViewStore.currentURL ?? url) }) {
+                Image(systemName: "safari")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(.primary)
+                    .frame(width: 44, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("ブラウザで開く")
+        }
+        .padding(.horizontal, 8)
+        .background(Color(UIColor.systemBackground))
     }
 }
 
