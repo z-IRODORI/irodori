@@ -1,11 +1,14 @@
 import SwiftUI
 import PhotosUI
+import FirebaseAuth
 
 struct ProfileEditView: View {
     @Binding var path: [ViewType]
     @State private var viewModel: ProfileEditViewModel
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showLogoutConfirmation = false
+    @State private var showDeleteAccountConfirmation = false
+    @State private var showDeleteAccountFinalConfirmation = false
 
     init(path: Binding<[ViewType]>, profileInfo: ProfileInfo?) {
         self._path = path
@@ -18,6 +21,7 @@ struct ProfileEditView: View {
                 profileImageSection
                 userInfoSection
                 logoutSection
+                deleteAccountSection
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -54,6 +58,36 @@ struct ProfileEditView: View {
             }
         } message: {
             Text("登録したデータは端末に残ります。同じ電話番号で再ログインすると引き続き利用できます。")
+        }
+        .alert("アカウントを削除しますか？", isPresented: $showDeleteAccountConfirmation) {
+            Button("キャンセル", role: .cancel) {}
+            Button("削除する", role: .destructive) {
+                showDeleteAccountFinalConfirmation = true
+            }
+        } message: {
+            Text("コーデ・クローゼット・プロフィールなど、すべてのデータが完全に削除されます。この操作は取り消せません。")
+        }
+        .alert("本当に削除しますか？", isPresented: $showDeleteAccountFinalConfirmation) {
+            Button("キャンセル", role: .cancel) {}
+            Button("完全に削除する", role: .destructive) {
+                Task { await viewModel.deleteAccount() }
+            }
+        } message: {
+            Text("同じ電話番号で登録し直すことはできますが、削除したデータは復元できません。")
+        }
+        .overlay {
+            if viewModel.isDeletingAccount {
+                ZStack {
+                    Color.black.opacity(0.3).ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        Text("アカウントを削除しています…")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
         }
     }
 
@@ -138,6 +172,19 @@ struct ProfileEditView: View {
         }
         .buttonStyle(.plain)
         .padding(.top, 16)
+    }
+
+    private var deleteAccountSection: some View {
+        Button {
+            showDeleteAccountConfirmation = true
+        } label: {
+            Text("アカウントを削除")
+                .font(.system(size: 13))
+                .foregroundStyle(.red.opacity(0.8))
+                .underline()
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 24)
     }
 
     // MARK: - 場所 (複数登録)
@@ -313,22 +360,26 @@ final class ProfileEditViewModel {
     var username: String
     var profileImageUrl: String?
     var isUploadingImage = false
+    var isDeletingAccount = false
     var prefectureCode: String?
     /// メイン以外の追加場所 (端末ローカルのみ。サーバはメイン1値しか持たない)
     var additionalPrefectureCodes: [String]
 
     private var profileInfo: ProfileInfo?
     private let prefectureClient: UpdateUserPrefectureClientProtocol
+    private let deleteUserClient: DeleteUserClientProtocol
     private var lastSyncedPrefectureCode: String?
 
     init(
         profileInfo: ProfileInfo?,
-        prefectureClient: UpdateUserPrefectureClientProtocol = UpdateUserPrefectureClient()
+        prefectureClient: UpdateUserPrefectureClientProtocol = UpdateUserPrefectureClient(),
+        deleteUserClient: DeleteUserClientProtocol = DeleteUserClient()
     ) {
         self.profileInfo = profileInfo
         self.username = profileInfo?.username ?? ""
         self.profileImageUrl = profileInfo?.profileImageUrl
         self.prefectureClient = prefectureClient
+        self.deleteUserClient = deleteUserClient
         let stored = UserDefaults.standard.string(forKey: UserDefaultsKey.prefectureCode.rawValue)
         self.prefectureCode = stored
         self.lastSyncedPrefectureCode = stored
@@ -468,6 +519,48 @@ final class ProfileEditViewModel {
             normalized,
             forKey: UserDefaultsKey.additionalPrefectureCodes.rawValue
         )
+    }
+
+    // MARK: - 退会
+
+    /// アカウントを完全に削除する。サーバ側で Firestore の全データと Firebase Auth ユーザーを削除し、
+    /// 成功したら端末のローカル状態も初期化する。isAuthenticated が false になり SplashView がログイン画面へ戻す。
+    func deleteAccount() async {
+        guard !isDeletingAccount else { return }
+        guard let user = Auth.auth().currentUser else {
+            ToastManager.shared.show("ログイン状態を確認できませんでした。再度ログインしてください。")
+            return
+        }
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+
+        do {
+            // トークンとローカル userId (旧世代は Firebase UID と異なる) を削除前に確保する
+            let idToken = try await user.getIDToken()
+            let userId = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? user.uid
+            let result = try await deleteUserClient.delete(userId: userId, idToken: idToken)
+            switch result {
+            case .success:
+                AnalyticsLogger.shared.log(action: .accountDeleted)
+                // Auth ユーザーはサーバ側で削除済み。残ったローカルセッションを破棄する
+                try? Auth.auth().signOut()
+                AccountLocalState.resetForNewRegistration()
+            case .failure:
+                ToastManager.shared.show("削除に失敗しました。通信環境をご確認のうえ、もう一度お試しください。")
+            }
+        } catch {
+            // サーバ側の削除完了後にレスポンスを受け取れなかった場合、再試行時の getIDToken が
+            // user-not-found 等で失敗する。その場合は削除済みとして端末を初期化する
+            let nsError = error as NSError
+            if let code = AuthErrorCode(rawValue: nsError.code),
+               [.userNotFound, .userTokenExpired, .invalidUserToken].contains(code) {
+                AnalyticsLogger.shared.log(action: .accountDeleted)
+                try? Auth.auth().signOut()
+                AccountLocalState.resetForNewRegistration()
+                return
+            }
+            ToastManager.shared.show("削除に失敗しました。通信環境をご確認のうえ、もう一度お試しください。")
+        }
     }
 
     func uploadProfileImage(_ image: UIImage) async {

@@ -32,6 +32,7 @@ enum GAEventAction: String {
     case userInfoSubmitted
     case termsAccepted
     case logout
+    case accountDeleted = "account_deleted"
     
     // Navigation Actions
     case goHome = "go_home"

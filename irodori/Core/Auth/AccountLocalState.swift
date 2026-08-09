@@ -14,11 +14,22 @@ enum AccountLocalState {
         .notificationPromptShown,     // 通知プリプロンプトの表示済み記録
     ]
 
-    /// 新規会員登録用の初期化。userId を含む全アカウント状態を消すため、
+    /// 新規会員登録・退会用の初期化。userId を含む全アカウント状態を消すため、
     /// 既存データを引き継ぐ場合 (ログイン) では絶対に呼ばないこと。
     static func resetForNewRegistration() {
         for key in UserDefaultsKey.allCases where !keepKeys.contains(key) {
             UserDefaults.standard.removeObject(forKey: key.rawValue)
+        }
+        deleteProfileImageFiles()
+    }
+
+    /// Documents に保存されるプロフィール画像 (profile_*) を削除する。
+    /// 残すと次のアカウントに前のアバターが写り込む。
+    private static func deleteProfileImageFiles() {
+        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,
+              let fileURLs = try? FileManager.default.contentsOfDirectory(at: documents, includingPropertiesForKeys: nil) else { return }
+        for fileURL in fileURLs where fileURL.lastPathComponent.hasPrefix("profile_") {
+            try? FileManager.default.removeItem(at: fileURL)
         }
     }
 }

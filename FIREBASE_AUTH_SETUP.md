@@ -18,7 +18,8 @@ IRODORI の会員登録・ログインは **電話番号 (SMS認証) のみ** �
 | 認証の状態管理 (整形・再送60秒・エラー日本語化) | `irodori/Feature/Auth/PhoneAuthViewModel.swift` |
 | ログイン入口 | `irodori/Feature/Auth/LoginView.swift` |
 | 起動時の認証ゲート (**全ユーザー必須**) | `irodori/Feature/Splash/SplashViewModel.swift` |
-| ログアウト (確認アラート付き) | `irodori/Feature/Profile/ProfileEditView.swift` |
+| ログアウト・退会 (確認アラート付き) | `irodori/Feature/Profile/ProfileEditView.swift` |
+| 退会 API クライアント (Bearer IDトークン) | `irodori/Data/APIClient/DeleteUserClient.swift` |
 | APNs トークン連携 / reCAPTCHA リダイレクト | `irodori/AppDelegate.swift` |
 
 ### フロー
@@ -141,5 +142,9 @@ IRODORI の会員登録・ログインは **電話番号 (SMS認証) のみ** �
 
 - 審査員は日本のSMSを受信できないため、**App Review 情報に §2 のテスト番号と確認コードを記載**すること
   (例: 「Test phone number: +81 90 0000 0001 / Verification code: 123456」)
-- アカウント作成があるため、Apple は原則アプリ内の**アカウント削除機能** (5.1.1(v)) を求める。
-  現状は未実装 (今後の課題)。指摘された場合はサーバ側のデータ削除 API と合わせて対応する
+- **アカウント削除 (5.1.1(v)) は実装済み**: プロフィール編集 → 「アカウントを削除」(2段階確認)。
+  iOS が `DELETE /api/user` (irodori-api) を Bearer ID トークン付きで呼び、サーバが
+  Firestore (`users/{id}` サブツリー + user_id を持つトップレベル9コレクション)・
+  Storage (4プレフィックス)・Firebase Auth ユーザーを完全削除する (Auth 削除は必ず最後 = 失敗時再試行可)。
+  既知の制約: 旧世代ユーザー (user_id が端末UUID) はサーバに uid との対応表が無いため、
+  トークン検証 + UUID形式チェック + 監査ログでの緩和にとどまる (詳細は irodori-api 側の実装コメント参照)
