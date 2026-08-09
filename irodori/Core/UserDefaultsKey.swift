@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum UserDefaultsKey: String {
+enum UserDefaultsKey: String, CaseIterable {
     case hasAgreedToTermsOfService
     case userId
     case gender
