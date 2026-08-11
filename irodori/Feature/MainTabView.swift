@@ -21,8 +21,9 @@ struct MainTabView: View {
                     CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
                 }
 
-                // コーデ追加 (中央のカメラボタン。タブとして留まらず、タップでカメラ画面へ直行)
-                Tab("", systemImage: "camera.circle.fill", value: MainTabViewModel.Tab.plus) {
+                // コーデ追加 (中央のカメラ。タブとして留まらず、タップでカメラ画面へ直行)
+                // circle.fill 版は黒い円盤になり他タブから浮くため、通常シンボル+ラベルで揃える
+                Tab("カメラ", systemImage: "camera", value: MainTabViewModel.Tab.plus) {
                     EmptyView()
                 }
 
@@ -44,6 +45,8 @@ struct MainTabView: View {
             }
             .environment(viewModel)
             .environment(favoritesStore)
+            // 選択タブの色をデフォルトの青からアプリ基調の黒に (白カード+黒アクセントの世界観に合わせる)
+            .tint(.black)
             .task { await favoritesStore.refresh() }
             .onChange(of: viewModel.selectedTab) { oldTab, newTab in
                 if newTab == .plus {
