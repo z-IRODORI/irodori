@@ -305,8 +305,8 @@ struct CalendarView: View {
     private var monthSwitcher: some View {
         HStack(spacing: 2) {
             // months は新しい順のため、過去へ = index+1 / 未来へ = index-1
+            // (ハプティクスは monthPager の onChange で一元化)
             Button {
-                Haptic.selection()
                 goToPastMonth()
             } label: {
                 Image(systemName: "chevron.left")
@@ -325,7 +325,6 @@ struct CalendarView: View {
                 .frame(minWidth: 108)
 
             Button {
-                Haptic.selection()
                 goToFutureMonth()
             } label: {
                 Image(systemName: "chevron.right")
@@ -341,8 +340,7 @@ struct CalendarView: View {
 
     private var todayPill: some View {
         Button {
-            Haptic.selection()
-            withAnimation(.easeOut(duration: 0.2)) {
+            withAnimation(.easeOut(duration: 0.25)) {
                 selectedMonthIndex = currentMonthIndex
             }
         } label: {
@@ -399,76 +397,94 @@ struct CalendarView: View {
 
     private func goToPastMonth() {
         guard canGoPast else { return }
-        withAnimation(.easeOut(duration: 0.2)) { selectedMonthIndex = monthIndex + 1 }
+        withAnimation(.easeOut(duration: 0.25)) { selectedMonthIndex = monthIndex + 1 }
     }
 
     private func goToFutureMonth() {
         guard canGoFuture else { return }
-        withAnimation(.easeOut(duration: 0.2)) { selectedMonthIndex = monthIndex - 1 }
+        withAnimation(.easeOut(duration: 0.25)) { selectedMonthIndex = monthIndex - 1 }
     }
 
-    /// 1ヶ月が必ず1画面に収まるレイアウト (スクロールなし)。
-    /// グリッドは残り高さを GeometryReader で受け、セル高を行数から逆算する。
+    /// 横スクロールのページング。指に追従して隣の月へ連続的にスライドする
+    /// (以前は .id 差し替え + onEnded スワイプ判定だったため切替が非連続だった)。
+    /// チェブロン/今日ボタンからの withAnimation による selectedMonthIndex 変更も
+    /// scrollPosition 経由で同じスライドアニメーションになる。
     private var monthPager: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let month = selectedMonth {
-                statsRow(for: month)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                switch monthState {
-                case .loading:
-                    weekdayHeader
-                        .padding(.horizontal, 16)
-                    monthSkeletonGrid
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 10)
-                case .loaded(let responses):
-                    if !hasAnyEntry(month: month, responses: responses) {
-                        emptyMonthHint
-                            .padding(.horizontal, 16)
+        GeometryReader { geo in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 0) {
+                    // months は新しい順のため、左=過去 / 右=未来 になるよう逆順に並べる
+                    ForEach(Array(viewModel.months.indices.reversed()), id: \.self) { index in
+                        monthPage(index: index)
+                            .frame(width: geo.size.width)
                     }
-                    weekdayHeader
-                        .padding(.horizontal, 16)
-                    gridArea(month: month, responses: responses)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 10)
-                case .failed:
-                    // 失敗時も日付グリッドは描画し、予定コーデだけでも見せる (従来挙動の踏襲)
-                    if !viewModel.hasPlanned(year: month.year, month: month.monthOfTheYear) {
-                        emptyMonthHint
-                            .padding(.horizontal, 16)
-                    }
-                    weekdayHeader
-                        .padding(.horizontal, 16)
-                    gridArea(month: month, responses: [])
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 10)
                 }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: pagerPosition)
+        }
+        // 月の切替ハプティクスはここで一元化 (スワイプ/チェブロン/今日ボタンすべて発火)
+        .onChange(of: monthIndex) { _, _ in
+            Haptic.selection()
+        }
+    }
+
+    /// scrollPosition との橋渡し。get が nil を今月に解決するため、
+    /// 初回表示時から今月のページに (アニメーションなしで) 位置合わせされる
+    private var pagerPosition: Binding<Int?> {
+        Binding(
+            get: { monthIndex },
+            set: { selectedMonthIndex = $0 }
+        )
+    }
+
+    /// 1ヶ月ぶんのページ。1画面に必ず収まるレイアウト (縦スクロールなし)。
+    /// グリッドは残り高さを GeometryReader で受け、セル高を行数から逆算する。
+    @ViewBuilder
+    private func monthPage(index: Int) -> some View {
+        let month = viewModel.months[index]
+        let state = monthState(at: index)
+        VStack(alignment: .leading, spacing: 10) {
+            statsRow(for: month, state: state)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+            switch state {
+            case .loading:
+                weekdayHeader
+                    .padding(.horizontal, 16)
+                monthSkeletonGrid
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 10)
+            case .loaded(let responses):
+                if !hasAnyEntry(month: month, responses: responses) {
+                    emptyMonthHint
+                        .padding(.horizontal, 16)
+                }
+                weekdayHeader
+                    .padding(.horizontal, 16)
+                gridArea(month: month, responses: responses)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 10)
+            case .failed:
+                // 失敗時も日付グリッドは描画し、予定コーデだけでも見せる (従来挙動の踏襲)
+                if !viewModel.hasPlanned(year: month.year, month: month.monthOfTheYear) {
+                    emptyMonthHint
+                        .padding(.horizontal, 16)
+                }
+                weekdayHeader
+                    .padding(.horizontal, 16)
+                gridArea(month: month, responses: [])
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 10)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .contentShape(Rectangle())
-        // 左右スワイプでも月を移動できるようにする
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 30)
-                .onEnded { value in
-                    guard abs(value.translation.width) > abs(value.translation.height),
-                          abs(value.translation.width) > 50 else { return }
-                    Haptic.selection()
-                    if value.translation.width < 0 {
-                        goToFutureMonth()
-                    } else {
-                        goToPastMonth()
-                    }
-                }
-        )
-        .id(monthIndex)
-        .transition(.opacity)
     }
 
-    private var monthState: MonthLoadState {
-        viewModel.monthStates.indices.contains(monthIndex)
-            ? viewModel.monthStates[monthIndex] : .loading
+    private func monthState(at index: Int) -> MonthLoadState {
+        viewModel.monthStates.indices.contains(index)
+            ? viewModel.monthStates[index] : .loading
     }
 
     private func hasAnyEntry(month: Month, responses: [CoordinateListResponse]) -> Bool {
@@ -477,9 +493,9 @@ struct CalendarView: View {
     }
 
     /// 記録◯件・予定◯件 (WEAR 風の控えめなキャプション)
-    private func statsRow(for month: Month) -> some View {
+    private func statsRow(for month: Month, state: MonthLoadState) -> some View {
         let recordCount: Int = {
-            if case .loaded(let responses) = monthState {
+            if case .loaded(let responses) = state {
                 return responses.filter { $0.displayImageURL != nil }.count
             }
             return 0
