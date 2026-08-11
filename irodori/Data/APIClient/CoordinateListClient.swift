@@ -16,7 +16,9 @@ final class CoordinateListClient: CoordinateListClientProtocol {
 //        let baseURL = "https://nfzoiluhpi.execute-api.ap-northeast-1.amazonaws.com/prod/"
         let baseURL = "https://irodori-api.onrender.com"
         let endpoint = "api/coordinate/list/\(uid)"
-        let url = URL(string: "\(baseURL)/\(endpoint)?year=\(year)&month=\(month)")!
+        // include_all=1: 同日に複数のコーデがある場合に全件返す opt-in
+        // (旧サーバは未知のクエリを無視して従来どおり1日1件を返すため後方互換)
+        let url = URL(string: "\(baseURL)/\(endpoint)?year=\(year)&month=\(month)&include_all=1")!
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"

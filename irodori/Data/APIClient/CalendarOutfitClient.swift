@@ -14,7 +14,12 @@ struct CalendarOutfit: Codable, Identifiable, Hashable {
     let target_id: String   // pool_id または coordinate id
     let image_url: String
     let source: String
+    /// planned (提案・予定) | adopted (その日のコーデとして採用)。
+    /// 旧サーバ応答には無いため Optional (nil は planned 扱い)
+    var status: String? = nil
     var id: String { date }
+
+    var isAdopted: Bool { status == "adopted" }
 }
 
 struct CalendarOutfitsResponse: Codable {
@@ -39,9 +44,16 @@ struct CalendarOutfitBulkResponse: Codable {
 
 protocol CalendarOutfitClientProtocol {
     func list(uid: String, year: Int, month: Int) async throws -> Result<CalendarOutfitsResponse, HTTPError>
-    func put(uid: String, date: String, kind: String, targetId: String, imageURL: String, source: String) async throws -> Result<CalendarOutfitPutResponse, HTTPError>
+    func put(uid: String, date: String, kind: String, targetId: String, imageURL: String, source: String, status: String) async throws -> Result<CalendarOutfitPutResponse, HTTPError>
     func delete(uid: String, date: String) async throws -> Result<CalendarOutfitDeleteResponse, HTTPError>
     func bulk(uid: String, items: [CalendarOutfit], overwrite: Bool) async throws -> Result<CalendarOutfitBulkResponse, HTTPError>
+}
+
+extension CalendarOutfitClientProtocol {
+    /// status 省略時は「予定」として保存 (既存呼び出し互換)
+    func put(uid: String, date: String, kind: String, targetId: String, imageURL: String, source: String) async throws -> Result<CalendarOutfitPutResponse, HTTPError> {
+        try await put(uid: uid, date: date, kind: kind, targetId: targetId, imageURL: imageURL, source: source, status: "planned")
+    }
 }
 
 final class CalendarOutfitClient: CalendarOutfitClientProtocol {
@@ -52,6 +64,7 @@ final class CalendarOutfitClient: CalendarOutfitClientProtocol {
         let target_id: String
         let image_url: String
         let source: String
+        let status: String
     }
 
     private struct BulkRequestBody: Encodable {
@@ -73,7 +86,7 @@ final class CalendarOutfitClient: CalendarOutfitClientProtocol {
         return try await send(request)
     }
 
-    func put(uid: String, date: String, kind: String, targetId: String, imageURL: String, source: String) async throws -> Result<CalendarOutfitPutResponse, HTTPError> {
+    func put(uid: String, date: String, kind: String, targetId: String, imageURL: String, source: String, status: String) async throws -> Result<CalendarOutfitPutResponse, HTTPError> {
         var components = URLComponents(string: "\(baseURL)/api/calendar/outfits/\(date)")!
         components.queryItems = [URLQueryItem(name: "user_id", value: uid)]
         guard let url = components.url else { return .failure(.responseError) }
@@ -81,7 +94,7 @@ final class CalendarOutfitClient: CalendarOutfitClientProtocol {
         request.httpMethod = "PUT"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONEncoder().encode(
-            PutRequestBody(kind: kind, target_id: targetId, image_url: imageURL, source: source)
+            PutRequestBody(kind: kind, target_id: targetId, image_url: imageURL, source: source, status: status)
         )
         return try await send(request)
     }
@@ -135,10 +148,10 @@ final class MockCalendarOutfitClient: CalendarOutfitClientProtocol {
         .success(.init(status: "success", items: []))
     }
 
-    func put(uid: String, date: String, kind: String, targetId: String, imageURL: String, source: String) async throws -> Result<CalendarOutfitPutResponse, HTTPError> {
+    func put(uid: String, date: String, kind: String, targetId: String, imageURL: String, source: String, status: String) async throws -> Result<CalendarOutfitPutResponse, HTTPError> {
         .success(.init(
             status: "success",
-            item: CalendarOutfit(date: date, kind: kind, target_id: targetId, image_url: imageURL, source: source)
+            item: CalendarOutfit(date: date, kind: kind, target_id: targetId, image_url: imageURL, source: source, status: status)
         ))
     }
 

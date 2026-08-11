@@ -38,6 +38,10 @@ struct CalendarView: View {
     @State private var presentedPlannedPool: PresentedPlannedPool? = nil
     @State private var presentedSelfPlanned: CalendarOutfit? = nil
     @State private var isLoadingPlannedDetail = false
+    /// 同日複数コーデの日別一覧シート
+    @State private var daySheetData: CalendarDaySheetData? = nil
+    /// 空き日タップからの「その日の提案」シート
+    @State private var suggestionData: CalendarDaySuggestionData? = nil
 
     /// pool の予定コーデ詳細シートに渡す組 (削除に予定日が要るため item と一緒に保持する)
     private struct PresentedPlannedPool: Identifiable {
@@ -151,7 +155,10 @@ struct CalendarView: View {
                             ToastManager.shared.show("予定を削除しました", style: .normal)
                         }
                         return ok
-                    }
+                    },
+                    isAdopted: presented.outfit.isAdopted,
+                    onAdopt: { await viewModel.adoptPlanned(presented.outfit) },
+                    onUnadopt: { await viewModel.unadoptPlanned(presented.outfit) }
                 )
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -179,6 +186,25 @@ struct CalendarView: View {
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Menu {
+                            // 採用 = 提案(予定)のままでも削除でもない第3の状態「その日のコーデ」
+                            if planned.isAdopted {
+                                Button("採用を取り消す") {
+                                    Task {
+                                        if await viewModel.unadoptPlanned(planned) {
+                                            presentedSelfPlanned = viewModel.plannedByDate[planned.date]
+                                        }
+                                    }
+                                }
+                            } else {
+                                Button("この日のコーデにする") {
+                                    Task {
+                                        if await viewModel.adoptPlanned(planned) {
+                                            ToastManager.shared.show("この日のコーデに採用しました", style: .normal)
+                                            presentedSelfPlanned = viewModel.plannedByDate[planned.date]
+                                        }
+                                    }
+                                }
+                            }
                             Button("予定から削除", role: .destructive) {
                                 Task {
                                     if await viewModel.deletePlanned(planned) {
@@ -195,6 +221,39 @@ struct CalendarView: View {
                     }
                 }
             }
+        }
+        // 同日複数コーデの切り替えシート。選択後はシートが閉じてから既存の詳細導線へ渡す
+        // (シートの閉鎖アニメーションと次のシート/pushが競合しないよう少し遅らせる)
+        .sheet(item: $daySheetData) { data in
+            CalendarDayOutfitsSheet(
+                data: data,
+                onSelectRecord: { record in
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(350))
+                        openRecord(record)
+                    }
+                },
+                onSelectOutfit: { outfit in
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(350))
+                        await openPlannedDetail(outfit)
+                    }
+                }
+            )
+        }
+        // 空き日タップからの「その日の提案」シート (提案体験の入口)
+        .sheet(item: $suggestionData) { data in
+            CalendarDaySuggestionSheet(
+                data: data,
+                load: { await viewModel.suggest(forDate: data.date) },
+                onPlan: { item in await viewModel.savePlanned(date: data.date, item: item) },
+                onOpenPlanner: {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(350))
+                        path.append(.outfitPlanner)
+                    }
+                }
+            )
         }
         .overlay {
             if isLoadingPlannedDetail {
@@ -501,9 +560,14 @@ struct CalendarView: View {
             return 0
         }()
         let plannedPrefix = String(format: "%04d-%02d-", month.year, month.monthOfTheYear)
-        let plannedCount = viewModel.plannedByDate.keys.filter { $0.hasPrefix(plannedPrefix) }.count
+        let monthOutfits = viewModel.plannedByDate.filter { $0.key.hasPrefix(plannedPrefix) }
+        let plannedCount = monthOutfits.filter { !$0.value.isAdopted }.count
+        let adoptedCount = monthOutfits.filter { $0.value.isAdopted }.count
         return HStack(spacing: 10) {
             Label("記録 \(recordCount)件", systemImage: "camera.fill")
+            if adoptedCount > 0 {
+                Label("採用 \(adoptedCount)件", systemImage: "checkmark.circle")
+            }
             if plannedCount > 0 {
                 Label("予定 \(plannedCount)件", systemImage: "clock")
             }
@@ -625,134 +689,232 @@ struct CalendarView: View {
     // MARK: - Day Cell
 
     private func dayCell(month: Month, day: Int, responses: [CoordinateListResponse], cellHeight: CGFloat) -> some View {
-        // day フィールドで突合する (旧実装の配列インデックス依存は歯抜けデータでズレるため)
-        let coord = responses.first { $0.day == day }
-        // display_type に応じて撮影/切り取り画像を選ぶ
-        let imageURL = coord?.displayImageURL
-        let coordinateId = coord?.id
-        // 着用記録がある日は記録を優先し、無い日だけ予定コーデを表示する
-        let planned = imageURL == nil
-            ? viewModel.planned(year: month.year, month: month.monthOfTheYear, day: day)
-            : nil
+        // include_all=1 のため同日複数行があり得る。day で突合し画像のある行だけ拾う (サーバ順 = created_at 順)
+        let dayRecords = responses.filter { $0.day == day && $0.displayImageURL != nil }
+        // 予定/採用コーデは記録と同居させる (以前は「記録がある日は予定が不可視」だった)
+        let planned = viewModel.planned(year: month.year, month: month.monthOfTheYear, day: day)
+        let totalCount = dayRecords.count + (planned == nil ? 0 : 1)
         let isToday = checkIsToday(year: month.year, month: month.monthOfTheYear, day: day)
+        let dateString = String(format: "%04d-%02d-%02d", month.year, month.monthOfTheYear, day)
+        // 空いている今日以降の日は「その日の提案」を体験できる
+        let canSuggest = totalCount == 0 && dateString >= HomeViewModel.jstTodayString()
 
         return Button(action: {
-            if let imageURL, let coordinateId, !coordinateId.isEmpty {
-                let targetDateString = String(format: "%04d-%02d-%02d", month.year, month.monthOfTheYear, day)
-                AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
-                    "date": targetDateString,
-                    "has_coordinate": true
-                ])
-                let params = ViewType.CoordinateDetailParams(
-                    coordinateId: coordinateId,
-                    coordinateImageURL: imageURL,
-                    showHeader: false
-                )
-                path.append(.coordinateDetail(params))
-            } else if let planned {
-                Haptic.impact(.soft)
-                Task { await openPlannedDetail(planned) }
-            }
+            handleDayTap(month: month, day: day, dateString: dateString, dayRecords: dayRecords, planned: planned)
         }) {
             ZStack {
-                if let imageURL {
+                if let record = dayRecords.first, let imageURL = record.displayImageURL {
                     coordinateImage(from: imageURL)
                         .scaledToFill()
                         .frame(minWidth: 0, maxWidth: .infinity)
                         .frame(height: cellHeight)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                    Text("\(day)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.5), radius: 2)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .padding(4)
+                    dayNumberOverlay(day)
                 } else if let planned {
-                    // 予定コーデ: 破線枠 + 時計アイコンで「まだ着ていない予定」を表現
                     coordinateImage(from: planned.image_url)
                         .scaledToFill()
                         .frame(minWidth: 0, maxWidth: .infinity)
                         .frame(height: cellHeight)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(
-                                    Color.black.opacity(0.4),
-                                    style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
-                                )
-                        )
-
-                    Text("\(day)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.5), radius: 2)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .padding(4)
-
-                    Image(systemName: "clock.fill")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.5), radius: 2)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                        .padding(4)
+                        .overlay {
+                            // 破線 = 「まだ着ていない予定」。採用済みは実線 (記録と同格) に昇格
+                            if !planned.isAdopted {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .strokeBorder(
+                                        Color.black.opacity(0.4),
+                                        style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+                                    )
+                            }
+                        }
+                    dayNumberOverlay(day)
+                    if planned.isAdopted {
+                        AdoptedCheckBadge(size: 14)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                            .padding(3)
+                    } else {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.5), radius: 2)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                            .padding(4)
+                    }
                 } else {
                     Color.clear
 
-                    if isToday {
-                        Circle()
-                            .fill(Color.black)
-                            .frame(width: 28, height: 28)
-                        Text("\(day)")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white)
-                    } else {
-                        Text("\(day)")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.black.opacity(0.55))
+                    VStack(spacing: 4) {
+                        if isToday {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black)
+                                    .frame(width: 28, height: 28)
+                                Text("\(day)")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
+                        } else {
+                            Text("\(day)")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.black.opacity(0.55))
+                        }
+                        // 破線サークル+plus = 「未定の日は提案してもらえる」入口 (認知獲得の常設アフォーダンス)
+                        if canSuggest && cellHeight >= 48 {
+                            ZStack {
+                                Circle()
+                                    .strokeBorder(
+                                        Color.gray.opacity(0.45),
+                                        style: StrokeStyle(lineWidth: 1, dash: [2.5, 2])
+                                    )
+                                Image(systemName: "plus")
+                                    .font(.system(size: 8, weight: .semibold))
+                                    .foregroundStyle(Color.gray.opacity(0.6))
+                            }
+                            .frame(width: 16, height: 16)
+                        }
                     }
+                }
+
+                // 同日複数 (記録N件 + 予定/採用) のインジケータ。タップで日別シートへ
+                if totalCount > 1 {
+                    HStack(spacing: 2) {
+                        Image(systemName: "square.on.square.fill")
+                            .font(.system(size: 7, weight: .bold))
+                        if cellHeight >= 40 {
+                            Text(totalCount > 9 ? "9+" : "\(totalCount)")
+                                .font(.system(size: 9, weight: .bold))
+                                .monospacedDigit()
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(.black.opacity(0.55)))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(3)
                 }
             }
             .frame(height: cellHeight)
+            // 今日の強調: 画像やコーデのある日でも今日が分かる黒リング
+            .overlay {
+                if isToday {
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color.black, lineWidth: 2)
+                }
+            }
         }
         .buttonStyle(.plain)
-        .disabled(imageURL == nil && planned == nil)
+        .disabled(totalCount == 0 && !canSuggest)
+    }
+
+    private func dayNumberOverlay(_ day: Int) -> some View {
+        Text("\(day)")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.5), radius: 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(4)
+    }
+
+    private func handleDayTap(
+        month: Month,
+        day: Int,
+        dateString: String,
+        dayRecords: [CoordinateListResponse],
+        planned: CalendarOutfit?
+    ) {
+        let totalCount = dayRecords.count + (planned == nil ? 0 : 1)
+        let dateLabel = "\(month.monthOfTheYear)月\(day)日"
+        if totalCount > 1 {
+            // 複数の日だけ日別シートを挟む (1件の日は従来通り即遷移)
+            Haptic.selection()
+            daySheetData = CalendarDaySheetData(dateLabel: dateLabel, records: dayRecords, outfit: planned)
+        } else if let record = dayRecords.first {
+            openRecord(record)
+        } else if let planned {
+            Haptic.impact(.soft)
+            Task { await openPlannedDetail(planned) }
+        } else {
+            Haptic.impact(.soft)
+            suggestionData = CalendarDaySuggestionData(date: dateString, dateLabel: dateLabel)
+        }
+    }
+
+    /// 着用記録の詳細へ (単日直タップ / 日別シート選択の共通ルート)
+    private func openRecord(_ record: CoordinateListResponse) {
+        guard let imageURL = record.displayImageURL,
+              let coordinateId = record.id, !coordinateId.isEmpty else { return }
+        let targetDateString = String(format: "%04d-%02d-%02d", record.year, record.month, record.day)
+        AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+            "date": targetDateString,
+            "has_coordinate": true
+        ])
+        path.append(.coordinateDetail(.init(
+            coordinateId: coordinateId,
+            coordinateImageURL: imageURL,
+            showHeader: false
+        )))
     }
 
     // MARK: - 一覧 (3列写真グリッド。WEAR のフィードと同じ極小ギャップ)
 
     private struct RecordEntry: Identifiable {
+        /// 一覧に載せる対象は「提案 (未採用の予定) 以外」= 着用記録 + 採用コーデ
+        enum Source {
+            case record(coordinateId: String)
+            case adopted(CalendarOutfit)
+        }
+
         let id: String
         let year: Int
         let month: Int
         let day: Int
-        let coordinateId: String
         let imageURL: String
+        let source: Source
+
+        var dateKey: String { String(format: "%04d-%02d-%02d", year, month, day) }
+        var isAdopted: Bool {
+            if case .adopted = source { return true }
+            return false
+        }
     }
 
-    /// 全ロード済み月の記録を新しい順に平坦化する (months が新しい順・月内は日の降順)
+    /// 全ロード済み月の記録 (同日複数含む) + 採用コーデを新しい順に平坦化する。
+    /// 未採用の予定 (提案されているだけのコーデ) は一覧に載せない
     private var allRecordEntries: [RecordEntry] {
-        var entries: [RecordEntry] = []
+        var keyed: [(key: String, order: Int, entry: RecordEntry)] = []
         for (i, month) in viewModel.months.enumerated() {
             guard viewModel.monthStates.indices.contains(i),
                   case .loaded(let responses) = viewModel.monthStates[i] else { continue }
-            let monthEntries = responses
-                .compactMap { resp -> RecordEntry? in
-                    guard let imageURL = resp.displayImageURL,
-                          let coordinateId = resp.id, !coordinateId.isEmpty else { return nil }
-                    return RecordEntry(
-                        id: "\(month.year)-\(month.monthOfTheYear)-\(resp.day)-\(coordinateId)",
-                        year: month.year,
-                        month: month.monthOfTheYear,
-                        day: resp.day,
-                        coordinateId: coordinateId,
-                        imageURL: imageURL
-                    )
-                }
-                .sorted { $0.day > $1.day }
-            entries.append(contentsOf: monthEntries)
+            for (index, resp) in responses.enumerated() {
+                guard let imageURL = resp.displayImageURL,
+                      let coordinateId = resp.id, !coordinateId.isEmpty else { continue }
+                let entry = RecordEntry(
+                    id: "\(month.year)-\(month.monthOfTheYear)-\(resp.day)-\(coordinateId)",
+                    year: month.year,
+                    month: month.monthOfTheYear,
+                    day: resp.day,
+                    imageURL: imageURL,
+                    source: .record(coordinateId: coordinateId)
+                )
+                keyed.append((entry.dateKey, index, entry))
+            }
         }
-        return entries
+        for outfit in viewModel.plannedByDate.values where outfit.isAdopted {
+            let parts = outfit.date.split(separator: "-")
+            guard parts.count == 3,
+                  let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]) else { continue }
+            let entry = RecordEntry(
+                id: "adopted-\(outfit.date)",
+                year: y, month: m, day: d,
+                imageURL: outfit.image_url,
+                source: .adopted(outfit)
+            )
+            // 同日では撮影記録の後ろに並べる
+            keyed.append((entry.dateKey, Int.max, entry))
+        }
+        return keyed
+            .sorted { $0.key == $1.key ? $0.order < $1.order : $0.key > $1.key }
+            .map(\.entry)
     }
 
     private var recordsGrid: some View {
@@ -783,15 +945,21 @@ struct CalendarView: View {
 
     private func recordTile(_ entry: RecordEntry) -> some View {
         Button {
-            AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
-                "date": String(format: "%04d-%02d-%02d", entry.year, entry.month, entry.day),
-                "has_coordinate": true
-            ])
-            path.append(.coordinateDetail(.init(
-                coordinateId: entry.coordinateId,
-                coordinateImageURL: entry.imageURL,
-                showHeader: false
-            )))
+            switch entry.source {
+            case .record(let coordinateId):
+                AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
+                    "date": entry.dateKey,
+                    "has_coordinate": true
+                ])
+                path.append(.coordinateDetail(.init(
+                    coordinateId: coordinateId,
+                    coordinateImageURL: entry.imageURL,
+                    showHeader: false
+                )))
+            case .adopted(let outfit):
+                Haptic.impact(.soft)
+                Task { await openPlannedDetail(outfit) }
+            }
         } label: {
             coordinateImage(from: entry.imageURL)
                 .scaledToFill()
@@ -805,6 +973,13 @@ struct CalendarView: View {
                         .foregroundStyle(.white)
                         .shadow(color: .black.opacity(0.55), radius: 2)
                         .padding(6)
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    // 採用コーデの視覚言語 (セル/日別シートと共通の ✓)
+                    if entry.isAdopted {
+                        AdoptedCheckBadge()
+                            .padding(6)
+                    }
                 }
                 .contentShape(Rectangle())
         }

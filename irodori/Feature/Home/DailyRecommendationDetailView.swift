@@ -26,6 +26,11 @@ struct DailyRecommendationDetailView: View {
     /// 予定から削除 (カレンダー文脈のみ)。CalendarViewModel.deletePlanned を包み、
     /// ローカルの plannedByDate も即時更新されるようにする (シート閉鎖では再取得されないため)
     var onDeletePlanned: (() async -> Bool)? = nil
+    /// 予定コーデの採用状態と切替 (カレンダー文脈のみ)。
+    /// 採用 = 提案のままでも削除でもない第3の状態「その日のコーデとして確定」
+    var isAdopted: Bool = false
+    var onAdopt: (() async -> Bool)? = nil
+    var onUnadopt: (() async -> Bool)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(FavoritesStore.self) private var favoritesStore
     @Environment(MainTabViewModel.self) private var tabViewModel
@@ -36,6 +41,8 @@ struct DailyRecommendationDetailView: View {
     @State private var showAddToCalendar = false
     @State private var showDeleteConfirm = false
     @State private var isDeleting = false
+    @State private var isAdopting = false
+    @State private var adoptedState = false
     @State private var webLink: HomeWebLink? = nil
 
     var body: some View {
@@ -136,6 +143,10 @@ struct DailyRecommendationDetailView: View {
                     wearButton
                 }
 
+                if plannedDate != nil, onAdopt != nil {
+                    adoptSection
+                }
+
                 if plannedDate != nil, onDeletePlanned != nil {
                     deletePlannedButton
                 }
@@ -146,6 +157,7 @@ struct DailyRecommendationDetailView: View {
             }
             .padding(20)
         }
+        .onAppear { adoptedState = isAdopted }
         .navigationTitle("詳細")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddToCalendar) {
@@ -188,6 +200,76 @@ struct DailyRecommendationDetailView: View {
             .background(Color.black)
             .foregroundColor(.white)
             .cornerRadius(10)
+        }
+    }
+
+    // 採用 (この日のコーデとして確定) の切替。提案(予定)のまま / 削除 に次ぐ第3の状態。
+    // 採用済みは ✓ の状態表示 + 控えめな取り消しリンクにして、主役を「採用する」側に置く
+    @ViewBuilder
+    private var adoptSection: some View {
+        if adoptedState {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.black)
+                Text("この日のコーデに採用済み")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                if onUnadopt != nil {
+                    Button {
+                        Haptic.selection()
+                        toggleAdopt(to: false)
+                    } label: {
+                        Text(isAdopting ? "変更中…" : "取り消す")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .underline()
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isAdopting)
+                }
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .background(Color.gray.opacity(0.06))
+            .cornerRadius(10)
+        } else {
+            Button {
+                Haptic.impact(.medium)
+                toggleAdopt(to: true)
+            } label: {
+                VStack(spacing: 3) {
+                    Label(isAdopting ? "保存中…" : "この日のコーデにする", systemImage: "checkmark.circle")
+                        .font(.headline)
+                    Text("提案から「採用」に変わり、カレンダーと一覧に記録されます")
+                        .font(.system(size: 11))
+                        .opacity(0.75)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.black)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+            .disabled(isAdopting)
+        }
+    }
+
+    private func toggleAdopt(to adopted: Bool) {
+        guard !isAdopting else { return }
+        let action = adopted ? onAdopt : onUnadopt
+        guard let action else { return }
+        isAdopting = true
+        Task { @MainActor in
+            let ok = await action()
+            isAdopting = false
+            if ok {
+                adoptedState = adopted
+                Haptic.notify(.success)
+                if adopted {
+                    ToastManager.shared.show("この日のコーデに採用しました", style: .normal)
+                }
+            }
         }
     }
 

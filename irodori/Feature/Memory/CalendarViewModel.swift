@@ -30,17 +30,20 @@ final class CalendarViewModel {
     private let calendarOutfitClient: CalendarOutfitClientProtocol
     private let poolClient: RecommendationPoolClientProtocol
     private let dailyClient: DailyRecommendationClientProtocol
+    private let planClient: RecommendationPlanClientProtocol
 
     init(
         apiClient: CoordinateListClientProtocol,
         calendarOutfitClient: CalendarOutfitClientProtocol = CalendarOutfitClient(),
         poolClient: RecommendationPoolClientProtocol = RecommendationPoolClient(),
-        dailyClient: DailyRecommendationClientProtocol = DailyRecommendationClient()
+        dailyClient: DailyRecommendationClientProtocol = DailyRecommendationClient(),
+        planClient: RecommendationPlanClientProtocol = RecommendationPlanClient()
     ) {
         self.apiClient = apiClient
         self.calendarOutfitClient = calendarOutfitClient
         self.poolClient = poolClient
         self.dailyClient = dailyClient
+        self.planClient = planClient
         self.uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
         setupMonths()
     }
@@ -109,6 +112,69 @@ final class CalendarViewModel {
             }
         }
         plannedByDate = merged
+    }
+
+    /// 提案 (予定) コーデを「その日のコーデ」として採用する。
+    /// サーバの status が adopted で返らない場合 (旧サーバ) は失敗扱いにして嘘の状態を作らない。
+    /// pool はホームの「これにする」と同じ扱いで着用記録 (学習シグナル) も送る
+    func adoptPlanned(_ outfit: CalendarOutfit) async -> Bool {
+        guard let result = try? await calendarOutfitClient.put(
+            uid: uid, date: outfit.date, kind: outfit.kind, targetId: outfit.target_id,
+            imageURL: outfit.image_url, source: outfit.source, status: "adopted"
+        ), case .success(let response) = result,
+           let saved = response.item, saved.isAdopted else {
+            ToastManager.shared.show("採用の保存に失敗しました")
+            return false
+        }
+        plannedByDate[outfit.date] = saved
+        if outfit.kind == "pool" {
+            // 採用の取り消しでは戻せない一方向のシグナルだが、着る意思の表明として許容する
+            _ = try? await dailyClient.markWorn(uid: uid, poolId: outfit.target_id, wornDate: outfit.date)
+        }
+        return true
+    }
+
+    /// 採用を取り消して「予定」状態に戻す
+    func unadoptPlanned(_ outfit: CalendarOutfit) async -> Bool {
+        guard let result = try? await calendarOutfitClient.put(
+            uid: uid, date: outfit.date, kind: outfit.kind, targetId: outfit.target_id,
+            imageURL: outfit.image_url, source: outfit.source, status: "planned"
+        ), case .success(let response) = result, let saved = response.item else {
+            ToastManager.shared.show("変更の保存に失敗しました")
+            return false
+        }
+        plannedByDate[outfit.date] = saved
+        return true
+    }
+
+    // MARK: - その日の提案 (空き日タップからの提案体験)
+
+    /// 指定日のコーデ提案を取得する。plan API は days>=2 のため2日分を要求して対象日を使う
+    func suggest(forDate date: String) async -> OutfitPlanDay? {
+        guard !uid.isEmpty else { return nil }
+        let gender = Gender.fromWithDefault(
+            UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
+        )
+        let prefectureCode = UserDefaults.standard.string(forKey: UserDefaultsKey.prefectureCode.rawValue)
+        guard let result = try? await planClient.plan(
+            uid: uid, gender: gender, days: 2, startDate: date,
+            prefectureCode: prefectureCode, candidatesPerDay: 4
+        ), case .success(let response) = result else { return nil }
+        return response.days.first { $0.date == date } ?? response.days.first
+    }
+
+    /// 提案されたコーデを指定日の予定として保存する
+    func savePlanned(date: String, item: DailyRecommendationItem) async -> Bool {
+        guard let result = try? await calendarOutfitClient.put(
+            uid: uid, date: date,
+            kind: item.kindEnum == .self ? "self" : "pool",
+            targetId: item.pool_id, imageURL: item.image_url, source: "calendar_day"
+        ), case .success(let response) = result, let saved = response.item else {
+            ToastManager.shared.show("予定の保存に失敗しました")
+            return false
+        }
+        plannedByDate[date] = saved
+        return true
     }
 
     func deletePlanned(_ outfit: CalendarOutfit) async -> Bool {
