@@ -174,29 +174,6 @@ fileprivate struct FeedbackAckBadge: View {
     }
 }
 
-/// 発見枠 (テイスト圏外からの挑戦提案) バッジ。
-/// DailyIchioshiBadge と同じ控えめな視覚言語 (白カプセル+細縁) のティール版。
-fileprivate struct DiscoveryBadge: View {
-    var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 8, weight: .semibold))
-            Text("挑戦")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(0.2)
-        }
-        .foregroundStyle(Color.teal)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3.5)
-        .background(.white)
-        .clipShape(Capsule())
-        .overlay(
-            Capsule().stroke(Color.teal.opacity(0.35), lineWidth: 0.8)
-        )
-        .shadow(color: .black.opacity(0.06), radius: 2, x: 0, y: 1)
-    }
-}
-
 /// 構成リストの未所持サムネ (破線サークル=未所持の視覚言語)
 fileprivate struct MissingItemThumb: View {
     var size: CGFloat = 44
@@ -405,11 +382,26 @@ struct TomorrowPickSection: View {
         }
     }
 
-    // MARK: - 提案セット全体への「合っていない」フィードバック
+    // MARK: - セット全体のメタ行 (根拠キャプション + 「合っていない」)
 
-    private var setMismatchRow: some View {
-        HStack {
-            Spacer()
+    /// 左: 「あなたの◯回の記録から」等の根拠キャプション (サーバ生成)。
+    /// カルーセル下の11ptグレーでは気付かれないため、カルーセル直上に黒字で置き
+    /// 「この3案が何から選ばれたか」を先に伝える (バッジ化はしない)。
+    /// 右: セットごと dislike して次の候補に切り替える逃げ道。
+    private var setMetaRow: some View {
+        HStack(alignment: .center, spacing: 10) {
+            if let caption = daily?.signal_caption, !caption.isEmpty {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(caption)
+                        .font(.system(size: 12))
+                        .lineSpacing(2)
+                        .lineLimit(2)
+                }
+                .foregroundStyle(.black.opacity(0.75))
+            }
+            Spacer(minLength: 8)
             Button {
                 Haptic.selection()
                 showSetMismatchDialog = true
@@ -715,16 +707,11 @@ struct TomorrowPickSection: View {
     @ViewBuilder
     private var contentArea: some View {
         if !cards.isEmpty {
-            // 提案が全体的に外れていた時の逃げ道: セットごと dislike して次の候補に切り替える
-            setMismatchRow
+            setMetaRow
             cardCarousel
                 .opacity(ritualRevealed ? 1 : 0)
                 .offset(y: ritualRevealed ? 0 : 16)
             paginationRow
-            // 根拠バッジ: 「あなたの◯回の記録から」/ 逆マイルストーン
-            if let caption = daily?.signal_caption, !caption.isEmpty {
-                signalCaptionRow(caption)
-            }
         } else if viewModel.isLoadingDailyRecommendation {
             loadingCarousel
         } else if viewModel.hasDailyRecommendationError {
@@ -757,15 +744,12 @@ struct TomorrowPickSection: View {
                 .frame(width: 272, height: 340)
                 .clipped()
                 .overlay(alignment: .topLeading) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if isBest {
-                            DailyIchioshiBadge()
-                        }
-                        if card.is_discovery {
-                            DiscoveryBadge()
-                        }
+                    // 挑戦枠のバッジは廃止 (バッジを増やさない方針)。
+                    // is_discovery はカード題字 (ReasonHeadline) の teal で伝える
+                    if isBest {
+                        DailyIchioshiBadge()
+                            .padding(10)
                     }
-                    .padding(10)
                 }
                 .overlay(alignment: .topTrailing) {
                     if !card.isCloset {
@@ -781,18 +765,33 @@ struct TomorrowPickSection: View {
                 }
 
             VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(styleName(card))
+                // なぜこのコーデか、をカードの題字そのもので伝える (バッジは使わない)。
+                // ジャンル名は添え字に降格 (母集団がcasual偏重で、題字としては毎日同じ文字列になりがち)
+                let headline = ReasonHeadline.line(
+                    for: card,
+                    signalCount: daily?.signal_count,
+                    maxTemp: daily?.weather.max_temp,
+                    scopeName: viewModel.selectedPickScope.displayName
+                )
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(headline.text)
                         .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(headline.isDiscovery ? Color.teal : .black)
                         .lineLimit(1)
-                    Spacer()
-                    if usedItemsCount(for: card) > 0 {
-                        Text("手持ち \(card.owned_items.count)/\(usedItemsCount(for: card))")
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(styleName(card))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer()
+                        if usedItemsCount(for: card) > 0 {
+                            Text("手持ち \(card.owned_items.count)/\(usedItemsCount(for: card))")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
-                // なぜこのコーデをおすすめしたか (サーバ生成。全文は構成シートで)
+                // 題字の根拠の詳細 (サーバ生成。全文は構成シートで)
                 // 理由なし/1行でも2行ぶんの高さを常に確保し、カード内の要素位置を揃える
                 Text(card.reason ?? "")
                     .font(.system(size: 11))
@@ -831,7 +830,8 @@ struct TomorrowPickSection: View {
             .padding(12)
         }
         // 種類 (理由の行数・手持ち有無・キャプション有無) によらず高さを統一する
-        .frame(width: 272, height: 548, alignment: .top)
+        // (548 + 題字/添え字の2段化ぶん12pt。skeletonCard と同値を保つこと)
+        .frame(width: 272, height: 560, alignment: .top)
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
@@ -961,10 +961,13 @@ struct TomorrowPickSection: View {
                 .fill(Color.gray.opacity(0.12))
                 .frame(width: 272, height: 340)
             VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.gray.opacity(0.12))
+                    .frame(width: 150, height: 14)
                 HStack {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.gray.opacity(0.12))
-                        .frame(width: 120, height: 14)
+                        .frame(width: 90, height: 10)
                     Spacer()
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.gray.opacity(0.12))
@@ -993,7 +996,7 @@ struct TomorrowPickSection: View {
             }
             .padding(12)
         }
-        .frame(width: 272, height: 548, alignment: .top)
+        .frame(width: 272, height: 560, alignment: .top)
         .background(.white)
         .shimmering()
         .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -1067,17 +1070,6 @@ struct TomorrowPickSection: View {
                 ToastManager.shared.show("記録に失敗しました。時間をおいて再度お試しください")
             }
         }
-    }
-
-    private func signalCaptionRow(_ caption: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 10, weight: .semibold))
-            Text(caption)
-                .font(.system(size: 11))
-        }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 24)
     }
 
     /// カード長押しからのワンタップ「興味なし」(理由なし送信)。
