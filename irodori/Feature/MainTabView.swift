@@ -16,6 +16,16 @@ struct MainTabView: View {
                     HomeView(path: $path, viewModel: HomeViewModel(apiClient: HomeClient()))
                 }
 
+                // カレンダー (着用記録・予定コーデのふりかえり)
+                Tab("カレンダー", systemImage: "calendar", value: MainTabViewModel.Tab.calendar) {
+                    CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
+                }
+
+                // コーデ追加 (中央のカメラボタン。タブとして留まらず、タップでカメラ画面へ直行)
+                Tab("", systemImage: "camera.circle.fill", value: MainTabViewModel.Tab.plus) {
+                    EmptyView()
+                }
+
                 // 相棒
                 Tab(value: MainTabViewModel.Tab.partner) {
                     PartnerView(path: $path)
@@ -27,18 +37,8 @@ struct MainTabView: View {
                     }
                 }
 
-                // コーデ追加 (中央の + ボタン。タップでカメラ画面へ直行)
-                Tab("", systemImage: "plus.circle.fill", value: MainTabViewModel.Tab.plus) {
-                    EmptyView()
-                }
-
-                // カレンダー (着用記録・予定コーデのふりかえり)
-                Tab("カレンダー", systemImage: "calendar", value: MainTabViewModel.Tab.calendar) {
-                    CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
-                }
-
                 // クローゼット
-                Tab("クローゼット", systemImage: "person.fill", value: MainTabViewModel.Tab.profile) {
+                Tab("クローゼット", systemImage: "tshirt", value: MainTabViewModel.Tab.profile) {
                     ProfileView(path: $path)
                 }
             }
