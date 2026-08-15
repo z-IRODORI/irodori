@@ -374,18 +374,43 @@ struct DailyRecommendationDetailView: View {
         }
     }
 
+    // コーデのレシピ行。手持ちの有無に関わらず、行の「探す」から
+    // そのアイテムを ZOZOTOWN で検索できる (足りないアイテム行と同じ導線)
     private var coordItemsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             ForEach(["tops", "bottoms", "outer", "accessory"], id: \.self) { key in
                 if let v = item.items[key] ?? nil, !v.isEmpty {
-                    HStack(alignment: .top) {
-                        Text(labelFor(key))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .frame(width: 70, alignment: .leading)
-                        Text(v).font(.subheadline)
-                        Spacer()
+                    Button {
+                        Haptic.selection()
+                        if let url = ZOZOSearchURL.url(for: v) {
+                            webLink = HomeWebLink(url: url)
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(labelFor(key))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(width: 70, alignment: .leading)
+                            Text(v)
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 8)
+                            HStack(spacing: 4) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text("探す")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .overlay(Capsule().stroke(Color.black.opacity(0.25), lineWidth: 1))
+                            .clipShape(Capsule())
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
