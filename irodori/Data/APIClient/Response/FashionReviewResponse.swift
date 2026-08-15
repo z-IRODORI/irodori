@@ -37,6 +37,19 @@ struct FashionReviewResponse: Decodable, Hashable {
         var category: String?       // 例: "Tシャツ", "ジーンズ"
         var color: String?          // 例: "ホワイト", "ブラック"
         var description: String?    // 例: "黒 レザー ライダースジャケット"
+
+        /// ネット画像検索 (WebItemImagesRow) に使う検出結果ワード。
+        /// 説明文 → 「色 + カテゴリ」→ 種類 の順で採用する。
+        var webImageSearchWord: String {
+            if let description = description?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !description.isEmpty {
+                return description
+            }
+            let parts = [color, category]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            return parts.isEmpty ? item_type : parts.joined(separator: " ")
+        }
     }
 }
 

@@ -129,6 +129,8 @@ struct ItemImageEditView: View {
                     replaceEntryCard
                 }
 
+                webReferenceImagesCard
+
                 attributesSection
 
                 Color.clear.frame(height: 8)
@@ -371,6 +373,25 @@ struct ItemImageEditView: View {
         .buttonStyle(.plain)
         .disabled(disabled)
         .opacity(disabled ? 0.4 : 1)
+    }
+
+    // MARK: - ネットの参考画像
+
+    /// このアイテムの「きれいな画像」をネット検索して横並びで見せる。
+    /// 検索ワードは差し替え画面と同じ「色 + カテゴリ」(検索時のみ「ユニクロ」が付く)。
+    private var webReferenceImagesCard: some View {
+        WebItemImagesRow(
+            searchWord: ItemImageReplaceViewModel.defaultQuery(for: viewModel.item),
+            typeLabel: viewModel.item.item_type
+        )
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.07), lineWidth: 1)
+        )
     }
 
     // MARK: - 商品画像への差し替え導線
