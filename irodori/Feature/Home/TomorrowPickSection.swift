@@ -285,6 +285,8 @@ struct TomorrowPickSection: View {
     @State private var ritualRevealed = true
     /// 朝いち演出中は相棒コメントをタイプライター表示する
     @State private var ritualTypewriter = false
+    /// 今日/明日/週末タブの選択下線をスライドさせる
+    @Namespace private var scopeUnderlineNamespace
     #if DEBUG
     /// 開発ビルド専用: カルーセルの表示件数 (1〜9、リリースは常に3)
     @AppStorage("debug.pickCardLimit") private var debugCardLimit: Int = 3
@@ -449,24 +451,40 @@ struct TomorrowPickSection: View {
         viewModel.pickTabs.first { $0.scope == viewModel.selectedPickScope }
     }
 
+    /// 今日/明日/週末の切替を、カプセルではなく題字サイズのテキストタブで見せる。
+    /// 「いま見ている提案がどの日のものか」がセクション見出しとして流し見でも伝わり、
+    /// 具体的な日付・地域・天気は直下の sectionHeader が担う。
     private var scopeSegments: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 22) {
             ForEach(viewModel.pickTabs) { tab in
                 let isSelected = tab.scope == viewModel.selectedPickScope
                 Button {
                     Haptic.selection()
-                    viewModel.selectPickScope(tab.scope)
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        viewModel.selectPickScope(tab.scope)
+                    }
                 } label: {
-                    Text(tab.label)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(isSelected ? .white : .black)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(isSelected ? Color.black : Color.white)
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(Color.gray.opacity(isSelected ? 0 : 0.3), lineWidth: 1))
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(tab.scope.displayName)
+                            .font(.system(size: 22, weight: .bold))
+                            .tracking(0.5)
+                            .foregroundStyle(isSelected ? Color.black : Color.black.opacity(0.3))
+                        Group {
+                            if isSelected {
+                                Capsule()
+                                    .fill(Color.black)
+                                    .matchedGeometryEffect(id: "scope_underline", in: scopeUnderlineNamespace)
+                            } else {
+                                Color.clear
+                            }
+                        }
+                        .frame(width: 22, height: 3)
+                    }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("\(tab.label)のコーデ提案")
+                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             }
             Spacer()
         }
