@@ -149,7 +149,8 @@ final class CalendarViewModel {
 
     // MARK: - その日の提案 (空き日タップからの提案体験)
 
-    /// 指定日のコーデ提案を取得する。plan API は days>=2 のため2日分を要求して対象日を使う
+    /// 指定日のコーデ提案を取得する。plan API は days>=2 のため2日分を要求して対象日を使う。
+    /// 候補は本命+入替9=10件 (一覧から選ぶ体験のため。API上限は本命+14)
     func suggest(forDate date: String) async -> OutfitPlanDay? {
         guard !uid.isEmpty else { return nil }
         let gender = Gender.fromWithDefault(
@@ -158,7 +159,7 @@ final class CalendarViewModel {
         let prefectureCode = UserDefaults.standard.string(forKey: UserDefaultsKey.prefectureCode.rawValue)
         guard let result = try? await planClient.plan(
             uid: uid, gender: gender, days: 2, startDate: date,
-            prefectureCode: prefectureCode, candidatesPerDay: 4
+            prefectureCode: prefectureCode, candidatesPerDay: 10
         ), case .success(let response) = result else { return nil }
         return response.days.first { $0.date == date } ?? response.days.first
     }

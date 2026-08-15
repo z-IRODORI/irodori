@@ -31,6 +31,9 @@ struct DailyRecommendationDetailView: View {
     var isAdopted: Bool = false
     var onAdopt: (() async -> Bool)? = nil
     var onUnadopt: (() async -> Bool)? = nil
+    /// この日の候補一覧 (10件) から予定を選び直す導線 (カレンダー文脈・今日以降の予定のみ)。
+    /// 呼び出し側でこのシートを閉じ、CalendarDaySuggestionSheet (replacing) を開く
+    var onShowCandidates: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(FavoritesStore.self) private var favoritesStore
     @Environment(MainTabViewModel.self) private var tabViewModel
@@ -145,6 +148,10 @@ struct DailyRecommendationDetailView: View {
 
                 if plannedDate != nil, onAdopt != nil {
                     adoptSection
+                }
+
+                if plannedDate != nil, onShowCandidates != nil {
+                    showCandidatesButton
                 }
 
                 if plannedDate != nil, onDeletePlanned != nil {
@@ -270,6 +277,22 @@ struct DailyRecommendationDetailView: View {
                     ToastManager.shared.show("この日のコーデに採用しました", style: .normal)
                 }
             }
+        }
+    }
+
+    // 別の候補から選び直す (カレンダーの予定コーデ文脈のみ)。
+    // 削除→再提案の2手を1手にする: この日の候補一覧へ切り替えて予定を差し替える
+    private var showCandidatesButton: some View {
+        Button {
+            Haptic.impact(.soft)
+            onShowCandidates?()
+        } label: {
+            Label("別の候補から選び直す", systemImage: "rectangle.grid.2x2")
+                .font(.system(size: 15, weight: .semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .foregroundColor(.black)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black.opacity(0.25), lineWidth: 1))
         }
     }
 

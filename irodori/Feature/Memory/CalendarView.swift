@@ -158,7 +158,11 @@ struct CalendarView: View {
                     },
                     isAdopted: presented.outfit.isAdopted,
                     onAdopt: { await viewModel.adoptPlanned(presented.outfit) },
-                    onUnadopt: { await viewModel.unadoptPlanned(presented.outfit) }
+                    onUnadopt: { await viewModel.unadoptPlanned(presented.outfit) },
+                    onShowCandidates: canReplaceCandidates(date: presented.outfit.date) ? {
+                        presentedPlannedPool = nil
+                        openReplaceCandidates(date: presented.outfit.date)
+                    } : nil
                 )
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -205,6 +209,12 @@ struct CalendarView: View {
                                     }
                                 }
                             }
+                            if canReplaceCandidates(date: planned.date) {
+                                Button("別の候補から選び直す") {
+                                    presentedSelfPlanned = nil
+                                    openReplaceCandidates(date: planned.date)
+                                }
+                            }
                             Button("予定から削除", role: .destructive) {
                                 Task {
                                     if await viewModel.deletePlanned(planned) {
@@ -238,7 +248,10 @@ struct CalendarView: View {
                         try? await Task.sleep(for: .milliseconds(350))
                         await openPlannedDetail(outfit)
                     }
-                }
+                },
+                onShowCandidates: canReplaceCandidates(date: data.date)
+                    ? { openReplaceCandidates(date: data.date, dateLabel: data.dateLabel) }
+                    : nil
             )
         }
         // 空き日タップからの「その日の提案」シート (提案体験の入口)
@@ -827,7 +840,7 @@ struct CalendarView: View {
         if totalCount > 1 {
             // 複数の日だけ日別シートを挟む (1件の日は従来通り即遷移)
             Haptic.selection()
-            daySheetData = CalendarDaySheetData(dateLabel: dateLabel, records: dayRecords, outfit: planned)
+            daySheetData = CalendarDaySheetData(date: dateString, dateLabel: dateLabel, records: dayRecords, outfit: planned)
         } else if let record = dayRecords.first {
             openRecord(record)
         } else if let planned {
@@ -994,6 +1007,33 @@ struct CalendarView: View {
             return "\(m)月\(d)日の予定コーデ"
         }
         return "予定コーデ"
+    }
+
+    /// "2026-08-20" → "8月20日" (パース不能ならそのまま)
+    private func dayLabel(fromDateString date: String) -> String {
+        let parts = date.split(separator: "-")
+        if parts.count == 3, let m = Int(parts[1]), let d = Int(parts[2]) {
+            return "\(m)月\(d)日"
+        }
+        return date
+    }
+
+    /// 予定の選び直し (候補一覧) を出せるか。plan API の対象になる今日以降のみ
+    private func canReplaceCandidates(date: String) -> Bool {
+        date >= HomeViewModel.jstTodayString()
+    }
+
+    /// 予定ありの日の「別の候補から選び直す」。
+    /// 表示中のシート (詳細 / 日別一覧) が閉じてから候補一覧を差し替えモードで開く
+    private func openReplaceCandidates(date: String, dateLabel: String? = nil) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            suggestionData = CalendarDaySuggestionData(
+                date: date,
+                dateLabel: dateLabel ?? dayLabel(fromDateString: date),
+                replacing: true
+            )
+        }
     }
 
     /// 予定コーデのセルタップで詳細を直接開く (以前の 詳細/削除 ダイアログは廃止し、削除は詳細画面内に移した)

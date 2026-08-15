@@ -5,8 +5,9 @@
 //  カレンダーの日タップから開く2つのハーフモーダル。
 //  - CalendarDayOutfitsSheet: 同日に複数のコーデ (記録N件 + 予定/採用) がある日の切り替え選択。
 //    Sandbox (CalendarMultiCoordSandbox) で検証した本命案 (日別一覧シート) の本番化。
-//  - CalendarDaySuggestionSheet: 空いている日から「その日のコーデ提案」を体験する導線。
+//  - CalendarDaySuggestionSheet: その日のコーデ候補10件 (本命+入替9)。
 //    既存の plan API (start_date 指定) を1日分だけ使い、サーバ改修なしで提案を出す。
+//    空き日 = そのまま予定にする / 予定ありの日 = replacing で開き予定を差し替える。
 //
 
 import SwiftUI
@@ -15,16 +16,19 @@ import Kingfisher
 // MARK: - 日別一覧シート (同日複数コーデの切り替え)
 
 struct CalendarDaySheetData: Identifiable {
+    let date: String                         // YYYY-MM-DD
     let dateLabel: String                    // 例: "8月12日"
     let records: [CoordinateListResponse]    // 着用記録 (0件以上)
     let outfit: CalendarOutfit?              // 予定 or 採用 (高々1件)
-    var id: String { dateLabel }
+    var id: String { date }
 }
 
 struct CalendarDayOutfitsSheet: View {
     let data: CalendarDaySheetData
     let onSelectRecord: (CoordinateListResponse) -> Void
     let onSelectOutfit: (CalendarOutfit) -> Void
+    /// 非 nil のとき、予定コーデを候補一覧から選び直す導線を出す (予定ありの日のみ)
+    var onShowCandidates: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
@@ -62,6 +66,25 @@ struct CalendarDayOutfitsSheet: View {
                             onSelectOutfit(outfit)
                         }
                     }
+                }
+                // 予定ありの日は、この日の候補一覧 (10件) から選び直せる
+                if data.outfit != nil, let onShowCandidates {
+                    Button {
+                        Haptic.selection()
+                        dismiss()
+                        onShowCandidates()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("予定コーデを別の候補から選び直す")
+                                .font(.system(size: 13, weight: .semibold))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(.black)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
                 }
             }
             .padding(.horizontal, 20)
@@ -137,6 +160,8 @@ struct AdoptedCheckBadge: View {
 struct CalendarDaySuggestionData: Identifiable {
     let date: String         // YYYY-MM-DD
     let dateLabel: String    // 例: "8月15日"
+    /// true = 予定ありの日からの「選び直し」(保存すると既存の予定を差し替える)
+    var replacing: Bool = false
     var id: String { date }
 }
 
@@ -176,7 +201,10 @@ struct CalendarDaySuggestionSheet: View {
                             .lineSpacing(3)
                     }
                     candidatesRow(day)
-                    plannerLink
+                    // 差し替え文脈では焦点を絞るため、まとめ提案への誘導は出さない
+                    if !data.replacing {
+                        plannerLink
+                    }
                 }
             }
             .padding(.horizontal, 20)
@@ -194,7 +222,9 @@ struct CalendarDaySuggestionSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(data.dateLabel)に着るなら")
                     .font(.system(size: 17, weight: .bold))
-                Text("相棒が天気と手持ちからコーデを提案します")
+                Text(data.replacing
+                     ? "気に入る候補があれば、いまの予定と差し替えられます"
+                     : "相棒が天気と手持ちからコーデを提案します")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -236,19 +266,19 @@ struct CalendarDaySuggestionSheet: View {
         .padding(.vertical, 32)
     }
 
-    /// 本命 + 入替候補を軸ラベル (堅実/挑戦/気分転換) 付きの横並びで見せる
+    /// 本命 + 入替候補 (計10件) を軸ラベル (堅実/挑戦/気分転換) 付きの横並びで見せる
     private func candidatesRow(_ day: OutfitPlanDay) -> some View {
         let candidates = [day.item] + day.alternates
         return ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(alignment: .top, spacing: 10) {
-                ForEach(candidates) { candidate in
-                    candidateCard(candidate)
+                ForEach(Array(candidates.enumerated()), id: \.element.id) { index, candidate in
+                    candidateCard(candidate, isPrimary: index == 0)
                 }
             }
         }
     }
 
-    private func candidateCard(_ candidate: OutfitPlanCandidate) -> some View {
+    private func candidateCard(_ candidate: OutfitPlanCandidate, isPrimary: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             KFImage(URL(string: candidate.item.image_url))
                 .resizable()
@@ -257,7 +287,7 @@ struct CalendarDaySuggestionSheet: View {
                 .frame(width: 150, height: 188)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-            Text(axisLabel(candidate.alt_tag))
+            Text(axisLabel(candidate.alt_tag, isPrimary: isPrimary))
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text(candidate.item.reason ?? candidate.item.vibe)
@@ -269,7 +299,9 @@ struct CalendarDaySuggestionSheet: View {
             Button {
                 savePlan(candidate.item)
             } label: {
-                Text(savingID == candidate.id ? "保存中…" : "この日の予定にする")
+                Text(savingID == candidate.id
+                     ? "保存中…"
+                     : (data.replacing ? "この予定に変更する" : "この日の予定にする"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -302,12 +334,14 @@ struct CalendarDaySuggestionSheet: View {
         .padding(.top, 4)
     }
 
-    private func axisLabel(_ altTag: String?) -> String {
+    /// 先頭のみ「本命」。以降は軸ラベル、軸が無い候補 (4件目以降) は「候補」に落とす
+    private func axisLabel(_ altTag: String?, isPrimary: Bool) -> String {
+        if isPrimary { return "本命" }
         switch altTag {
         case "steady": return "堅実"
         case "challenge": return "挑戦"
         case "change": return "気分転換"
-        default: return "本命"
+        default: return "候補"
         }
     }
 
@@ -328,7 +362,12 @@ struct CalendarDaySuggestionSheet: View {
             savingID = nil
             if ok {
                 Haptic.notify(.success)
-                ToastManager.shared.show("\(data.dateLabel)の予定コーデに入れました", style: .normal)
+                ToastManager.shared.show(
+                    data.replacing
+                        ? "\(data.dateLabel)の予定コーデを変更しました"
+                        : "\(data.dateLabel)の予定コーデに入れました",
+                    style: .normal
+                )
                 dismiss()
             }
         }
