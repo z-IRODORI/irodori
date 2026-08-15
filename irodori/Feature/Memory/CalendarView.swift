@@ -254,19 +254,22 @@ struct CalendarView: View {
                     : nil
             )
         }
-        // 空き日タップからの「その日の提案」シート (提案体験の入口)
-        .sheet(item: $suggestionData) { data in
-            CalendarDaySuggestionSheet(
-                data: data,
-                load: { await viewModel.suggest(forDate: data.date) },
-                onPlan: { item in await viewModel.savePlanned(date: data.date, item: item) },
-                onOpenPlanner: {
-                    Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(350))
-                        path.append(.outfitPlanner)
+        // その日のコーデ候補10件 (空き日=予定にする / 予定あり=選び直し)。
+        // コーデ詳細と同じく、画像の視認性優先で半モーダルではなく全画面で見せる
+        .fullScreenCover(item: $suggestionData) { data in
+            NavigationStack {
+                CalendarDaySuggestionSheet(
+                    data: data,
+                    load: { await viewModel.suggest(forDate: data.date) },
+                    onPlan: { item in await viewModel.savePlanned(date: data.date, item: item) },
+                    onOpenPlanner: {
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(350))
+                            path.append(.outfitPlanner)
+                        }
                     }
-                }
-            )
+                )
+            }
         }
         .overlay {
             if isLoadingPlannedDetail {

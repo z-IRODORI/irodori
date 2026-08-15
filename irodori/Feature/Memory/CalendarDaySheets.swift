@@ -2,10 +2,11 @@
 //  CalendarDaySheets.swift
 //  irodori
 //
-//  カレンダーの日タップから開く2つのハーフモーダル。
-//  - CalendarDayOutfitsSheet: 同日に複数のコーデ (記録N件 + 予定/採用) がある日の切り替え選択。
-//    Sandbox (CalendarMultiCoordSandbox) で検証した本命案 (日別一覧シート) の本番化。
-//  - CalendarDaySuggestionSheet: その日のコーデ候補10件 (本命+入替9)。
+//  カレンダーの日タップから開くモーダル2種。
+//  - CalendarDayOutfitsSheet: 同日に複数のコーデ (記録N件 + 予定/採用) がある日の切り替え選択
+//    (ハーフモーダル)。Sandbox (CalendarMultiCoordSandbox) で検証した本命案の本番化。
+//  - CalendarDaySuggestionSheet: その日のコーデ候補10件 (本命+入替9) の2列グリッド。
+//    コーデ詳細と同じ全画面モーダル (fullScreenCover + NavigationStack) で画像の視認性を優先。
 //    既存の plan API (start_date 指定) を1日分だけ使い、サーバ改修なしで提案を出す。
 //    空き日 = そのまま予定にする / 予定ありの日 = replacing で開き予定を差し替える。
 //
@@ -184,6 +185,8 @@ struct CalendarDaySuggestionSheet: View {
     @State private var savingID: String? = nil
     @Environment(\.dismiss) private var dismiss
 
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 2)
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
@@ -200,7 +203,7 @@ struct CalendarDaySuggestionSheet: View {
                             .foregroundStyle(.secondary)
                             .lineSpacing(3)
                     }
-                    candidatesRow(day)
+                    candidatesGrid(day)
                     // 差し替え文脈では焦点を絞るため、まとめ提案への誘導は出さない
                     if !data.replacing {
                         plannerLink
@@ -208,11 +211,17 @@ struct CalendarDaySuggestionSheet: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 24)
+            .padding(.top, 8)
             .padding(.bottom, 20)
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .navigationTitle("コーデ候補")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("閉じる") { dismiss() }
+                    .disabled(savingID != nil)
+            }
+        }
         .task { await loadSuggestion() }
     }
 
@@ -243,7 +252,8 @@ struct CalendarDaySuggestionSheet: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        .padding(.top, 140)
+        .padding(.bottom, 40)
     }
 
     private var failedRow: some View {
@@ -263,29 +273,31 @@ struct CalendarDaySuggestionSheet: View {
             .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
+        .padding(.top, 140)
+        .padding(.bottom, 32)
     }
 
-    /// 本命 + 入替候補 (計10件) を軸ラベル (堅実/挑戦/気分転換) 付きの横並びで見せる
-    private func candidatesRow(_ day: OutfitPlanDay) -> some View {
+    /// 本命 + 入替候補 (計10件) を軸ラベル (堅実/挑戦/気分転換) 付きの2列グリッドで見せる。
+    /// 全画面モーダルの空間を活かし、画像を大きく・10件を縦に一覧できるようにする
+    private func candidatesGrid(_ day: OutfitPlanDay) -> some View {
         let candidates = [day.item] + day.alternates
-        return ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(alignment: .top, spacing: 10) {
-                ForEach(Array(candidates.enumerated()), id: \.element.id) { index, candidate in
-                    candidateCard(candidate, isPrimary: index == 0)
-                }
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: 20) {
+            ForEach(Array(candidates.enumerated()), id: \.element.id) { index, candidate in
+                candidateCard(candidate, isPrimary: index == 0)
             }
         }
     }
 
     private func candidateCard(_ candidate: OutfitPlanCandidate, isPrimary: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            KFImage(URL(string: candidate.item.image_url))
-                .resizable()
-                .placeholder { Color.gray.opacity(0.12) }
-                .scaledToFill()
-                .frame(width: 150, height: 188)
-                .clipped()
+            Color.clear
+                .aspectRatio(3 / 4, contentMode: .fit)
+                .overlay {
+                    KFImage(URL(string: candidate.item.image_url))
+                        .resizable()
+                        .placeholder { Color.gray.opacity(0.12) }
+                        .scaledToFill()
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             Text(axisLabel(candidate.alt_tag, isPrimary: isPrimary))
                 .font(.system(size: 10, weight: .semibold))
@@ -295,7 +307,7 @@ struct CalendarDaySuggestionSheet: View {
                 .foregroundStyle(.secondary)
                 .lineSpacing(2)
                 .lineLimit(2, reservesSpace: true)
-                .frame(width: 150, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Button {
                 savePlan(candidate.item)
             } label: {
@@ -312,7 +324,6 @@ struct CalendarDaySuggestionSheet: View {
             .buttonStyle(.plain)
             .disabled(savingID != nil)
         }
-        .frame(width: 150)
     }
 
     private var plannerLink: some View {
@@ -371,5 +382,40 @@ struct CalendarDaySuggestionSheet: View {
                 dismiss()
             }
         }
+    }
+}
+
+// MARK: - Preview
+
+private func previewLoadDay() async -> OutfitPlanDay? {
+    let result = try? await MockRecommendationPlanClient().plan(
+        uid: "preview", gender: .male, days: 2, startDate: "2026-08-20",
+        prefectureCode: nil, candidatesPerDay: 10
+    )
+    if case .success(let response) = result {
+        return response.days.first
+    }
+    return nil
+}
+
+#Preview("候補10件 (空き日)") {
+    NavigationStack {
+        CalendarDaySuggestionSheet(
+            data: .init(date: "2026-08-20", dateLabel: "8月20日"),
+            load: { await previewLoadDay() },
+            onPlan: { _ in true },
+            onOpenPlanner: {}
+        )
+    }
+}
+
+#Preview("候補10件 (予定の選び直し)") {
+    NavigationStack {
+        CalendarDaySuggestionSheet(
+            data: .init(date: "2026-08-20", dateLabel: "8月20日", replacing: true),
+            load: { await previewLoadDay() },
+            onPlan: { _ in true },
+            onOpenPlanner: {}
+        )
     }
 }
