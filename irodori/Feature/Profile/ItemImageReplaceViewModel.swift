@@ -77,18 +77,19 @@ final class ItemImageReplaceViewModel {
         }
     }
 
-    /// 選択中の候補で差し替える: DL → 端末内で背景除去/正方形化 → 新規登録 → 旧削除。
+    /// 候補で差し替える: DL → 端末内で背景除去/正方形化 → 新規登録 → 旧削除。
     /// 成功時は差し替え後の ClosetItem を返す (失敗時はトースト表示して nil)。
-    func applyReplacement() async -> ClosetItem? {
-        guard let selected, !isApplying,
+    /// 検索グリッド (ItemImageReplaceView) と参考画像プレビュー (WebImagePreviewSheet) で共用する。
+    func applyReplacement(_ result: SearchImageResult) async -> ClosetItem? {
+        guard !isApplying,
               let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else { return nil }
         isApplying = true
         defer { isApplying = false }
 
         // 原寸(高画質)を優先し、失敗したらサムネにフォールバック (検索追加と同じ)
-        var downloaded = await Self.downloadImage(from: selected.originalURL)
+        var downloaded = await Self.downloadImage(from: result.originalURL)
         if downloaded == nil {
-            downloaded = await Self.downloadImage(from: selected.thumbnailURL)
+            downloaded = await Self.downloadImage(from: result.thumbnailURL)
         }
         guard let image = downloaded else {
             ToastManager.shared.show("画像を取得できませんでした。別の画像をお試しください")

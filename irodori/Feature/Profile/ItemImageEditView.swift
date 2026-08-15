@@ -6,8 +6,9 @@
 //  「ノイズ除去」(Vision 被写体マスク) と消しゴム (なぞって透明にする) で画像を整え、
 //  確認ステップ「この画像で良いですか？」で OK されたら透過 PNG として保存する。
 //
-//  自分で直しきれない撮影切り抜きのために、ツールの下に
-//  「きれいな商品画像に差し替える」(ItemImageReplaceView) への導線を置く。
+//  自分で直しきれない撮影切り抜きのために、「ネットで見つけた画像」10件の行
+//  (WebItemImagesRow) を差し替えモードで置く。タップ → 拡大プレビュー → 差し替え、
+//  10件に気に入るものが無ければ行末の「検索して探す」で ItemImageReplaceView へ。
 //  差し替え後はそのまま新しいアイテムで編集画面を開き直す。
 //
 //  UI は OutfitSuggestionView と同じミニマル言語:
@@ -65,14 +66,7 @@ struct ItemImageEditView: View {
             .navigationDestination(isPresented: $showReplacePicker) {
                 ItemImageReplaceView(
                     viewModel: .init(item: viewModel.item),
-                    onReplaced: { oldId, newItem in
-                        // 差し替えはこの時点でサーバに反映済み。クローゼット一覧へ伝えたうえで、
-                        // 戻り先の編集画面も新しいアイテムで開き直す (続けて消しゴム等で微調整できる)
-                        onSaved(oldId, newItem)
-                        currentStroke = []
-                        viewModel = .init(item: newItem)
-                        Task { await viewModel.loadImage() }
-                    }
+                    onReplaced: handleReplaced
                 )
             }
             .alert("編集中の内容があります", isPresented: $showReplaceConfirmation) {
@@ -122,11 +116,6 @@ struct ItemImageEditView: View {
                         .stroke(Color.black.opacity(0.3), lineWidth: 1)
                         .frame(width: brushSize / 2, height: brushSize / 2)
                         .frame(width: 30, height: 30)
-                }
-
-                // 撮影切り抜きのアイテムだけに、自分で直しきれないときの逃げ道を出す
-                if viewModel.item.isPhotoCropImage {
-                    replaceEntryCard
                 }
 
                 webReferenceImagesCard
@@ -375,14 +364,29 @@ struct ItemImageEditView: View {
         .opacity(disabled ? 0.4 : 1)
     }
 
-    // MARK: - ネットの参考画像
+    // MARK: - ネットの画像 (参考 / 差し替え)
 
     /// このアイテムの「きれいな画像」をネット検索して横並びで見せる。
     /// 検索ワードは差し替え画面と同じ「色 + カテゴリ」(検索時のみ「ユニクロ」が付く)。
+    /// 撮影切り抜きのアイテムでは差し替えモード: タップ → 拡大プレビュー → そのまま差し替え。
+    /// 10件に気に入るものが無ければ行末の「検索して探す」で ItemImageReplaceView へ。
     private var webReferenceImagesCard: some View {
         WebItemImagesRow(
             searchWord: ItemImageReplaceViewModel.defaultQuery(for: viewModel.item),
-            typeLabel: viewModel.item.item_type
+            typeLabel: viewModel.item.item_type,
+            replaceContext: viewModel.item.isPhotoCropImage ? .init(
+                item: viewModel.item,
+                extraWarning: viewModel.hasChanges ? "いまの編集内容は反映されません" : nil,
+                onReplaced: handleReplaced
+            ) : nil,
+            onSearchMore: viewModel.item.isPhotoCropImage ? {
+                // 編集中の内容は差し替えに引き継がれないため、変更がある時だけ確認する
+                if viewModel.hasChanges {
+                    showReplaceConfirmation = true
+                } else {
+                    showReplacePicker = true
+                }
+            } : nil
         )
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -394,58 +398,14 @@ struct ItemImageEditView: View {
         )
     }
 
-    // MARK: - 商品画像への差し替え導線
-
-    /// ノイズ除去・消しゴムで直しきれないときの別ルート。
-    /// 主CTA (保存する) と競合しないよう、副次的なカード + chevron で置く。
-    private var replaceEntryCard: some View {
-        Button {
-            Haptic.impact(.soft)
-            // 編集中の内容は差し替えに引き継がれないため、変更がある時だけ確認する
-            if viewModel.hasChanges {
-                showReplaceConfirmation = true
-            } else {
-                showReplacePicker = true
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("きれいな商品画像に差し替える")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.black)
-                    Text("うまく切り抜けないときは、ネットの商品画像から選べます")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
-                }
-
-                Spacer(minLength: 4)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.gray.opacity(0.5))
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.black.opacity(0.07), lineWidth: 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
-        .disabled(viewModel.isRemovingNoise || viewModel.isSmoothingEdges)
+    /// 差し替え完了 (拡大プレビュー / 検索画面のどちらから来ても同じ)。
+    /// サーバ反映済みのため、クローゼット一覧へ伝えたうえで
+    /// 編集画面も新しいアイテムで開き直す (続けて消しゴム等で微調整できる)。
+    private func handleReplaced(oldId: String, newItem: ClosetItem) {
+        onSaved(oldId, newItem)
+        currentStroke = []
+        viewModel = .init(item: newItem)
+        Task { await viewModel.loadImage() }
     }
 
     private var editCtaBar: some View {

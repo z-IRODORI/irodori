@@ -345,7 +345,8 @@ struct ItemImageReplaceView: View {
     }
 
     private func apply() async {
-        guard let newItem = await viewModel.applyReplacement() else { return }
+        guard let selected = viewModel.selected else { return }
+        guard let newItem = await viewModel.applyReplacement(selected) else { return }
         Haptic.notify(.success)
         ToastManager.shared.show("商品画像に差し替えました", style: .normal)
         onReplaced(viewModel.item.id, newItem)
