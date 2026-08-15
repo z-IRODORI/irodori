@@ -48,6 +48,8 @@ struct MainTabView: View {
             // 選択タブの色をデフォルトの青からアプリ基調の黒に (白カード+黒アクセントの世界観に合わせる)
             .tint(.black)
             .task { await favoritesStore.refresh() }
+            // 電話番号⇄user_id の対応表をサーバへ同期 (旧世代UUIDユーザーの遡及紐付け。同期済みなら何もしない)
+            .task { await PhoneLinkSyncer.syncIfNeeded() }
             .onChange(of: viewModel.selectedTab) { oldTab, newTab in
                 if newTab == .plus {
                     // + はタブとして留まらず、カメラ画面を直接開く

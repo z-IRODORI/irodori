@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import FirebaseAuth
 
 struct LoginView: View {
     let onSignInSuccess: () -> Void
@@ -113,8 +114,19 @@ struct LoginView: View {
                     // 新規会員登録: アカウント紐付きのローカル状態を初期化して
                     // プロフィール入力〜オンボーディングの全導線を通す
                     AccountLocalState.resetForNewRegistration()
+                    onSignInSuccess()
+                } else if !hasLocalData {
+                    // 機種変更/再インストール後のログイン: 端末にデータが無いので、
+                    // サーバの紐付け表からこの電話番号の user_id を復元してから遷移する
+                    // (復元できればコーデ・クローゼット・学習データにそのまま戻れる)
+                    Task { @MainActor in
+                        await restoreLinkedAccountIfAvailable()
+                        onSignInSuccess()
+                    }
+                } else {
+                    // 同一端末での引き継ぎログイン: userId は UserDefaults に残っている
+                    onSignInSuccess()
                 }
-                onSignInSuccess()
             })
         }
     }
@@ -122,6 +134,19 @@ struct LoginView: View {
     private func startPhoneAuth(mode: AuthEntryMode) {
         authMode = mode
         isPresentedPhoneAuth = true
+    }
+
+    /// サーバの紐付け表 (phone_account_links) から旧 user_id を復元する。
+    /// 紐付けが無い/失敗時は何もしない (新規ユーザーとして進む)
+    private func restoreLinkedAccountIfAvailable() async {
+        guard UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) == nil,
+              let user = Auth.auth().currentUser,
+              let idToken = try? await user.getIDToken() else { return }
+        guard let result = try? await PhoneLinkClient().linkedAccount(idToken: idToken),
+              case .success(let response) = result, !response.user_id.isEmpty else { return }
+        UserDefaults.standard.set(response.user_id, forKey: UserDefaultsKey.userId.rawValue)
+        // 復元した userId は同期済みとして記録 (次回起動での再リンク送信を防ぐ)
+        UserDefaults.standard.set(response.user_id, forKey: UserDefaultsKey.phoneLinkSyncedUserId.rawValue)
     }
 }
 

@@ -44,7 +44,11 @@ final class InputUserInfoViewModel {
             // 認証必須化後は到達しない想定。発生したら計測で検知する
             AnalyticsLogger.shared.log(error: .userIdFallback, parameters: ["context": "input_user_info"])
         }
-        let uid = firebaseUID ?? UUID().uuidString
+        // 既に userId がある場合は上書きしない (userId 不変の不変条件)。
+        // 機種変更復元 (紐付け表から旧UUIDを復元済み) でプロフィール再入力に来たとき、
+        // Firebase UID で上書きすると旧データに到達できなくなるため
+        let existingUserId = userDefaults.string(forKey: UserDefaultsKey.userId.rawValue)
+        let uid = existingUserId ?? firebaseUID ?? UUID().uuidString
         userDefaults.set(uid, forKey: UserDefaultsKey.userId.rawValue)
 
         // 居住地を UD に先行保存し、サーバへ送信 (失敗してもオンボーディングは進める)

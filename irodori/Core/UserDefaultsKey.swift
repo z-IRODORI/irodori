@@ -41,4 +41,6 @@ enum UserDefaultsKey: String, CaseIterable {
     case notificationPromptShown
     /// まとめて提案の開封リビールを縮退するか (「一気に開ける」を選んだ人は次回から開封済みで着地)
     case plannerRevealCollapsed
+    /// 電話番号⇄アカウント紐付けをサーバに同期済みの userId (再送防止。値が userId と一致すれば同期済み)
+    case phoneLinkSyncedUserId
 }
