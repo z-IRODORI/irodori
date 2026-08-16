@@ -31,6 +31,9 @@ enum DailyWeatherDisplay {
         let wxiconCode: Int?
         /// ウェザーニュースの文言 (「晴れのち雨」等)。info ポップアップの見出しに使う
         let label: String?
+        /// ウェザーニュースの各アイコンの説明文言。info ポップアップの詳細に使う
+        /// (見出しの言い換えではなく「どういう空になるか」の説明)
+        let description: String?
 
         /// Assets.xcassets/wxicon/ のアセット名 (例: wx112)
         var wxAssetName: String? { wxiconCode.map { "wx\($0)" } }
@@ -54,12 +57,51 @@ enum DailyWeatherDisplay {
         430: "みぞれ", 550: "猛暑", 650: "小雨", 850: "大雨・嵐", 950: "大雪・吹雪",
     ]
 
+    /// ウェザーニュースのアイコンコード → 説明文言 (https://weathernews.jp/s/topics/img/wxicon/ の原文)。
+    /// 215 のみページに記載が無いため、212 と同型の雪版として補完している。
+    private static let wxDescriptions: [Int: String] = [
+        100: "雲が少なく、昼間なら青空が広がり、夜なら星空が見られます。また、少し白っぽい空でも日差しがタップリあります。",
+        101: "だいたい晴れますが、時々、雲が日差しを遮ります。",
+        102: "だいたい晴れますが、数時間だけ雨が降ります。",
+        104: "だいたい晴れますが、数時間だけ雪が降ります。",
+        110: "晴れていても、だんだん雲が多くなって、時々、日差しを遮ります。",
+        112: "晴れていても、だんだん曇り空に変わり、数時間だけ雨が降ります。",
+        115: "晴れていても、だんだん曇り空に変わり、数時間だけ雪が降ります。",
+        200: "空は雲に覆われて、昼間は青空が、夜は星がほとんど見ることができません。",
+        201: "雲は多いですが、時々青空が見えたり、日差しが差したりします。",
+        202: "曇り空で、数時間だけ雨が降ります。",
+        204: "曇り空で、数時間だけ雪が降ります。",
+        210: "曇り空ですが、だんだん雲が少なくなって、時々青空が見えたり、日が差したりすることがあります。",
+        212: "曇り空がしばらく続きますが、だんだん雨雲に変わり、数時間だけ雨が降ります。",
+        215: "曇り空がしばらく続きますが、だんだん雪雲に変わり、数時間だけ雪が降ります。",
+        300: "雨が降り続いたり、一旦やんでもすぐに雨が降り出します。雷が鳴ることもあります。",
+        301: "降り続いた雨が一旦やんで、数時間だけ晴れたり、日が差したりします。",
+        302: "雨が降っても、時々やんだりします。",
+        303: "雨に雪が混じったり、時々雪に変わったりします。",
+        311: "降っていた雨が急にやんで、時々青空が見えたり、日が差したりすることがあります。",
+        313: "降っていた雨がやんできますが、雨がやんだ後も空は雲に覆われます。",
+        314: "降っていた雨がやんだ後、雪が降ったりやんだりします。",
+        400: "雪が降り続いたり、一旦やんでもすぐに雪が降り出します。雷が鳴ることもあります。",
+        401: "降り続いた雪が一旦やんで、数時間だけ晴れたり、日が差したりします。",
+        402: "雪が降っても、時々やんだりします。",
+        403: "雪に雨が混じったり、時々雨に変わったりします。",
+        411: "降っていた雪が急にやんで、時々青空が見えたり、日が差したりすることがあります。",
+        413: "降っていた雪がやんできますが、雪がやんだ後も空は雲に覆われます。",
+        414: "降っていた雪が、だんだん雨に変わります。",
+        430: "雪や雨が降ったり、みぞれが降ります。雷が鳴ることもあります。",
+        550: "気温が体温くらいか、それ以上に上がり、熱中症の危険性が高まるほどの、厳しい暑さになります。",
+        650: "傘が必要ない程度の弱い雨がポツポツと降ります。",
+        850: "土砂降りの激しい雨が続いたり、雨風が強まって、大荒れの天気になります。",
+        950: "雪がドカドカと強く降って大雪になったり、視界が悪くなるほどの激しい吹雪になります。",
+    ]
+
     private static func make(
         _ code: Int?, _ icon: String, _ tint: Color, labelOverride: String? = nil
     ) -> Style {
         Style(
             iconName: icon, tint: tint, wxiconCode: code,
-            label: labelOverride ?? code.flatMap { wxLabels[$0] }
+            label: labelOverride ?? code.flatMap { wxLabels[$0] },
+            description: code.flatMap { wxDescriptions[$0] }
         )
     }
 
@@ -275,13 +317,15 @@ struct WeatherInfoPopover: View {
             // 見出しはウェザーニュースのアイコン一覧と同じ文言
             Text(style.label ?? weather.condition)
                 .font(.system(size: 15, weight: .bold))
-            if let label = style.label, label != weather.condition {
-                // 元の予報文 (気象庁の詳細文言) も添えて情報を落とさない
-                Text(weather.condition)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
+            // 詳細はウェザーニュースの各アイコンの説明文言 (見出しの言い換えではなく
+            // 「どういう空になるか」の説明)。未知の文言だけ元の予報文を出す
+            Text(style.description ?? weather.condition)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.leading)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 4) {
                 Text("最低 \(weather.min_temp)°")
                     .foregroundStyle(Color.blue.opacity(0.85))
@@ -293,7 +337,7 @@ struct WeatherInfoPopover: View {
             .font(.system(size: 13, weight: .semibold))
         }
         .padding(16)
-        .frame(minWidth: 200)
+        .frame(width: 260)
         .presentationCompactAdaptation(.popover)
     }
 }

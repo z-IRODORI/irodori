@@ -148,6 +148,36 @@ struct DailyWeatherDisplayTests {
         }
     }
 
+    @Test("ポップアップの詳細はウェザーニュースの説明文言になる (見出しの言い換えではない)")
+    func wxDescriptionsAreExplanatory() {
+        let cloudyRain = DailyWeatherDisplay.style(for: "くもり時々雨")
+        #expect(cloudyRain.description == "曇り空で、数時間だけ雨が降ります。")
+        #expect(cloudyRain.description != cloudyRain.label)
+
+        #expect(DailyWeatherDisplay.style(for: "晴れ").description?.contains("青空") == true)
+        #expect(DailyWeatherDisplay.style(for: "雨時々止む").description == "雨が降っても、時々やんだりします。")
+        #expect(DailyWeatherDisplay.style(for: "猛暑").description?.contains("熱中症") == true)
+        // 未知の文言は説明も nil (ポップアップは元の予報文へフォールバック)
+        #expect(DailyWeatherDisplay.style(for: "不明").description == nil)
+    }
+
+    @Test("コードが決まる天気にはすべて説明文言があり、見出しと重複しない")
+    func everyCodedConditionHasDistinctDescription() {
+        let conditions = [
+            "晴れ", "晴れ時々くもり", "晴れのちくもり", "晴れ一時雨", "晴れのち雨", "晴れ一時雪", "晴れのち雪",
+            "くもり", "くもり時々晴れ", "くもりのち晴れ", "くもり時々雨", "くもりのち雨", "くもり一時雪", "くもりのち雪",
+            "雨", "雨時々晴れ", "雨のち晴れ", "雨時々止む", "雨時々雪", "雨のちくもり", "雨のち雪",
+            "雪", "雪時々晴れ", "雪のち晴れ", "雪時々止む", "雪時々雨", "雪のちくもり", "雪のち雨",
+            "霧", "みぞれ", "小雨", "大雨", "嵐", "大雪", "吹雪", "猛暑", "雷雨",
+        ]
+        for condition in conditions {
+            let style = DailyWeatherDisplay.style(for: condition)
+            #expect(style.wxiconCode != nil, "コード未判定: \(condition)")
+            #expect(style.description != nil, "説明文言が無い: \(condition)")
+            #expect(style.description != style.label, "説明が見出しの重複: \(condition)")
+        }
+    }
+
     // MARK: - 説明文の短縮 (compactCondition)
 
     @Test("特殊系の語も説明文から欠落しない")
