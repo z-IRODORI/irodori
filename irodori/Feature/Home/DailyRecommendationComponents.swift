@@ -348,9 +348,21 @@ struct DailyMiniWeatherBadge: View {
     let weather: DailyRecommendationWeather
     @State private var showWeatherInfo = false
 
+    /// バッジ全体の高さ。左キャップ (天気アイコン部) の高さと一致させる
+    private let badgeHeight: CGFloat = 30
+
     var body: some View {
-        HStack(spacing: 6) {
-            WxWeatherIcon(condition: weather.condition, size: 18)
+        let style = DailyWeatherDisplay.style(for: weather.condition)
+        HStack(spacing: 8) {
+            // 天気アイコンはカプセル左端に密着させ、Capsule の clip で左の角丸ごと
+            // 塗りつぶす「左キャップ」にする (四角いアイコンが白地に浮いて見えないように)。
+            // アイコン PNG は透過なので、天気系統色の淡い下地でキャップ面を作る
+            ZStack {
+                style.tint.opacity(0.14)
+                WxWeatherIcon(condition: weather.condition, size: badgeHeight - 8)
+            }
+            .frame(width: badgeHeight + 8, height: badgeHeight)
+
             HStack(spacing: 2) {
                 Text("\(weather.min_temp)")
                     .foregroundStyle(Color.blue.opacity(0.85))
@@ -371,6 +383,8 @@ struct DailyMiniWeatherBadge: View {
                 Image(systemName: "info.circle")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                    .frame(width: 28, height: badgeHeight)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("天気の説明を表示")
@@ -378,8 +392,8 @@ struct DailyMiniWeatherBadge: View {
                 WeatherInfoPopover(weather: weather)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.trailing, 2)
+        .frame(height: badgeHeight)
         .background(.white)
         .clipShape(Capsule())
         .overlay(Capsule().stroke(Color.black.opacity(0.06), lineWidth: 1))
