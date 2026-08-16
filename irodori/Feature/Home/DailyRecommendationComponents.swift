@@ -305,6 +305,37 @@ struct WxWeatherIcon: View {
     }
 }
 
+/// WN タイル画像を領域いっぱいに敷き詰める版 (バッジの左キャップ用)。
+/// WN のアイコンは「色付きの角丸タイル」なので、下地に載せると二重タイルに見える。
+/// タイル自体をキャップ面としてフィルし、四隅の透過ノッチは同系色の下地で埋め、
+/// 外側の Capsule クリップで左端の角丸に沿わせる。
+struct WxWeatherIconCap: View {
+    let condition: String
+    var width: CGFloat = 36
+    var height: CGFloat = 30
+
+    var body: some View {
+        let style = DailyWeatherDisplay.style(for: condition)
+        ZStack {
+            // タイル四隅の角丸 (透過) から下の白が覗かないようにする下地
+            style.tint.opacity(0.35)
+            if let asset = style.wxAssetName, let tile = UIImage(named: asset) {
+                Image(uiImage: tile)
+                    .resizable()
+                    .scaledToFill()
+                    .scaleEffect(1.08)   // タイル自身の角丸をクロップして面として敷き詰める
+            } else {
+                Image(systemName: style.iconName)
+                    .symbolRenderingMode(.multicolor)
+                    .font(.system(size: height * 0.55))
+                    .foregroundStyle(style.tint)
+            }
+        }
+        .frame(width: width, height: height)
+        .clipped()
+    }
+}
+
 // MARK: - 天気の説明ポップアップ (info ボタンから表示)
 
 struct WeatherInfoPopover: View {
@@ -352,16 +383,14 @@ struct DailyMiniWeatherBadge: View {
     private let badgeHeight: CGFloat = 30
 
     var body: some View {
-        let style = DailyWeatherDisplay.style(for: weather.condition)
         HStack(spacing: 8) {
-            // 天気アイコンはカプセル左端に密着させ、Capsule の clip で左の角丸ごと
-            // 塗りつぶす「左キャップ」にする (四角いアイコンが白地に浮いて見えないように)。
-            // アイコン PNG は透過なので、天気系統色の淡い下地でキャップ面を作る
-            ZStack {
-                style.tint.opacity(0.14)
-                WxWeatherIcon(condition: weather.condition, size: badgeHeight - 8)
-            }
-            .frame(width: badgeHeight + 8, height: badgeHeight)
+            // 天気アイコン (WN の色付きタイル) をカプセル左端に密着させ、
+            // Capsule の clip で左の角丸ごと敷き詰める「左キャップ」
+            WxWeatherIconCap(
+                condition: weather.condition,
+                width: badgeHeight + 8,
+                height: badgeHeight
+            )
 
             HStack(spacing: 2) {
                 Text("\(weather.min_temp)")
