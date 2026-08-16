@@ -283,8 +283,6 @@ struct TomorrowPickSection: View {
     @State private var sendoffItem: DailyRecommendationItem? = nil
     /// 朝いち演出 (1日1回): false の間はカルーセルを隠し、フェードインで登場させる
     @State private var ritualRevealed = true
-    /// 朝いち演出中は相棒コメントをタイプライター表示する
-    @State private var ritualTypewriter = false
     /// 今日/明日/週末タブの選択下線をスライドさせる
     @Namespace private var scopeUnderlineNamespace
     #if DEBUG
@@ -314,7 +312,6 @@ struct TomorrowPickSection: View {
             #if DEBUG
             debugBar
             #endif
-            partnerRow
             // 翌日レスポンス: 昨日の👍👎への「反映したよ」バッジ
             if let ack = daily?.feedback_ack {
                 FeedbackAckBadge(ack: ack)
@@ -557,20 +554,7 @@ struct TomorrowPickSection: View {
     }
     #endif
 
-    // MARK: - 相棒コメント
-
-    private var partnerRow: some View {
-        HStack(alignment: .top, spacing: 10) {
-            PartnerIconImage(size: 44)
-            DailyPartnerCommentBox(
-                text: daily?.partner_comment ?? "\(viewModel.selectedPickScope.displayName)のコーデ、3案そろえたよ。",
-                typewriter: ritualTypewriter
-            )
-        }
-        .padding(.horizontal, 24)
-    }
-
-    // MARK: - 朝いち演出 (1日1回だけ: フェードイン + タイプライター)
+    // MARK: - 朝いち演出 (1日1回だけ: フェードイン)
 
     private func playMorningRitualIfNeeded() {
         guard !cards.isEmpty else { return }
@@ -579,7 +563,6 @@ struct TomorrowPickSection: View {
         guard UserDefaults.standard.string(forKey: key) != today else { return }
         UserDefaults.standard.set(today, forKey: key)
         ritualRevealed = false
-        ritualTypewriter = true
         withAnimation(.easeOut(duration: 0.7).delay(0.2)) {
             ritualRevealed = true
         }
@@ -792,10 +775,15 @@ struct TomorrowPickSection: View {
                     scopeName: viewModel.selectedPickScope.displayName
                 )
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(headline.text)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(headline.isDiscovery ? Color.teal : .black)
-                        .lineLimit(1)
+                    // 相棒アイコンを題字の左に添えて「相棒が選んだ一着」であることを伝える
+                    // (天気下の相棒コメント行は廃止し、相棒の存在感はここへ集約)
+                    HStack(spacing: 6) {
+                        PartnerIconImage(size: 18)
+                        Text(headline.text)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(headline.isDiscovery ? Color.teal : .black)
+                            .lineLimit(1)
+                    }
                     HStack(alignment: .firstTextBaseline) {
                         Text(styleName(card))
                             .font(.system(size: 11))
