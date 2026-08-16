@@ -494,8 +494,11 @@ struct TomorrowPickSection: View {
                 Text(tab.shortDate)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
+                    .fixedSize()
             }
+            // 行幅が足りない端末では、気温・日付 (fixedSize) ではなく県名側を省略させる
             DailyLocationBadge(prefectureName: viewModel.currentPrefectureName, action: onLocationTap)
+                .layoutPriority(-1)
             if let weather = daily?.weather {
                 DailyMiniWeatherBadge(weather: weather)
             }

@@ -403,6 +403,9 @@ struct DailyMiniWeatherBadge: View {
                     .foregroundStyle(.secondary)
             }
             .font(.system(size: 13, weight: .semibold))
+            // 行の幅が数pt不足しただけで2桁の気温が「2/3°」のように末尾グリフ落ちする
+            // (SwiftUIは収まらないグリフを黙って描画しない)。気温は絶対に縮めない
+            .fixedSize()
 
             // 天気の説明 (ウェザーニュース文言) をポップアップで見せる info ボタン
             Button {
