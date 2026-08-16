@@ -709,10 +709,12 @@ struct TomorrowPickSection: View {
     private var contentArea: some View {
         if !cards.isEmpty {
             setMetaRow
+            // ページング (x/N) と「一覧で見る」はカードの上に置き、
+            // スクロールせずに件数と一覧導線が見えるようにする
+            paginationRow
             cardCarousel
                 .opacity(ritualRevealed ? 1 : 0)
                 .offset(y: ritualRevealed ? 0 : 16)
-            paginationRow
         } else if viewModel.isLoadingDailyRecommendation {
             loadingCarousel
         } else if viewModel.hasDailyRecommendationError {
@@ -774,26 +776,27 @@ struct TomorrowPickSection: View {
                     maxTemp: daily?.weather.max_temp,
                     scopeName: viewModel.selectedPickScope.displayName
                 )
-                VStack(alignment: .leading, spacing: 3) {
-                    // 相棒アイコンを題字の左に添えて「相棒が選んだ一着」であることを伝える
-                    // (天気下の相棒コメント行は廃止し、相棒の存在感はここへ集約)
-                    HStack(spacing: 6) {
-                        PartnerIconImage(size: 18)
+                // 相棒アイコンは題字とタイプ (casual / korean 等) の2行ぶんに広げて配置し、
+                // 「相棒が選んだ一着」の存在感を強める
+                // (天気下の相棒コメント行は廃止し、相棒の存在感はここへ集約)
+                HStack(alignment: .center, spacing: 8) {
+                    PartnerIconImage(size: 34)
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(headline.text)
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(headline.isDiscovery ? Color.teal : .black)
                             .lineLimit(1)
-                    }
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(styleName(card))
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        Spacer()
-                        if usedItemsCount(for: card) > 0 {
-                            Text("手持ち \(card.owned_items.count)/\(usedItemsCount(for: card))")
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(styleName(card))
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Spacer()
+                            if usedItemsCount(for: card) > 0 {
+                                Text("手持ち \(card.owned_items.count)/\(usedItemsCount(for: card))")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
