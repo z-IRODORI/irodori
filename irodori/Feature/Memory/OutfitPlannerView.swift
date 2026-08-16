@@ -581,11 +581,7 @@ struct OutfitPlannerView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             if let weather = day.weather {
-                let style = DailyWeatherDisplay.style(for: weather.condition)
-                Image(systemName: style.iconName)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(style.tint)
-                    .font(.system(size: 18))
+                WxWeatherIcon(condition: weather.condition, size: 18)
                     .padding(.top, 4)
                 Text(DailyWeatherDisplay.compactCondition(weather.condition))
                     .font(.system(size: 9))
@@ -777,11 +773,7 @@ struct OutfitPlannerView: View {
                     }
                     if let weather = day.weather {
                         HStack(spacing: 4) {
-                            let style = DailyWeatherDisplay.style(for: weather.condition)
-                            Image(systemName: style.iconName)
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(style.tint)
-                                .font(.system(size: 11))
+                            WxWeatherIcon(condition: weather.condition, size: 12)
                             Text("\(DailyWeatherDisplay.compactCondition(weather.condition))・\(weather.min_temp)〜\(weather.max_temp)°C")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)

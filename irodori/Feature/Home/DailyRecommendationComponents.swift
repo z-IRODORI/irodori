@@ -8,50 +8,160 @@
 //
 
 import SwiftUI
+import UIKit
 import Kingfisher
 
 // MARK: - 天気アイコン判定
+//
+// ウェザーニュースの天気アイコン体系 (https://weathernews.jp/s/topics/img/wxicon/) に準拠する:
+//  - 複合天気は「前半 (先に現れる天気) がベース系統」を決める
+//    (100番台=晴れ / 200=くもり / 300=雨 / 400=雪。例: 晴れのち雨 = 晴れベースの雨複合 112)
+//  - 「時々 / 一時 / のち」の副天気は複合グリフとベース色で表現する
+//    (晴れ時々くもり=オレンジの cloud.sun / くもり時々晴れ=グレーの cloud.sun で向きを区別)
+//  - 専用コード相当 (霧200・みぞれ430・小雨650・大雨/嵐850・大雪/吹雪950・猛暑550) は
+//    複合解析より先に専用アイコンへマップする
 
 enum DailyWeatherDisplay {
     struct Style {
+        /// SF Symbols 名 (ウェザーニュースアイコンが使えない場合のフォールバック表示用)
         let iconName: String
         let tint: Color
+        /// ウェザーニュースの天気アイコンコード (100/200/300/400 番台 + 特殊コード)。
+        /// nil は未知の文言 (SF Symbols フォールバックのみ)
+        let wxiconCode: Int?
+        /// ウェザーニュースの文言 (「晴れのち雨」等)。info ポップアップの見出しに使う
+        let label: String?
+
+        /// Assets.xcassets/wxicon/ のアセット名 (例: wx112)
+        var wxAssetName: String? { wxiconCode.map { "wx\($0)" } }
+    }
+
+    /// 天気の系統 (ウェザーニュースの 100/200/300/400 番台に対応)
+    private enum Family {
+        case sunny, cloudy, rain, snow, fog
+    }
+
+    /// ウェザーニュースのアイコンコード → 文言 (https://weathernews.jp/s/topics/img/wxicon/)
+    private static let wxLabels: [Int: String] = [
+        100: "晴れ", 101: "晴れ時々くもり", 102: "晴れ一時雨", 104: "晴れ一時雪",
+        110: "晴れのちくもり", 112: "晴れのち雨", 115: "晴れのち雪",
+        200: "くもり", 201: "くもり時々晴れ", 202: "くもり時々雨", 204: "くもり時々雪",
+        210: "くもりのち晴れ", 212: "くもりのち雨", 215: "くもりのち雪",
+        300: "雨", 301: "雨時々晴れ", 302: "雨時々止む", 303: "雨時々雪",
+        311: "雨のち晴れ", 313: "雨のちくもり", 314: "雨のち雪",
+        400: "雪", 401: "雪時々晴れ", 402: "雪時々止む", 403: "雪時々雨",
+        411: "雪のち晴れ", 413: "雪のちくもり", 414: "雪のち雨",
+        430: "みぞれ", 550: "猛暑", 650: "小雨", 850: "大雨・嵐", 950: "大雪・吹雪",
+    ]
+
+    private static func make(
+        _ code: Int?, _ icon: String, _ tint: Color, labelOverride: String? = nil
+    ) -> Style {
+        Style(
+            iconName: icon, tint: tint, wxiconCode: code,
+            label: labelOverride ?? code.flatMap { wxLabels[$0] }
+        )
     }
 
     static func style(for condition: String) -> Style {
         let c = condition
+
+        // --- 専用アイコン (特殊コード群)。複合解析より優先する ---
+        if c.contains("猛暑") || c.contains("酷暑") {
+            return make(550, "thermometer.sun.fill", .red)
+        }
+        if c.contains("台風") || c.contains("嵐") {
+            return make(850, "tropicalstorm", .indigo)
+        }
         if c.contains("雷") {
-            return .init(iconName: "cloud.bolt.rain.fill", tint: .purple)
+            // WN のアイコン一覧に雷単独は無く 850 (大雨・嵐) へ集約。文言は雷雨と明示する
+            return make(850, "cloud.bolt.rain.fill", .purple, labelOverride: "雷雨")
         }
-        if c.contains("雪") {
-            return .init(iconName: "cloud.snow.fill", tint: .cyan)
+        if c.contains("みぞれ") {
+            return make(430, "cloud.sleet.fill", .cyan)
         }
-        if c.contains("雨") {
-            if c.contains("晴") {
-                return .init(iconName: "cloud.sun.rain.fill", tint: .blue)
+        if c.contains("吹雪") || c.contains("暴風雪") {
+            return make(950, "wind.snow", .cyan)
+        }
+        if c.contains("大雪") {
+            return make(950, "snowflake", .cyan)
+        }
+        if c.contains("大雨") || c.contains("豪雨") || c.contains("暴風雨") {
+            return make(850, "cloud.heavyrain.fill", .blue)
+        }
+        if c.contains("小雨") || c.contains("霧雨") {
+            return make(650, "cloud.drizzle.fill", .blue)
+        }
+
+        // 「のち」(遷移) か「時々/一時」(断続) かでコードが分かれる。
+        // 気象庁文の「後」も遷移として扱うが、「午後」の「後」は誤検出しない
+        let transition = c.contains("のち")
+            || c.replacingOccurrences(of: "午後", with: "").contains("後")
+
+        // --- 前半ベース + 副天気の複合マトリクス ---
+        let (primary, secondary) = primaryAndSecondary(in: c)
+        switch (primary, secondary) {
+        case (.sunny, nil):      return make(100, "sun.max.fill", .orange)
+        case (.sunny, .cloudy):  return make(transition ? 110 : 101, "cloud.sun.fill", .orange)
+        case (.sunny, .rain):    return make(transition ? 112 : 102, "cloud.sun.rain.fill", .blue)
+        case (.sunny, .snow):    return make(transition ? 115 : 104, "sun.snow", .cyan)
+
+        case (.cloudy, nil):     return make(200, "cloud.fill", .gray)
+        case (.cloudy, .sunny):  return make(transition ? 210 : 201, "cloud.sun.fill", .gray)
+        case (.cloudy, .rain):   return make(transition ? 212 : 202, "cloud.rain.fill", .blue)
+        case (.cloudy, .snow):   return make(transition ? 215 : 204, "cloud.snow.fill", .cyan)
+
+        case (.rain, nil):       return make(c.contains("止む") ? 302 : 300, "cloud.rain.fill", .blue)
+        case (.rain, .sunny):    return make(transition ? 311 : 301, "cloud.sun.rain.fill", .blue)
+        case (.rain, .cloudy):   return make(transition ? 313 : 302, "cloud.rain.fill", .blue)
+        case (.rain, .snow):     return make(transition ? 314 : 303, "cloud.sleet.fill", .cyan)
+
+        case (.snow, nil):       return make(c.contains("止む") ? 402 : 400, "cloud.snow.fill", .cyan)
+        case (.snow, .sunny):    return make(transition ? 411 : 401, "sun.snow", .cyan)
+        case (.snow, .cloudy):   return make(transition ? 413 : 402, "cloud.snow.fill", .cyan)
+        case (.snow, .rain):     return make(transition ? 414 : 403, "cloud.sleet.fill", .cyan)
+
+        // 霧は単独ならくもり系の共有アイコン (200)、複合の副側はくもり扱い
+        case (.fog, _):          return make(200, "cloud.fog.fill", .gray, labelOverride: "霧")
+        case (_, .fog):          return style(for: c.replacingOccurrences(of: "霧", with: "くもり"))
+
+        default:                 return make(nil, "cloud.sun.fill", .gray)
+        }
+    }
+
+    /// 条件文の「先に現れる系統」と「次に現れる別系統」を返す。
+    /// ウェザーニュースの複合アイコンは前半がベースになるため、出現位置で判定する
+    /// (例: 晴れのち雨 → (.sunny, .rain) / 雨のち晴れ → (.rain, .sunny))。
+    private static func primaryAndSecondary(in condition: String) -> (Family?, Family?) {
+        let keywords: [(String, Family)] = [
+            ("晴", .sunny), ("曇", .cloudy), ("くもり", .cloudy),
+            ("霧", .fog), ("雨", .rain), ("雪", .snow),
+        ]
+        var hits: [(offset: Int, family: Family)] = []
+        for (keyword, family) in keywords {
+            guard let range = condition.range(of: keyword) else { continue }
+            let offset = condition.distance(from: condition.startIndex, to: range.lowerBound)
+            // 同一系統 (曇/くもり) は最初の出現だけ採用する
+            if let index = hits.firstIndex(where: { $0.family == family }) {
+                if offset < hits[index].offset { hits[index].offset = offset }
+            } else {
+                hits.append((offset, family))
             }
-            if c.contains("曇") {
-                return .init(iconName: "cloud.heavyrain.fill", tint: .blue)
-            }
-            return .init(iconName: "cloud.rain.fill", tint: .blue)
         }
-        if c.contains("曇") && c.contains("晴") {
-            return .init(iconName: "cloud.sun.fill", tint: .orange)
-        }
-        if c.contains("曇") {
-            return .init(iconName: "cloud.fill", tint: .gray)
-        }
-        if c.contains("晴") {
-            return .init(iconName: "sun.max.fill", tint: .orange)
-        }
-        return .init(iconName: "cloud.sun.fill", tint: .gray)
+        let ordered = hits.sorted { $0.offset < $1.offset }.map(\.family)
+        return (ordered.first, ordered.count > 1 ? ordered[1] : nil)
     }
 }
 
 extension DailyWeatherDisplay {
-    /// 天気そのものを表す語 (完全一致で拾う。「雷を伴い」等の修飾句は落とす)
+    /// 天気そのものを表す語 (完全一致で拾う。「雷を伴い」等の修飾句は落とす)。
+    /// ウェザーニュースのアイコン一覧にある特殊系 (霧・小雨・猛暑・吹雪・止む 等) も
+    /// 説明文から欠落しないよう網羅する
     private static let weatherTerms: Set<String> = [
-        "晴れ", "晴", "くもり", "曇り", "曇", "雨", "大雨", "雪", "大雪", "みぞれ", "雷雨", "雷",
+        "晴れ", "晴", "くもり", "曇り", "曇", "霧",
+        "雨", "大雨", "小雨", "霧雨", "雷雨", "暴風雨",
+        "雪", "大雪", "吹雪", "暴風雪", "みぞれ",
+        "雷", "猛暑", "止む",
     ]
     private static let weatherConnectives: Set<String> = ["後", "のち", "時々", "一時"]
 
@@ -129,18 +239,74 @@ struct DailyLocationBadge: View {
     }
 }
 
-// MARK: - ミニ天気バッジ (見出し右に配置)
+// MARK: - ウェザーニュース天気アイコン
 
-struct DailyMiniWeatherBadge: View {
+/// ウェザーニュースの天気アイコン画像 (Assets.xcassets/wxicon/wx{code})。
+/// 未知の文言などアセットが無い場合は SF Symbols 表示にフォールバックする。
+struct WxWeatherIcon: View {
+    let condition: String
+    var size: CGFloat = 18
+
+    var body: some View {
+        let style = DailyWeatherDisplay.style(for: condition)
+        if let asset = style.wxAssetName, UIImage(named: asset) != nil {
+            Image(asset)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+        } else {
+            Image(systemName: style.iconName)
+                .symbolRenderingMode(.multicolor)
+                .font(.system(size: size * 0.85))
+                .foregroundStyle(style.tint)
+        }
+    }
+}
+
+// MARK: - 天気の説明ポップアップ (info ボタンから表示)
+
+struct WeatherInfoPopover: View {
     let weather: DailyRecommendationWeather
 
     var body: some View {
         let style = DailyWeatherDisplay.style(for: weather.condition)
+        VStack(spacing: 10) {
+            WxWeatherIcon(condition: weather.condition, size: 44)
+            // 見出しはウェザーニュースのアイコン一覧と同じ文言
+            Text(style.label ?? weather.condition)
+                .font(.system(size: 15, weight: .bold))
+            if let label = style.label, label != weather.condition {
+                // 元の予報文 (気象庁の詳細文言) も添えて情報を落とさない
+                Text(weather.condition)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            HStack(spacing: 4) {
+                Text("最低 \(weather.min_temp)°")
+                    .foregroundStyle(Color.blue.opacity(0.85))
+                Text("/")
+                    .foregroundStyle(.secondary)
+                Text("最高 \(weather.max_temp)°")
+                    .foregroundStyle(.orange)
+            }
+            .font(.system(size: 13, weight: .semibold))
+        }
+        .padding(16)
+        .frame(minWidth: 200)
+        .presentationCompactAdaptation(.popover)
+    }
+}
+
+// MARK: - ミニ天気バッジ (見出し右に配置)
+
+struct DailyMiniWeatherBadge: View {
+    let weather: DailyRecommendationWeather
+    @State private var showWeatherInfo = false
+
+    var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: style.iconName)
-                .symbolRenderingMode(.multicolor)
-                .font(.system(size: 14))
-                .foregroundStyle(style.tint)
+            WxWeatherIcon(condition: weather.condition, size: 18)
             HStack(spacing: 2) {
                 Text("\(weather.min_temp)")
                     .foregroundStyle(Color.blue.opacity(0.85))
@@ -152,6 +318,21 @@ struct DailyMiniWeatherBadge: View {
                     .foregroundStyle(.secondary)
             }
             .font(.system(size: 13, weight: .semibold))
+
+            // 天気の説明 (ウェザーニュース文言) をポップアップで見せる info ボタン
+            Button {
+                Haptic.impact(.light)
+                showWeatherInfo = true
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("天気の説明を表示")
+            .popover(isPresented: $showWeatherInfo, arrowEdge: .top) {
+                WeatherInfoPopover(weather: weather)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
