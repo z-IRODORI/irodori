@@ -93,6 +93,16 @@ struct CameraView: View {
         }
 //        .navigationBarBackButtonHidden()
         .ignoresSafeArea()
+        // 解析エンジン切替 (デバッグ検証用。Release ビルドには入らない)。
+        // Header 内ではなくルートのオーバーレイに置く: カメラ準備中 (.initial) や
+        // シミュレータのカメラ無し環境でも常に表示され、動作確認が可能になる。
+        .overlay(alignment: .topTrailing) {
+            #if DEBUG
+            debugEngineToggle
+                .padding(.top, 80)
+                .padding(.trailing, 24)
+            #endif
+        }
         .onAppear {
             AnalyticsLogger.shared.log(screen: .cameraScreenView)
             checkCameraPermission()   // カメラを初期化
@@ -229,12 +239,6 @@ struct CameraView: View {
 ////                }
 //            }
 //            .frame(maxWidth: .infinity, alignment: .trailing)
-
-            #if DEBUG
-            // 解析エンジン切替 (デバッグ検証用。Release ビルドには入らない)
-            debugEngineToggle
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            #endif
         }
         .frame(maxWidth: .infinity)
         .frame(height: 30)
@@ -263,6 +267,7 @@ struct CameraView: View {
                 in: Capsule()
             )
         }
+        .accessibilityIdentifier("debug-engine-toggle")
     }
     #endif
 
