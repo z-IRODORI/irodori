@@ -7,9 +7,13 @@
 
 import SwiftUI
 
+extension CoordinateDetailResponse.CoordinateItem: Identifiable {}
+
 struct CoordinateDetailView: View {
     @State var viewModel: CoordinateDetailViewModel
     @State private var coordinateImage: UIImage?
+    /// タップされたアイテム (詳細シート表示用)
+    @State private var selectedItem: CoordinateDetailResponse.CoordinateItem?
     let showHeader: Bool
 
     var body: some View {
@@ -33,6 +37,12 @@ struct CoordinateDetailView: View {
                         ReviewText(aiReviewComment: coordinateDetail.ai_review_comment)
                     }
                     .padding(.horizontal, 24)
+
+                    // 着用アイテム (画像URLがあるもののみ)。タップでアイテム詳細シートへ
+                    let items = coordinateDetail.items.filter { $0.item_image_path.hasPrefix("http") }
+                    if !items.isEmpty {
+                        itemsSection(items)
+                    }
                 } else if viewModel.isLoadingDetail {
                     ProgressView()
                         .padding(.top, 32)
@@ -84,6 +94,14 @@ struct CoordinateDetailView: View {
         .sheet(isPresented: $viewModel.willShowRecommendCoordinateView) {
             RecommendCoordinateView(viewModel: .init(recommendCoordinateClient: RecommendCoordinateClient()))
         }
+        // アイテム詳細 (カテゴリ/カラー/名前/特徴 + このアイテムを使ったコーデ)
+        .sheet(item: $selectedItem) { item in
+            ItemDetailSheet(
+                itemId: item.id,
+                initialImageURL: item.item_image_path,
+                initialTypeLabel: item.item_type
+            )
+        }
         .navigationDestination(isPresented: $viewModel.willShowChatView) {
             if let image = coordinateImage {
                 ChatView(coordinateId: viewModel.coordinateDetail?.current_coordinate.id ?? UUID().uuidString, image: image)
@@ -110,6 +128,48 @@ struct CoordinateDetailView: View {
         }
     }
     
+    /// 着用アイテムの横スクロール (v2 で生成した透過アイテム画像、legacy のトップス/ボトムス画像)
+    private func itemsSection(_ items: [CoordinateDetailResponse.CoordinateItem]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("着用しているアイテム")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.black)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(items) { item in
+                        Button {
+                            selectedItem = item
+                        } label: {
+                            VStack(spacing: 0) {
+                                CachedAsyncImage(url: URL(string: item.item_image_path)!) { phase in
+                                    if let image = phase.image {
+                                        image.resizable().scaledToFit()
+                                    } else if phase.error != nil {
+                                        Image(systemName: "photo").foregroundStyle(.secondary)
+                                    } else {
+                                        ProgressView()
+                                    }
+                                }
+                                .frame(width: 96, height: 96)
+                                .padding(10)
+
+                                Text(item.item_type)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.black)
+                                    .padding(.bottom, 8)
+                            }
+                            .background(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     // 一覧での表示画像を撮影/切り取りで切り替える (コーデごとに永続化)
     private var displayTypePicker: some View {
         VStack(alignment: .leading, spacing: 8) {

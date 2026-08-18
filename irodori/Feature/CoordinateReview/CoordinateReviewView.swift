@@ -18,6 +18,8 @@ struct CoordinateReviewView: View {
     @State private var tappedURL = ""
     @State private var tappedAffiliateProduct: AffiliateProduct?
     @State private var hasCalledSetupFirstTakePhoto = false
+    /// タップされたアイテム (詳細シート表示用)
+    @State private var selectedItem: FashionReviewResponse.Item?
     @Binding var path: [ViewType]
 
     var body: some View {
@@ -49,7 +51,16 @@ struct CoordinateReviewView: View {
                         }
                         .padding(.horizontal, 24)
                         let detectedItems = viewModel.fashionReview?.items ?? []
-                        CoordinateItems(topsUIImage: viewModel.topsUIImage, bottomsUIImage: viewModel.bottomsUIImage)
+                        // v2 はサーバー生成の透過アイテム画像 URL (items/{uid}/generated/) が入る。
+                        // エンジン設定でなくレスポンス内容で判定する (トグル変更に影響されない)
+                        let hasGeneratedItems = detectedItems.contains { $0.item_image_path.contains("/generated/") }
+                        CoordinateItems(
+                            topsUIImage: viewModel.topsUIImage,
+                            bottomsUIImage: viewModel.bottomsUIImage,
+                            serverItems: detectedItems,
+                            useServerItems: hasGeneratedItems,
+                            onTapItem: { item in selectedItem = item }
+                        )
                             .padding(.horizontal, 24)
                             .padding(.bottom, detectedItems.isEmpty ? 50 + 12 + 12 : 0)   // ButtonHeight + ButtonBottomPadding + BottomPadding
                         // 検出したアイテムごとに、ネットで見つけた「きれいな画像」を横並びで提示する
@@ -100,6 +111,14 @@ struct CoordinateReviewView: View {
                 }
                 .sheet(isPresented: $viewModel.willShowRecommendCoordinateView) {
                     RecommendCoordinateView(viewModel: .init(recommendCoordinateClient: RecommendCoordinateClient()))
+                }
+                // アイテム詳細 (カテゴリ/カラー/名前/特徴 + このアイテムを使ったコーデ)
+                .sheet(item: $selectedItem) { item in
+                    ItemDetailSheet(
+                        itemId: item.id,
+                        initialImageURL: item.item_image_path,
+                        initialTypeLabel: item.item_type
+                    )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .background(.gray.opacity(0.08))

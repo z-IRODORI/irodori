@@ -55,7 +55,10 @@ final class CoordinateReviewViewModel {
         //    - "Could not create inference context" エラーの原因
         // 3. メモリとリソースの競合
         //    - Neural EngineやGPUのメモリ制限により、並列実行時にリソース不足が発生
-        await segment()
+        //
+        // v2 エンジンはサーバー側で全アイテムを検出するため、オンデバイス検出の
+        // 失敗 (トップス/ボトムス未検出) では中断しない (成功すればローディング演出に使う)。
+        await segment(failureAborts: AnalysisEngine.current == .legacy)
 
         if errroMessage == nil {
             // 送信前に人物切り取りをオンデバイスで実行 (サーバー側では切り取らない)
@@ -80,11 +83,13 @@ final class CoordinateReviewViewModel {
         do {
             let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
             let startTime = CFAbsoluteTimeGetCurrent()
+            // v2 はサーバー側でアイテム画像を生成するため tops/bottoms を送らない
+            let isLegacy = AnalysisEngine.current == .legacy
             let fashionReviewResponse: Result<FashionReviewResponse, HTTPError> = try await apiClient.post(
                 uid: uid,
                 image: coordinateImage.correctOrientation,
-                topsImage: topsUIImage,
-                bottomsImage: bottomsUIImage,
+                topsImage: isLegacy ? topsUIImage : nil,
+                bottomsImage: isLegacy ? bottomsUIImage : nil,
                 cutoutImage: cutoutImage,
                 purposeNum: nil//tag.number
             )
@@ -106,7 +111,9 @@ final class CoordinateReviewViewModel {
         }
     }
 
-    func segment() async {
+    /// - Parameter failureAborts: トップス/ボトムス未検出をエラーとして中断するか。
+    ///   legacy は true (従来どおり)。v2 はサーバー側で検出するため false。
+    func segment(failureAborts: Bool = true) async {
         guard let pixelBuffer = coordinateImage.toCVPixelBuffer() else { return }
         let input = ModelInput(image: pixelBuffer)
         guard let model else { return }
@@ -120,14 +127,16 @@ final class CoordinateReviewViewModel {
             let squareTopsUIImage = coordinateImage.mask(image: topsMaskUIImage).croppedNonTransparentToSquare512()
             let squareBottomsUIImage = coordinateImage.mask(image: bottomsMaskUIImage).croppedNonTransparentToSquare512()
 
-            if squareTopsUIImage == nil && squareBottomsUIImage == nil {
-                setErrerMessage(mlError: .notTopsAndBottoms)
-                return
-            } else if squareTopsUIImage == nil {
-                setErrerMessage(mlError: .notTops)
-                return
-            } else if squareBottomsUIImage == nil {
-                setErrerMessage(mlError: .notBottoms)
+            if squareTopsUIImage == nil || squareBottomsUIImage == nil {
+                if failureAborts {
+                    if squareTopsUIImage == nil && squareBottomsUIImage == nil {
+                        setErrerMessage(mlError: .notTopsAndBottoms)
+                    } else if squareTopsUIImage == nil {
+                        setErrerMessage(mlError: .notTops)
+                    } else {
+                        setErrerMessage(mlError: .notBottoms)
+                    }
+                }
                 return
             }
              self.outputUIImage = outputUIImage

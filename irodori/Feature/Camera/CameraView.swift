@@ -17,6 +17,12 @@ struct CameraView: View {
     @State private var isShowOnboardingModal: Bool = false
     @State private var showFullBodyPicker = false
     var onPhotoCaptured: ((UIImage) -> Void)? = nil
+    #if DEBUG
+    /// 開発ビルド専用: コーデ解析エンジンの切替 (A/B 検証)。
+    /// "legacy" = 既存 / "v2" = Gemini 3 Flash 検出 + アイテム画像生成。
+    /// Release ビルドはトグル非表示 & 常に legacy (AnalysisEngine.current 参照)。
+    @AppStorage(AnalysisEngine.storageKey) private var debugAnalysisEngine = AnalysisEngine.legacy.rawValue
+    #endif
 
     var body: some View {
         ZStack {
@@ -223,10 +229,42 @@ struct CameraView: View {
 ////                }
 //            }
 //            .frame(maxWidth: .infinity, alignment: .trailing)
+
+            #if DEBUG
+            // 解析エンジン切替 (デバッグ検証用。Release ビルドには入らない)
+            debugEngineToggle
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            #endif
         }
         .frame(maxWidth: .infinity)
         .frame(height: 30)
     }
+
+    #if DEBUG
+    /// 既存解析 (legacy) と v2 (Gemini 3 Flash + アイテム画像生成) を切り替える DEBUG トグル
+    private var debugEngineToggle: some View {
+        Button {
+            Haptic.impact(.soft)
+            debugAnalysisEngine = (debugAnalysisEngine == AnalysisEngine.v2.rawValue)
+                ? AnalysisEngine.legacy.rawValue
+                : AnalysisEngine.v2.rawValue
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "flask")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(debugAnalysisEngine == AnalysisEngine.v2.rawValue ? "解析: v2" : "解析: 既存")
+                    .font(.system(size: 12, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                debugAnalysisEngine == AnalysisEngine.v2.rawValue ? Color.purple : Color.orange,
+                in: Capsule()
+            )
+        }
+    }
+    #endif
 
     private func PartnerComment(image: ImageResource, text: String) -> some View {
         HStack(spacing: 0) {

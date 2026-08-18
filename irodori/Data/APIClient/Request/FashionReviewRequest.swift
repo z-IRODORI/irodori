@@ -15,6 +15,28 @@ struct FashionReviewRequest: Encodable {
     let bottoms_image: Data?   // MLモデルで検出したボトムス画像
     let cutout_image: Data?   // iOSで人物切り取りした背景透過PNG (任意)
     let model: String? = "gemini-2.5-flash-lite"   // "gemini-2.5-flash" or "gemini-2.5-flash-lite" or "gemini-3-pro-preview"
+    /// 解析エンジン: "legacy" (既存) | "v2" (Gemini 3 Flash 検出 + アイテム画像生成)。
+    /// デバッグビルドのカメラ画面トグルからのみ "v2" になる (Release は常に legacy)。
+    var engine: String = AnalysisEngine.current.rawValue
+}
+
+/// コーデ解析エンジンの選択 (A/B 検証用)
+enum AnalysisEngine: String {
+    case legacy
+    case v2
+
+    /// UserDefaults キー (デバッグトグルの @AppStorage と共有)
+    static let storageKey = "debug.analysisEngine"
+
+    /// 現在のエンジン。Release ビルドは常に legacy (デバッグトグルの値を参照しない)。
+    static var current: AnalysisEngine {
+        #if DEBUG
+        let raw = UserDefaults.standard.string(forKey: storageKey) ?? ""
+        return AnalysisEngine(rawValue: raw) ?? .legacy
+        #else
+        return .legacy
+        #endif
+    }
 }
 
 extension FashionReviewRequest {
@@ -33,6 +55,7 @@ extension FashionReviewRequest {
             parameters["cutout_image"] = cutout_image
         }
         parameters["model"] = model
+        parameters["engine"] = engine
         return parameters
     }
 }
