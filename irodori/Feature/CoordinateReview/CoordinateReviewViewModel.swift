@@ -13,6 +13,9 @@ import CoreML
 final class CoordinateReviewViewModel {
     let coordinateImage: UIImage
     let apiClient: FashionReviewClientProtocol
+    /// バックグラウンド解析の完了トースターから開く場合の保存済みコーデID。
+    /// 指定時は解析せず保存済み結果を取得して表示する (カメラ遷移時と同じ画面)
+    let resultCoordinateId: String?
     var fashionReview: FashionReviewResponse?
     var isFinishedRequest = false
     var currentDateString = ""
@@ -32,9 +35,12 @@ final class CoordinateReviewViewModel {
     /// v2: バックグラウンド解析ジョブとして送信し終えた (View はこれを見て画面を閉じる)
     var didSubmitBackgroundJob = false
 
-    init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol) {
+    init(coordinateImage: UIImage,
+         apiClient: FashionReviewClientProtocol,
+         resultCoordinateId: String? = nil) {
         self.coordinateImage = coordinateImage
         self.apiClient = apiClient
+        self.resultCoordinateId = resultCoordinateId
 
         // Model の初期化
         let config = MLModelConfiguration()
@@ -49,6 +55,11 @@ final class CoordinateReviewViewModel {
     /// - Parameter allowBackgroundJob: v2 のときバックグラウンドジョブ送信を許可するか。
     ///   初回撮影オンボーディング (結果をその場で見せる) は false で従来の同期パスを使う。
     func onAppear(allowBackgroundJob: Bool = true) async {
+        // 完了トースターから開いた場合: 解析せず保存済み結果を取得して表示する
+        if let resultCoordinateId {
+            await loadSavedResult(coordinateId: resultCoordinateId)
+            return
+        }
         // CoreMLの制限により、segment()は単独で実行する必要がある
         // 理由:
         // 1. CoreMLは内部的にシリアル実行を強制する
@@ -72,10 +83,16 @@ final class CoordinateReviewViewModel {
             // 常駐トースターに引き継ぐ (初回撮影オンボーディングは結果を
             // その場で見せる必要があるため従来の同期パスを使う)。
             if AnalysisEngine.current == .v2 && allowBackgroundJob {
-                _ = await AnalysisJobStore.shared.submit(
+                let accepted = await AnalysisJobStore.shared.submit(
                     image: coordinateImage.correctOrientation,
                     cutoutImage: cutoutImage
                 )
+                if accepted {
+                    // 送信が速すぎると抽出演出が途中で切れたように見えるため、
+                    // 少し余裕を持たせてから閉じる → 閉じアニメーション後に
+                    // トースターがスライドインする (AnalysisJobStore が表示を遅延)
+                    try? await Task.sleep(for: .seconds(1.8))
+                }
                 // 受付失敗時もエラートーストで通知済みなので画面は閉じる
                 didSubmitBackgroundJob = true
             } else {
@@ -164,6 +181,23 @@ final class CoordinateReviewViewModel {
              self.bottomsUIImage = squareBottomsUIImage!   // nil にはならない
         } catch {
             setErrerMessage(mlError: .unknwon)
+        }
+    }
+
+    /// 保存済みコーデから撮影直後と同じ形の結果を取得する (完了トースター経由)
+    private func loadSavedResult(coordinateId: String) async {
+        do {
+            let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+            let result = try await apiClient.fetchResult(coordinateId: coordinateId, uid: uid)
+            switch result {
+            case .success(let response):
+                fashionReview = response
+                isFinishedRequest = true
+            case .failure(let error):
+                handleAPIError(error)
+            }
+        } catch {
+            handleAPIError(error)
         }
     }
 

@@ -11,15 +11,16 @@ import SwiftUI
 
 struct AnalysisStatusToast: View {
     private var store = AnalysisJobStore.shared
-    /// 完了トースタータップ時に結果画面へ遷移する (MainTabView が path へ push)
-    var onOpenResult: (ViewType.CoordinateDetailParams) -> Void
+    /// 完了トースタータップ時に結果画面へ遷移する (MainTabView が path へ push)。
+    /// 撮影元画像 (結果画面のヒーロー表示用。Caches から復元できない場合は nil)
+    var onOpenResult: (AnalysisJobStore.Job, UIImage?) -> Void
 
-    init(onOpenResult: @escaping (ViewType.CoordinateDetailParams) -> Void) {
+    init(onOpenResult: @escaping (AnalysisJobStore.Job, UIImage?) -> Void) {
         self.onOpenResult = onOpenResult
     }
 
     var body: some View {
-        if let job = store.current {
+        if let job = store.current, !store.isToastSuppressed {
             Button {
                 handleTap(job)
             } label: {
@@ -111,13 +112,11 @@ struct AnalysisStatusToast: View {
         case .processing:
             break  // 解析中はタップしても何もしない (✕ で消せる)
         case .completed:
-            guard let coordinateId = job.coordinateId else { return }
+            guard job.coordinateId != nil else { return }
             Haptic.impact(.soft)
-            onOpenResult(.init(
-                coordinateId: coordinateId,
-                coordinateImageURL: job.coordinateImageURL ?? "",
-                showHeader: true
-            ))
+            // clear で Caches が消える前に元画像を読み込んで渡す
+            let originalImage = store.loadOriginalImage()
+            onOpenResult(job, originalImage)
             store.clearAfterOpeningResult()
         case .failed:
             Task { await store.retry() }

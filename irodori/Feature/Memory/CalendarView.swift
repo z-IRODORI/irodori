@@ -140,6 +140,17 @@ struct CalendarView: View {
                 Task { await viewModel.loadPlanned() }
             }
         }
+        // バックグラウンド解析の完了時にもカレンダーへ反映する。
+        // 従来の再読込トリガーは「path が空になった時」(撮影フローから戻った時) のみで、
+        // ジョブ方式は保存前に path が空になるため、完了を検知して再読込する必要がある
+        .onChange(of: AnalysisJobStore.shared.current?.status) { _, newStatus in
+            if newStatus == .completed {
+                Task {
+                    viewModel.hasLoaded = false
+                    await viewModel.onAppear()
+                }
+            }
+        }
         // pool の予定コーデ詳細。削除は詳細画面内の「予定から削除」で行う。
         // シート閉鎖では onChange(path) が発火しないため、削除は必ず viewModel.deletePlanned を
         // 経由してローカルの plannedByDate を即時更新する

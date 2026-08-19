@@ -66,7 +66,9 @@ struct MainTabView: View {
                     CoordinateReviewView(
                         viewModel: .init(
                             coordinateImage: params.image!.correctOrientation,
-                            apiClient: FashionReviewClient()
+                            apiClient: FashionReviewClient(),
+                            // 完了トースター経由なら保存済み結果を表示 (解析しない)
+                            resultCoordinateId: params.resultCoordinateId
                         ),
                         fromFirstTakePhotoView: params.fromFirstTakePhotoView,
                         path: $path
@@ -146,14 +148,29 @@ struct MainTabView: View {
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: toastManager.message)
         // v2 解析ジョブの常駐トースター (全タブ・push 先でも見える)。
-        // タブバーの上に浮かせ、完了タップで結果画面 (コーデ詳細) へ push する
+        // タブバーのすぐ上に浮かせ、完了タップでカメラ遷移時と同じ結果画面へ push する
         .overlay(alignment: .bottom) {
-            AnalysisStatusToast { params in
-                path.append(.coordinateDetail(params))
+            AnalysisStatusToast { job, originalImage in
+                if let image = originalImage, let coordinateId = job.coordinateId {
+                    // カメラから遷移した時と同一の結果画面 (保存済み結果を表示)
+                    path.append(.coordinateReview(.init(
+                        image: image,
+                        fromFirstTakePhotoView: false,
+                        resultCoordinateId: coordinateId
+                    )))
+                } else if let coordinateId = job.coordinateId {
+                    // 元画像を復元できない場合のフォールバック (コーデ詳細)
+                    path.append(.coordinateDetail(.init(
+                        coordinateId: coordinateId,
+                        coordinateImageURL: job.coordinateImageURL ?? "",
+                        showHeader: true
+                    )))
+                }
             }
-            .padding(.bottom, 96)
+            .padding(.bottom, 48)
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: analysisJobStore.current)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: analysisJobStore.isToastSuppressed)
         // アプリ再起動時に進行中ジョブを復元してポーリング再開
         .task { analysisJobStore.restoreIfNeeded() }
         // NavigationStack 外側に environment を流すことで、

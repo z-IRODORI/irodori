@@ -34,6 +34,9 @@ final class AnalysisJobStore {
     }
     /// トースターに出す撮影写真のサムネイル
     private(set) var thumbnail: UIImage?
+    /// 抽出画面が閉じるアニメーションを終えるまでトースターの表示を遅らせる。
+    /// 送信直後に抽出画面の上へトースターが被るのを防ぐ (閉じた後にスライドイン)
+    private(set) var isToastSuppressed = false
 
     private let apiClient: AnalysisJobClientProtocol
     private var pollTask: Task<Void, Never>?
@@ -79,9 +82,13 @@ final class AnalysisJobStore {
             let result = try await apiClient.submit(uid: uid, image: image, cutoutImage: cutoutImage)
             switch result {
             case .success(let response):
+                // 抽出画面が開いている間はトースターを出さず、画面が閉じた後に
+                // スライドインさせる (didSubmitBackgroundJob → path.removeAll 後)
+                isToastSuppressed = true
                 current = Job(jobId: response.job_id, status: .processing, submittedAt: Date())
                 thumbnail = loadImage(Self.thumbnailFileName)
                 startPolling()
+                revealToastAfterScreenDismiss()
                 return true
             case .failure(let error):
                 ToastManager.shared.show(error.errorDescription ?? "解析の受付に失敗しました")
@@ -93,6 +100,19 @@ final class AnalysisJobStore {
         }
     }
 
+    /// 抽出画面のホールド (1.8s) + 閉じアニメーション (~0.4s) を待ってから表示する
+    private func revealToastAfterScreenDismiss() {
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2.4))
+            self?.isToastSuppressed = false
+        }
+    }
+
+    /// 完了トースタータップ時に結果画面のヒーロー画像として使う元画像
+    func loadOriginalImage() -> UIImage? {
+        loadImage(Self.originalFileName)
+    }
+
     /// トースターの ✕。ローカル追跡をやめるだけで、サーバー側の解析は完走し
     /// 結果はカレンダーに残る。
     func cancel() {
@@ -100,6 +120,7 @@ final class AnalysisJobStore {
         pollTask = nil
         current = nil
         thumbnail = nil
+        isToastSuppressed = false
         clearImages()
     }
 

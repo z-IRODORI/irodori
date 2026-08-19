@@ -29,6 +29,9 @@ enum ViewType: Hashable {
     struct CoordinateReviewParams: Hashable {
         let image: UIImage?
         let fromFirstTakePhotoView: Bool
+        /// バックグラウンド解析の完了トースターから開く場合の保存済みコーデID。
+        /// 指定時は解析せず GET /api/fashion_review/{id} の結果を表示する
+        var resultCoordinateId: String? = nil
     }
 
     struct CoordinateDetailParams: Hashable {
