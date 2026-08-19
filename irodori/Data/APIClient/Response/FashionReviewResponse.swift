@@ -15,6 +15,9 @@ struct FashionReviewResponse: Decodable, Hashable {
     var ai_review_comment: String
     var tags: [String]?
     var item_types: [String]?
+    /// v2: アイテム画像をバックグラウンド生成中か。true の間は
+    /// GET /api/coordinate/{id} をポーリングして item_image_path を差し替える
+    var items_generating: Bool? = nil
 
     struct CurrentCoordinate: Decodable, Hashable {
         var id: String

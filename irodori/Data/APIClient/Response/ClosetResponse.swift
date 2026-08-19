@@ -36,12 +36,14 @@ struct ClosetItem: Codable, Identifiable, Hashable {
             return .tops
         case "ボトムス":
             return .bottoms
-//        case "靴", "シューズ":
-//            return .shoes
-//        case "アウター":
-//            return .outer
+        case "靴", "シューズ":
+            return .shoes
+        case "アウター":
+            return .outer
+        case "アクセサリー", "小物", "バッグ", "帽子":
+            return .accessories
         default:
-            return .tops // デフォルトはトップス
+            return .tops // 未知の種別はトップス扱い (従来互換)
         }
     }
 }

@@ -16,6 +16,8 @@ struct CoordinateItems: View {
     let bottomsUIImage: UIImage?
     var serverItems: [FashionReviewResponse.Item] = []
     var useServerItems: Bool = false
+    /// v2: アイテム画像をバックグラウンド生成中 (見出しにインジケータを出す)
+    var isGenerating: Bool = false
     var onTapItem: ((FashionReviewResponse.Item) -> Void)? = nil
 
     /// v2 で画像URLが入っているアイテムのみカード表示 (URL 空は保険で除外)
@@ -25,9 +27,18 @@ struct CoordinateItems: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("着用しているアイテム")
-                .font(.system(size: 20, weight: .bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                Text("着用しているアイテム")
+                    .font(.system(size: 20, weight: .bold))
+                if isGenerating {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("画像を生成中…")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     if useServerItems && !displayableServerItems.isEmpty {

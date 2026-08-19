@@ -31,5 +31,8 @@ struct CoordinateDetailResponse: Codable {
         let coordinate_id: String
         let item_type: String
         let item_image_path: String
+        /// v2: 画像の由来 (generated/cached/crop/coordinate)。
+        /// "pending" はバックグラウンド生成中 (ポーリングの継続判定に使う)
+        var image_source: String? = nil
     }
 }
