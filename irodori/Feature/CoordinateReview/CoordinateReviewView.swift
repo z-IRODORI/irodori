@@ -59,7 +59,6 @@ struct CoordinateReviewView: View {
                             bottomsUIImage: viewModel.bottomsUIImage,
                             serverItems: detectedItems,
                             useServerItems: hasGeneratedItems,
-                            isGenerating: viewModel.isGeneratingItems,
                             onTapItem: { item in selectedItem = item }
                         )
                             .padding(.horizontal, 24)

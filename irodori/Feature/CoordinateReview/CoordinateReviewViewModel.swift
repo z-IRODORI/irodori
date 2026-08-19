@@ -29,10 +29,6 @@ final class CoordinateReviewViewModel {
     var topsBoundingRect: CGRect?
     var bottomsBoundingRect: CGRect?
     var errroMessage: ErrorMessage?
-    /// v2: アイテム画像のバックグラウンド生成中フラグ (アイテム一覧に生成中表示を出す)
-    var isGeneratingItems = false
-    private var itemImagePollTask: Task<Void, Never>?
-    private let coordinateDetailClient: CoordinateDetailClientProtocol = CoordinateDetailClient()
 
     init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol) {
         self.coordinateImage = coordinateImage
@@ -106,10 +102,6 @@ final class CoordinateReviewViewModel {
                 self.fashionReview = fashionReview
                 print(fashionReview)
                 isFinishedRequest = true
-                // v2: アイテム画像はバックグラウンド生成 → ポーリングで差し替える
-                if fashionReview.items_generating == true {
-                    startItemImagePolling(coordinateId: fashionReview.current_coordinate.id)
-                }
             case .failure(let error):
                 handleAPIError(error)
                 return
@@ -156,42 +148,6 @@ final class CoordinateReviewViewModel {
         } catch {
             setErrerMessage(mlError: .unknwon)
         }
-    }
-
-    // MARK: - v2: アイテム画像のポーリング差し替え
-
-    /// バックグラウンド生成の完了を GET /api/coordinate/{id} で追いかけ、
-    /// 完了したアイテムから item_image_path を差し替える (5秒間隔・最大約100秒)。
-    private func startItemImagePolling(coordinateId: String) {
-        isGeneratingItems = true
-        itemImagePollTask?.cancel()
-        itemImagePollTask = Task { [weak self] in
-            defer { Task { @MainActor in self?.isGeneratingItems = false } }
-            for _ in 0..<20 {
-                try? await Task.sleep(for: .seconds(5))
-                guard let self, !Task.isCancelled else { return }
-                guard let result = try? await self.coordinateDetailClient.get(coordinateId: coordinateId),
-                      case .success(let detail) = result else { continue }
-                self.applyUpdatedItemImages(detail.items)
-                let stillPending = detail.items.contains { $0.image_source == "pending" }
-                if !stillPending { return }
-            }
-        }
-    }
-
-    /// ポーリング結果のアイテム画像URLを表示中のレスポンスへ反映する
-    private func applyUpdatedItemImages(_ updated: [CoordinateDetailResponse.CoordinateItem]) {
-        guard var review = fashionReview else { return }
-        var changed = false
-        for u in updated {
-            if let index = review.items.firstIndex(where: { $0.id == u.id }),
-               !u.item_image_path.isEmpty,
-               review.items[index].item_image_path != u.item_image_path {
-                review.items[index].item_image_path = u.item_image_path
-                changed = true
-            }
-        }
-        if changed { fashionReview = review }
     }
 
     private func setCurrentDateString() {
