@@ -29,6 +29,8 @@ final class CoordinateReviewViewModel {
     var topsBoundingRect: CGRect?
     var bottomsBoundingRect: CGRect?
     var errroMessage: ErrorMessage?
+    /// v2: バックグラウンド解析ジョブとして送信し終えた (View はこれを見て画面を閉じる)
+    var didSubmitBackgroundJob = false
 
     init(coordinateImage: UIImage, apiClient: FashionReviewClientProtocol) {
         self.coordinateImage = coordinateImage
@@ -44,7 +46,9 @@ final class CoordinateReviewViewModel {
             print("モデルのロードまたは設定に失敗しました: \(error)")
         }
     }
-    func onAppear() async {
+    /// - Parameter allowBackgroundJob: v2 のときバックグラウンドジョブ送信を許可するか。
+    ///   初回撮影オンボーディング (結果をその場で見せる) は false で従来の同期パスを使う。
+    func onAppear(allowBackgroundJob: Bool = true) async {
         // CoreMLの制限により、segment()は単独で実行する必要がある
         // 理由:
         // 1. CoreMLは内部的にシリアル実行を強制する
@@ -63,7 +67,20 @@ final class CoordinateReviewViewModel {
         if errroMessage == nil {
             // 送信前に人物切り取りをオンデバイスで実行 (サーバー側では切り取らない)
             await generatePersonCutout()
-            await coordinateReview()
+
+            // v2 はバックグラウンドジョブとして送信し、抽出画面を閉じて
+            // 常駐トースターに引き継ぐ (初回撮影オンボーディングは結果を
+            // その場で見せる必要があるため従来の同期パスを使う)。
+            if AnalysisEngine.current == .v2 && allowBackgroundJob {
+                _ = await AnalysisJobStore.shared.submit(
+                    image: coordinateImage.correctOrientation,
+                    cutoutImage: cutoutImage
+                )
+                // 受付失敗時もエラートーストで通知済みなので画面は閉じる
+                didSubmitBackgroundJob = true
+            } else {
+                await coordinateReview()
+            }
         }
     }
 

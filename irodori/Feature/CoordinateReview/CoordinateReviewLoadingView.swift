@@ -57,11 +57,11 @@ struct CoordinateReviewLoadingView: View {
     var body: some View {
         VStack(spacing: 20) {
             VStack(spacing: 6) {
-                Text("コーデを分析中...")
+                Text(AnalysisEngine.current == .v2 ? "アイテムを抽出しています..." : "コーデを分析中...")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.black)
-                // v2 (アイテム画像生成あり) は legacy より時間がかかる
-                Text(AnalysisEngine.current == .v2 ? "作成に20〜30秒ほど時間がかかります" : "作成に8〜10秒ほど時間がかかります")
+                // v2 は抽出後にバックグラウンドで解析し、完了は画面下のトースターで知らせる
+                Text(AnalysisEngine.current == .v2 ? "送信後はホームに戻ります。完了までお待ちください" : "作成に8〜10秒ほど時間がかかります")
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(.black.opacity(0.4))
             }

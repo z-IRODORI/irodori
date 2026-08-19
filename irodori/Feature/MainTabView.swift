@@ -6,6 +6,7 @@ struct MainTabView: View {
     @State private var favoritesStore: FavoritesStore = .init()
     @State private var previousTab: MainTabViewModel.Tab = .home
     private let toastManager = ToastManager.shared
+    private let analysisJobStore = AnalysisJobStore.shared
 
     var body: some View {
         @Bindable var vm = viewModel
@@ -144,6 +145,17 @@ struct MainTabView: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: toastManager.message)
+        // v2 解析ジョブの常駐トースター (全タブ・push 先でも見える)。
+        // タブバーの上に浮かせ、完了タップで結果画面 (コーデ詳細) へ push する
+        .overlay(alignment: .bottom) {
+            AnalysisStatusToast { params in
+                path.append(.coordinateDetail(params))
+            }
+            .padding(.bottom, 96)
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: analysisJobStore.current)
+        // アプリ再起動時に進行中ジョブを復元してポーリング再開
+        .task { analysisJobStore.restoreIfNeeded() }
         // NavigationStack 外側に environment を流すことで、
         // .navigationDestination で push する画面 (FavoritesView 等) や
         // .sheet で出すモーダル (DailyRecommendationDetailView 等) にも届く

@@ -142,7 +142,11 @@ struct CoordinateReviewView: View {
         }
         .task {
             AnalyticsLogger.shared.log(screen: .coordinateReviewScreenView)
-            await viewModel.onAppear()
+            await viewModel.onAppear(allowBackgroundJob: !fromFirstTakePhotoView)
+        }
+        // v2: ジョブ送信が完了したら抽出画面を閉じてホームへ戻る (常駐トースターに引き継ぎ)
+        .onChange(of: viewModel.didSubmitBackgroundJob) { _, submitted in
+            if submitted { path.removeAll() }
         }
         .onChange(of: viewModel.fashionReview) { _, newValue in
             // 分析結果が表示されたタイミングで setupFirstTakePhotoIfNeeded を呼び出す
