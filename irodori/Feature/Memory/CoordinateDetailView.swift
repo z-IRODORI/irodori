@@ -152,6 +152,8 @@ struct CoordinateDetailView: View {
                                 }
                                 .frame(width: 96, height: 96)
                                 .padding(10)
+                                // 白系アイテムでも輪郭が見えるよう薄グレー地に載せる
+                                .background(Color.gray.opacity(0.06))
 
                                 Text(item.item_type)
                                     .font(.system(size: 11, weight: .semibold))

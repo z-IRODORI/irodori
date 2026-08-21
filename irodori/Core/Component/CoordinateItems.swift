@@ -72,6 +72,8 @@ struct CoordinateItems: View {
             }
             .frame(width: 110, height: 110)
             .padding(12)
+            // 白系アイテムでも輪郭が見えるよう薄グレー地に載せる
+            .background(Color.gray.opacity(0.06))
 
             VStack(spacing: 2) {
                 Text(item.category ?? item.item_type)

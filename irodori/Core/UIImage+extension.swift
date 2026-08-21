@@ -242,8 +242,11 @@ extension UIImage {
                 let b = pixelBuffer[offset + 2]
                 let alpha = pixelBuffer[offset + 3]
 
-                // 白&透明 以外の領域を求める
-                if !(r == 255 && g == 255 && b == 255) && (alpha == 1) {
+                // 白&透明 以外の領域を求める。
+                // 旧実装は `alpha == 1` (=ちょうど 1/255) の画素しか拾っておらず、
+                // アンチエイリアス縁の希少な画素頼みでバウンディングボックスが
+                // 欠けてアイテムが見切れることがあった。不透明画素全体で判定する
+                if !(r == 255 && g == 255 && b == 255) && (alpha > 0) {
                     minX = min(minX, x)
                     maxX = max(maxX, x)
                     minY = min(minY, y)

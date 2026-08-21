@@ -167,7 +167,7 @@ struct MainTabView: View {
                     )))
                 }
             }
-            .padding(.bottom, 38)
+            .padding(.bottom, 58)  // タブバー上端 (~38pt) + 余白 20pt
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: analysisJobStore.current)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: analysisJobStore.isToastSuppressed)

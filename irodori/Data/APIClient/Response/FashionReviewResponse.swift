@@ -39,16 +39,21 @@ struct FashionReviewResponse: Decodable, Hashable {
         var description: String?    // 例: "黒 レザー ライダースジャケット"
 
         /// ネット画像検索 (WebItemImagesRow) に使う検出結果ワード。
-        /// 説明文 → 「色 + カテゴリ」→ 種類 の順で採用する。
+        /// 「色 + カテゴリ」→ 説明文 → 種類 の順で採用する。
+        /// (v2 の説明文は40字前後の文章で、そのまま検索クエリにすると画像が
+        ///  ほぼヒットしない。短い「色 + アイテム名」が最も検索精度が高い)
         var webImageSearchWord: String {
+            let parts = [color, category]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            if !parts.isEmpty {
+                return parts.joined(separator: " ")
+            }
             if let description = description?.trimmingCharacters(in: .whitespacesAndNewlines),
                !description.isEmpty {
                 return description
             }
-            let parts = [color, category]
-                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            return parts.isEmpty ? item_type : parts.joined(separator: " ")
+            return item_type
         }
     }
 }
