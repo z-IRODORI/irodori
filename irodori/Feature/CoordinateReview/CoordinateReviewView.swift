@@ -129,7 +129,9 @@ struct CoordinateReviewView: View {
                     topsImage: viewModel.topsUIImage,
                     bottomsImage: viewModel.bottomsUIImage,
                     topsRect: viewModel.topsBoundingRect,
-                    bottomsRect: viewModel.bottomsBoundingRect
+                    bottomsRect: viewModel.bottomsBoundingRect,
+                    // ボトムスがトレイに並び終えてから2秒は画面を保持する (v2 ジョブ方式)
+                    onItemsShowcaseFinished: { viewModel.markExtractionShowcaseFinished() }
                 )
                 .navigationBarBackButtonHidden()
             }
@@ -144,9 +146,13 @@ struct CoordinateReviewView: View {
             AnalyticsLogger.shared.log(screen: .coordinateReviewScreenView)
             await viewModel.onAppear(allowBackgroundJob: !fromFirstTakePhotoView)
         }
-        // v2: ジョブ送信が完了したら抽出画面を閉じてホームへ戻る (常駐トースターに引き継ぎ)
+        // v2: ジョブ送信+抽出演出が完了したら抽出画面を閉じてホームへ戻り、
+        // 閉じアニメーションの後にトースターをスライドインさせる
         .onChange(of: viewModel.didSubmitBackgroundJob) { _, submitted in
-            if submitted { path.removeAll() }
+            if submitted {
+                path.removeAll()
+                AnalysisJobStore.shared.revealToast(afterDelay: 0.5)
+            }
         }
         .onChange(of: viewModel.fashionReview) { _, newValue in
             // 分析結果が表示されたタイミングで setupFirstTakePhotoIfNeeded を呼び出す

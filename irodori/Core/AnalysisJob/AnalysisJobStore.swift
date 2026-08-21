@@ -88,7 +88,9 @@ final class AnalysisJobStore {
                 current = Job(jobId: response.job_id, status: .processing, submittedAt: Date())
                 thumbnail = loadImage(Self.thumbnailFileName)
                 startPolling()
-                revealToastAfterScreenDismiss()
+                // 表示は抽出画面を閉じた View が revealToast() で行う。
+                // 万一呼ばれなかった場合の保険として一定時間後に必ず表示する
+                revealToast(afterDelay: 20)
                 return true
             case .failure(let error):
                 ToastManager.shared.show(error.errorDescription ?? "解析の受付に失敗しました")
@@ -100,10 +102,12 @@ final class AnalysisJobStore {
         }
     }
 
-    /// 抽出画面のホールド (1.8s) + 閉じアニメーション (~0.4s) を待ってから表示する
-    private func revealToastAfterScreenDismiss() {
+    /// トースターの表示を解禁する (抽出画面を閉じた View が呼ぶ。冪等)
+    func revealToast(afterDelay delay: TimeInterval = 0) {
         Task { [weak self] in
-            try? await Task.sleep(for: .seconds(2.4))
+            if delay > 0 {
+                try? await Task.sleep(for: .seconds(delay))
+            }
             self?.isToastSuppressed = false
         }
     }

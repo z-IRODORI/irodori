@@ -34,6 +34,10 @@ final class CoordinateReviewViewModel {
     var errroMessage: ErrorMessage?
     /// v2: バックグラウンド解析ジョブとして送信し終えた (View はこれを見て画面を閉じる)
     var didSubmitBackgroundJob = false
+    /// v2: ジョブ受付済み (抽出演出の完了と両方揃ってから画面を閉じる)
+    private var backgroundJobAccepted = false
+    /// v2: 抽出演出 (ボトムス配置) から2秒のホールドが終わったか
+    private var extractionShowcaseHoldDone = false
 
     init(coordinateImage: UIImage,
          apiClient: FashionReviewClientProtocol,
@@ -88,13 +92,20 @@ final class CoordinateReviewViewModel {
                     cutoutImage: cutoutImage
                 )
                 if accepted {
-                    // 送信が速すぎると抽出演出が途中で切れたように見えるため、
-                    // 少し余裕を持たせてから閉じる → 閉じアニメーション後に
-                    // トースターがスライドインする (AnalysisJobStore が表示を遅延)
-                    try? await Task.sleep(for: .seconds(1.8))
+                    // 画面を閉じるのは「ジョブ受付」と「抽出演出 (ボトムス配置+2秒)」の
+                    // 両方が揃ってから (演出が途中で切れる違和感を防ぐ)。
+                    backgroundJobAccepted = true
+                    // 演出が発火しないケース (tops/bottoms 未検出等) の保険タイムアウト
+                    Task { [weak self] in
+                        try? await Task.sleep(for: .seconds(6))
+                        self?.extractionShowcaseHoldDone = true
+                        self?.tryFinishBackgroundSubmission()
+                    }
+                    tryFinishBackgroundSubmission()
+                } else {
+                    // 受付失敗はエラートーストで通知済みなので即閉じる
+                    didSubmitBackgroundJob = true
                 }
-                // 受付失敗時もエラートーストで通知済みなので画面は閉じる
-                didSubmitBackgroundJob = true
             } else {
                 await coordinateReview()
             }
@@ -182,6 +193,23 @@ final class CoordinateReviewViewModel {
         } catch {
             setErrerMessage(mlError: .unknwon)
         }
+    }
+
+    /// 抽出演出の見せ場 (ボトムスがトレイに並び終えた) 通知。
+    /// そこから2秒間は画面を保持し、ジョブ受付と揃ったら閉じる
+    func markExtractionShowcaseFinished() {
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2.0))
+            self?.extractionShowcaseHoldDone = true
+            self?.tryFinishBackgroundSubmission()
+        }
+    }
+
+    /// ジョブ受付 + 演出ホールド完了の両方が揃ったら抽出画面を閉じる
+    private func tryFinishBackgroundSubmission() {
+        guard backgroundJobAccepted, extractionShowcaseHoldDone,
+              !didSubmitBackgroundJob else { return }
+        didSubmitBackgroundJob = true
     }
 
     /// 保存済みコーデから撮影直後と同じ形の結果を取得する (完了トースター経由)

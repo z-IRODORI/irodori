@@ -20,6 +20,9 @@ struct CoordinateReviewLoadingView: View {
     /// 検出位置 (正規化座標)。取れなかった場合は既定位置で演出する
     let topsRect: CGRect?
     let bottomsRect: CGRect?
+    /// トップス/ボトムスがトレイに並び終えた瞬間の通知 (v2 ジョブ方式が
+    /// 「並べてから2秒ホールドして閉じる」タイミングを取るために使う)
+    var onItemsShowcaseFinished: (() -> Void)? = nil
 
     private enum Stage: Int, Comparable {
         case scanning       // セグメンテーション実行中
@@ -112,6 +115,8 @@ struct CoordinateReviewLoadingView: View {
         guard !Task.isCancelled else { return }
         withAnimation(flightSpring) { bottomsLanded = true }
         Haptic.impact(.soft)
+        // ボトムスがトレイに並び終えた = アイテム抽出の見せ場が完了
+        onItemsShowcaseFinished?()
 
         try? await Task.sleep(for: .seconds(0.9))
         guard !Task.isCancelled else { return }
