@@ -49,13 +49,14 @@ final class TryOnViewModel {
             phase = .success(cached, fromCache: true)
             return
         }
-        generate()
+        generate(quality: .standard)
     }
 
-    /// キャッシュを無視して作り直す (結果が気に入らないとき用)
+    /// キャッシュを無視して上位モデルで作り直す (結果が気に入らないとき用)。
+    /// 初回 standard → 再生成 high の二段構えでコスパと満足度を両立する。
     func regenerate() {
         didSaveToPhotos = false
-        generate()
+        generate(quality: .high)
     }
 
     func cancel() {
@@ -71,7 +72,7 @@ final class TryOnViewModel {
         ToastManager.shared.show("写真に保存しました", style: .normal)
     }
 
-    private func generate() {
+    private func generate(quality: TryOnQuality) {
         generationTask?.cancel()
         guard let faceData = faceDataOverride ?? FaceImageStore.shared.sendData() else {
             phase = .failure(TryOnFailure(
@@ -89,7 +90,8 @@ final class TryOnViewModel {
         generationTask = Task { [weak self] in
             guard let self else { return }
             let result = await self.client.generate(
-                userId: userId, faceImage: faceData, gender: gender, source: self.source)
+                userId: userId, faceImage: faceData, gender: gender,
+                source: self.source, quality: quality)
             guard !Task.isCancelled else { return }
             switch result {
             case .success(let response):

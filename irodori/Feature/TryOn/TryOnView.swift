@@ -114,7 +114,7 @@ struct TryOnView: View {
                     Haptic.impact(.soft)
                     viewModel.regenerate()
                 } label: {
-                    Label("もう一度生成", systemImage: "arrow.triangle.2.circlepath")
+                    Label("高品質でもう一度生成", systemImage: "wand.and.stars")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity)

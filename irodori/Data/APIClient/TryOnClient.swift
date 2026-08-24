@@ -24,12 +24,20 @@ struct TryOnAPIError: Error, Equatable {
     static let cancelled = TryOnAPIError(code: "CANCELLED", message: "")
 }
 
+/// 生成品質。standard = Lite (約$0.034/枚) / high = 上位モデル (約$0.067/枚、顔の同一性が一段良い)。
+/// 初回は standard、「もう一度生成」は high に切り替えてコスパと満足度を両立する。
+enum TryOnQuality: String {
+    case standard
+    case high
+}
+
 protocol TryOnClientProtocol {
     func generate(
         userId: String,
         faceImage: Data,
         gender: Gender,
-        source: TryOnSource
+        source: TryOnSource,
+        quality: TryOnQuality
     ) async -> Result<TryOnResponse, TryOnAPIError>
 }
 
@@ -40,7 +48,8 @@ final class TryOnClient: TryOnClientProtocol {
         userId: String,
         faceImage: Data,
         gender: Gender,
-        source: TryOnSource
+        source: TryOnSource,
+        quality: TryOnQuality
     ) async -> Result<TryOnResponse, TryOnAPIError> {
         guard let url = URL(string: "\(baseURL)/api/try-on") else {
             return .failure(.network)
@@ -62,6 +71,7 @@ final class TryOnClient: TryOnClientProtocol {
         appendField("user_id", userId)
         appendField("user_token", userId)
         appendField("gender", gender.apiValue)
+        appendField("quality", quality.rawValue)
 
         switch source {
         case .closet(let items):
@@ -156,7 +166,8 @@ final class MockTryOnClient: TryOnClientProtocol {
         userId: String,
         faceImage: Data,
         gender: Gender,
-        source: TryOnSource
+        source: TryOnSource,
+        quality: TryOnQuality
     ) async -> Result<TryOnResponse, TryOnAPIError> {
         try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
         if Task.isCancelled { return .failure(.cancelled) }
@@ -168,7 +179,7 @@ final class MockTryOnClient: TryOnClientProtocol {
             status: "success",
             image_base64: data.base64EncodedString(),
             mime_type: "image/jpeg",
-            model: "mock",
+            model: "mock-\(quality.rawValue)",
             generation_ms: Int(delaySeconds * 1000)
         ))
     }

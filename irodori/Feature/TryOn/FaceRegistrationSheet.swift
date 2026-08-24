@@ -26,8 +26,8 @@ struct FaceRegistrationSheet: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let faceCrop, let pickedImage {
-                    confirmView(faceCrop: faceCrop, original: pickedImage)
+                if let faceCrop {
+                    confirmView(faceCrop: faceCrop)
                 } else {
                     introView
                 }
@@ -79,7 +79,7 @@ struct FaceRegistrationSheet: View {
                 .font(.system(size: 20, weight: .bold))
                 .padding(.top, 16)
 
-            Text("登録した顔写真をもとに、コーデを着た\nあなたの試着イメージをAIが生成します。")
+            Text("登録した顔写真をもとに、コーデを着た\nあなたの試着イメージをAIが生成します。\n顔が大きくはっきり写った写真ほど、仕上がりが似ます。")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -152,7 +152,7 @@ struct FaceRegistrationSheet: View {
 
     // MARK: - プレビュー確認
 
-    private func confirmView(faceCrop: UIImage, original: UIImage) -> some View {
+    private func confirmView(faceCrop: UIImage) -> some View {
         VStack(spacing: 0) {
             Spacer()
 
@@ -180,7 +180,7 @@ struct FaceRegistrationSheet: View {
             VStack(spacing: 8) {
                 Button {
                     Haptic.notify(.success)
-                    let saved = FaceImageStore.shared.save(original: original, faceCrop: faceCrop)
+                    let saved = FaceImageStore.shared.save(faceCrop: faceCrop)
                     if saved {
                         onRegistered()
                     } else {
@@ -222,12 +222,24 @@ struct FaceRegistrationSheet: View {
 
     // MARK: - 顔検出
 
-    /// Vision で最大の顔をクロップし、プレビュー確認へ進める。顔が取れなければエラー表示。
+    /// 顔クロップの最小辺 (px)。これ未満だと生成結果が別人化するため弾く
+    /// (2026-08-25 A/B 実験: 192px の顔参照では同一性が保てない)。
+    private static let minFaceCropSide = 220
+
+    /// Vision で最大の顔をクロップし、プレビュー確認へ進める。
+    /// 髪型も同一性の手掛かりになるため padding は広め (0.5)。
     private func process(_ image: UIImage) {
         let fixed = image.fixedOrientation()
+        let detector = DetectFace()
         guard let cgImage = fixed.cgImage,
-              let crop = DetectFace().cropLargestFace(in: cgImage) else {
+              let largest = detector.detectFaces(in: cgImage)
+                  .max(by: { $0.width * $0.height < $1.width * $1.height }),
+              let crop = detector.squareCrop(cgImage, faceBox: largest, padding: 0.5) else {
             errorMessage = "顔を検出できませんでした。顔がはっきり写った写真を選んでください。"
+            return
+        }
+        guard min(crop.width, crop.height) >= Self.minFaceCropSide else {
+            errorMessage = "顔が小さすぎます。顔が大きくはっきり写った写真ほど、試着の仕上がりが似ます。"
             return
         }
         errorMessage = nil

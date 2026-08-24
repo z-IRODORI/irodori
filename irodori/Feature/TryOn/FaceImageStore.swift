@@ -31,12 +31,14 @@ final class FaceImageStore {
         return FileManager.default.fileExists(atPath: url.path)
     }
 
-    /// 送信用 (長辺 1024 / JPEG 0.85) とサムネ (顔クロップ・長辺 240) を保存する。
+    /// 送信用 (顔タイトクロップ・長辺 1024 まで / JPEG 0.85) とサムネ (長辺 240) を保存する。
+    /// 元写真全体を縮小して送ると顔が小さくなり生成結果が別人化するため、
+    /// 送信画像は必ず顔クロップにする (2026-08-25 A/B 実験で解像度が支配要因と特定)。
     /// 顔写真が変わると過去の試着結果は本人と一致しなくなるためキャッシュも消す。
     @discardableResult
-    func save(original: UIImage, faceCrop: UIImage) -> Bool {
+    func save(faceCrop: UIImage) -> Bool {
         guard let imageFileURL, let thumbFileURL else { return false }
-        let send = original.fixedOrientation().resizedToFit(longEdge: 1024)
+        let send = faceCrop.fixedOrientation().resizedToFit(longEdge: 1024)
         guard let sendData = send.jpegData(compressionQuality: 0.85),
               let thumbData = faceCrop.fixedOrientation()
                   .resizedToFit(longEdge: 240)
