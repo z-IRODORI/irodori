@@ -18,6 +18,7 @@ struct OutfitCollageDetailView: View {
     @State private var pickerSlot: PickerSlot? = nil
     @State private var showingClosetPicker = false
     @State private var webLink: HomeWebLink? = nil
+    @State private var tryOnSource: TryOnSource? = nil
     // インライン配置編集 (コラージュ表示そのものが編集キャンバス)
     @State private var layoutViewModel = OutfitCollageLayoutEditViewModel()
 
@@ -34,6 +35,9 @@ struct OutfitCollageDetailView: View {
                     collageSection(response)
                     VStack(spacing: 10) {
                         shuffleButton
+                        if let source = response.tryOnSource {
+                            tryOnButton(source)
+                        }
                         fromItemButton
                     }
                     itemList(response)
@@ -47,6 +51,7 @@ struct OutfitCollageDetailView: View {
         .background(Color.gray.opacity(0.08))
         .navigationTitle("クローゼットでコーデ")
         .navigationBarTitleDisplayMode(.inline)
+        .tryOnFlow(source: $tryOnSource)
         .sheet(item: $pickerSlot) { picker in
             OutfitCollageItemPickerView(
                 slotDisplayName: picker.displayName,
@@ -415,6 +420,25 @@ struct OutfitCollageDetailView: View {
             }
         }
         .padding(12)
+    }
+
+    // MARK: - 試着
+
+    private func tryOnButton(_ source: TryOnSource) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            tryOnSource = source
+        } label: {
+            Label("このコーデを試着する", systemImage: "person.crop.rectangle")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.gray.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+        }
+        .disabled(viewModel.isRegeneratingOutfitCollage)
     }
 
     // MARK: - アイテムから作る

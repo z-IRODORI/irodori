@@ -17,6 +17,9 @@ struct OutfitCollageSection: View {
     let onOpenDetail: () -> Void
     let onRetry: () -> Void
 
+    /// 試着フロー (顔登録 → 生成) の起点
+    @State private var tryOnSource: TryOnSource? = nil
+
     var body: some View {
         // 生成不可 (クローゼット空など) の場合はセクションごと非表示
         if !isLoading && !hasError && !(response?.isDisplayable ?? false) {
@@ -26,6 +29,7 @@ struct OutfitCollageSection: View {
                 sectionHeader
                 content
             }
+            .tryOnFlow(source: $tryOnSource)
         }
     }
 
@@ -73,17 +77,38 @@ struct OutfitCollageSection: View {
 
             itemChips(r.items)
 
-            Button(action: {
-                Haptic.impact(.soft)
-                onOpenDetail()
-            }) {
-                Label("コーデを組み替える", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            // 試着 (白地+枠線・固定幅) と組み替え (黒・可変幅) の横並び
+            HStack(spacing: 8) {
+                if let source = r.tryOnSource {
+                    Button(action: {
+                        Haptic.impact(.soft)
+                        tryOnSource = source
+                    }) {
+                        Label("試着", systemImage: "person.crop.rectangle")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .frame(width: 88)
+                            .padding(.vertical, 12)
+                            .background(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                Button(action: {
+                    Haptic.impact(.soft)
+                    onOpenDetail()
+                }) {
+                    Label("コーデを組み替える", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(14)

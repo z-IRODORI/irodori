@@ -283,6 +283,8 @@ struct TomorrowPickSection: View {
     @State private var sendoffItem: DailyRecommendationItem? = nil
     /// 朝いち演出 (1日1回): false の間はカルーセルを隠し、フェードインで登場させる
     @State private var ritualRevealed = true
+    /// 試着フロー (顔登録 → 生成) の起点。カード/詳細どちらのボタンからも入る
+    @State private var tryOnSource: TryOnSource? = nil
     /// 今日/明日/週末タブの選択下線をスライドさせる
     @Namespace private var scopeUnderlineNamespace
     #if DEBUG
@@ -340,6 +342,7 @@ struct TomorrowPickSection: View {
         .onChange(of: viewModel.selectedPickScope) { _, _ in
             currentCardID = nil
         }
+        .tryOnFlow(source: $tryOnSource)
         .sheet(item: $sendoffItem) { item in
             DecisionSendoffView(
                 item: item,
@@ -815,28 +818,49 @@ struct TomorrowPickSection: View {
                 Spacer(minLength: 0)
 
                 let isDecided = card.pool_id == decidedPoolIdForCurrentTab
-                Button {
-                    markWornTapped(card)
-                } label: {
-                    HStack(spacing: 6) {
-                        if isDecided {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 12, weight: .bold))
+                // 試着 (白地+枠線・固定幅) と着る (黒・可変幅) の横並び。
+                // 縦 padding は従来の単独ボタンと同値のためカード高さ 560 は不変
+                HStack(spacing: 8) {
+                    if let source = card.tryOnSource {
+                        Button {
+                            Haptic.impact(.soft)
+                            tryOnSource = source
+                        } label: {
+                            Label("試着", systemImage: "person.crop.rectangle")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.black)
+                                .frame(width: 88)
+                                .padding(.vertical, 10)
+                                .background(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                .contentShape(Rectangle())
                         }
-                        Text(isDecided
-                             ? "これで決まり"
-                             : (markingWornID == card.id ? "記録中..." : wearButtonTitle))
-                            .font(.system(size: 14, weight: .semibold))
+                        .buttonStyle(.plain)
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(isDecided ? Color.black.opacity(0.5) : .black)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .contentShape(Rectangle())
+                    Button {
+                        markWornTapped(card)
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isDecided {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 12, weight: .bold))
+                            }
+                            Text(isDecided
+                                 ? "これで決まり"
+                                 : (markingWornID == card.id ? "記録中..." : wearButtonTitle))
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(isDecided ? Color.black.opacity(0.5) : .black)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(markingWornID != nil || isDecided)
                 }
-                .buttonStyle(.plain)
-                .disabled(markingWornID != nil || isDecided)
                 .padding(.top, 4)
             }
             .padding(12)
@@ -1201,6 +1225,7 @@ fileprivate struct TomorrowCompositionView: View {
     @State private var showDislikeReasons = false
     @State private var selectedReasons: Set<String> = []
     @State private var isSendingFeedback = false
+    @State private var tryOnSource: TryOnSource? = nil
     @Environment(\.dismiss) private var dismiss
 
     private static let dislikeReasonOptions = [
@@ -1242,6 +1267,9 @@ fileprivate struct TomorrowCompositionView: View {
                         .lineSpacing(6)
                 }
                 compositionList
+                if let source = item.tryOnSource {
+                    tryOnButton(source)
+                }
                 // 気に入ったら先の日の予定にストックできる (カレンダー詳細と同じ導線をホームにも)。
                 // closet 種別はカレンダー側の詳細取得がプール前提のため対象外
                 if !item.isCloset, onAddedToCalendar != nil {
@@ -1276,6 +1304,24 @@ fileprivate struct TomorrowCompositionView: View {
             )
             .presentationDetents([.height(300)])
         }
+        .tryOnFlow(source: $tryOnSource)
+    }
+
+    // このコーデを自分が着たイメージを生成する (詳細からも試着に入れる)
+    private func tryOnButton(_ source: TryOnSource) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            tryOnSource = source
+        } label: {
+            Label("試着してみる", systemImage: "person.crop.rectangle")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(.black)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
     }
 
     // 予定コーデとしてカレンダーにストックする (カレンダー/お気に入りの詳細と同じ導線)

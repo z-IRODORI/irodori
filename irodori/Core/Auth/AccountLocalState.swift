@@ -21,6 +21,8 @@ enum AccountLocalState {
             UserDefaults.standard.removeObject(forKey: key.rawValue)
         }
         deleteProfileImageFiles()
+        // 試着用の顔写真と生成結果キャッシュ。残すと次のアカウントに前の顔が写り込む
+        FaceImageStore.shared.deleteAll()
     }
 
     /// Documents に保存されるプロフィール画像 (profile_*) を削除する。
