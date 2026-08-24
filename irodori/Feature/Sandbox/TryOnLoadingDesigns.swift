@@ -3,13 +3,14 @@
 //  irodori
 //
 //  試着ローディング演出の候補比較 (トグル同居の1ファイル)。
-//  - 案A: タイプライター吹き出し + サムネイル軌道 (本番 TryOnLoadingView をそのまま表示)
-//  - 案B: ステージ進行チップ (コーデを確認 → 着せ替え中 → 仕上げ) + Haptic 連鎖
-//  - 案C: ミニマル (パルス同心円 + 人型シルエットへアイテムが吸い込まれる)
+//  2026-08-25 に案B (ステージ進行チップ + Haptic 連鎖) を採用し、
+//  本番 Feature/TryOn/TryOnLoadingView.swift として部品化済み。
+//  - 案A: タイプライター吹き出し + サムネイル軌道 (未採用・このファイルに保存)
+//  - 案B: ステージ進行チップ (採用 → 本番 TryOnLoadingView をそのまま表示)
+//  - 案C: ミニマル (パルス同心円 + シルエット吸い込み。未採用・このファイルに保存)
 //
 //  確認方法: #Preview「3案 比較」で segmented 切替。
 //  実APIでの通し確認は TryOnView.swift の #Preview「実API (要顔登録)」を使う。
-//  採用案が決まったら本番 TryOnLoadingView を差し替え、来歴コメントを残すこと。
 //
 
 import SwiftUI
@@ -25,72 +26,33 @@ enum TryOnLoadingSandbox {
     ]
 }
 
-// MARK: - 案B: ステージ進行チップ + Haptic
+// MARK: - 案A: タイプライター吹き出し + サムネイル軌道 (未採用)
 
-private struct TryOnLoadingDesignB: View {
+private struct TryOnLoadingDesignA: View {
     let faceImage: UIImage?
     let thumbnailURLs: [String]
     let onCancel: () -> Void
 
-    @State private var stage = 0
-    private let stages = ["コーデを確認", "着せ替え中", "仕上げ"]
-    private let captions = [
-        "選んだアイテムを確認しています",
-        "あなたの写真にコーデを合わせています",
-        "光と質感を整えています",
+    @State private var messageIndex = 0
+    @State private var typedText = ""
+    @State private var pulse = false
+
+    private let messages = [
+        "コーデを準備しています…",
+        "あなたに合わせて試着中…",
+        "細部を仕上げています…",
     ]
 
     var body: some View {
         VStack(spacing: 0) {
-            stepBar
-                .padding(.top, 28)
-                .padding(.horizontal, 32)
-
             Spacer()
 
-            ZStack {
-                Circle()
-                    .fill(.white)
-                    .frame(width: 150, height: 150)
-                    .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
-                if let faceImage {
-                    Image(uiImage: faceImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 130, height: 130)
-                        .clipShape(Circle())
-                } else {
-                    Image(systemName: "person.crop.circle")
-                        .font(.system(size: 72))
-                        .foregroundStyle(Color.gray.opacity(0.35))
-                }
-            }
+            orbitStage
+                .frame(height: 260)
 
-            HStack(spacing: 10) {
-                ForEach(Array(thumbnailURLs.prefix(4).enumerated()), id: \.offset) { index, url in
-                    KFImage(URL(string: url))
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 52, height: 52)
-                        .background(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(.white, lineWidth: 2))
-                        .shadow(color: .black.opacity(0.08), radius: 5, x: 0, y: 2)
-                        .opacity(stage >= 1 || index == 0 ? 1 : 0.25)
-                        .scaleEffect(stage >= 1 ? 1 : 0.85)
-                }
-            }
-            .padding(.top, 24)
-            .animation(.spring(response: 0.45, dampingFraction: 0.7), value: stage)
-
-            Text(captions[min(stage, captions.count - 1)])
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-                .padding(.top, 18)
-                .contentTransition(.opacity)
-                .animation(.easeInOut(duration: 0.3), value: stage)
+            speechBubble
+                .padding(.top, 28)
+                .padding(.horizontal, 40)
 
             Spacer()
 
@@ -108,51 +70,97 @@ private struct TryOnLoadingDesignB: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.gray.opacity(0.08))
-        .task {
-            while stage < stages.count - 1 {
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
-                guard !Task.isCancelled else { return }
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) { stage += 1 }
-                Haptic.impact(.soft)
-            }
-        }
+        .task(id: messageIndex) { await typeCurrentMessage() }
+        .onAppear { pulse = true }
     }
 
-    private var stepBar: some View {
-        HStack(spacing: 6) {
-            ForEach(stages.indices, id: \.self) { index in
-                HStack(spacing: 6) {
-                    HStack(spacing: 5) {
-                        if stage > index {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 9, weight: .bold))
-                        } else if stage == index {
-                            ProgressView()
-                                .controlSize(.mini)
-                                .tint(stage == index ? .white : .black)
-                        }
-                        Text(stages[index])
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundStyle(stage >= index ? .white : Color.gray.opacity(0.6))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(stage >= index ? Color.black : Color.gray.opacity(0.12))
-                    .clipShape(Capsule())
+    private var orbitStage: some View {
+        TimelineView(.animation) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            ZStack {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1.5)
+                        .frame(width: 130 + CGFloat(index) * 46)
+                        .scaleEffect(pulse ? 1.06 : 0.96)
+                        .animation(
+                            .easeInOut(duration: 1.6)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(index) * 0.25),
+                            value: pulse)
+                }
 
-                    if index < stages.count - 1 {
-                        Rectangle()
-                            .fill(stage > index ? Color.black : Color.gray.opacity(0.25))
-                            .frame(height: 1.5)
-                            .frame(maxWidth: 20)
-                    }
+                faceCircle
+
+                ForEach(Array(thumbnailURLs.prefix(6).enumerated()), id: \.offset) { index, urlString in
+                    let count = min(thumbnailURLs.count, 6)
+                    let angle = time * 0.55 + (Double(index) / Double(max(count, 1))) * 2 * .pi
+                    orbitThumb(urlString)
+                        .offset(x: cos(angle) * 120, y: sin(angle) * 58)
                 }
             }
         }
     }
+
+    private var faceCircle: some View {
+        Group {
+            if let faceImage {
+                Image(uiImage: faceImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "person.crop.circle")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(Color.gray.opacity(0.4))
+                    .padding(16)
+            }
+        }
+        .frame(width: 84, height: 84)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(.white, lineWidth: 3))
+        .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 3)
+    }
+
+    private func orbitThumb(_ urlString: String) -> some View {
+        KFImage(URL(string: urlString))
+            .resizable()
+            .scaledToFill()
+            .frame(width: 46, height: 46)
+            .background(.white)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(.white, lineWidth: 2))
+            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+
+    private var speechBubble: some View {
+        Text(typedText.isEmpty ? " " : typedText)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(.black.opacity(0.75))
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 18)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+    }
+
+    private func typeCurrentMessage() async {
+        let message = messages[messageIndex % messages.count]
+        typedText = ""
+        for character in message {
+            guard !Task.isCancelled else { return }
+            typedText.append(character)
+            try? await Task.sleep(nanoseconds: 38_000_000)
+        }
+        try? await Task.sleep(nanoseconds: 2_400_000_000)
+        guard !Task.isCancelled else { return }
+        messageIndex += 1
+    }
 }
 
-// MARK: - 案C: ミニマル (シルエット吸い込み)
+// MARK: - 案C: ミニマル (シルエット吸い込み・未採用)
 
 private struct TryOnLoadingDesignC: View {
     let thumbnailURLs: [String]
@@ -189,7 +197,6 @@ private struct TryOnLoadingDesignC: View {
                         .font(.system(size: 64, weight: .light))
                         .foregroundStyle(Color.black.opacity(0.55))
 
-                    // アイテムサムネがシルエットへ吸い込まれてフェード
                     ForEach(Array(thumbnailURLs.prefix(4).enumerated()), id: \.offset) { index, url in
                         let cycle = 3.2
                         let phase = (time / cycle + Double(index) / Double(max(thumbnailURLs.count, 1)))
@@ -245,14 +252,14 @@ private struct TryOnLoadingDesignC: View {
 // MARK: - 比較ビュー
 
 struct TryOnLoadingDesignsCompare: View {
-    @State private var selected = 0
+    @State private var selected = 1   // 既定は採用済みの案B
     @State private var restartKey = 0
 
     var body: some View {
         VStack(spacing: 0) {
             Picker("案", selection: $selected) {
                 Text("A 吹き出し").tag(0)
-                Text("B ステージ").tag(1)
+                Text("B ステージ (採用)").tag(1)
                 Text("C ミニマル").tag(2)
             }
             .pickerStyle(.segmented)
@@ -262,12 +269,13 @@ struct TryOnLoadingDesignsCompare: View {
             Group {
                 switch selected {
                 case 0:
-                    TryOnLoadingView(
+                    TryOnLoadingDesignA(
                         faceImage: nil,
                         thumbnailURLs: TryOnLoadingSandbox.thumbnailURLs,
                         onCancel: { restartKey += 1 })
                 case 1:
-                    TryOnLoadingDesignB(
+                    // 採用済み: 本番部品をそのまま表示
+                    TryOnLoadingView(
                         faceImage: nil,
                         thumbnailURLs: TryOnLoadingSandbox.thumbnailURLs,
                         onCancel: { restartKey += 1 })
