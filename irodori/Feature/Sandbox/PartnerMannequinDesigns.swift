@@ -325,39 +325,14 @@ private struct MannequinDesignC: View {
 
                 VStack(spacing: 0) {
                     ForEach(MannequinSandbox.constants) { constant in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Button {
+                        ConstantRow(
+                            constant: constant,
+                            isExpanded: expandedConstant == constant.id,
+                            onTap: {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                     expandedConstant = expandedConstant == constant.id ? nil : constant.id
                                 }
-                            } label: {
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text(constant.title)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(.secondary)
-                                        .frame(width: 76, alignment: .leading)
-                                    Text(constant.value)
-                                        .font(.system(size: 15, weight: .bold))
-                                        .multilineTextAlignment(.leading)
-                                    Spacer()
-                                    Image(systemName: "chevron.down")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundStyle(Color.gray.opacity(0.5))
-                                        .rotationEffect(.degrees(expandedConstant == constant.id ? 180 : 0))
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            if expandedConstant == constant.id {
-                                Text(constant.derivation)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                                    .lineSpacing(3)
-                                    .padding(.leading, 76)
-                                    .transition(.opacity)
-                            }
-                        }
-                        .padding(.vertical, 12)
+                            })
                         if constant.id != MannequinSandbox.constants.last?.id {
                             Divider()
                         }
@@ -407,6 +382,45 @@ private struct MannequinDesignC: View {
             .padding(.vertical, 20)
         }
         .background(Color.gray.opacity(0.04))
+    }
+}
+
+// 定数1行 (案C用)。式が深くなり型チェックが重くなるため部品に分離している
+private struct ConstantRow: View {
+    let constant: MannequinSandbox.Constant
+    let isExpanded: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button(action: onTap) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(constant.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 76, alignment: .leading)
+                    Text(constant.value)
+                        .font(.system(size: 15, weight: .bold))
+                        .multilineTextAlignment(.leading)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.gray.opacity(0.5))
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if isExpanded {
+                Text(constant.derivation)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(3)
+                    .padding(.leading, 76)
+                    .transition(.opacity)
+            }
+        }
+        .padding(.vertical, 12)
     }
 }
 
