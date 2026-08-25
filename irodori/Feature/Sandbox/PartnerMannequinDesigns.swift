@@ -6,8 +6,14 @@
 //  画面デザイン3案比較 (トグル同居の1ファイル)。
 //
 //  対象ユーザー: コーデを決める変数が多すぎて服選びに抵抗がある人。
-//  解決: 診断(ファッションタイプ/動物占い)・体型(骨格/身長)・記録から
-//        「あなたの定数」を3つだけ導出し、毎日の提案を定数への当てはめに還元する。
+//  変数モデル: 決めるコスト = アウター×トップス×ボトムス×気温×天気×場所×人×時間×重複
+//  (例 10*10*3*2*X*Y*3*Z)。この積を以下の4分類で畳み、最終的に「これでいく/別の一手」の
+//  2択まで還元する:
+//  - アイテム変数 (アウター/トップス/ボトムス) → 定数(型)でフィルタし提案1件に
+//  - 環境変数 (気温/天気)                     → 相棒が自動観測 (×1)
+//  - 文脈変数 (場所/人/時間)                  → 「いつもの一日」デフォルト+例外1タップ (ContextRow)
+//  - 制約変数 (直近コーデとの重複)             → 着用記録から自動回避 (×1)
+//  消した変数は黙って消さず「確認済み」と一言申告する (eliminatedLine)。
 //  - 案A「今日の正解」   : 即答型。マネキン+題字1行。3秒で決められる
 //  - 案B「相棒の朝礼」   : 対話型。相棒が定数を確認しながら手渡す
 //  - 案C「あなたの型」   : 教育型。定数を常設表示し、提案と根拠を紐づける
@@ -57,15 +63,18 @@ enum MannequinSandbox {
     ]
 
     static let headline = "定数どおり、Iラインのネイビー×白。"
-    static let reasons = [
-        "手持ちの6割を占めるベース2色でまとまり、",
-        "骨格ストレートの得意な直線シルエットです。",
-    ]
     static let reasonLines = [
         (rule: "配色の定数", body: "ベースのネイビー×白。差し色はローファーのブラウン1点だけ。"),
         (rule: "シルエットの定数", body: "上をコンパクトに、下はテーパードで縦のIラインに。"),
     ]
-    static let weatherLine = "最高26° 晴れ。長袖シャツ1枚でちょうどいい日。"
+
+    // 文脈変数 (場所・人・時間) はデフォルト + 例外時のみ1タップに畳む
+    static let contextDefault = "いつもの一日"
+    static let contextOptions = ["いつもの一日", "しごと きっちりめ", "デート・おでかけ", "遠出・よく歩く"]
+
+    // 消した変数の申告。環境変数 (気温・天気) と制約変数 (直近の重複) は
+    // 相棒が確認済みであることを一言で伝える (黙って消すと信頼されない)
+    static let eliminatedLine = "気温26°・晴れは確認済み。おととい着たシャツは外してあります。"
 }
 
 // MARK: - 共通部品: マネキン (置き画スタイルのプレースホルダ)
@@ -110,12 +119,48 @@ private struct MannequinCard: View {
     }
 }
 
+// MARK: - 共通部品: 文脈変数の1タップ切替
+
+/// 場所・人・時間 (Y×3×Z 通り) を「いつもの一日」のデフォルトに畳み、
+/// 例外の日だけ1タップで上書きする。入力コントロールなのでバッジ禁止の対象外。
+private struct ContextRow: View {
+    @Binding var selection: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text("きょうは")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Menu {
+                ForEach(MannequinSandbox.contextOptions, id: \.self) { option in
+                    Button(option) {
+                        Haptic.selection()
+                        selection = option
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(selection)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .underline()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+        }
+    }
+}
+
 // MARK: - 案A「今日の正解」— 即答型
 
 /// 開いた瞬間に答えが1つだけある。題字が理由を語り、詳細はタップ展開。
 /// 決めるまで最短3秒。変数はすべて畳んである。
 private struct MannequinDesignA: View {
     @State private var showReasons = false
+    @State private var context = MannequinSandbox.contextDefault
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -126,12 +171,17 @@ private struct MannequinDesignA: View {
                         .font(.system(size: 20, weight: .bold))
                 }
 
+                ContextRow(selection: $context)
+
                 MannequinCard()
 
-                // 題字がルールを語る (バッジは使わない)
+                // 題字がルールを語り、消した変数 (気温・天気・重複) は一言で申告する
                 VStack(alignment: .leading, spacing: 6) {
                     Text(MannequinSandbox.headline)
                         .font(.system(size: 15, weight: .bold))
+                    Text(MannequinSandbox.eliminatedLine)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             showReasons.toggle()
@@ -155,9 +205,6 @@ private struct MannequinDesignA: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
-                            Text(MannequinSandbox.weatherLine)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
                         }
                         .padding(.top, 4)
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -201,40 +248,69 @@ private struct MannequinDesignA: View {
 
 // MARK: - 案B「相棒の朝礼」— 対話型
 
-/// 相棒が定数を1つずつ確認しながらコーデを手渡す。
+/// 相棒が文脈変数 (場所・人・時間) を1問で畳み、定数を確認しながらコーデを手渡す。
 /// ルールが会話として耳に入る。毎朝の儀式になる。
 private struct MannequinDesignB: View {
+    /// nil = 未回答。回答後に相棒の続きが流れる
+    @State private var contextAnswer: String?
     @State private var step = 0
 
-    private let bubbles = [
-        "おはよう。今日の分も、あなたの型で組んでおいたよ。",
-        "定数のおさらい: Iライン、ネイビー×白、きれいめ7:3。",
-        "最高26°の晴れだから、長袖シャツ1枚でちょうどいい。",
-    ]
+    private var bubbles: [String] {
+        [
+            "おはよう。きょうは、いつもの一日でいい？",
+            contextAnswer == MannequinSandbox.contextDefault
+                ? "OK。じゃあ定数のおさらい: Iライン、ネイビー×白、きれいめ7:3。"
+                : "了解、\(contextAnswer ?? "")向けにきれいめを1段上げるね。定数は Iライン、ネイビー×白。",
+            MannequinSandbox.eliminatedLine,
+        ]
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
-                ForEach(Array(bubbles.prefix(step + 1).enumerated()), id: \.offset) { index, text in
-                    HStack(alignment: .top, spacing: 10) {
-                        if index == 0 {
-                            PartnerIconImage(size: 36)
-                        } else {
-                            Color.clear.frame(width: 36, height: 1)
-                        }
-                        Text(text)
-                            .font(.system(size: 13.5))
-                            .lineSpacing(3)
+                partnerBubble(bubbles[0], showIcon: true)
+
+                if let contextAnswer {
+                    // ユーザーの返答 (右寄せ・黒)
+                    HStack {
+                        Spacer(minLength: 60)
+                        Text(contextAnswer)
+                            .font(.system(size: 13.5, weight: .medium))
+                            .foregroundStyle(.white)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
-                            .background(Color.gray.opacity(0.08))
+                            .background(.black)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
-                        Spacer(minLength: 24)
                     }
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
+
+                    ForEach(1...max(1, min(step, bubbles.count - 1)), id: \.self) { index in
+                        partnerBubble(bubbles[index], showIcon: false)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                } else {
+                    // 返答チップ: 文脈変数 (Y×3×Z通り) をここで2タップ以内に畳む
+                    HStack(spacing: 8) {
+                        Spacer(minLength: 40)
+                        replyChip(MannequinSandbox.contextDefault)
+                        Menu {
+                            ForEach(MannequinSandbox.contextOptions.dropFirst(), id: \.self) { option in
+                                Button(option) { answer(option) }
+                            }
+                        } label: {
+                            Text("予定がある日")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(.white)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.gray.opacity(0.35), lineWidth: 1))
+                        }
+                    }
                 }
 
-                if step >= bubbles.count - 1 {
+                if contextAnswer != nil && step >= bubbles.count - 1 {
                     MannequinCard(compact: true)
                         .padding(.leading, 46)
                         .transition(.opacity.combined(with: .scale(scale: 0.97)))
@@ -293,7 +369,9 @@ private struct MannequinDesignB: View {
             .padding(.vertical, 20)
         }
         .background(Color.gray.opacity(0.04))
-        .task {
+        // 返答後に相棒の続き (定数おさらい → 消し込み申告) を流す
+        .task(id: contextAnswer) {
+            guard contextAnswer != nil else { return }
             while step < bubbles.count - 1 {
                 try? await Task.sleep(nanoseconds: 900_000_000)
                 guard !Task.isCancelled else { return }
@@ -301,6 +379,47 @@ private struct MannequinDesignB: View {
                 Haptic.impact(.soft)
             }
         }
+    }
+
+    private func answer(_ option: String) {
+        Haptic.selection()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            contextAnswer = option
+            step = 1
+        }
+    }
+
+    private func partnerBubble(_ text: String, showIcon: Bool) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            if showIcon {
+                PartnerIconImage(size: 36)
+            } else {
+                Color.clear.frame(width: 36, height: 1)
+            }
+            Text(text)
+                .font(.system(size: 13.5))
+                .lineSpacing(3)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.gray.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            Spacer(minLength: 24)
+        }
+    }
+
+    private func replyChip(_ option: String) -> some View {
+        Button {
+            answer(option)
+        } label: {
+            Text(option)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(.black)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -310,6 +429,7 @@ private struct MannequinDesignB: View {
 /// 「ルールを知らない」に最直球。使うほどルールが身につく。
 private struct MannequinDesignC: View {
     @State private var expandedConstant: String?
+    @State private var context = MannequinSandbox.contextDefault
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -350,6 +470,7 @@ private struct MannequinDesignC: View {
                         Text("型から、今日の一着")
                             .font(.system(size: 16, weight: .bold))
                     }
+                    ContextRow(selection: $context)
                     MannequinCard(compact: true)
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(MannequinSandbox.reasonLines, id: \.rule) { line in
@@ -363,6 +484,9 @@ private struct MannequinDesignC: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        Text(MannequinSandbox.eliminatedLine)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                     Button {
                         Haptic.notify(.success)
