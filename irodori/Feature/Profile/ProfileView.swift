@@ -34,6 +34,8 @@ struct ProfileView: View {
                         path.append(.profileEdit)
                     }
                     .padding(.horizontal, 20)
+                    // 試着用の顔写真の再登録・削除 (登録本体は Feature/TryOn/FaceRegistrationSheet)
+                    TryOnFaceSettingCard()
 //                    tabSegmentView  // コーデタブ未実装のためコメントアウト
 
                     VStack(spacing: 16) {

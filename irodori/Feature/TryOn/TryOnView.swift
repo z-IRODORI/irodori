@@ -32,6 +32,20 @@ struct TryOnView: View {
                 .navigationTitle("試着")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    // 結果が似ていない時にその場で撮り直せる導線 (登録し直すと再度試着へ続行)
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        if let onChangeFace {
+                            Button {
+                                Haptic.impact(.soft)
+                                viewModel.cancel()
+                                dismiss()
+                                onChangeFace()
+                            } label: {
+                                Text("顔写真を変更")
+                                    .font(.system(size: 13))
+                            }
+                        }
+                    }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("閉じる") {
                             viewModel.cancel()
