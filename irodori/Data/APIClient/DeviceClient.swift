@@ -105,6 +105,19 @@ struct DeviceUnlinkResponse: Decodable {
     let device_id: String
 }
 
+/// 未ペアリングで QR 待ちのデバイス (同じネットワークから見えたもの)
+struct DevicePresence: Decodable, Equatable {
+    let device_id_suffix: String
+    let state: String        // pairing | reading | registering | paired
+    let model: String?
+    let seen_ago_s: Double
+}
+
+struct DevicePresenceResponse: Decodable {
+    let devices: [DevicePresence]
+    let client_ip_known: Bool
+}
+
 enum DeviceCommand: String {
     case testCapture = "test_capture"
     case setupOn = "setup_on"
@@ -123,6 +136,8 @@ protocol DeviceClientProtocol {
     /// ライブプレビューのロングポーリング。seq より新しいフレームが来るまで最大 wait 秒待って返す。
     /// 新フレームが無ければ nil (204)。
     func fetchPreview(deviceId: String, after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)?
+    /// 同じネットワークで QR 待ちのデバイス一覧 (ペアリング画面の起動確認用)
+    func getPresence(userId: String, idToken: String) async throws -> Result<DevicePresenceResponse, HTTPError>
 }
 
 // MARK: - 実装
@@ -158,6 +173,10 @@ final class DeviceClient: DeviceClientProtocol {
 
     func unlink(deviceId: String, userId: String, idToken: String) async throws -> Result<DeviceUnlinkResponse, HTTPError> {
         await send(request(method: "DELETE", path: "api/devices/\(deviceId)", userId: userId, idToken: idToken))
+    }
+
+    func getPresence(userId: String, idToken: String) async throws -> Result<DevicePresenceResponse, HTTPError> {
+        await send(request(method: "GET", path: "api/devices/presence", userId: userId, idToken: idToken))
     }
 
     func fetchPreview(deviceId: String, after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)? {
@@ -265,5 +284,10 @@ final class MockDeviceClient: DeviceClientProtocol {
     func fetchPreview(deviceId: String, after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)? {
         try? await Task.sleep(for: .seconds(wait))
         return nil
+    }
+
+    var presence: [DevicePresence] = []
+    func getPresence(userId: String, idToken: String) async throws -> Result<DevicePresenceResponse, HTTPError> {
+        .success(.init(devices: presence, client_ip_known: true))
     }
 }

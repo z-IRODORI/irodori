@@ -15,6 +15,7 @@ struct DeviceSetupView: View {
     @Binding var path: [ViewType]
     @State private var viewModel: DeviceSetupViewModel
     @State private var showUnlinkConfirm = false
+    @State private var showTroubleshooting = false
 
     @MainActor
     init(path: Binding<[ViewType]>, viewModel: DeviceSetupViewModel? = nil) {
@@ -96,12 +97,81 @@ struct DeviceSetupView: View {
                 .frame(maxWidth: .infinity)
             }
 
+            cameraPresenceRow
+
             Text("画面を明るくして、QR 全体がレンズに入るようにゆっくり近づけてください。読み取れると数秒でこの画面が切り替わります。")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
+            troubleshooting
+
             privacyNote
         }
+    }
+
+    /// カメラが起動して QR 待ちになっているか (同じ Wi-Fi からの生存通知で判定)
+    private var cameraPresenceRow: some View {
+        let (icon, color, text): (String, Color, String) = {
+            switch viewModel.cameraPresence {
+            case .checking:
+                return ("antenna.radiowaves.left.and.right", .secondary, "カメラを探しています…")
+            case .notFound:
+                return ("exclamationmark.circle", .secondary, "カメラが見つかりません。電源と Wi‑Fi を確認してください")
+            case .waiting(let ago):
+                return ("checkmark.circle.fill", .green, ago < 10 ? "カメラは起動して QR を待っています" : "カメラは起動しています (\(Int(ago)) 秒前に通信)")
+            case .registering:
+                return ("arrow.triangle.2.circlepath", .pink, "QR を読み取りました。登録中…")
+            case .noWifi:
+                return ("wifi.slash", .secondary, "iPhone を自宅の Wi‑Fi につなぐと、カメラの起動を確認できます")
+            }
+        }()
+        return HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(color)
+            Text(text)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.black)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.gray.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .animation(.easeInOut(duration: 0.2), value: viewModel.cameraPresence)
+    }
+
+    private var troubleshooting: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showTroubleshooting.toggle() }
+            } label: {
+                HStack {
+                    Text("読み取れないときは")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.black)
+                    Spacer()
+                    Image(systemName: showTroubleshooting ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if showTroubleshooting {
+                VStack(alignment: .leading, spacing: 6) {
+                    guideRow("power", "ラズパイの電源が入っていて、緑のランプがゆっくり点滅している (= QR 待ち)")
+                    guideRow("wifi", "ラズパイと iPhone が同じ Wi‑Fi につながっている")
+                    guideRow("ruler", "画面とレンズの距離は 30〜50cm。QR 全体がレンズに入るように")
+                    guideRow("sun.max", "画面の明るさを最大に。反射で読めないときは少し角度を変える")
+                    guideRow("clock", "起動直後は 30 秒ほどかかる。緑のランプが点滅し始めてからかざす")
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(14)
+        .background(Color.gray.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - 連携済

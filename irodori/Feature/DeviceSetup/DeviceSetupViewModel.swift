@@ -25,6 +25,15 @@ final class DeviceSetupViewModel {
     private(set) var device: DeviceInfo?
     private(set) var qrPayload: String?
     private(set) var claimExpiresAt: Date?
+    /// ペアリング画面でのカメラの起動状況 (同じネットワークからの生存通知)
+    enum CameraPresence: Equatable {
+        case checking          // まだ 1 回も確認できていない
+        case notFound          // 通知が来ていない (電源 / Wi-Fi を疑う)
+        case waiting(Double)   // QR 待ち (何秒前に通信したか)
+        case registering       // QR を読んで登録中
+        case noWifi            // iPhone 側のネットワークが判定できない
+    }
+    private(set) var cameraPresence: CameraPresence = .checking
     private(set) var previewImage: UIImage?
     private(set) var isSendingCommand = false
     /// 試し撮りを送ってから結果 (last_capture) が来るまで true
@@ -35,6 +44,7 @@ final class DeviceSetupViewModel {
 
     private let client: DeviceClientProtocol
     private var pollTask: Task<Void, Never>?
+    private var presenceTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var previewSeq = 0
     private var testCaptureSentAt: Double = 0
@@ -63,6 +73,8 @@ final class DeviceSetupViewModel {
     func stop() {
         pollTask?.cancel()
         pollTask = nil
+        presenceTask?.cancel()
+        presenceTask = nil
         stopPreviewLoop()
     }
 
@@ -103,6 +115,30 @@ final class DeviceSetupViewModel {
         qrPayload = claim.qr_payload
         claimExpiresAt = Date().addingTimeInterval(TimeInterval(claim.expires_in))
         startPairingPolling()
+        startPresencePolling()
+    }
+
+    /// 同じネットワークで QR 待ちのカメラがいるかを 1.5 秒ごとに確認する
+    private func startPresencePolling() {
+        presenceTask?.cancel()
+        presenceTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self, self.phase == .unpaired else { return }
+                if let c = await self.credentials(),
+                   let result = try? await self.client.getPresence(userId: c.userId, idToken: c.idToken),
+                   case .success(let res) = result {
+                    if !res.client_ip_known {
+                        self.cameraPresence = .noWifi
+                    } else if let d = res.devices.first {
+                        self.cameraPresence = (d.state == "registering" || d.state == "reading")
+                            ? .registering : .waiting(d.seen_ago_s)
+                    } else {
+                        self.cameraPresence = .notFound
+                    }
+                }
+                try? await Task.sleep(for: .seconds(1.5))
+            }
+        }
     }
 
     var isClaimExpired: Bool {
@@ -114,12 +150,14 @@ final class DeviceSetupViewModel {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(1))
                 guard let self, self.phase == .unpaired else { return }
                 guard let c = await self.credentials(),
                       let result = try? await self.client.listDevices(userId: c.userId, idToken: c.idToken),
                       case .success(let list) = result else { continue }
                 if let first = list.devices.first {
+                    self.presenceTask?.cancel()
+                    self.presenceTask = nil
                     self.applyDevice(first)
                     self.phase = .paired
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
