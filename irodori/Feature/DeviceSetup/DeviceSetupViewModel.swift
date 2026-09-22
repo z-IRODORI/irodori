@@ -33,7 +33,8 @@ final class DeviceSetupViewModel {
 
     private let client: DeviceClientProtocol
     private var pollTask: Task<Void, Never>?
-    private var lastPreviewAt: Double = 0
+    private var previewTask: Task<Void, Never>?
+    private var previewSeq = 0
     private var testCaptureSentAt: Double = 0
     private var attachedJobId: String?
 
@@ -60,6 +61,7 @@ final class DeviceSetupViewModel {
     func stop() {
         pollTask?.cancel()
         pollTask = nil
+        stopPreviewLoop()
     }
 
     private func reload() async {
@@ -131,6 +133,12 @@ final class DeviceSetupViewModel {
     private func applyDevice(_ d: DeviceInfo) {
         let settingsChanged = device?.settings != d.settings
         device = d
+        // 設置モードの間だけライブプレビューのロングポーリングを回す
+        if d.setup_mode {
+            startPreviewLoopIfNeeded()
+        } else {
+            stopPreviewLoop()
+        }
         if settingsChanged || device == nil {
             settingsDraft = d.settings
         }
@@ -164,7 +172,6 @@ final class DeviceSetupViewModel {
         switch result {
         case .success(let d):
             applyDevice(d)
-            await refreshPreviewIfNeeded(d)
         case .failure(let e):
             if case .notFound = e {
                 // 別端末で解除された
@@ -175,17 +182,37 @@ final class DeviceSetupViewModel {
         }
     }
 
-    private func refreshPreviewIfNeeded(_ d: DeviceInfo) async {
-        guard d.setup_mode, let urlString = d.preview_url, let at = d.preview_at, at > lastPreviewAt,
-              var comps = URLComponents(string: urlString) else {
-            if !d.setup_mode { previewImage = nil }
-            return
+    // MARK: - ライブプレビュー (ロングポーリング)
+
+    /// サーバに「手元の seq より新しいフレームが来たら即返して」と頼み続ける。
+    /// 返ってきたら間を置かずに次を要求するので、遅延はネット往復 1 回分に収まる。
+    private func startPreviewLoopIfNeeded() {
+        guard previewTask == nil, let id = device?.device_id else { return }
+        previewSeq = 0
+        previewTask = Task { [weak self] in
+            var failures = 0
+            while !Task.isCancelled {
+                guard let self, let c = await self.credentials() else { return }
+                do {
+                    if let result = try await self.client.fetchPreview(
+                        deviceId: id, after: self.previewSeq, wait: 3.0, userId: c.userId, idToken: c.idToken
+                    ) {
+                        self.previewSeq = result.seq
+                        self.previewImage = result.image
+                    }
+                    failures = 0
+                } catch {
+                    failures += 1
+                    try? await Task.sleep(for: .seconds(min(3.0, 0.5 * Double(failures))))
+                }
+            }
         }
-        comps.queryItems = [URLQueryItem(name: "t", value: String(Int(at)))]  // キャッシュ回避
-        guard let url = comps.url, let (data, _) = try? await URLSession.shared.data(from: url),
-              let img = UIImage(data: data) else { return }
-        lastPreviewAt = at
-        previewImage = img
+    }
+
+    private func stopPreviewLoop() {
+        previewTask?.cancel()
+        previewTask = nil
+        previewImage = nil
     }
 
     // MARK: - 操作

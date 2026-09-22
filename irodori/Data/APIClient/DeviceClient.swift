@@ -8,7 +8,7 @@
 //  設計: z-IRODORI/proposals/raspi-aicam-outfit-capture.md §3〜§4
 //
 
-import Foundation
+import UIKit
 
 // MARK: - レスポンス
 
@@ -95,6 +95,9 @@ protocol DeviceClientProtocol {
     func sendCommand(deviceId: String, command: DeviceCommand, userId: String, idToken: String) async throws -> Result<DeviceCommandResponse, HTTPError>
     func updateSettings(deviceId: String, settings: DeviceSettings, userId: String, idToken: String) async throws -> Result<DeviceInfo, HTTPError>
     func unlink(deviceId: String, userId: String, idToken: String) async throws -> Result<DeviceUnlinkResponse, HTTPError>
+    /// ライブプレビューのロングポーリング。seq より新しいフレームが来るまで最大 wait 秒待って返す。
+    /// 新フレームが無ければ nil (204)。
+    func fetchPreview(deviceId: String, after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)?
 }
 
 // MARK: - 実装
@@ -130,6 +133,28 @@ final class DeviceClient: DeviceClientProtocol {
 
     func unlink(deviceId: String, userId: String, idToken: String) async throws -> Result<DeviceUnlinkResponse, HTTPError> {
         await send(request(method: "DELETE", path: "api/devices/\(deviceId)", userId: userId, idToken: idToken))
+    }
+
+    func fetchPreview(deviceId: String, after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)? {
+        var components = URLComponents(string: "\(baseURL)/api/devices/\(deviceId)/preview")!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: userId),
+            URLQueryItem(name: "after", value: String(seq)),
+            URLQueryItem(name: "wait", value: String(wait)),
+        ]
+        var req = URLRequest(url: components.url!)
+        req.httpMethod = "GET"
+        req.addValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.timeoutInterval = wait + 15
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else { return nil }
+        if http.statusCode == 204 { return nil }
+        guard http.statusCode == 200, let image = UIImage(data: data) else {
+            throw HTTPError.fromStatusCode(http.statusCode)
+        }
+        let newSeq = Int(http.value(forHTTPHeaderField: "X-Preview-Seq") ?? "") ?? seq
+        return (image, newSeq)
     }
 
     // MARK: - 共通
@@ -210,5 +235,10 @@ final class MockDeviceClient: DeviceClientProtocol {
     func unlink(deviceId: String, userId: String, idToken: String) async throws -> Result<DeviceUnlinkResponse, HTTPError> {
         devices.removeAll { $0.device_id == deviceId }
         return .success(.init(status: "unlinked", device_id: deviceId))
+    }
+
+    func fetchPreview(deviceId: String, after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)? {
+        try? await Task.sleep(for: .seconds(wait))
+        return nil
     }
 }
