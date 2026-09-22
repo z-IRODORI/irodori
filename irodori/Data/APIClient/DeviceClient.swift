@@ -87,6 +87,8 @@ struct DeviceInfo: Decodable, Equatable, Identifiable {
     let preview_url: String?
     let preview_at: Double?
     let last_capture: DeviceCaptureSummary?
+    /// 同じ Wi-Fi にいるときに直接見る LAN 配信ページ (無ければクラウド経路)
+    let lan_stream_url: String?
 
     var id: String { device_id }
 }
@@ -111,6 +113,7 @@ struct DevicePresence: Decodable, Equatable {
     let state: String        // pairing | reading | registering | paired
     let model: String?
     let seen_ago_s: Double
+    let lan_stream_url: String?
 }
 
 struct DevicePresenceResponse: Decodable {
@@ -260,7 +263,8 @@ final class MockDeviceClient: DeviceClientProtocol {
             setup_mode: setupMode,
             preview_url: nil,
             preview_at: nil,
-            last_capture: nil
+            last_capture: nil,
+            lan_stream_url: nil
         )
     }
 

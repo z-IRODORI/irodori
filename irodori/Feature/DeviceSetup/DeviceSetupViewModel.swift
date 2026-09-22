@@ -36,6 +36,9 @@ final class DeviceSetupViewModel {
     private(set) var cameraPresence: CameraPresence = .checking
     /// ペアリング前のカメラ映像 (QR の位置合わせ用)
     private(set) var pairingPreviewImage: UIImage?
+    /// LAN 直接配信の URL (同じ Wi-Fi のとき)。失敗したら nil に戻してクラウド経路へ
+    private(set) var lanStreamURL: URL?
+    private var lanStreamFailedURL: String?
     private(set) var previewImage: UIImage?
     private(set) var isSendingCommand = false
     /// 試し撮りを送ってから結果 (last_capture) が来るまで true
@@ -160,6 +163,7 @@ final class DeviceSetupViewModel {
                     } else if let d = res.devices.first {
                         self.cameraPresence = (d.state == "registering" || d.state == "reading")
                             ? .registering : .waiting(d.seen_ago_s)
+                        self.updateLANStream(d.lan_stream_url)
                     } else {
                         self.cameraPresence = .notFound
                     }
@@ -210,9 +214,24 @@ final class DeviceSetupViewModel {
 
     // MARK: - 連携済
 
+    /// LAN 配信 URL の更新。一度失敗した URL は再挑戦しない (クラウド経路に固定)
+    private func updateLANStream(_ urlString: String?) {
+        guard let urlString, urlString != lanStreamFailedURL, let url = URL(string: urlString) else {
+            if urlString == nil { lanStreamURL = nil }
+            return
+        }
+        if lanStreamURL != url { lanStreamURL = url }
+    }
+
+    func lanStreamFailed() {
+        lanStreamFailedURL = lanStreamURL?.absoluteString
+        lanStreamURL = nil
+    }
+
     private func applyDevice(_ d: DeviceInfo) {
         let settingsChanged = device?.settings != d.settings
         device = d
+        if d.setup_mode { updateLANStream(d.lan_stream_url) } else { lanStreamURL = nil }
         // 設置モードの間だけライブプレビューのロングポーリングを回す
         if d.setup_mode {
             startPreviewLoopIfNeeded()

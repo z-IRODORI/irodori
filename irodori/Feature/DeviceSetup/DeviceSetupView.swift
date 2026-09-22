@@ -99,13 +99,21 @@ struct DeviceSetupView: View {
 
             cameraPresenceRow
 
-            if let img = viewModel.pairingPreviewImage {
+            if viewModel.lanStreamURL != nil || viewModel.pairingPreviewImage != nil {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("いまカメラが見ているもの")
                         .font(.system(size: 13, weight: .semibold))
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
+                    Group {
+                        if let url = viewModel.lanStreamURL {
+                            LANStreamView(url: url, onFailure: { viewModel.lanStreamFailed() })
+                                .aspectRatio(3 / 4, contentMode: .fit)   // ペアリング前の既定は縦置き
+                                .id(url)
+                        } else if let img = viewModel.pairingPreviewImage {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFit()
+                        }
+                    }
                         .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.07), lineWidth: 1))
@@ -254,6 +262,12 @@ struct DeviceSetupView: View {
         }
     }
 
+    /// LAN 配信の枠の比率。縦置き (90/270) は 3:4、横置きは 4:3
+    private var streamAspect: CGFloat {
+        let r = viewModel.device?.settings.rotation ?? 90
+        return (r == 90 || r == 270) ? 3.0 / 4.0 : 4.0 / 3.0
+    }
+
     private var lastSeenText: String {
         guard let t = viewModel.device?.last_seen_at else { return "まだ一度も通信していません" }
         let sec = Int(Date().timeIntervalSince1970 - t)
@@ -268,7 +282,12 @@ struct DeviceSetupView: View {
                 .font(.system(size: 14, weight: .semibold))
             ZStack(alignment: .bottom) {
                 Group {
-                    if let img = viewModel.previewImage {
+                    if let url = viewModel.lanStreamURL {
+                        // 同じ Wi-Fi: ラズパイの MJPEG ページを直接表示 (15fps・低遅延)。枠は向き設定に合わせる
+                        LANStreamView(url: url, onFailure: { viewModel.lanStreamFailed() })
+                            .aspectRatio(streamAspect, contentMode: .fit)
+                            .id(url)
+                    } else if let img = viewModel.previewImage {
                         Image(uiImage: img)
                             .resizable()
                             .scaledToFit()
