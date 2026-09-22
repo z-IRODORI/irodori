@@ -34,6 +34,8 @@ final class DeviceSetupViewModel {
         case noWifi            // iPhone 側のネットワークが判定できない
     }
     private(set) var cameraPresence: CameraPresence = .checking
+    /// ペアリング前のカメラ映像 (QR の位置合わせ用)
+    private(set) var pairingPreviewImage: UIImage?
     private(set) var previewImage: UIImage?
     private(set) var isSendingCommand = false
     /// 試し撮りを送ってから結果 (last_capture) が来るまで true
@@ -45,6 +47,7 @@ final class DeviceSetupViewModel {
     private let client: DeviceClientProtocol
     private var pollTask: Task<Void, Never>?
     private var presenceTask: Task<Void, Never>?
+    private var pairingPreviewTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var previewSeq = 0
     private var testCaptureSentAt: Double = 0
@@ -75,6 +78,8 @@ final class DeviceSetupViewModel {
         pollTask = nil
         presenceTask?.cancel()
         presenceTask = nil
+        pairingPreviewTask?.cancel()
+        pairingPreviewTask = nil
         stopPreviewLoop()
     }
 
@@ -116,6 +121,29 @@ final class DeviceSetupViewModel {
         claimExpiresAt = Date().addingTimeInterval(TimeInterval(claim.expires_in))
         startPairingPolling()
         startPresencePolling()
+        startPairingPreviewLoop()
+    }
+
+    /// ペアリング前のカメラ映像をロングポーリングで受け取り続ける (設置モードと同じ仕組み)
+    private func startPairingPreviewLoop() {
+        pairingPreviewTask?.cancel()
+        pairingPreviewTask = Task { [weak self] in
+            var seq = 0
+            var failures = 0
+            while !Task.isCancelled {
+                guard let self, self.phase == .unpaired, let c = await self.credentials() else { return }
+                do {
+                    if let result = try await self.client.fetchPresencePreview(after: seq, wait: 3.0, userId: c.userId, idToken: c.idToken) {
+                        seq = result.seq
+                        self.pairingPreviewImage = result.image
+                    }
+                    failures = 0
+                } catch {
+                    failures += 1
+                    try? await Task.sleep(for: .seconds(min(3.0, 0.5 * Double(failures))))
+                }
+            }
+        }
     }
 
     /// 同じネットワークで QR 待ちのカメラがいるかを 1.5 秒ごとに確認する
@@ -158,6 +186,9 @@ final class DeviceSetupViewModel {
                 if let first = list.devices.first {
                     self.presenceTask?.cancel()
                     self.presenceTask = nil
+                    self.pairingPreviewTask?.cancel()
+                    self.pairingPreviewTask = nil
+                    self.pairingPreviewImage = nil
                     self.applyDevice(first)
                     self.phase = .paired
                     UINotificationFeedbackGenerator().notificationOccurred(.success)

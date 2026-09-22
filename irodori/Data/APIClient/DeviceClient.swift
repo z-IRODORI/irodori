@@ -138,6 +138,8 @@ protocol DeviceClientProtocol {
     func fetchPreview(deviceId: String, after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)?
     /// 同じネットワークで QR 待ちのデバイス一覧 (ペアリング画面の起動確認用)
     func getPresence(userId: String, idToken: String) async throws -> Result<DevicePresenceResponse, HTTPError>
+    /// ペアリング前のカメラ映像 (同じネットワークの QR 待ちデバイス)。ロングポーリング
+    func fetchPresencePreview(after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)?
 }
 
 // MARK: - 実装
@@ -179,8 +181,16 @@ final class DeviceClient: DeviceClientProtocol {
         await send(request(method: "GET", path: "api/devices/presence", userId: userId, idToken: idToken))
     }
 
+    func fetchPresencePreview(after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)? {
+        try await fetchJPEG(path: "api/devices/presence/preview", after: seq, wait: wait, userId: userId, idToken: idToken)
+    }
+
     func fetchPreview(deviceId: String, after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)? {
-        var components = URLComponents(string: "\(baseURL)/api/devices/\(deviceId)/preview")!
+        try await fetchJPEG(path: "api/devices/\(deviceId)/preview", after: seq, wait: wait, userId: userId, idToken: idToken)
+    }
+
+    private func fetchJPEG(path: String, after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)? {
+        var components = URLComponents(string: "\(baseURL)/\(path)")!
         components.queryItems = [
             URLQueryItem(name: "user_id", value: userId),
             URLQueryItem(name: "after", value: String(seq)),
@@ -289,5 +299,10 @@ final class MockDeviceClient: DeviceClientProtocol {
     var presence: [DevicePresence] = []
     func getPresence(userId: String, idToken: String) async throws -> Result<DevicePresenceResponse, HTTPError> {
         .success(.init(devices: presence, client_ip_known: true))
+    }
+
+    func fetchPresencePreview(after seq: Int, wait: Double, userId: String, idToken: String) async throws -> (image: UIImage, seq: Int)? {
+        try? await Task.sleep(for: .seconds(wait))
+        return nil
     }
 }

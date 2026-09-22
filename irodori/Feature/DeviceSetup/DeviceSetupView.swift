@@ -99,6 +99,22 @@ struct DeviceSetupView: View {
 
             cameraPresenceRow
 
+            if let img = viewModel.pairingPreviewImage {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("いまカメラが見ているもの")
+                        .font(.system(size: 13, weight: .semibold))
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.07), lineWidth: 1))
+                    Text("この枠の中に、QR がはっきり大きく写るように iPhone を動かしてください。ぼやけていたら 30〜50cm まで離します。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Text("画面を明るくして、QR 全体がレンズに入るようにゆっくり近づけてください。読み取れると数秒でこの画面が切り替わります。")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
