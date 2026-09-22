@@ -7,6 +7,7 @@ struct MainTabView: View {
     @State private var previousTab: MainTabViewModel.Tab = .home
     private let toastManager = ToastManager.shared
     private let analysisJobStore = AnalysisJobStore.shared
+    private let pushManager = PushNotificationManager.shared
 
     var body: some View {
         @Bindable var vm = viewModel
@@ -175,6 +176,18 @@ struct MainTabView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: analysisJobStore.isToastSuppressed)
         // アプリ再起動時に進行中ジョブを復元してポーリング再開
         .task { analysisJobStore.restoreIfNeeded() }
+        // プッシュ通知タップ (玄関カメラの記録完了) → コーデ詳細へ
+        .onChange(of: pushManager.pendingDestination) { _, destination in
+            guard let destination else { return }
+            path.append(destination)
+            pushManager.pendingDestination = nil
+        }
+        .task {
+            if let destination = pushManager.pendingDestination {
+                path.append(destination)
+                pushManager.pendingDestination = nil
+            }
+        }
         // NavigationStack 外側に environment を流すことで、
         // .navigationDestination で push する画面 (FavoritesView 等) や
         // .sheet で出すモーダル (DailyRecommendationDetailView 等) にも届く

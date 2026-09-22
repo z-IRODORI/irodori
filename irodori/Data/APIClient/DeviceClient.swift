@@ -23,7 +23,32 @@ struct DeviceSettings: Codable, Equatable {
     var window_start_hour: Int
     var window_end_hour: Int
     var one_per_day: Bool
+    /// 撮影後、次の自動撮影までの最短秒数 (連写防止)
+    var capture_cooldown_s: Int
     var rotation: Int
+    /// 記録できたらプッシュ通知する
+    var notify_on_capture: Bool
+
+    init(window_start_hour: Int, window_end_hour: Int, one_per_day: Bool,
+         capture_cooldown_s: Int = 120, rotation: Int, notify_on_capture: Bool = true) {
+        self.window_start_hour = window_start_hour
+        self.window_end_hour = window_end_hour
+        self.one_per_day = one_per_day
+        self.capture_cooldown_s = capture_cooldown_s
+        self.rotation = rotation
+        self.notify_on_capture = notify_on_capture
+    }
+
+    // 旧サーバの応答 (フィールド無し) でも落ちないように既定値で補う
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        window_start_hour = try c.decode(Int.self, forKey: .window_start_hour)
+        window_end_hour = try c.decode(Int.self, forKey: .window_end_hour)
+        one_per_day = try c.decodeIfPresent(Bool.self, forKey: .one_per_day) ?? false
+        capture_cooldown_s = try c.decodeIfPresent(Int.self, forKey: .capture_cooldown_s) ?? 120
+        rotation = try c.decodeIfPresent(Int.self, forKey: .rotation) ?? 90
+        notify_on_capture = try c.decodeIfPresent(Bool.self, forKey: .notify_on_capture) ?? true
+    }
 }
 
 struct DeviceJudgement: Decodable, Equatable {

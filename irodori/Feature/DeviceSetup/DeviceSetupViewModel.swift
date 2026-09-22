@@ -29,7 +29,9 @@ final class DeviceSetupViewModel {
     private(set) var isSendingCommand = false
     /// 試し撮りを送ってから結果 (last_capture) が来るまで true
     private(set) var isWaitingTestCapture = false
-    var settingsDraft = DeviceSettings(window_start_hour: 6, window_end_hour: 11, one_per_day: true, rotation: 90)
+    var settingsDraft = DeviceSettings(window_start_hour: 6, window_end_hour: 11, one_per_day: false, rotation: 90)
+    /// 通知の許可を一度は求めたか (連携済み画面を開いたとき 1 回だけ)
+    private var askedNotification = false
 
     private let client: DeviceClientProtocol
     private var pollTask: Task<Void, Never>?
@@ -79,6 +81,7 @@ final class DeviceSetupViewModel {
                 applyDevice(first)
                 phase = .paired
                 startDevicePolling()
+                await askNotificationOnce()
             } else {
                 phase = .unpaired
                 await beginPairing()
@@ -122,10 +125,18 @@ final class DeviceSetupViewModel {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     ToastManager.shared.show("玄関カメラとつながりました", style: .normal)
                     self.startDevicePolling()
+                    await self.askNotificationOnce()
                     return
                 }
             }
         }
+    }
+
+    /// 記録完了のプッシュ通知の許可を求める (連携済みの文脈で 1 回だけ)。許可済みならトークン登録のみ
+    private func askNotificationOnce() async {
+        guard !askedNotification else { return }
+        askedNotification = true
+        await PushNotificationManager.shared.requestAuthorizationAndRegister()
     }
 
     // MARK: - 連携済

@@ -240,6 +240,7 @@ struct DeviceSetupView: View {
                 guideRow("arrow.up.and.down", "カメラの高さは 1.0〜1.3m。縦置きにする")
                 guideRow("sun.max", "窓を背にしない。逆光だと服の色が飛ぶ")
                 guideRow("clock", "記録するのは朝の時間帯だけ (下の設定で変えられる)")
+                guideRow("bell", "記録できたら、写真つきで通知するよ")
             }
         }
     }
@@ -324,6 +325,23 @@ struct DeviceSetupView: View {
                     hourPicker($viewModel.settingsDraft.window_start_hour)
                     Text("〜").font(.system(size: 13)).foregroundStyle(.secondary)
                     hourPicker($viewModel.settingsDraft.window_end_hour)
+                }
+                Toggle(isOn: $viewModel.settingsDraft.notify_on_capture) {
+                    Text("記録できたら知らせる").font(.system(size: 13))
+                }
+                .tint(.black)
+                HStack {
+                    Text("次の撮影まで").font(.system(size: 13))
+                    Spacer()
+                    Picker("", selection: $viewModel.settingsDraft.capture_cooldown_s) {
+                        Text("30秒").tag(30)
+                        Text("1分").tag(60)
+                        Text("2分").tag(120)
+                        Text("5分").tag(300)
+                        Text("10分").tag(600)
+                    }
+                    .pickerStyle(.menu)
+                    .tint(.black)
                 }
                 Toggle(isOn: $viewModel.settingsDraft.one_per_day) {
                     Text("1日1回だけ記録する").font(.system(size: 13))

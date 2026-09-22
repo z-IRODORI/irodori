@@ -13,6 +13,8 @@ import FirebaseAuth
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         FirebaseApp.configure()
+        // リモートプッシュ (FCM): 玄関カメラの記録完了通知。許可ダイアログはここでは出さない
+        PushNotificationManager.shared.configure()
 
         // Phone Auth の APNs サイレント検証用トークンを取得する (通知許可ダイアログは出ない)
         application.registerForRemoteNotifications()
@@ -34,6 +36,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Auth.auth().setAPNSToken(deviceToken, type: .unknown)
+        // Firebase Messaging にも同じトークンを渡す (Phone Auth と共存)
+        PushNotificationManager.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
