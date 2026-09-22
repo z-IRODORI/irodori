@@ -132,6 +132,8 @@ struct MainTabView: View {
                     OutfitSuggestionView(path: $path)
                 case .addItemBySearch:
                     KeywordItemSearchView()
+                case .deviceSetup:
+                    DeviceSetupView(path: $path)
                 }
             }
         }

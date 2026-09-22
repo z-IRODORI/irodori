@@ -102,6 +102,28 @@ final class AnalysisJobStore {
         }
     }
 
+    /// 玄関カメラ (デバイス) 側で作られた解析ジョブを追跡対象にする。
+    /// サムネイルはサーバに保存された撮影画像の URL から取る (元画像は端末に無いので retry は不可)。
+    func attach(jobId: String, thumbnailURL: URL?) {
+        if let job = current, job.status == .processing, job.jobId == jobId { return }
+        pollTask?.cancel()
+        clearImages()
+        thumbnail = nil
+        current = Job(jobId: jobId, status: .processing, submittedAt: Date())
+        isToastSuppressed = false
+        startPolling()
+        guard let thumbnailURL else { return }
+        Task { [weak self] in
+            guard let (data, _) = try? await URLSession.shared.data(from: thumbnailURL),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run {
+                guard let self, self.current?.jobId == jobId else { return }
+                self.saveImages(image)
+                self.thumbnail = self.loadImage(Self.thumbnailFileName)
+            }
+        }
+    }
+
     /// トースターの表示を解禁する (抽出画面を閉じた View が呼ぶ。冪等)
     func revealToast(afterDelay delay: TimeInterval = 0) {
         Task { [weak self] in

@@ -36,6 +36,8 @@ struct ProfileView: View {
                     .padding(.horizontal, 20)
                     // 試着用の顔写真の再登録・削除 (登録本体は Feature/TryOn/FaceRegistrationSheet)
                     TryOnFaceSettingCard()
+                    // 玄関カメラ (Raspberry Pi) の連携・設置ガイド
+                    DeviceSettingCard { path.append(.deviceSetup) }
 //                    tabSegmentView  // コーデタブ未実装のためコメントアウト
 
                     VStack(spacing: 16) {
