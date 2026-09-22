@@ -103,12 +103,18 @@ extension PushNotificationManager: MessagingDelegate {
 // MARK: - UNUserNotificationCenterDelegate
 
 extension PushNotificationManager: UNUserNotificationCenterDelegate {
-    /// フォアグラウンドでもバナーと音を出す
+    /// フォアグラウンド表示: 玄関カメラの記録完了だけバナーと音を出す。
+    /// 既存のローカル通知 (21 時ティザー等) は従来どおりフォアグラウンドでは出さない
+    /// (delegate が無かったときの既定挙動を維持する)。
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        let userInfo = notification.request.content.userInfo
+        if (userInfo["type"] as? String) == "device_capture" {
+            return [.banner, .list, .sound]
+        }
+        return []
     }
 
     /// 通知タップ → コーデ詳細へ
