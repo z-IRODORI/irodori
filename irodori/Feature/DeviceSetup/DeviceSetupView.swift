@@ -16,6 +16,7 @@ struct DeviceSetupView: View {
     @State private var viewModel: DeviceSetupViewModel
     @State private var showUnlinkConfirm = false
     @State private var showTroubleshooting = false
+    @State private var showQRFullScreen = false
 
     @MainActor
     init(path: Binding<[ViewType]>, viewModel: DeviceSetupViewModel? = nil) {
@@ -66,21 +67,36 @@ struct DeviceSetupView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 stepRow(1, "ラズパイの電源を入れて、Wi‑Fi につなぐ")
-                stepRow(2, "下の QR をカメラのレンズにかざす (30〜50cm)")
+                stepRow(2, "下の QR をタップして全画面にし、レンズに向ける (80cm〜1m)")
                 stepRow(3, "つながったら、立ち位置を決めて試し撮り")
             }
 
             card {
                 VStack(spacing: 14) {
                     if let payload = viewModel.qrPayload, let qr = Self.qrImage(payload) {
-                        Image(uiImage: qr)
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 240, height: 240)
-                            .padding(8)
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        Button {
+                            Haptic.impact(.soft)
+                            showQRFullScreen = true
+                        } label: {
+                            VStack(spacing: 8) {
+                                Image(uiImage: qr)
+                                    .interpolation(.none)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: .infinity)
+                                    .padding(8)
+                                    .background(Color.white)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                Text("タップで全画面 (遠くからも読めるように)")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.black)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .fullScreenCover(isPresented: $showQRFullScreen) {
+                            QRFullScreenView(image: qr)
+                        }
                     } else {
                         ProgressView().frame(width: 240, height: 240)
                     }
@@ -117,13 +133,13 @@ struct DeviceSetupView: View {
                         .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.07), lineWidth: 1))
-                    Text("この枠の中に、QR がはっきり大きく写るように iPhone を動かしてください。ぼやけていたら 30〜50cm まで離します。")
+                    Text("この枠の中に QR がはっきり写るように iPhone を動かしてください。近すぎるとぼやけるので、80cm〜1m 離します。")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Text("画面を明るくして、QR 全体がレンズに入るようにゆっくり近づけてください。読み取れると数秒でこの画面が切り替わります。")
+            Text("QR をタップして全画面にし、下の映像で QR がはっきり写る位置 (80cm〜1m) で止めてください。読み取れると数秒でこの画面が切り替わります。")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
@@ -186,7 +202,7 @@ struct DeviceSetupView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     guideRow("power", "ラズパイの電源が入っていて、緑のランプがゆっくり点滅している (= QR 待ち)")
                     guideRow("wifi", "ラズパイと iPhone が同じ Wi‑Fi につながっている")
-                    guideRow("ruler", "画面とレンズの距離は 30〜50cm。QR 全体がレンズに入るように")
+                    guideRow("ruler", "QR を全画面にして 80cm〜1m。近すぎるとピントが合わない")
                     guideRow("sun.max", "画面の明るさを最大に。反射で読めないときは少し角度を変える")
                     guideRow("clock", "起動直後は 30 秒ほどかかる。緑のランプが点滅し始めてからかざす")
                 }
