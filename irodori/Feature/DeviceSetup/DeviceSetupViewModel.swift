@@ -39,6 +39,8 @@ final class DeviceSetupViewModel {
     /// LAN 直接配信の URL (同じ Wi-Fi のとき)。失敗したら nil に戻してクラウド経路へ
     private(set) var lanStreamURL: URL?
     private var lanStreamFailedURL: String?
+    /// LAN 配信のフレームの縦横 (ページが知らせてくる)。回転で変わる
+    private(set) var lanFrameSize: CGSize?
     private(set) var previewImage: UIImage?
     private(set) var isSendingCommand = false
     /// 試し撮りを送ってから結果 (last_capture) が来るまで true
@@ -217,15 +219,59 @@ final class DeviceSetupViewModel {
     /// LAN 配信 URL の更新。一度失敗した URL は再挑戦しない (クラウド経路に固定)
     private func updateLANStream(_ urlString: String?) {
         guard let urlString, urlString != lanStreamFailedURL, let url = URL(string: urlString) else {
-            if urlString == nil { lanStreamURL = nil }
+            if urlString == nil { lanStreamURL = nil; lanFrameSize = nil }
             return
         }
-        if lanStreamURL != url { lanStreamURL = url }
+        if lanStreamURL != url {
+            lanStreamURL = url
+            lanFrameSize = nil
+        }
     }
 
     func lanStreamFailed() {
         lanStreamFailedURL = lanStreamURL?.absoluteString
         lanStreamURL = nil
+        lanFrameSize = nil
+    }
+
+    /// LAN 配信ページからフレームの大きさが届いた (回転が変わると再度届く)
+    func lanFrameSizeReported(_ size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+        if lanFrameSize != size { lanFrameSize = size }
+    }
+
+    /// いまカメラが使っている回転 (自動判定の結果を優先)
+    var effectiveRotation: Int {
+        let settings = device?.settings
+        if settings?.rotation_auto ?? true {
+            return device?.status?.judgement?.effective_rotation ?? settings?.rotation ?? 90
+        }
+        return settings?.rotation ?? 90
+    }
+
+    /// 映像の表示枠の縦横比 (幅/高さ)。実際のフレームの大きさを最優先し、
+    /// 無ければクラウド経由の静止画、それも無ければ回転設定から推定する
+    var previewAspect: CGFloat {
+        if let s = lanFrameSize, lanStreamURL != nil { return s.width / s.height }
+        if let img = previewImage, img.size.height > 0 { return img.size.width / img.size.height }
+        let r = effectiveRotation
+        return (r == 90 || r == 270) ? 3.0 / 4.0 : 4.0 / 3.0
+    }
+
+    /// 映像が横倒し・逆さまのとき: 手動で 90° ずつ回す (自動判定は切って即保存)
+    func rotateManually() async {
+        let current = effectiveRotation
+        settingsDraft.rotation_auto = false
+        settingsDraft.rotation = (current + 90) % 360
+        await saveSettings(silently: true)
+        ToastManager.shared.show("映像を \(settingsDraft.rotation)° に回しました", style: .normal)
+    }
+
+    /// 向きを自動判定に戻す (即保存)
+    func resetRotationToAuto() async {
+        settingsDraft.rotation_auto = true
+        await saveSettings(silently: true)
+        ToastManager.shared.show("向きを自動判定に戻しました", style: .normal)
     }
 
     private func applyDevice(_ d: DeviceInfo) {
@@ -342,7 +388,7 @@ final class DeviceSetupViewModel {
         }
     }
 
-    func saveSettings() async {
+    func saveSettings(silently: Bool = false) async {
         guard let d = device, let c = await credentials() else { return }
         guard let result = try? await client.updateSettings(deviceId: d.device_id, settings: settingsDraft, userId: c.userId, idToken: c.idToken),
               case .success(let updated) = result else {
@@ -350,7 +396,7 @@ final class DeviceSetupViewModel {
             return
         }
         applyDevice(updated)
-        ToastManager.shared.show("設定を保存しました", style: .normal)
+        if !silently { ToastManager.shared.show("設定を保存しました", style: .normal) }
     }
 
     func unlink() async {

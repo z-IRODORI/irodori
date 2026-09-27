@@ -121,8 +121,11 @@ struct DeviceSetupView: View {
                         .font(.system(size: 13, weight: .semibold))
                     Group {
                         if let url = viewModel.lanStreamURL {
-                            LANStreamView(url: url, onFailure: { viewModel.lanStreamFailed() })
-                                .aspectRatio(3 / 4, contentMode: .fit)   // ペアリング前の既定は縦置き
+                            // 枠は映像の実サイズ (ページが知らせてくる) に合わせる。届くまでは回転設定から推定
+                            LANStreamView(url: url,
+                                          onFailure: { viewModel.lanStreamFailed() },
+                                          onFrameSize: { viewModel.lanFrameSizeReported($0) })
+                                .aspectRatio(viewModel.previewAspect, contentMode: .fit)
                                 .id(url)
                         } else if let img = viewModel.pairingPreviewImage {
                             Image(uiImage: img)
@@ -133,6 +136,7 @@ struct DeviceSetupView: View {
                         .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.07), lineWidth: 1))
+                        .animation(.easeInOut(duration: 0.25), value: viewModel.previewAspect)
                     Text("この枠の中に QR がはっきり写るように iPhone を動かしてください。近すぎるとぼやけるので、80cm〜1m 離します。")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -280,15 +284,6 @@ struct DeviceSetupView: View {
         }
     }
 
-    /// LAN 配信の枠の比率。縦置き (90/270) は 3:4、横置きは 4:3
-    private var streamAspect: CGFloat {
-        let settings = viewModel.device?.settings
-        let r = (settings?.rotation_auto ?? true)
-            ? (viewModel.device?.status?.judgement?.effective_rotation ?? settings?.rotation ?? 90)
-            : (settings?.rotation ?? 90)
-        return (r == 90 || r == 270) ? 3.0 / 4.0 : 4.0 / 3.0
-    }
-
     private var lastSeenText: String {
         guard let t = viewModel.device?.last_seen_at else { return "まだ一度も通信していません" }
         let sec = Int(Date().timeIntervalSince1970 - t)
@@ -302,28 +297,32 @@ struct DeviceSetupView: View {
             Text("いまカメラが見ているもの")
                 .font(.system(size: 14, weight: .semibold))
             ZStack(alignment: .bottom) {
-                Group {
-                    if let url = viewModel.lanStreamURL {
-                        // 同じ Wi-Fi: ラズパイの MJPEG ページを直接表示 (15fps・低遅延)。枠は向き設定に合わせる
-                        LANStreamView(url: url, onFailure: { viewModel.lanStreamFailed() })
-                            .aspectRatio(streamAspect, contentMode: .fit)
-                            .id(url)
-                    } else if let img = viewModel.previewImage {
-                        Image(uiImage: img)
-                            .resizable()
-                            .scaledToFit()
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.08))
-                            .aspectRatio(3 / 4, contentMode: .fit)
-                            .overlay(
-                                VStack(spacing: 6) {
-                                    ProgressView()
-                                    Text("映像を待っています…").font(.system(size: 12)).foregroundStyle(.secondary)
-                                }
-                            )
+                // 枠は「いま届いている映像」と同じ縦横比にする (横置きなら横長、縦置きなら縦長)。
+                // LAN 配信はページがフレームの大きさを知らせてくるので、それを最優先で使う
+                Color.black
+                    .aspectRatio(viewModel.previewAspect, contentMode: .fit)
+                    .overlay {
+                        if let url = viewModel.lanStreamURL {
+                            // 同じ Wi-Fi: ラズパイの MJPEG ページを直接表示 (15fps・低遅延)
+                            LANStreamView(url: url,
+                                          onFailure: { viewModel.lanStreamFailed() },
+                                          onFrameSize: { viewModel.lanFrameSizeReported($0) })
+                                .id(url)
+                        } else if let img = viewModel.previewImage {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFit()
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.08))
+                                .overlay(
+                                    VStack(spacing: 6) {
+                                        ProgressView()
+                                        Text("映像を待っています…").font(.system(size: 12)).foregroundStyle(.secondary)
+                                    }
+                                )
+                        }
                     }
-                }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(
                     // 枠の色で達成度を見せる: 無色 (人なし) → 黄 → 緑 (撮影できる)
@@ -331,14 +330,78 @@ struct DeviceSetupView: View {
                         .stroke(readinessColor, lineWidth: viewModel.isFullBodyOK ? 5 : 3)
                         .animation(.easeInOut(duration: 0.25), value: viewModel.readiness)
                 )
+                .animation(.easeInOut(duration: 0.25), value: viewModel.previewAspect)
 
                 hintBand
                     .padding(12)
             }
+
+            orientationRow
+
             Text("映像の緑の点と線は、カメラが見つけた体の部位です。枠が黄色から緑になれば撮影できる状態です。立ち位置から 1.8〜2.5m、カメラの高さは 1.0〜1.3m が目安。")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// 映像の向きをその場で直す行。横倒し・逆さまなら「回す」で 90° ずつ回し、自動判定にも戻せる
+    private var orientationRow: some View {
+        let auto = viewModel.device?.settings.rotation_auto ?? true
+        let rotation = viewModel.effectiveRotation
+        let isLandscape = viewModel.previewAspect > 1
+        return HStack(spacing: 10) {
+            Image(systemName: isLandscape ? "rectangle" : "rectangle.portrait")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isLandscape ? "横向きの映像" : "縦向きの映像")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(auto ? "向きは自動判定 (いま \(rotation)°)。人が写ると頭が上になるように直します"
+                          : "向きは手動 (\(rotation)°)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 6)
+            if !auto {
+                Button {
+                    Haptic.impact(.soft)
+                    Task { await viewModel.resetRotationToAuto() }
+                } label: {
+                    Text("自動")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.gray.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            Button {
+                Haptic.impact(.soft)
+                Task { await viewModel.rotateManually() }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "rotate.right")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("回す")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.black)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isSendingCommand)
+            .accessibilityLabel("映像を 90 度回す")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.gray.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     /// 達成度 → 枠色。0 = 無色、途中 = 黄〜黄緑、1 = 緑。服装チェックに引っかかればオレンジ
@@ -389,7 +452,8 @@ struct DeviceSetupView: View {
                 Text("置き方のコツ")
                     .font(.system(size: 14, weight: .semibold))
                 guideRow("figure.stand", "立ち位置から 1.8〜2.5m 離す。足元まで入る距離")
-                guideRow("arrow.up.and.down", "カメラの高さは 1.0〜1.3m。縦置きにする")
+                guideRow("arrow.up.and.down", "カメラの高さは 1.0〜1.3m。横置きでも縦置きでもよい")
+                guideRow("rotate.right", "映像が横倒し・逆さまなら、設置モードの映像の下の「回す」で直す")
                 guideRow("sun.max", "窓を背にしない。逆光だと服の色が飛ぶ")
                 guideRow("clock", "記録するのは朝の時間帯だけ (下の設定で変えられる)")
                 guideRow("bell", "記録できたら、写真つきで通知するよ")
@@ -444,12 +508,13 @@ struct DeviceSetupView: View {
                     HStack(spacing: 6) {
                         ForEach(Array(thumbs.enumerated()), id: \.offset) { i, url in
                             ZStack(alignment: .topLeading) {
-                                // 3 枚を同じ大きさ (3:4) に揃える。scaledToFill は overlay 側に置き、枠は Color.clear で決める
-                                Color.clear
+                                // 3 枚を同じ大きさ (3:4) の枠に揃え、写真は切り取らずに全体を収める
+                                // (横長の写真や向きの問題があっても、そのまま確認できるように)
+                                Color.gray.opacity(0.08)
                                     .aspectRatio(3 / 4, contentMode: .fit)
                                     .overlay(
                                         CachedAsyncImage(url: url.flatMap(URL.init(string:))) { image in
-                                            image.resizable().scaledToFill()
+                                            image.resizable().scaledToFit()
                                         } placeholder: {
                                             Rectangle().fill(Color.gray.opacity(0.08))
                                         }
