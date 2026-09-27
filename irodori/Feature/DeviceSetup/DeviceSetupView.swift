@@ -236,6 +236,8 @@ struct DeviceSetupView: View {
 
             placementGuide
 
+            attireRuleCard
+
             if let cap = viewModel.device?.last_capture {
                 lastCaptureCard(cap)
             }
@@ -336,9 +338,10 @@ struct DeviceSetupView: View {
         }
     }
 
-    /// 達成度 → 枠色。0 = 無色、途中 = 黄〜黄緑、1 = 緑
+    /// 達成度 → 枠色。0 = 無色、途中 = 黄〜黄緑、1 = 緑。服装チェックに引っかかればオレンジ
     private var readinessColor: Color {
         let r = viewModel.readiness
+        if r > 0 && viewModel.isAttireBlocked { return Color.orange }
         if r <= 0 { return Color.black.opacity(0.07) }
         if r >= 1 { return Color.green }
         // 黄 (hue 0.14) → 緑 (hue 0.33) へ滑らかに
@@ -347,24 +350,31 @@ struct DeviceSetupView: View {
 
     @ViewBuilder
     private var hintBand: some View {
+        let blocked = viewModel.isPersonPresent && viewModel.isAttireBlocked
         let text: String = {
             if !viewModel.isPersonPresent { return "カメラの前に立ってみて" }
+            if blocked {
+                if let labels = viewModel.attire?.exposed_labels, !labels.isEmpty {
+                    return "この服装は送りません（\(labels.joined(separator: "・"))）"
+                }
+                return "服装を判定できません（暗さ・逆光）"
+            }
             if viewModel.isFullBodyOK { return "撮影できるよ！" }
             return viewModel.hints.first ?? "全身が写るかチェック！"
         }()
         HStack(spacing: 8) {
-            if viewModel.isPersonPresent && !viewModel.isFullBodyOK {
+            if viewModel.isPersonPresent && !viewModel.isFullBodyOK && !blocked {
                 Text("\(Int(viewModel.readiness * 100))%")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.secondary)
             }
             Text(text)
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(viewModel.isFullBodyOK ? .white : .black)
+                .foregroundStyle((viewModel.isFullBodyOK && !blocked) || blocked ? .white : .black)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(viewModel.isFullBodyOK ? Color.green : Color.white.opacity(0.92))
+        .background(blocked ? Color.orange : (viewModel.isFullBodyOK ? Color.green : Color.white.opacity(0.92)))
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
         .animation(.easeInOut(duration: 0.2), value: text)
@@ -384,6 +394,38 @@ struct DeviceSetupView: View {
         }
     }
 
+    /// 送らない服装のルール (プライバシー)。撮る前に知ってもらう
+    private var attireRuleCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("送らない服装")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                Text("次の 3 か所が服で隠れていない写真は、カメラの中で消去してサーバーに送りません。")
+                    .font(.system(size: 13))
+                HStack(spacing: 8) {
+                    ForEach(["胸", "おなか", "太ももの付け根"], id: \.self) { label in
+                        Text(label)
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.orange.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                }
+                Text("裸・下着・水着・スポーツブラ・おへそが見える服などが当てはまります。ノースリーブや膝丈のショートパンツは送ります。設置モードの映像で、この服装が送れるかを事前に確認できます。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Text("肌に近い色の服や、暗い・逆光の場所では誤って止めることがあります。その場合は理由を通知でお知らせするので、試し撮りでやり直せます。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private func lastCaptureCard(_ cap: DeviceCaptureSummary) -> some View {
         card {
             VStack(alignment: .leading, spacing: 10) {
@@ -393,7 +435,7 @@ struct DeviceSetupView: View {
                     Spacer()
                     Text(captureStatusLabel(cap))
                         .font(.system(size: 12))
-                        .foregroundStyle(cap.status == "completed" ? Color.pink : .secondary)
+                        .foregroundStyle(cap.status == "completed" ? Color.pink : (cap.status == "skipped" ? Color.orange : .secondary))
                 }
                 if let thumbs = cap.thumbnails, !thumbs.isEmpty {
                     HStack(spacing: 6) {
@@ -429,7 +471,20 @@ struct DeviceSetupView: View {
                         }
                     }
                 }
-                if let error = cap.error, cap.status != "completed", cap.status != "processing" {
+                if cap.status == "skipped" {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.raised.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.orange)
+                            Text(cap.skip?.reason ?? "服装を判定できなかったため")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        Text("写真はカメラの中で消去し、サーバーには送っていません。上の「送らない服装」のルールに当てはまったためです。着替えたら試し撮りでやり直せます。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let error = cap.error, cap.status != "completed", cap.status != "processing" {
                     Text(error)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -445,6 +500,7 @@ struct DeviceSetupView: View {
 
     private func captureStatusLabel(_ cap: DeviceCaptureSummary) -> String {
         switch cap.status {
+        case "skipped": return "送りませんでした"
         case "processing": return "解析中…"
         case "completed": return "記録できた"
         case "canceled": return "全身が写らなかった"
@@ -465,6 +521,20 @@ struct DeviceSetupView: View {
                     Text("〜").font(.system(size: 13)).foregroundStyle(.secondary)
                     hourPicker($viewModel.settingsDraft.window_end_hour)
                 }
+                HStack {
+                    Text("服装チェック").font(.system(size: 13))
+                    Spacer()
+                    Picker("", selection: $viewModel.settingsDraft.attire_check) {
+                        Text("厳しめ (推奨)").tag("strict")
+                        Text("ふつう").tag("normal")
+                        Text("オフ").tag("off")
+                    }
+                    .pickerStyle(.menu)
+                    .tint(.black)
+                }
+                Text(attireLevelDescription)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
                 Toggle(isOn: $viewModel.settingsDraft.notify_on_shot) {
                     Text("撮影したら知らせる").font(.system(size: 13))
                 }
@@ -506,6 +576,14 @@ struct DeviceSetupView: View {
                     secondaryButton("保存") { Task { await viewModel.saveSettings() } }
                 }
             }
+        }
+    }
+
+    private var attireLevelDescription: String {
+        switch viewModel.settingsDraft.attire_check {
+        case "normal": return "下着・裸・水着だけ止めます。おへそが少し見える程度は送ります"
+        case "off": return "服装で止めません。すべての写真を送ります"
+        default: return "胸・おなか・太ももの付け根が隠れていなければ送りません。判定できないときも送りません"
         }
     }
 

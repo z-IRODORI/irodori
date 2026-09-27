@@ -79,8 +79,8 @@ final class PushNotificationManager: NSObject {
 
     nonisolated static func destination(from userInfo: [AnyHashable: Any]) -> ViewType? {
         guard let type = userInfo["type"] as? String else { return nil }
-        if type == "device_shot" {
-            // 撮影した瞬間の通知 → 玄関カメラ画面 (3 枚と解析の進み具合が見える)
+        if type == "device_shot" || type == "device_skipped" {
+            // 撮影した瞬間 / 送らなかった通知 → 玄関カメラ画面 (3 枚・理由・ルールが見える)
             return .deviceSetup
         }
         guard type == "device_capture",
@@ -116,7 +116,7 @@ extension PushNotificationManager: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         let userInfo = notification.request.content.userInfo
-        if let type = userInfo["type"] as? String, type == "device_capture" || type == "device_shot" {
+        if let type = userInfo["type"] as? String, ["device_capture", "device_shot", "device_skipped"].contains(type) {
             return [.banner, .list, .sound]
         }
         return []

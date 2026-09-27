@@ -398,6 +398,13 @@ final class DeviceSetupViewModel {
         device?.status?.judgement?.present ?? false
     }
 
+    /// 服装チェックのライブ結果 (設置モード中のみ)
+    var attire: DeviceAttire? { device?.status?.judgement?.attire }
+    var isAttireBlocked: Bool {
+        guard let a = attire else { return false }
+        return a.status == "exposed" || a.status == "unknown"
+    }
+
     /// 撮影条件の達成度 (0...1)。人がいなければ 0、条件を満たせば 1
     var readiness: Double {
         guard isPersonPresent else { return 0 }

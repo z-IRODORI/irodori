@@ -30,10 +30,13 @@ struct DeviceSettings: Codable, Equatable {
     var notify_on_capture: Bool
     /// 撮影した瞬間にもプッシュ通知する
     var notify_on_shot: Bool
+    /// 服装チェックの厳しさ: strict / normal / off
+    var attire_check: String
 
     init(window_start_hour: Int, window_end_hour: Int, one_per_day: Bool,
          capture_cooldown_s: Int = 120, rotation: Int, notify_on_capture: Bool = true,
-         notify_on_shot: Bool = true) {
+         notify_on_shot: Bool = true, attire_check: String = "strict") {
+        self.attire_check = attire_check
         self.window_start_hour = window_start_hour
         self.window_end_hour = window_end_hour
         self.one_per_day = one_per_day
@@ -53,7 +56,15 @@ struct DeviceSettings: Codable, Equatable {
         rotation = try c.decodeIfPresent(Int.self, forKey: .rotation) ?? 90
         notify_on_capture = try c.decodeIfPresent(Bool.self, forKey: .notify_on_capture) ?? true
         notify_on_shot = try c.decodeIfPresent(Bool.self, forKey: .notify_on_shot) ?? true
+        attire_check = try c.decodeIfPresent(String.self, forKey: .attire_check) ?? "strict"
     }
+}
+
+/// 服装チェック (プライバシー) のライブ結果
+struct DeviceAttire: Decodable, Equatable {
+    let status: String            // ok | exposed | unknown | off
+    let exposed_labels: [String]? // 例: ["おなか"]
+    let reason: String?
 }
 
 struct DeviceJudgement: Decodable, Equatable {
@@ -63,6 +74,15 @@ struct DeviceJudgement: Decodable, Equatable {
     /// 撮影に必要なキーポイントのうち見えている割合 (0...1)
     let progress: Double?
     let missing: [String]?
+    let attire: DeviceAttire?
+}
+
+/// 送らなかった撮影の理由
+struct DeviceSkipInfo: Decodable, Equatable {
+    let source: String?          // device | server
+    let reason_code: String?     // exposed | unknown
+    let exposed_labels: [String]?
+    let reason: String?
 }
 
 struct DeviceStatus: Decodable, Equatable {
@@ -81,6 +101,7 @@ struct DeviceCaptureSummary: Decodable, Equatable {
     let captured_at: Double?
     let trigger: String?        // auto | test
     let thumbnails: [String?]?
+    let skip: DeviceSkipInfo?
 }
 
 struct DeviceInfo: Decodable, Equatable, Identifiable {
@@ -266,7 +287,7 @@ final class MockDeviceClient: DeviceClientProtocol {
             last_seen_at: Date().timeIntervalSince1970,
             settings: DeviceSettings(window_start_hour: 6, window_end_hour: 11, one_per_day: true, rotation: 90),
             status: DeviceStatus(state: "framing",
-                                 judgement: DeviceJudgement(present: true, ok: false, hints: ["一歩下がって"], progress: 0.6, missing: ["l_knee"]),
+                                 judgement: DeviceJudgement(present: true, ok: false, hints: ["一歩下がって"], progress: 0.6, missing: ["l_knee"], attire: nil),
                                  updated_at: Date().timeIntervalSince1970),
             setup_mode: setupMode,
             preview_url: nil,
