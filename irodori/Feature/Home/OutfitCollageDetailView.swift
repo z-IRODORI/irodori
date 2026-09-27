@@ -466,11 +466,10 @@ struct OutfitCollageDetailView: View {
     @ViewBuilder
     private var recommendationsSection: some View {
         if viewModel.isLoadingOutfitRecommendations {
+            // コーデ本体の表示や編集は止めず、このセクションだけ読み込み中にする
             VStack(alignment: .leading, spacing: 14) {
                 recommendHeader
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
+                ClosetBridgeLoadingRow(caption: "このコーデに合うアイテムを探しています…")
             }
         } else if let rec = viewModel.outfitRecommendations, !rec.items.isEmpty {
             VStack(alignment: .leading, spacing: 14) {

@@ -67,28 +67,10 @@ struct ClosetBridgeSection: View {
 
     // MARK: - Skeleton
 
+    /// セクション内だけのローディング表示 (ホーム全体の読み込みとは独立)。
+    /// 見出しは出したまま、1 カテゴリぶんの行だけをプレースホルダにする
     private var skeleton: some View {
-        VStack(spacing: 14) {
-            ForEach(0..<2, id: \.self) { _ in
-                VStack(alignment: .leading, spacing: 10) {
-                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 160, height: 12)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(0..<4, id: \.self) { _ in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.12)).frame(width: 132, height: 132)
-                                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 100, height: 11)
-                                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 60, height: 13)
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(14)
-                .background(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-            }
-        }
+        ClosetBridgeLoadingRow()
     }
 
     // MARK: - Error State
@@ -115,6 +97,45 @@ struct ClosetBridgeSection: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+    }
+}
+
+// MARK: - Loading Row (アイテムおすすめの局所ローディング)
+
+/// 商品行 1 つぶんのスケルトン。ホーム「買い足すなら」とコラージュ詳細の
+/// 「このコーデにおすすめ」で共用し、画面全体ではなくそのセクションだけが
+/// 読み込み中であることを伝える。取得は数秒かかるため、待っている場所を明示する
+struct ClosetBridgeLoadingRow: View {
+    var caption: String = "手持ちの服に合うアイテムを探しています…"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .scaleEffect(0.8)
+                Text(caption)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        VStack(alignment: .leading, spacing: 6) {
+                            RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.12)).frame(width: 132, height: 132)
+                            RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 100, height: 11)
+                            RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.12)).frame(width: 60, height: 13)
+                        }
+                    }
+                }
+            }
+            .scrollDisabled(true)
+        }
+        .padding(14)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+        .accessibilityLabel("おすすめアイテムを読み込み中")
     }
 }
 
