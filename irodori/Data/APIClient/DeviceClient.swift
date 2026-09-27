@@ -28,15 +28,19 @@ struct DeviceSettings: Codable, Equatable {
     var rotation: Int
     /// 記録できたらプッシュ通知する
     var notify_on_capture: Bool
+    /// 撮影した瞬間にもプッシュ通知する
+    var notify_on_shot: Bool
 
     init(window_start_hour: Int, window_end_hour: Int, one_per_day: Bool,
-         capture_cooldown_s: Int = 120, rotation: Int, notify_on_capture: Bool = true) {
+         capture_cooldown_s: Int = 120, rotation: Int, notify_on_capture: Bool = true,
+         notify_on_shot: Bool = true) {
         self.window_start_hour = window_start_hour
         self.window_end_hour = window_end_hour
         self.one_per_day = one_per_day
         self.capture_cooldown_s = capture_cooldown_s
         self.rotation = rotation
         self.notify_on_capture = notify_on_capture
+        self.notify_on_shot = notify_on_shot
     }
 
     // 旧サーバの応答 (フィールド無し) でも落ちないように既定値で補う
@@ -48,6 +52,7 @@ struct DeviceSettings: Codable, Equatable {
         capture_cooldown_s = try c.decodeIfPresent(Int.self, forKey: .capture_cooldown_s) ?? 120
         rotation = try c.decodeIfPresent(Int.self, forKey: .rotation) ?? 90
         notify_on_capture = try c.decodeIfPresent(Bool.self, forKey: .notify_on_capture) ?? true
+        notify_on_shot = try c.decodeIfPresent(Bool.self, forKey: .notify_on_shot) ?? true
     }
 }
 
@@ -55,6 +60,9 @@ struct DeviceJudgement: Decodable, Equatable {
     let present: Bool?
     let ok: Bool?
     let hints: [String]?
+    /// 撮影に必要なキーポイントのうち見えている割合 (0...1)
+    let progress: Double?
+    let missing: [String]?
 }
 
 struct DeviceStatus: Decodable, Equatable {
@@ -258,7 +266,7 @@ final class MockDeviceClient: DeviceClientProtocol {
             last_seen_at: Date().timeIntervalSince1970,
             settings: DeviceSettings(window_start_hour: 6, window_end_hour: 11, one_per_day: true, rotation: 90),
             status: DeviceStatus(state: "framing",
-                                 judgement: DeviceJudgement(present: true, ok: false, hints: ["一歩下がって"]),
+                                 judgement: DeviceJudgement(present: true, ok: false, hints: ["一歩下がって"], progress: 0.6, missing: ["l_knee"]),
                                  updated_at: Date().timeIntervalSince1970),
             setup_mode: setupMode,
             preview_url: nil,

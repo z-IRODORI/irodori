@@ -78,7 +78,12 @@ final class PushNotificationManager: NSObject {
     // MARK: - 受信内容の解釈
 
     nonisolated static func destination(from userInfo: [AnyHashable: Any]) -> ViewType? {
-        guard let type = userInfo["type"] as? String, type == "device_capture",
+        guard let type = userInfo["type"] as? String else { return nil }
+        if type == "device_shot" {
+            // 撮影した瞬間の通知 → 玄関カメラ画面 (3 枚と解析の進み具合が見える)
+            return .deviceSetup
+        }
+        guard type == "device_capture",
               let coordinateId = userInfo["coordinate_id"] as? String, !coordinateId.isEmpty else { return nil }
         let image = (userInfo["image_url"] as? String) ?? ""
         return .coordinateDetail(.init(coordinateId: coordinateId, coordinateImageURL: image, showHeader: true))
@@ -111,7 +116,7 @@ extension PushNotificationManager: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         let userInfo = notification.request.content.userInfo
-        if (userInfo["type"] as? String) == "device_capture" {
+        if let type = userInfo["type"] as? String, type == "device_capture" || type == "device_shot" {
             return [.banner, .list, .sound]
         }
         return []

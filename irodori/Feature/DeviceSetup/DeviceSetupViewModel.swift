@@ -397,4 +397,11 @@ final class DeviceSetupViewModel {
     var isPersonPresent: Bool {
         device?.status?.judgement?.present ?? false
     }
+
+    /// 撮影条件の達成度 (0...1)。人がいなければ 0、条件を満たせば 1
+    var readiness: Double {
+        guard isPersonPresent else { return 0 }
+        if isFullBodyOK { return 1 }
+        return min(max(device?.status?.judgement?.progress ?? 0, 0), 0.99)
+    }
 }

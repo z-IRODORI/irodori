@@ -321,35 +321,53 @@ struct DeviceSetupView: View {
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(
+                    // 枠の色で達成度を見せる: 無色 (人なし) → 黄 → 緑 (撮影できる)
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(viewModel.isFullBodyOK ? Color.pink : Color.black.opacity(0.07), lineWidth: viewModel.isFullBodyOK ? 3 : 1)
+                        .stroke(readinessColor, lineWidth: viewModel.isFullBodyOK ? 5 : 3)
+                        .animation(.easeInOut(duration: 0.25), value: viewModel.readiness)
                 )
 
                 hintBand
                     .padding(12)
             }
-            Text("立ち位置から 1.8〜2.5m、カメラの高さは 1.0〜1.3m、縦置き。窓を背にしない。ヒントが全部消えてピンクの枠になれば OK。")
+            Text("映像の緑の点と線は、カメラが見つけた体の部位です。枠が黄色から緑になれば撮影できる状態です。立ち位置から 1.8〜2.5m、カメラの高さは 1.0〜1.3m が目安。")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// 達成度 → 枠色。0 = 無色、途中 = 黄〜黄緑、1 = 緑
+    private var readinessColor: Color {
+        let r = viewModel.readiness
+        if r <= 0 { return Color.black.opacity(0.07) }
+        if r >= 1 { return Color.green }
+        // 黄 (hue 0.14) → 緑 (hue 0.33) へ滑らかに
+        return Color(hue: 0.14 + 0.19 * r, saturation: 0.85, brightness: 0.9)
     }
 
     @ViewBuilder
     private var hintBand: some View {
         let text: String = {
             if !viewModel.isPersonPresent { return "カメラの前に立ってみて" }
-            if viewModel.isFullBodyOK { return "全身ばっちり！" }
+            if viewModel.isFullBodyOK { return "撮影できるよ！" }
             return viewModel.hints.first ?? "全身が写るかチェック！"
         }()
-        Text(text)
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(viewModel.isFullBodyOK ? .white : .black)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(viewModel.isFullBodyOK ? Color.pink : Color.white.opacity(0.92))
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
-            .animation(.easeInOut(duration: 0.2), value: text)
+        HStack(spacing: 8) {
+            if viewModel.isPersonPresent && !viewModel.isFullBodyOK {
+                Text("\(Int(viewModel.readiness * 100))%")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            Text(text)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(viewModel.isFullBodyOK ? .white : .black)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(viewModel.isFullBodyOK ? Color.green : Color.white.opacity(0.92))
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        .animation(.easeInOut(duration: 0.2), value: text)
     }
 
     private var placementGuide: some View {
@@ -447,6 +465,10 @@ struct DeviceSetupView: View {
                     Text("〜").font(.system(size: 13)).foregroundStyle(.secondary)
                     hourPicker($viewModel.settingsDraft.window_end_hour)
                 }
+                Toggle(isOn: $viewModel.settingsDraft.notify_on_shot) {
+                    Text("撮影したら知らせる").font(.system(size: 13))
+                }
+                .tint(.black)
                 Toggle(isOn: $viewModel.settingsDraft.notify_on_capture) {
                     Text("記録できたら知らせる").font(.system(size: 13))
                 }
