@@ -282,7 +282,10 @@ struct DeviceSetupView: View {
 
     /// LAN 配信の枠の比率。縦置き (90/270) は 3:4、横置きは 4:3
     private var streamAspect: CGFloat {
-        let r = viewModel.device?.settings.rotation ?? 90
+        let settings = viewModel.device?.settings
+        let r = (settings?.rotation_auto ?? true)
+            ? (viewModel.device?.status?.judgement?.effective_rotation ?? settings?.rotation ?? 90)
+            : (settings?.rotation ?? 90)
         return (r == 90 || r == 270) ? 3.0 / 4.0 : 4.0 / 3.0
     }
 
@@ -561,22 +564,51 @@ struct DeviceSetupView: View {
                 }
                 .tint(.black)
                 HStack {
-                    Text("カメラの向き").font(.system(size: 13))
+                    Text("映像の向き").font(.system(size: 13))
                     Spacer()
-                    Picker("", selection: $viewModel.settingsDraft.rotation) {
-                        Text("縦置き").tag(90)
-                        Text("縦置き (逆)").tag(270)
-                        Text("横置き").tag(0)
-                        Text("横置き (逆)").tag(180)
+                    Picker("", selection: rotationSelection) {
+                        Text("自動 (推奨)").tag(-1)
+                        Text("そのまま").tag(0)
+                        Text("90° 回す").tag(90)
+                        Text("180° 回す").tag(180)
+                        Text("270° 回す").tag(270)
                     }
                     .pickerStyle(.menu)
                     .tint(.black)
                 }
+                Text(rotationDescription)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
                 if viewModel.settingsDraft != viewModel.device?.settings {
                     secondaryButton("保存") { Task { await viewModel.saveSettings() } }
                 }
             }
         }
+    }
+
+    /// 「自動」は -1、手動は角度。自動を選ぶと rotation_auto=true、角度を選ぶと false + その角度
+    private var rotationSelection: Binding<Int> {
+        Binding(
+            get: { viewModel.settingsDraft.rotation_auto ? -1 : viewModel.settingsDraft.rotation },
+            set: { v in
+                if v < 0 {
+                    viewModel.settingsDraft.rotation_auto = true
+                } else {
+                    viewModel.settingsDraft.rotation_auto = false
+                    viewModel.settingsDraft.rotation = v
+                }
+            }
+        )
+    }
+
+    private var rotationDescription: String {
+        if viewModel.settingsDraft.rotation_auto {
+            if let r = viewModel.device?.status?.judgement?.effective_rotation {
+                return "人が写ったとき頭が上になる向きを自動で選びます (いまは \(r)°)"
+            }
+            return "人が写ったとき頭が上になる向きを自動で選びます"
+        }
+        return "映像が横倒しや逆さまなら、正立するまで回してください"
     }
 
     private var attireLevelDescription: String {

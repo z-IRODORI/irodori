@@ -26,6 +26,8 @@ struct DeviceSettings: Codable, Equatable {
     /// 撮影後、次の自動撮影までの最短秒数 (連写防止)
     var capture_cooldown_s: Int
     var rotation: Int
+    /// 映像の向きを自動で決める (人が写ったとき頭が上になる回転)
+    var rotation_auto: Bool
     /// 記録できたらプッシュ通知する
     var notify_on_capture: Bool
     /// 撮影した瞬間にもプッシュ通知する
@@ -35,8 +37,9 @@ struct DeviceSettings: Codable, Equatable {
 
     init(window_start_hour: Int, window_end_hour: Int, one_per_day: Bool,
          capture_cooldown_s: Int = 120, rotation: Int, notify_on_capture: Bool = true,
-         notify_on_shot: Bool = true, attire_check: String = "strict") {
+         notify_on_shot: Bool = true, attire_check: String = "strict", rotation_auto: Bool = true) {
         self.attire_check = attire_check
+        self.rotation_auto = rotation_auto
         self.window_start_hour = window_start_hour
         self.window_end_hour = window_end_hour
         self.one_per_day = one_per_day
@@ -54,6 +57,7 @@ struct DeviceSettings: Codable, Equatable {
         one_per_day = try c.decodeIfPresent(Bool.self, forKey: .one_per_day) ?? false
         capture_cooldown_s = try c.decodeIfPresent(Int.self, forKey: .capture_cooldown_s) ?? 120
         rotation = try c.decodeIfPresent(Int.self, forKey: .rotation) ?? 90
+        rotation_auto = try c.decodeIfPresent(Bool.self, forKey: .rotation_auto) ?? true
         notify_on_capture = try c.decodeIfPresent(Bool.self, forKey: .notify_on_capture) ?? true
         notify_on_shot = try c.decodeIfPresent(Bool.self, forKey: .notify_on_shot) ?? true
         attire_check = try c.decodeIfPresent(String.self, forKey: .attire_check) ?? "strict"
@@ -75,6 +79,8 @@ struct DeviceJudgement: Decodable, Equatable {
     let progress: Double?
     let missing: [String]?
     let attire: DeviceAttire?
+    /// いまカメラが使っている回転 (自動判定の結果)
+    let effective_rotation: Int?
 }
 
 /// 送らなかった撮影の理由
@@ -287,7 +293,7 @@ final class MockDeviceClient: DeviceClientProtocol {
             last_seen_at: Date().timeIntervalSince1970,
             settings: DeviceSettings(window_start_hour: 6, window_end_hour: 11, one_per_day: true, rotation: 90),
             status: DeviceStatus(state: "framing",
-                                 judgement: DeviceJudgement(present: true, ok: false, hints: ["一歩下がって"], progress: 0.6, missing: ["l_knee"], attire: nil),
+                                 judgement: DeviceJudgement(present: true, ok: false, hints: ["一歩下がって"], progress: 0.6, missing: ["l_knee"], attire: nil, effective_rotation: 90),
                                  updated_at: Date().timeIntervalSince1970),
             setup_mode: setupMode,
             preview_url: nil,
