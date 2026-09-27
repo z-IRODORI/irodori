@@ -167,26 +167,30 @@ final class HomeViewModel {
         refreshPickTabsIfNeeded()
         hydrateFromCache(uid: uid)
         isLoadingHome = homeResponse.recent_coordinates.isEmpty
-        isLoadingAnalysis = recentCoordinateAnalysis.isEmpty
+        // 「今週のあなたへ」(LLM 分析) は現行ホームでは表示していないため取得しない。
+        // 毎起動 3〜4 秒の Gemini 呼び出しと、単一ワーカー API 上での他リクエストとの
+        // 競合をなくす (Sandbox のデザイン検証ビューは残しているのでプロパティは維持)
+        isLoadingAnalysis = false
         if dailyByScope[selectedPickScope] == nil {
             dailyLoadingScopes.insert(selectedPickScope)
         }
         isLoadingOutfitCollage = (outfitCollage == nil)
-        isLoadingClosetBridge = (closetBridge == nil)
         hasLoadError = false
         dailyErrorScopes.remove(selectedPickScope)
         hasOutfitCollageError = false
-        hasClosetBridgeError = false
+
+        // 「買い足すなら」(アイテムおすすめ) はサーバ側の生成が数秒かかるため、
+        // ホーム全体の読み込み (この関数の完了 = pull-to-refresh の終了) からは切り離し、
+        // セクション内のローディング表示だけで待つ
+        loadClosetBridgeDetached(uid: uid, gender: gender)
 
         // 各セクションを独立に取得・反映する。
         // 旧実装は async let を固定順で await していたため、先に await される遅い呼び出し
         // (LLM分析など) が終わるまで、完了済みの後続セクションも反映されなかった
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadHomeSection(uid: uid) }
-            group.addTask { await self.loadAnalysisSection(uid: uid) }
             group.addTask { await self.loadDaily(scope: self.selectedPickScope, force: true) }
             group.addTask { await self.loadCollageSection(uid: uid, gender: gender) }
-            group.addTask { await self.loadClosetBridgeSection(uid: uid, gender: gender) }
             // アイテム登録促進バナーの判定用 (登録済みなら件数はほぼ変わらないため未取得時のみ)
             group.addTask { await self.loadClosetItemsIfNeeded() }
             // カレンダーの予定コーデ: おすすめコーデのタブに「予定あり」を示す
@@ -401,6 +405,22 @@ final class HomeViewModel {
             if outfitCollage == nil { hasOutfitCollageError = true }
         }
         isLoadingOutfitCollage = false
+    }
+
+    /// 買い足し提案の取得中タスク (多重起動を防ぐ)
+    private var closetBridgeTask: Task<Void, Never>?
+
+    /// 買い足し提案をホーム全体の読み込みと切り離して取得する。
+    /// 表示中の内容があればそのまま見せ、無いときだけセクション内スケルトンを出す
+    private func loadClosetBridgeDetached(uid: String, gender: Gender) {
+        guard closetBridgeTask == nil else { return }
+        isLoadingClosetBridge = (closetBridge == nil)
+        hasClosetBridgeError = false
+        closetBridgeTask = Task { [weak self] in
+            guard let self else { return }
+            await self.loadClosetBridgeSection(uid: uid, gender: gender)
+            self.closetBridgeTask = nil
+        }
     }
 
     private func loadClosetBridgeSection(uid: String, gender: Gender) async {
