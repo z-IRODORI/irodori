@@ -781,27 +781,22 @@ struct TomorrowPickSection: View {
                     maxTemp: daily?.weather.max_temp,
                     scopeName: viewModel.selectedPickScope.displayName
                 )
-                // 相棒アイコンは題字とタイプ (casual / korean 等) の2行ぶんに広げて配置し、
-                // 「相棒が選んだ一着」の存在感を強める
-                // (天気下の相棒コメント行は廃止し、相棒の存在感はここへ集約)
-                HStack(alignment: .center, spacing: 8) {
-                    PartnerIconImage(size: 34)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(headline.text)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(headline.isDiscovery ? Color.teal : .black)
+                // 相棒アイコンはホーム最上部の統合相棒ヘッダーに集約し、カード内では題字と手持ち数をすっきり見せる
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(headline.text)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(headline.isDiscovery ? Color.teal : .black)
+                        .lineLimit(1)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(styleName(card))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(styleName(card))
+                        Spacer()
+                        if usedItemsCount(for: card) > 0 {
+                            Text("手持ち \(card.owned_items.count)/\(usedItemsCount(for: card))")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                            Spacer()
-                            if usedItemsCount(for: card) > 0 {
-                                Text("手持ち \(card.owned_items.count)/\(usedItemsCount(for: card))")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
-                            }
                         }
                     }
                 }
@@ -1209,7 +1204,7 @@ struct TomorrowPickSection: View {
 
 // MARK: - 構成アイテムビュー (このコーデの理由 + レシピ vs クローゼット)
 
-fileprivate struct TomorrowCompositionView: View {
+struct TomorrowCompositionView: View {
     let item: DailyRecommendationItem
     var initialRating: PickFeedbackRating? = nil
     /// フィードバック送信 (VM の sendFeedback へ委譲)。nil なら評価UI非表示

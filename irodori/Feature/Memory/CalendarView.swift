@@ -102,6 +102,10 @@ struct CalendarView: View {
         .sheet(isPresented: $showSandboxMenu) {
             NavigationStack {
                 List {
+                    NavigationLink("相棒統合ホーム画面 (改善案 A/B/C)") {
+                        PartnerIntegratedHomeSandboxView()
+                            .environment(tabViewModel)
+                    }
                     NavigationLink("週間コーデプランナー") { WeeklyPlannerSandboxView() }
                     NavigationLink("同日複数コーデUI (Mock)") {
                         CalendarMultiCoordSandboxView(dataSource: .mock(delay: 0))

@@ -21,6 +21,9 @@ struct HomeView: View {
     @State private var showFullBodyPickerSheet = false
     @State private var showStandardItemPickerSheet = false
     @State private var showTasteVoteSheet = false
+    #if DEBUG
+    @State private var showHomeSandboxSheet = false
+    #endif
     @Environment(MainTabViewModel.self) private var tabViewModel
 
     var body: some View {
@@ -33,8 +36,8 @@ struct HomeView: View {
 
             ScrollViewReader { scrollProxy in
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 28) {
-                    // Layer 1: 相棒のデイリーブリーフィング（相棒アイコン・タイプ・今日の理由・4つの特徴）
+                VStack(spacing: 22) {
+                    // Layer 1: 相棒のデイリーブリーフィング（タップで相棒画面へ遷移）
                     PartnerHomeBriefingCard(
                         partnerHome: viewModel.partnerHome,
                         persistedOnboarding: viewModel.persistedOnboarding,
@@ -42,7 +45,7 @@ struct HomeView: View {
                         partnerCommentFromDaily: viewModel.dailyRecommendation?.partner_comment,
                         onTapPartnerProfile: {
                             Haptic.impact(.soft)
-                            tabViewModel.selectedTab = .partner
+                            path.append(.partner)
                         },
                         onTapRetakeOnboarding: {
                             Haptic.impact(.soft)
@@ -65,7 +68,7 @@ struct HomeView: View {
                     .padding(.horizontal, -24)
                     .id("hero")
 
-                    // Layer 3: 相棒からのデータ獲得提案カード（「相棒にもっとあなたのことを教える」）
+                    // Layer 3: 相棒からのデータ獲得提案カード（コンパクト3タイル）
                     PartnerDataAcquisitionCard(
                         closetCount: viewModel.closetItems.count,
                         onTapPhotoAutoPick: {
@@ -82,13 +85,12 @@ struct HomeView: View {
                         }
                     )
 
-                    // 直近コーデ
+                    // 直近コーデ（登録済みのときのみ表示し、未登録時は上の3タイル登録カードに集約）
                     if viewModel.isLoadingHome {
                         recentCoordinatesSkeleton
                     } else if viewModel.hasLoadError {
                         recentCoordinatesError
                     } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
-                        // タイトルは RecentCoordinates 内部のヘッダー (見出し+編集ボタン) に一本化
                         RecentCoordinates(
                             recentCoordinates: viewModel.homeResponse.recent_coordinates,
                             isEditMode: viewModel.isEditMode,
@@ -105,48 +107,7 @@ struct HomeView: View {
                             }
                         )
                         .padding(.horizontal, -24)
-                    } else {
-                        coordinateEmptyState
                     }
-
-                    // 「クローゼットでコーデ」セクション:
-                    //  クローゼットのアイテムをバックエンドで合成したコーデコラージュ.
-                    //  タップ / CTA で差し替え・シャッフルの詳細モーダルを開く.
-                    OutfitCollageSection(
-                        response: viewModel.outfitCollage,
-                        isLoading: viewModel.isLoadingOutfitCollage,
-                        hasError: viewModel.hasOutfitCollageError,
-                        onOpenDetail: {
-                            viewModel.showingOutfitCollageDetail = true
-                        },
-                        onRetry: {
-                            Task { await viewModel.refreshOutfitCollage() }
-                        }
-                    )
-
-                    // 「コーデコラージュ」導線: 登録コーデ/写真から1枚のシェア画像を作る画面へ.
-                    collageEntryCard
-
-                    // 「買い足すなら」セクション: 手持ち服が活きる買い足しアイテム3件.
-                    //  カードタップで Yahoo Shopping の商品ページを WebView で開く.
-                    ClosetBridgeSection(
-                        response: viewModel.closetBridge,
-                        isLoading: viewModel.isLoadingClosetBridge,
-                        hasError: viewModel.hasClosetBridgeError,
-                        onTapProduct: { product in
-                            if !product.url.isEmpty, let url = URL(string: product.url) {
-                                viewModel.selectedWebLink = HomeWebLink(url: url)
-                            }
-                        },
-                        onTapZozo: { item in
-                            if !item.zozo_search_url.isEmpty, let url = URL(string: item.zozo_search_url) {
-                                viewModel.selectedWebLink = HomeWebLink(url: url)
-                            }
-                        },
-                        onRetry: {
-                            Task { await viewModel.refreshClosetBridge() }
-                        }
-                    )
 
                     // 20時以降の「明日の先取り」ティザー (夜→朝ループのトリガー)
                     DailyTeaserSection(
@@ -159,14 +120,10 @@ struct HomeView: View {
                         }
                     )
 
-                    if let tags = viewModel.homeResponse.tags, !tags.isEmpty {
-                        tagsSection
-                    }
-
-                    Spacer().frame(height: 60)
+                    Spacer().frame(height: 48)
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 20)
+                .padding(.top, 16)
             }
             .refreshable {
                 await viewModel.onAppear()
@@ -359,6 +316,22 @@ struct HomeView: View {
                 }
             }
         }
+        #if DEBUG
+        .fullScreenCover(isPresented: $showHomeSandboxSheet) {
+            NavigationStack {
+                PartnerIntegratedHomeSandboxView()
+                    .environment(tabViewModel)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("閉じる") {
+                                showHomeSandboxSheet = false
+                            }
+                            .foregroundStyle(.black)
+                        }
+                    }
+            }
+        }
+        #endif
     }
 
     // MARK: - Header
@@ -367,7 +340,26 @@ struct HomeView: View {
         ZStack {
             Text("ホーム")
                 .font(.system(size: 18, weight: .semibold))
-            HStack(spacing: 20) {
+            HStack(spacing: 16) {
+                #if DEBUG
+                Button {
+                    Haptic.impact(.soft)
+                    showHomeSandboxSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flask")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("改善案")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.gray.opacity(0.1))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                #endif
                 Spacer()
                 Button(action: { path.append(.favorites) }) {
                     Image(systemName: "heart")

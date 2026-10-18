@@ -29,17 +29,6 @@ struct MainTabView: View {
                     EmptyView()
                 }
 
-                // 相棒
-                Tab(value: MainTabViewModel.Tab.partner) {
-                    PartnerView(path: $path)
-                } label: {
-                    Label {
-                        Text("相棒")
-                    } icon: {
-                        Image(uiImage: partnerIcon)
-                    }
-                }
-
                 // クローゼット
                 Tab("クローゼット", systemImage: "tshirt", value: MainTabViewModel.Tab.profile) {
                     ProfileView(path: $path)
@@ -57,6 +46,12 @@ struct MainTabView: View {
                     // + はタブとして留まらず、カメラ画面を直接開く
                     viewModel.selectedTab = previousTab
                     path.append(.camera)
+                } else if newTab == .partner {
+                    // 相棒タブ指定時はホーム画面から相棒画面へ遷移
+                    viewModel.selectedTab = .home
+                    if path.last != .partner {
+                        path.append(.partner)
+                    }
                 } else {
                     previousTab = newTab
                 }
@@ -76,6 +71,9 @@ struct MainTabView: View {
                     )
                 case .calendar:
                     CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
+                        .environment(viewModel)
+                case .partner:
+                    PartnerView(path: $path)
                         .environment(viewModel)
                 case .coordinateDetail(let params):
                     CoordinateDetailView(

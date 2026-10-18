@@ -16,30 +16,59 @@ import SwiftUI
 struct PartnerPattern3GrowthView: View {
     /// 「相棒に相談」タップ時 (チャットへの遷移は呼び出し元が担う)。nil ならボタン非表示
     var onConsultTap: (() -> Void)? = nil
+    /// 「4つの質問」やり直しタップ時
+    var onRetakeOnboarding: (() -> Void)? = nil
     @State private var viewModel = PartnerPattern3ViewModel()
     @State private var showAllEvents = false
+
+    private var persistedOnboarding: PartnerOnboardingResponse? {
+        PartnerOnboardingFlowViewModel.loadPersistedResponse()
+    }
+
+    private var partnerTypeName: String {
+        if let t = viewModel.partnerHome?.type_name, !t.isEmpty { return t }
+        if let t = persistedOnboarding?.type_name, !t.isEmpty { return t }
+        if let saved = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerImage.rawValue), !saved.isEmpty {
+            return saved
+        }
+        return "ナチュラル・パートナー"
+    }
+
+    private var partnerSubtitle: String {
+        if let sub = viewModel.partnerHome?.partner_subtitle, !sub.isEmpty { return sub }
+        if let sub = persistedOnboarding?.partner_subtitle, !sub.isEmpty { return sub }
+        return "あなたの好みと予定に寄り添うスタイリスト"
+    }
+
+    private var displayTraits: [PartnerOnboardingTrait] {
+        if let traits = viewModel.partnerHome?.traits, !traits.isEmpty { return traits }
+        if let traits = persistedOnboarding?.traits, !traits.isEmpty { return traits }
+        return []
+    }
 
     var body: some View {
         ZStack {
             if viewModel.isLoading {
-                ProgressView("相棒の成長を確認中...")
+                ProgressView("相棒を読み込み中...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let growth = viewModel.growth {
                 ScrollView {
-                    VStack(spacing: 28) {
+                    VStack(spacing: 24) {
                         gaugeSection(state: growth.state)
 
                         if let greeting = viewModel.greeting {
                             PartnerTalkBubble(text: greeting)
                         }
 
+                        traitsSection
+
                         PartnerAdviceCard()
 
                         eventsSection(events: growth.recent_events)
                     }
                     .padding(.horizontal, 20)
-                    .padding(.top, 24)
-                    .padding(.bottom, 100)
+                    .padding(.top, 20)
+                    .padding(.bottom, 80)
                 }
             }
         }
@@ -51,74 +80,53 @@ struct PartnerPattern3GrowthView: View {
         }
     }
 
-    // MARK: - 円形ゲージ + アバター
+    // MARK: - 相棒プロフィール + 理解度リング
 
     private func gaugeSection(state: PartnerState) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .stroke(Color.gray.opacity(0.12), lineWidth: 12)
+                    .stroke(Color.gray.opacity(0.12), lineWidth: 8)
 
                 Circle()
                     .trim(from: 0, to: viewModel.animatedGauge)
                     .stroke(
-                        AngularGradient(
-                            colors: [.pink.opacity(0.6), .pink, .purple.opacity(0.8)],
-                            center: .center,
-                            startAngle: .degrees(-90),
-                            endAngle: .degrees(270)
-                        ),
-                        style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                        Color.black,
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
 
                 VStack(spacing: 6) {
-                    PartnerIconImage(size: 88)
+                    PartnerIconImage(size: 84)
 
-                    Text("\(state.understanding_pct)%")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.black)
-
-                    Text("あなたへの理解度")
-                        .font(.system(size: 11))
-                        .foregroundColor(.gray)
+                    Text("理解度 \(state.understanding_pct)%")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.black)
                 }
             }
-            .frame(width: 210, height: 210)
+            .frame(width: 176, height: 176)
 
-            VStack(spacing: 6) {
-                HStack(spacing: 8) {
-                    Text("Lv.\(state.level)")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.pink)
-                        .clipShape(Capsule())
+            VStack(spacing: 5) {
+                Text(partnerTypeName)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.black)
 
-                    Text(state.level_name)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.black)
-                }
-
-                Text("これまで \(state.level)日 いっしょにいるよ")
+                Text(partnerSubtitle)
                     .font(.system(size: 12))
-                    .foregroundColor(.gray)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
 
-                HStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.orange)
-                    Text("\(state.streak_days)日連続で会えてる")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.black)
+                HStack(spacing: 12) {
+                    Label("\(state.level)日いっしょ", systemImage: "calendar")
+                    if state.streak_days > 0 {
+                        Label("\(state.streak_days)日連続", systemImage: "sparkles")
+                    }
                 }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
                 .padding(.top, 2)
             }
 
-            // 相棒への相談導線 (ホームの「相棒に相談」から移設)。
-            // プロフィールUIの定石「アバター→ステータス→主アクション」に合わせ、
-            // 円ゲージとLv/連続記録のまとまりの直下に主CTAとして置く
             if let onConsultTap {
                 Button {
                     Haptic.impact(.soft)
@@ -126,23 +134,83 @@ struct PartnerPattern3GrowthView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "bubble.left.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("相棒にチャットで相談する")
                             .font(.system(size: 14, weight: .semibold))
-                        Text("相棒に相談")
-                            .font(.system(size: 15, weight: .semibold))
                     }
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 13)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
                     .background(Color.black)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 2)
+                .padding(.top, 4)
             }
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 1.0).delay(0.2)) {
+            withAnimation(.easeOut(duration: 0.9).delay(0.15)) {
                 viewModel.animatedGauge = CGFloat(state.understanding_pct) / 100
+            }
+        }
+    }
+
+    // MARK: - 相棒が覚えている4つの特徴
+
+    private var traitsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                sectionTitle("相棒が覚えているあなたのこと", icon: "person.text.rectangle")
+                Spacer()
+                if let onRetakeOnboarding {
+                    Button {
+                        Haptic.impact(.soft)
+                        onRetakeOnboarding()
+                    } label: {
+                        Text("変更する")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if displayTraits.isEmpty {
+                Button {
+                    onRetakeOnboarding?()
+                } label: {
+                    HStack {
+                        Text("4つの質問に答えて、相棒にあなたの特徴を教える")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.black)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(14)
+                    .background(Color.gray.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(displayTraits) { trait in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(trait.axis_label)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            Text(trait.label)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.black)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color.gray.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
             }
         }
     }
@@ -154,7 +222,7 @@ struct PartnerPattern3GrowthView: View {
             sectionTitle("ふたりのきろく", icon: "book.closed")
 
             if events.isEmpty {
-                Text("これからいっぱい増えていくよ")
+                Text("コーデを選んだり登録すると、ここに記録が増えていくよ")
                     .font(.system(size: 13))
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -173,10 +241,10 @@ struct PartnerPattern3GrowthView: View {
                     } label: {
                         Text("すべてを見る（\(events.count)件）")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.pink)
+                            .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background(Color.pink.opacity(0.08))
+                            .background(Color.gray.opacity(0.08))
                             .clipShape(Capsule())
                     }
                     .padding(.top, 4)
@@ -191,9 +259,9 @@ struct PartnerPattern3GrowthView: View {
     // ふたりのきろくの1行（活動ログ。exp は出さず、種別アイコンで表す）
     private func eventRow(_ event: PartnerExpEvent) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: event.kind == "coordinate" ? "tshirt.fill" : "heart.fill")
+            Image(systemName: event.kind == "coordinate" ? "tshirt.fill" : "checkmark.circle.fill")
                 .font(.system(size: 12))
-                .foregroundColor(event.kind == "coordinate" ? .blue : .pink)
+                .foregroundColor(.black.opacity(0.75))
 
             Text(event.label)
                 .font(.system(size: 13))
@@ -234,7 +302,7 @@ struct PartnerPattern3GrowthView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundColor(.pink)
+                .foregroundColor(.black)
 
             Text(title)
                 .font(.system(size: 16, weight: .semibold))
@@ -249,6 +317,7 @@ struct PartnerPattern3GrowthView: View {
 @Observable
 final class PartnerPattern3ViewModel {
     var growth: PartnerGrowthResponse?
+    var partnerHome: PartnerHomeResponse?
     var greeting: String?
     var isLoading = false
     var animatedGauge: CGFloat = 0
@@ -272,6 +341,7 @@ final class PartnerPattern3ViewModel {
             growth = response
         }
         if case .success(let response) = await homeTask {
+            partnerHome = response
             greeting = response.greeting
         }
     }

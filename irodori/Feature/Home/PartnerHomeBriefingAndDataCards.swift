@@ -3,13 +3,13 @@
 //  irodori
 //
 //  UI/UXリニューアル：
-//  1) Layer 1: 相棒のデイリーブリーフィングカード（相棒アイコン・タイプ・反映ステータス・話し方に合わせた今日の理由）
-//  2) Layer 3: 相棒からのデータ獲得提案カード（「相棒にもっとあなたのことを教える」：カメラロール自動検出・定番/検索追加・2択好み比較）
+//  1) Layer 1: 相棒のデイリーブリーフィングカード（相棒アイコン＋名前＋今日の一言を統合し、カード全体タップで相棒画面へ遷移）
+//  2) Layer 3: 相棒からのデータ獲得提案カード（コンパクトな3タイル構成）
 //
 
 import SwiftUI
 
-// MARK: - Layer 1: 相棒デイリーブリーフィングカード
+// MARK: - Layer 1: 相棒デイリーブリーフィングカード（タップで相棒画面へ）
 
 struct PartnerHomeBriefingCard: View {
     let partnerHome: PartnerHomeResponse?
@@ -25,20 +25,13 @@ struct PartnerHomeBriefingCard: View {
         if let saved = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerImage.rawValue), !saved.isEmpty {
             return saved
         }
-        return "あなたの相棒"
+        return "ナチュラル・パートナー"
     }
 
     private var subtitle: String {
         if let sub = partnerHome?.partner_subtitle, !sub.isEmpty { return sub }
         if let sub = persistedOnboarding?.partner_subtitle, !sub.isEmpty { return sub }
-        return "4つの好みを反映中"
-    }
-
-    private var statusBadgeText: String {
-        if closetCount > 0 {
-            return "手持ち服 \(closetCount)点を反映中"
-        }
-        return "4つの好みを反映中"
+        return closetCount > 0 ? "手持ち服 \(closetCount)点と好みを反映中" : "4つの好みを反映中"
     }
 
     private var briefingText: String {
@@ -57,116 +50,75 @@ struct PartnerHomeBriefingCard: View {
         return "おはようございます。今日の気温とあなたの好みに合わせて、無理なく着られる3案を選びました。"
     }
 
-    private var traits: [PartnerOnboardingTrait] {
-        partnerHome?.traits ?? persistedOnboarding?.traits ?? []
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // 上段: 相棒アイコン + 名前・サブタイトル + 反映ステータスバッジ
-            HStack(alignment: .center, spacing: 12) {
-                Button(action: onTapPartnerProfile) {
-                    PartnerIconImage(size: 46)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(typeName)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.black)
-                            .lineLimit(1)
-
-                        Text(statusBadgeText)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.gray.opacity(0.1))
-                            .clipShape(Capsule())
-                    }
-
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 4)
-
-                Menu {
-                    Button {
-                        onTapPartnerProfile()
-                    } label: {
-                        Label("相棒タブを見る", systemImage: "person.crop.circle")
-                    }
-                    Button {
-                        onTapRetakeOnboarding()
-                    } label: {
-                        Label("4つの質問に答え直す", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(Color.gray.opacity(0.08))
-                        .clipShape(Circle())
-                }
-            }
-
-            // 中段: 相棒からの今日のブリーフィング
-            Text(briefingText)
-                .font(.system(size: 13))
-                .foregroundStyle(.black)
-                .lineSpacing(4)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.gray.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            // 下段: 反映中の特徴チップ（横スクロール）
-            if !traits.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(traits) { trait in
-                            HStack(spacing: 4) {
-                                Text(trait.axis_label)
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.secondary)
-                                Text("・")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.secondary)
-                                Text(trait.label)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.black)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.white)
-                            .clipShape(Capsule())
+        Button(action: onTapPartnerProfile) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 12) {
+                    ZStack(alignment: .bottomTrailing) {
+                        PartnerIconImage(size: 50)
+                            .clipShape(Circle())
                             .overlay(
-                                Capsule()
-                                    .stroke(Color.gray.opacity(0.22), lineWidth: 1)
+                                Circle()
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
                             )
-                        }
+
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 17, height: 17)
+                            .background(Color.black)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
                     }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text(typeName)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(.black)
+                                .lineLimit(1)
+
+                            Text("相棒画面へ ›")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.black.opacity(0.65))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.gray.opacity(0.1))
+                                .clipShape(Capsule())
+                        }
+
+                        Text(subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 4)
                 }
+
+                // 相棒からの今日の一言（吹き出しボックス）
+                Text(briefingText)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.black.opacity(0.85))
+                    .lineSpacing(3)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(red: 0.96, green: 0.96, blue: 0.97))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .padding(16)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
         }
-        .padding(18)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .buttonStyle(.plain)
     }
 }
 
-// MARK: - Layer 3: 相棒からのデータ獲得提案カード
+// MARK: - Layer 3: 相棒からのデータ獲得提案カード（コンパクト3タイル）
 
 struct PartnerDataAcquisitionCard: View {
     let closetCount: Int
@@ -176,93 +128,55 @@ struct PartnerDataAcquisitionCard: View {
     let onTapTasteVote: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // ヘッダー: 相棒からの自然な提案
-            HStack(alignment: .top, spacing: 12) {
-                PartnerIconImage(size: 38)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                    )
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("相棒に手持ち服・好みを教える")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.black)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text("相棒にもっとあなたのことを教える")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.black)
-                    }
+                Spacer()
 
-                    Text(
-                        closetCount == 0
-                        ? "普段着ている服や好みを教えると、手持ちの服を使ったコーデを提案できるようになります。"
-                        : "現在 \(closetCount)点のアイテムを反映しています。手持ちの服や好みを追加するほど、毎日の提案があなたらしくなります。"
-                    )
-                    .font(.system(size: 12))
+                Text(closetCount > 0 ? "手持ち \(closetCount)点" : "未登録")
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
             }
 
-            VStack(spacing: 10) {
-                // 提案1: 写真フォルダから自動で見つける (FullBodyPickerView)
-                actionRow(
+            HStack(spacing: 10) {
+                actionTile(
                     icon: "photo.on.rectangle.angled",
-                    title: "写真フォルダから自動で見つける",
-                    subtitle: "過去の全身写真をAIが見つけて、手持ち服をまとめて登録",
-                    badgeText: "おすすめ",
+                    title: "写真から検出",
+                    subtitle: "全身写真をAI選択",
                     isPrimary: true,
                     action: onTapPhotoAutoPick
                 )
 
-                // 提案2: 定番アイテムから選ぶ・検索する
-                actionRow(
-                    icon: "magnifyingglass",
-                    title: "定番アイテムから選ぶ・検索する",
-                    subtitle: "よく着るベーシックな服をタップしてクローゼットに追加",
-                    badgeText: nil,
+                actionTile(
+                    icon: "tshirt",
+                    title: "定番・検索",
+                    subtitle: "写真なしで追加",
                     isPrimary: false,
                     action: onTapSelectStandardItems
                 )
 
-                // 提案3: 2つのコーデを見比べて好みを教える (PartnerPattern4TasteVoteView)
-                actionRow(
+                actionTile(
                     icon: "heart.text.square",
-                    title: "2つのコーデを見比べて好みを教える",
-                    subtitle: "写真がない日でも、直感で選ぶだけで相棒が好みを学習",
-                    badgeText: nil,
+                    title: "2択で好み",
+                    subtitle: "直感で選ぶだけ",
                     isPrimary: false,
                     action: onTapTasteVote
                 )
             }
-
-            // 補足リンク: キーワードで細かく探したい人向け
-            HStack {
-                Spacer()
-                Button(action: onTapKeywordSearch) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus.magnifyingglass")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("ブランドや商品名で検索して追加する")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundStyle(.secondary)
-                    .underline()
-                }
-                .buttonStyle(.plain)
-            }
         }
-        .padding(18)
+        .padding(16)
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 
-    private func actionRow(
+    private func actionTile(
         icon: String,
         title: String,
         subtitle: String,
-        badgeText: String?,
         isPrimary: Bool,
         action: @escaping () -> Void
     ) -> some View {
@@ -270,55 +184,28 @@ struct PartnerDataAcquisitionCard: View {
             Haptic.impact(.soft)
             action()
         }) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(isPrimary ? Color.black : Color.gray.opacity(0.08))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(isPrimary ? .white : .black)
-                }
+            VStack(alignment: .leading, spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(isPrimary ? .white : .black)
+                    .frame(width: 34, height: 34)
+                    .background(isPrimary ? Color.black : Color.gray.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(title)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.black)
-                            .lineLimit(1)
+                Text(title)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.black)
+                    .lineLimit(1)
 
-                        if let badgeText {
-                            Text(badgeText)
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.black)
-                                .clipShape(Capsule())
-                        }
-                    }
-
-                    Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineSpacing(2)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 4)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.gray.opacity(0.5))
+                Text(subtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            .padding(14)
-            .background(Color.gray.opacity(0.04))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Color(red: 0.97, green: 0.97, blue: 0.98))
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isPrimary ? Color.black.opacity(0.25) : Color.gray.opacity(0.15), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
     }
