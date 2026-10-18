@@ -12,7 +12,7 @@ import Foundation
 
 // MARK: - 共通: 相棒の状態
 
-struct PartnerState: Decodable, Hashable {
+struct PartnerState: Codable, Hashable {
     let level: Int              // LV = 累計ログイン日数
     let level_name: String
     let exp: Int
@@ -36,20 +36,163 @@ struct PartnerState: Decodable, Hashable {
     }
 }
 
+struct PartnerOnboardingTrait: Codable, Hashable, Identifiable {
+    let axis: String            // impression | priority | range | tone
+    let axis_label: String      // 「なりたい印象」など
+    let value: String           // soft | F | C | gentle など
+    let label: String           // 「優しくて、話しかけやすい」など
+
+    var id: String { axis }
+}
+
+struct PartnerOnboardingResponse: Codable, Hashable {
+    let status: String
+    let user_id: String
+    let type_code: String
+    let type_name: String
+    let partner_subtitle: String
+    let speaking_style: String
+    let speaking_style_label: String
+    let birth_greeting: String
+    let home_briefing: String
+    let traits: [PartnerOnboardingTrait]
+    let state: PartnerState
+
+    static func mock(
+        impression: String = "soft",
+        priority: String = "F",
+        rangeVal: String = "C",
+        tone: String = "gentle"
+    ) -> PartnerOnboardingResponse {
+        let ax1 = rangeVal == "T" ? "T" : "C"
+        let ax2 = (impression == "unique" || impression == "refined") ? "P" : "R"
+        let ax3 = priority == "A" ? "A" : "F"
+        let ax4 = (impression == "refined" || impression == "unique") ? "Q" : "E"
+        let code = "\(ax1)\(ax2)\(ax3)\(ax4)"
+
+        let typeMap: [String: String] = [
+            "TPAQ": "アヴァンギャルド・スター",
+            "TPAE": "トレンド・エディター",
+            "TPFQ": "アクティブ・クリエイター",
+            "TPFE": "スマート・フォロワー",
+            "TRAQ": "ソーシャル・アイコン",
+            "TRAE": "モテ・プランナー",
+            "TRFQ": "エグゼクティブ・ノマド",
+            "TRFE": "クリーン・スタンダード",
+            "CPAQ": "オーセンティック・アーティスト",
+            "CPAE": "ヴィンテージ・ミニマリスト",
+            "CPFQ": "ヘビー・デューティー",
+            "CPFE": "セルフ・ミニマリスト",
+            "CRAQ": "ロイヤル・クラシック",
+            "CRAE": "トラッド・コンサバ",
+            "CRFQ": "プロフェッショナル・ギア",
+            "CRFE": "エッセンシャル・ワーカー"
+        ]
+        let typeName = typeMap[code] ?? "クリーン・スタンダード"
+
+        let impShort: String
+        let impLabel: String
+        switch impression {
+        case "refined":
+            impShort = "大人っぽさ"
+            impLabel = "大人っぽくて、落ち着いている"
+        case "unique":
+            impShort = "自分らしさ"
+            impLabel = "おしゃれで、自分らしさがある"
+        case "clean":
+            impShort = "清潔感"
+            impLabel = "きちんとしていて、清潔感がある"
+        default:
+            impShort = "親しみやすさ"
+            impLabel = "優しくて、話しかけやすい"
+        }
+
+        let priShort = priority == "A" ? "綺麗なシルエット" : "着心地の良さ"
+        let priLabel = priority == "A" ? "シルエットが綺麗で、気分が上がること" : "ラクに動けて、着心地がいいこと"
+        let rngShort = rangeVal == "T" ? "新鮮な組み合わせ" : "安心できる着回し"
+        let rngLabel = rangeVal == "T" ? "マンネリしない、新しい組み合わせ" : "手持ちの服で、安心できる着回し"
+
+        let toneShort: String
+        let toneLabel: String
+        let birthGreeting: String
+        let homeBriefing: String
+        switch tone {
+        case "normal":
+            toneShort = "フランク"
+            toneLabel = "友達みたいにフランクに"
+            birthGreeting = "よろしくね！これから毎朝、あなたの相棒としてコーデを一緒に考えるよ。\n「\(impShort)」と「\(priShort)」を大事にしつつ、\(rngShort)を提案していくね！"
+            homeBriefing = "おはよう！今日は朝晩で少し気温差がありそうだよ。\nあなたの好みに合わせて、「\(impShort)」と「\(priShort)」にぴったりの\(rngShort)を3案まとめておいたよ！"
+        case "spicy":
+            toneShort = "本音で辛口"
+            toneLabel = "本音でズバッと辛口に"
+            birthGreeting = "よろしく。今日からあなたの専属相棒として、妥協なしでコーデを組むよ。\n「\(impShort)」も「\(priShort)」も欲張りつつ、一番似合う\(rngShort)を選んでいくからね。"
+            homeBriefing = "おはよう。朝晩の寒暖差で服選びをミスりやすい日だから気をつけて。\n「\(impShort)」も「\(priShort)」も外さない\(rngShort)を3つ厳選しておいたよ。"
+        case "cool":
+            toneShort = "要点シンプル"
+            toneLabel = "要点だけシンプルに"
+            birthGreeting = "設定完了。「\(impShort)」×「\(priShort)」を軸に、毎朝3つの「\(rngShort)」を提案する。\n迷う時間を減らして、納得できる1日を作ろう。"
+            homeBriefing = "朝晩の気温差に注意。あなたの4つの好みに合わせて、「\(impShort)」と「\(priShort)」を満たす\(rngShort)を3案ピックアップした。"
+        default:
+            toneShort = "やさしく丁寧"
+            toneLabel = "やさしく丁寧に"
+            birthGreeting = "はじめまして。これからあなたの毎日をサポートしますね。\n「\(impShort)」と「\(priShort)」を大切にしながら、\(rngShort)を毎朝ご提案していきます。"
+            homeBriefing = "おはようございます。朝晩の気温差がある一日になりそうですね。\nあなたの好みに合わせて、「\(impShort)」と「\(priShort)」を両立できる\(rngShort)を3つ選びました。"
+        }
+
+        let traits: [PartnerOnboardingTrait] = [
+            .init(axis: "impression", axis_label: "なりたい印象", value: impression, label: impLabel),
+            .init(axis: "priority", axis_label: "大事にしたい感覚", value: priority, label: priLabel),
+            .init(axis: "range", axis_label: "毎日の提案", value: rangeVal, label: rngLabel),
+            .init(axis: "tone", axis_label: "相棒の話し方", value: tone, label: toneLabel)
+        ]
+
+        return PartnerOnboardingResponse(
+            status: "success",
+            user_id: "mock-user",
+            type_code: code,
+            type_name: typeName,
+            partner_subtitle: "\(impShort)・\(priShort)・\(rngShort)",
+            speaking_style: tone,
+            speaking_style_label: toneShort,
+            birth_greeting: birthGreeting,
+            home_briefing: homeBriefing,
+            traits: traits,
+            state: .mock()
+        )
+    }
+}
+
 struct PartnerHomeResponse: Decodable, Hashable {
     let status: String
     let user_id: String
     let greeting: String
     let sub_greeting: String?
     let state: PartnerState
+    var type_code: String? = nil
+    var type_name: String? = nil
+    var partner_subtitle: String? = nil
+    var speaking_style: String? = nil
+    var speaking_style_label: String? = nil
+    var home_briefing: String? = nil
+    var traits: [PartnerOnboardingTrait]? = nil
+    var has_completed_onboarding: Bool? = nil
 
     static func mock() -> PartnerHomeResponse {
-        PartnerHomeResponse(
+        let onb = PartnerOnboardingResponse.mock()
+        return PartnerHomeResponse(
             status: "success",
             user_id: "mock-user",
             greeting: "おはよう！このまえの「きれいめカジュアル」、まだ余韻に浸ってるよ。",
             sub_greeting: "4日連続で会えてうれしい 🌷",
-            state: .mock()
+            state: .mock(),
+            type_code: onb.type_code,
+            type_name: onb.type_name,
+            partner_subtitle: onb.partner_subtitle,
+            speaking_style: onb.speaking_style,
+            speaking_style_label: onb.speaking_style_label,
+            home_briefing: onb.home_briefing,
+            traits: onb.traits,
+            has_completed_onboarding: true
         )
     }
 }

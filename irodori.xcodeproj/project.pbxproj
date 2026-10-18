@@ -93,15 +93,11 @@
 		};
 		D4C87F6F2D8AA64900FA8A08 /* irodoriTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = irodoriTests;
 			sourceTree = "<group>";
 		};
 		D4C87F792D8AA64A00FA8A08 /* irodoriUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = irodoriUITests;
 			sourceTree = "<group>";
 		};
@@ -196,7 +192,6 @@
 				1CBBE8D3F0EC6DA58F50203C /* NotificationService.swift */,
 				11BE283114677EC1A3EE21FB /* Info.plist */,
 			);
-			name = NotificationService;
 			path = NotificationService;
 			sourceTree = "<group>";
 		};

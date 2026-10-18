@@ -43,59 +43,16 @@ struct SplashView: View {
                         viewModel.setupSignUpDate()   // アプリインストールしてから一度しか呼ばれない想定
                         viewModel.updateState()
                     })
-                case .onboarding:
-                    OnboardingView(closeButtonTapped: {
-                        viewModel.viewedOnboarding()
-                        viewModel.updateState()
-                    })
-                case .fashionType:
-                    NavigationStack(path: $path) {
-                        FashionTypeIntroView(path: $path)
-                        .navigationDestination(for: ViewType.self) { viewType in
-                            switch viewType {
-                            case .fashionType:
-                                FashionTypeView(
-                                    path: $path,
-                                    viewModel: .init(apiClient: FashionTypeClient())
-                                )
-                            case .fashionTypeResult(let response):
-                                FashionTypeResultView(
-                                    path: $path,
-                                    result: response,
-                                    onComplete: {
-                                        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasFashionTypeDiagnosis.rawValue)
-                                        viewModel.updateState()
-                                    }
-                                )
-                            default:
-                                EmptyView()
-                            }
+                case .onboarding, .fashionType, .selectStandardItem:
+                    PartnerOnboardingFlowView(
+                        showCloseButton: false,
+                        onComplete: {
+                            viewModel.viewedOnboarding()
+                            UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasFashionTypeDiagnosis.rawValue)
+                            UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
+                            viewModel.updateState()
                         }
-                    }
-                case .selectStandardItem:
-                    NavigationStack(path: $path) {
-                        SelectStandardItemView(
-                            path: $path,
-                            onComplete: {
-                                UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
-                                viewModel.updateState()
-                            }
-                        )
-                        .navigationDestination(for: ViewType.self) { viewType in
-                            switch viewType {
-                            case .recommendCoordinateByStandardItem(let params):
-                                RecommendCoordinateByStandardItemView(
-                                    results: params.results,
-                                    selectedItems: params.selectedItems,
-                                    onComplete: {
-                                        viewModel.updateState()
-                                    }
-                                )
-                            default:
-                                EmptyView()
-                            }
-                        }
-                    }
+                    )
                 case .home:
                     MainTabView()
                         .environment(AuthManager.shared)

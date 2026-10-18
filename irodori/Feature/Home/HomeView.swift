@@ -17,6 +17,10 @@ struct HomeView: View {
     @State private var showFirstTakePhotoSheet = false
     @State private var showTutorialSheet = false
     @State private var showingPrefecturePicker = false
+    @State private var showPartnerOnboardingSheet = false
+    @State private var showFullBodyPickerSheet = false
+    @State private var showStandardItemPickerSheet = false
+    @State private var showTasteVoteSheet = false
     @Environment(MainTabViewModel.self) private var tabViewModel
 
     var body: some View {
@@ -29,8 +33,24 @@ struct HomeView: View {
 
             ScrollViewReader { scrollProxy in
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 32) {
-                    // ヒーロー: 明日のコーデ (3案カルーセル + 構成アイテム比較 + これにする)
+                VStack(spacing: 28) {
+                    // Layer 1: 相棒のデイリーブリーフィング（相棒アイコン・タイプ・今日の理由・4つの特徴）
+                    PartnerHomeBriefingCard(
+                        partnerHome: viewModel.partnerHome,
+                        persistedOnboarding: viewModel.persistedOnboarding,
+                        closetCount: viewModel.closetItems.count,
+                        partnerCommentFromDaily: viewModel.dailyRecommendation?.partner_comment,
+                        onTapPartnerProfile: {
+                            Haptic.impact(.soft)
+                            tabViewModel.selectedTab = .partner
+                        },
+                        onTapRetakeOnboarding: {
+                            Haptic.impact(.soft)
+                            showPartnerOnboardingSheet = true
+                        }
+                    )
+
+                    // Layer 2: 今日/明日/週末の3案カルーセル + 構成アイテム比較 + これにする
                     TomorrowPickSection(
                         viewModel: viewModel,
                         onLocationTap: {
@@ -45,9 +65,22 @@ struct HomeView: View {
                     .padding(.horizontal, -24)
                     .id("hero")
 
-                    // 別ルートの提案導線 (旧・相棒カードの2ボタンを継承) は非表示にした。
-                    // 「相棒に相談」は相棒タブ (PartnerPattern3GrowthView の円ゲージ下) に移設
-//                    actionsCard
+                    // Layer 3: 相棒からのデータ獲得提案カード（「相棒にもっとあなたのことを教える」）
+                    PartnerDataAcquisitionCard(
+                        closetCount: viewModel.closetItems.count,
+                        onTapPhotoAutoPick: {
+                            showFullBodyPickerSheet = true
+                        },
+                        onTapSelectStandardItems: {
+                            showStandardItemPickerSheet = true
+                        },
+                        onTapKeywordSearch: {
+                            path.append(.addItemBySearch)
+                        },
+                        onTapTasteVote: {
+                            showTasteVoteSheet = true
+                        }
+                    )
 
                     // 直近コーデ
                     if viewModel.isLoadingHome {
@@ -143,22 +176,8 @@ struct HomeView: View {
         .background(Color.gray.opacity(0.08))
         .onAppear {
             Task {
-                if viewModel.homeResponse.recent_coordinates.isEmpty {
+                if viewModel.homeResponse.recent_coordinates.isEmpty || viewModel.partnerHome == nil {
                     await viewModel.onAppear()
-                }
-            }
-        }
-        .onChange(of: viewModel.isLoadingHome) { oldValue, newValue in
-            if oldValue == true && newValue == false {
-                if viewModel.homeResponse.recent_coordinates.isEmpty {
-                    if let lastDismissedDate = UserDefaults.standard.object(forKey: UserDefaultsKey.lastDismissedFirstTakePhotoDate.rawValue) as? Date {
-                        let oneHour: TimeInterval = 3600
-                        if Date().timeIntervalSince(lastDismissedDate) >= oneHour {
-                            showFirstTakePhotoSheet = true
-                        }
-                    } else {
-                        showFirstTakePhotoSheet = true
-                    }
                 }
             }
         }
@@ -166,6 +185,78 @@ struct HomeView: View {
             if newValue {
                 showFirstTakePhotoSheet = true
                 tabViewModel.shouldShowFirstTakePhotoOnHome = false
+            }
+        }
+        .fullScreenCover(isPresented: $showPartnerOnboardingSheet, onDismiss: {
+            Task {
+                let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+                await viewModel.loadPartnerHomeSection(uid: uid)
+                await viewModel.reloadDailyRecommendation()
+            }
+        }) {
+            PartnerOnboardingFlowView(
+                showCloseButton: true,
+                onComplete: {
+                    showPartnerOnboardingSheet = false
+                }
+            )
+        }
+        .fullScreenCover(isPresented: $showFullBodyPickerSheet) {
+            FullBodyPickerView(
+                onComplete: { images in
+                    showFullBodyPickerSheet = false
+                    if let first = images.first {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            path.append(.coordinateReview(.init(
+                                image: first,
+                                fromFirstTakePhotoView: false
+                            )))
+                        }
+                    }
+                },
+                onClose: {
+                    showFullBodyPickerSheet = false
+                }
+            )
+        }
+        .sheet(isPresented: $showStandardItemPickerSheet, onDismiss: {
+            Task { await viewModel.onAppear() }
+        }) {
+            NavigationStack {
+                SelectStandardItemView(
+                    path: $path,
+                    onComplete: {
+                        showStandardItemPickerSheet = false
+                    }
+                )
+                .navigationTitle("定番アイテムから追加")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") {
+                            showStandardItemPickerSheet = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showTasteVoteSheet, onDismiss: {
+            Task {
+                let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+                await viewModel.loadPartnerHomeSection(uid: uid)
+            }
+        }) {
+            NavigationStack {
+                PartnerPattern4TasteVoteView()
+                    .navigationTitle("2つのコーデを見比べる")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("閉じる") {
+                                showTasteVoteSheet = false
+                            }
+                        }
+                    }
             }
         }
         .sheet(isPresented: Binding(
@@ -285,7 +376,7 @@ struct HomeView: View {
                 Button(action: { tabViewModel.selectedTab = .calendar }) {
                     Image(systemName: "calendar")
                 }
-                Button(action: { showTutorialSheet = true }) {
+                Button(action: { showPartnerOnboardingSheet = true }) {
                     Image(systemName: "questionmark.circle")
                 }
             }

@@ -657,10 +657,9 @@ struct TomorrowPickSection: View {
 
     // MARK: - アイテム登録促進 (クローゼットが少ないユーザー向け)
 
-    /// クローゼット登録が少なく、手持ちベースのパーソナライズが効いていない状態か。
-    /// 取得成功前 (hasLoadedCloset=false) は誤表示を避けるため出さない
+    /// ホーム画面に「相棒にもっとあなたのことを教える」カード (PartnerDataAcquisitionCard) を新設したため、重複する旧バナーは非表示にする
     private var shouldShowItemNudge: Bool {
-        !cards.isEmpty && viewModel.hasLoadedCloset && viewModel.closetItems.count < 3
+        false
     }
 
     private var itemRegistrationNudge: some View {

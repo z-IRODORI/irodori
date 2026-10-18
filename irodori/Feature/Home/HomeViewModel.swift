@@ -94,6 +94,10 @@ final class HomeViewModel {
     var isLoadingOutfitRecommendations: Bool = false
     var hasOutfitRecommendationsError: Bool = false
 
+    // 相棒ブリーフィング & 4問オンボーディング状態
+    var partnerHome: PartnerHomeResponse? = nil
+    var persistedOnboarding: PartnerOnboardingResponse? = PartnerOnboardingFlowViewModel.loadPersistedResponse()
+
     // 居住地 (天気ヘッダの場所バッジ用. UserDefaults と同期)
     var currentPrefectureCode: String? = UserDefaults.standard.string(
         forKey: UserDefaultsKey.prefectureCode.rawValue
@@ -127,6 +131,7 @@ final class HomeViewModel {
     let updatePrefectureClient: UpdateUserPrefectureClientProtocol
     let outfitCollageClient: OutfitCollageClientProtocol
     let calendarOutfitClient: CalendarOutfitClientProtocol
+    let partnerClient: PartnerClientProtocol
     private let plannerCacheRepository: HomePlannerCacheRepositoryProtocol
 
     init(
@@ -140,6 +145,7 @@ final class HomeViewModel {
         updatePrefectureClient: UpdateUserPrefectureClientProtocol = UpdateUserPrefectureClient(),
         outfitCollageClient: OutfitCollageClientProtocol = OutfitCollageClient(),
         calendarOutfitClient: CalendarOutfitClientProtocol = CalendarOutfitClient(),
+        partnerClient: PartnerClientProtocol = FallbackPartnerClient(),
         plannerCacheRepository: HomePlannerCacheRepositoryProtocol = HomePlannerCacheRepository()
     ) {
         self.apiClient = apiClient
@@ -152,6 +158,7 @@ final class HomeViewModel {
         self.updatePrefectureClient = updatePrefectureClient
         self.outfitCollageClient = outfitCollageClient
         self.calendarOutfitClient = calendarOutfitClient
+        self.partnerClient = partnerClient
         self.plannerCacheRepository = plannerCacheRepository
         loadPlannerCache()
     }
@@ -161,6 +168,7 @@ final class HomeViewModel {
         let gender = Gender.fromWithDefault(
             UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)
         )
+        persistedOnboarding = PartnerOnboardingFlowViewModel.loadPersistedResponse()
 
         // 前回のレスポンスがあれば即描画 (stale-while-revalidate)。
         // スケルトンは「表示できる内容が無いセクション」だけに出す
@@ -183,6 +191,7 @@ final class HomeViewModel {
         // (LLM分析など) が終わるまで、完了済みの後続セクションも反映されなかった
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadHomeSection(uid: uid) }
+            group.addTask { await self.loadPartnerHomeSection(uid: uid) }
             group.addTask { await self.loadAnalysisSection(uid: uid) }
             group.addTask { await self.loadDaily(scope: self.selectedPickScope, force: true) }
             group.addTask { await self.loadCollageSection(uid: uid, gender: gender) }
@@ -195,6 +204,24 @@ final class HomeViewModel {
             // 21時のローカル通知を予約 (許可済みの場合のみ)
             group.addTask { await self.loadTomorrowTeaserIfNeeded() }
             group.addTask { await NotificationManager.shared.scheduleEveningTeaserIfNeeded() }
+        }
+    }
+
+    func loadPartnerHomeSection(uid: String) async {
+        let targetUid = uid.isEmpty ? "guest-user" : uid
+        persistedOnboarding = PartnerOnboardingFlowViewModel.loadPersistedResponse()
+        if let result = try? await partnerClient.getHome(userId: targetUid),
+           case .success(let response) = result {
+            partnerHome = response
+            if let typeName = response.type_name, !typeName.isEmpty {
+                let iconName = "\(typeName)_icon"
+                if UIImage(named: iconName) != nil {
+                    UserDefaults.standard.set(iconName, forKey: UserDefaultsKey.partnerIconImage.rawValue)
+                }
+                if UIImage(named: typeName) != nil {
+                    UserDefaults.standard.set(typeName, forKey: UserDefaultsKey.partnerImage.rawValue)
+                }
+            }
         }
     }
 

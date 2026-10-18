@@ -26,10 +26,19 @@ protocol PartnerClientProtocol {
     func getGrowth(userId: String) async throws -> Result<PartnerGrowthResponse, HTTPError>
     func getSpeakingStyle(userId: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError>
     func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError>
+    func saveOnboarding(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError>
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError>
 }
 
 // MARK: - リクエストボディ
+
+private struct PartnerOnboardingBody: Encodable {
+    let user_id: String
+    let impression: String
+    let priority: String
+    let range: String
+    let tone: String
+}
 
 private struct AdviceFeedbackBody: Encodable {
     let user_id: String
@@ -181,6 +190,19 @@ final class PartnerClient: PartnerClientProtocol {
 
     func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
         try await post(endpoint: "api/partner/speaking-style", body: SpeakingStyleBody(user_id: userId, style: style))
+    }
+
+    func saveOnboarding(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try await post(
+            endpoint: "api/partner/onboarding",
+            body: PartnerOnboardingBody(
+                user_id: userId,
+                impression: impression,
+                priority: priority,
+                range: rangeVal,
+                tone: tone
+            )
+        )
     }
 
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {
@@ -342,6 +364,11 @@ final class MockPartnerClient: PartnerClientProtocol {
         return .success(.mock(selected: style))
     }
 
+    func saveOnboarding(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        return .success(.mock(impression: impression, priority: priority, rangeVal: rangeVal, tone: tone))
+    }
+
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {
         try? await Task.sleep(nanoseconds: 800_000_000)
         return .success(.mock())
@@ -458,6 +485,13 @@ final class FallbackPartnerClient: PartnerClientProtocol {
 
     func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError> {
         try await withFallback({ try await real.setSpeakingStyle(userId: userId, style: style) }, { try await mock.setSpeakingStyle(userId: userId, style: style) })
+    }
+
+    func saveOnboarding(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try await withFallback(
+            { try await real.saveOnboarding(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone) },
+            { try await mock.saveOnboarding(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone) }
+        )
     }
 
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {

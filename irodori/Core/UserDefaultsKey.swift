@@ -43,4 +43,8 @@ enum UserDefaultsKey: String, CaseIterable {
     case plannerRevealCollapsed
     /// 電話番号⇄アカウント紐付けをサーバに同期済みの userId (再送防止。値が userId と一致すれば同期済み)
     case phoneLinkSyncedUserId
+    /// 4問MECEオンボーディングで誕生した相棒データのローカルキャッシュ (JSON Data)
+    case partnerOnboardingResponse
+    /// 4問MECEオンボーディング完了フラグ
+    case hasPartnerOnboardingCompleted
 }
