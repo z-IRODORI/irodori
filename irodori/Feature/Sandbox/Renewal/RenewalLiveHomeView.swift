@@ -55,6 +55,8 @@ final class RenewalLiveHomeModel {
     private(set) var loading: Set<RenewalScope> = []
     private(set) var errors: [RenewalScope: String] = [:]
     private(set) var pivots: [RenewalScope: String] = [:]
+    /// お手本コーデから抽出したアイテム (pool_id → 最新の状況)。ポーリングで更新する
+    private(set) var extractions: [String: OwnedFirstExtraction] = [:]
     var sendoff: Sendoff?
     var isSending = false
 
@@ -123,11 +125,38 @@ final class RenewalLiveHomeModel {
             switch result {
             case .success(let res):
                 responses[scope] = res
+                for r in res.recipes {
+                    if let pid = r.example?.pool_id, let e = r.example?.extraction { extractions[pid] = e }
+                }
             case .failure(let error):
                 errors[scope] = message(for: error)
             }
         } catch {
             // キャンセルは表示しない
+        }
+    }
+
+    func extraction(for recipe: OwnedFirstRecipe) -> OwnedFirstExtraction? {
+        guard let pid = recipe.example?.pool_id else { return nil }
+        return extractions[pid] ?? recipe.example?.extraction
+    }
+
+    /// 抽出中のお手本があれば、完了するまで数秒おきに状況を取りに行く (画面表示中のみ)
+    func pollExtractions(_ scope: RenewalScope) async {
+        for _ in 0..<40 {
+            let pending = (responses[scope]?.recipes ?? []).compactMap { r -> String? in
+                guard let pid = r.example?.pool_id else { return nil }
+                return (extraction(for: r)?.isInProgress ?? false) ? pid : nil
+            }
+            if pending.isEmpty { return }
+            do {
+                try await Task.sleep(for: .seconds(6))
+                if case .success(let res) = try await client.examples(uid: uid, poolIds: pending) {
+                    for (pid, e) in res.examples { extractions[pid] = e }
+                }
+            } catch {
+                return  // キャンセル (画面離脱・スコープ切替)
+            }
         }
     }
 
@@ -196,20 +225,25 @@ struct RenewalLiveHomeView: View {
     @State private var showPivot = false
     @State private var showDislike = false
     @AppStorage(RenewalFirstViewLayout.storageKey) private var layoutRaw = RenewalFirstViewLayout.list.rawValue
+    @AppStorage(RenewalVisualMode.storageKey) private var visualRaw = RenewalVisualMode.ownedPlusExample.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var response: OwnedFirstHomeResponse? { model.responses[scope] }
-    private var layout: RenewalFirstViewLayout { RenewalFirstViewLayout(rawValue: layoutRaw) ?? .current }
+    private var layout: RenewalFirstViewLayout { RenewalFirstViewLayout(rawValue: layoutRaw) ?? .list }
+    private var visualMode: RenewalVisualMode { RenewalVisualMode(rawValue: visualRaw) ?? .ownedPlusExample }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 partnerHeader
                 scopeBar
+                if let climate = response?.climate {
+                    RenewalClimateRow(climate: climate)
+                }
                 if let error = model.errors[scope] {
                     errorCard(error)
                 }
-                RenewalLayoutSwitcher(layoutRaw: $layoutRaw)
+                RenewalViewModeSwitcher(layoutRaw: $layoutRaw, visualRaw: $visualRaw)
                 if let response {
                     recipesView(response)
                     passButton
@@ -223,7 +257,10 @@ struct RenewalLiveHomeView: View {
         .refreshable { await model.load(scope, force: true) }
         .navigationTitle("ホーム")
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: scope) { await model.load(scope) }
+        .task(id: scope) {
+            await model.load(scope)
+            await model.pollExtractions(scope)
+        }
         .sheet(item: $detailRecipe) { recipe in
             RenewalLiveRecipeDetailView(model: model, recipe: recipe, scope: scope)
         }
@@ -362,7 +399,7 @@ struct RenewalLiveHomeView: View {
         return "sun.max"
     }
 
-    // MARK: ③ 3案 (レイアウト候補の切り替え)
+    // MARK: ③ 3案 (リスト / のぞき見 × 見せ方)
 
     @ViewBuilder
     private func recipesView(_ response: OwnedFirstHomeResponse) -> some View {
@@ -371,125 +408,24 @@ struct RenewalLiveHomeView: View {
             decidedId: response.decided_recipe_id,
             isSending: model.isSending,
             showCharCount: store.showCharCount,
+            visualMode: visualMode,
+            extraction: { model.extraction(for: $0) },
             onDetail: { detailRecipe = $0 },
             onDecide: { recipe in Task { await model.decide(recipe, scope: scope) } },
             onPivot: { showPivot = true }
         )
         Group {
             switch layout {
-            case .current: carousel(response)
             case .list: RenewalListLayout(recipes: response.recipes, actions: actions)
-            case .featured: RenewalFeaturedLayout(recipes: response.recipes, actions: actions)
-            case .columns: RenewalColumnsLayout(recipes: response.recipes, actions: actions)
             case .peek: RenewalPeekLayout(recipes: response.recipes, actions: actions)
             }
         }
         .opacity(model.loading.contains(scope) ? 0.5 : 1)
-        .overlay { if model.loading.contains(scope) && layout != .current { ProgressView() } }
-    }
-
-    private func carousel(_ response: OwnedFirstHomeResponse) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(alignment: .top, spacing: 12) {
-                ForEach(Array(response.recipes.enumerated()), id: \.element.id) { index, recipe in
-                    card(recipe, index: index, total: response.recipes.count, decidedId: response.decided_recipe_id)
-                        .containerRelativeFrame(.horizontal) { width, _ in width - 64 }
-                }
-            }
-            .scrollTargetLayout()
+        .overlay { if model.loading.contains(scope) { ProgressView() } }
+        .task(id: response.recipes.map(\.recipe_id).joined()) {
+            // ピボット・見送りで案が入れ替わったら、新しいお手本の抽出状況も追う
+            await model.pollExtractions(scope)
         }
-        .contentMargins(.horizontal, RenewalTokens.edge, for: .scrollContent)
-        .scrollTargetBehavior(.viewAligned)
-        .opacity(model.loading.contains(scope) ? 0.5 : 1)
-        .overlay {
-            if model.loading.contains(scope) { ProgressView() }
-        }
-    }
-
-    private func card(_ recipe: OwnedFirstRecipe, index: Int, total: Int, decidedId: String?) -> some View {
-        let decided = decidedId == recipe.recipe_id
-        let tileSize: CGFloat = recipe.owned_items.count + recipe.missing_items.count > 3 ? 50 : 60
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Text(recipe.status_label)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(RenewalTokens.ink)
-                Spacer(minLength: 0)
-                if recipe.isDiscovery {
-                    Text("発見枠")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(RenewalTokens.discovery)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(RenewalTokens.discovery.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius))
-                }
-                Text("\(index + 1)/\(total)")
-                    .font(.system(size: 11).monospacedDigit())
-                    .foregroundStyle(RenewalTokens.muted)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(recipe.owned_items) { item in
-                        Button { showPivot = true } label: {
-                            RenewalRemoteItemTile(label: item.label, imageURL: item.image_url, slot: item.slot, size: tileSize, owned: true)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint("タップで使う服を変えられます")
-                    }
-                    ForEach(recipe.missing_items) { m in
-                        RenewalRemoteItemTile(label: m.label, imageURL: nil, slot: m.slot, size: tileSize, owned: false)
-                    }
-                }
-            }
-
-            Button {
-                detailRecipe = recipe
-            } label: {
-                VStack(alignment: .leading, spacing: 8) {
-                    RenewalRemoteExampleImage(example: recipe.example, height: 200)
-                    Text(recipe.reason)
-                        .font(.system(size: 13))
-                        .foregroundStyle(RenewalTokens.ink)
-                        .lineSpacing(2)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if store.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint("タップで詳細を開きます")
-
-            Spacer(minLength: 0)
-
-            Button {
-                guard !decided else { return }
-                Task { await model.decide(recipe, scope: scope) }
-            } label: {
-                HStack(spacing: 6) {
-                    if model.isSending { ProgressView().tint(.white) }
-                    if decided { Image(systemName: "checkmark") }
-                    Text(decided ? "\(scope.label)はこれに決定済み" : scope.actionLabel)
-                }
-            }
-            .buttonStyle(RenewalPrimaryButtonStyle(filled: !decided))
-            .disabled(model.isSending)
-
-            Button {
-                showPivot = true
-            } label: {
-                Text(pivotLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(RenewalTokens.muted)
-                    .frame(maxWidth: .infinity, minHeight: 32)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(14)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .renewalCard()
     }
 
     private var pivotLabel: String {
@@ -697,6 +633,39 @@ struct RenewalLiveRecipeDetailView: View {
                             Text(vibe)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(RenewalTokens.ink)
+                        }
+                    }
+                    ForEach(recipe.climate_warnings ?? [], id: \.self) { w in
+                        Label(w, systemImage: "thermometer.medium")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color(red: 0.70, green: 0.33, blue: 0.04))
+                    }
+                    if let e = model.extraction(for: recipe), !e.items.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            RenewalSectionTitle(title: "お手本コーデのアイテム",
+                                                caption: e.isInProgress ? "商品画像を生成中…" : "お手本の写真から抽出 (Nano Banana)")
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(alignment: .top, spacing: 10) {
+                                    ForEach(e.items) { it in
+                                        VStack(spacing: 4) {
+                                            RenewalRemoteItemTile(label: it.label, imageURL: it.displayURL, slot: it.slot, size: 76, owned: true, showName: false)
+                                            Text(it.label)
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(RenewalTokens.ink)
+                                                .lineLimit(2)
+                                                .frame(width: 84)
+                                            if it.owned_item_id != nil {
+                                                Text("手持ちにあり")
+                                                    .font(.system(size: 9, weight: .semibold))
+                                                    .foregroundStyle(.white)
+                                                    .padding(.horizontal, 4)
+                                                    .background(RenewalTokens.primaryFill)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     VStack(alignment: .leading, spacing: 0) {

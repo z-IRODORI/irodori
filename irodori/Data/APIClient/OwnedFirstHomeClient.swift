@@ -18,6 +18,7 @@ struct OwnedFirstItem: Codable, Hashable, Identifiable {
     let label: String         // 「ホワイト シャツ」(色 + カテゴリの一般名詞)
     let image_url: String
     let family: String
+    let fit: String?          // ok | marginal | ng (気温への適合度)
 
     var id: String { item_id }
 }
@@ -26,6 +27,7 @@ struct OwnedFirstMissingItem: Codable, Hashable, Identifiable {
     let slot: String
     let label: String
     let family: String
+    let fit: String?
 
     var id: String { "\(slot)_\(label)" }
 }
@@ -35,6 +37,38 @@ struct OwnedFirstExample: Codable, Hashable {
     let image_url: String?
     let vibe: String?
     let match_score: Double?
+    let extraction: OwnedFirstExtraction?
+}
+
+/// お手本コーデから抽出したアイテム (Nano Banana)。status: none | pending | cropped | ready | failed
+struct OwnedFirstExtraction: Codable, Hashable {
+    let status: String
+    let items: [OwnedFirstExtractedItem]
+
+    var isInProgress: Bool { status == "pending" || status == "cropped" }
+}
+
+struct OwnedFirstExtractedItem: Codable, Hashable, Identifiable {
+    let slot: String
+    let label: String
+    let crop_url: String
+    let image_url: String
+    let owned_item_id: String?
+    let owned_image_url: String?
+
+    var id: String { "\(slot)_\(label)_\(crop_url)" }
+    /// 商品風画像ができていればそれ、まだなら写真の切り抜き
+    var displayURL: String { image_url.isEmpty ? crop_url : image_url }
+}
+
+/// 対象日の気候と服装の目安 (サーバの climate_logic)
+struct OwnedFirstClimate: Codable, Hashable {
+    let band: String
+    let label: String
+    let guidance: String
+    let outer_policy: String   // none | optional | required
+    let max_temp: Int
+    let min_temp: Int
 }
 
 struct OwnedFirstRecipe: Codable, Hashable, Identifiable {
@@ -48,6 +82,7 @@ struct OwnedFirstRecipe: Codable, Hashable, Identifiable {
     let missing_items: [OwnedFirstMissingItem]
     let example: OwnedFirstExample?
     let reason: String
+    let climate_warnings: [String]?
 
     var id: String { recipe_id }
     var isDiscovery: Bool { kind == "discovery" }
@@ -66,6 +101,7 @@ struct OwnedFirstHomeResponse: Codable, Hashable {
     let weather: OwnedFirstWeather
     let daily_angle: String
     let daily_angle_label: String
+    let climate: OwnedFirstClimate?
     let greeting: String
     let data_nudge: String?
     let speaking_style: String
@@ -88,6 +124,11 @@ struct OwnedFirstWearResponse: Codable {
     let learned_summary: String
 }
 
+struct OwnedFirstExamplesResponse: Codable {
+    let status: String
+    let examples: [String: OwnedFirstExtraction]
+}
+
 struct OwnedFirstFeedbackResponse: Codable {
     let status: String
     let ack_message: String
@@ -100,6 +141,7 @@ protocol OwnedFirstHomeClientProtocol {
     func get(uid: String, gender: String, targetDate: String, pivotItemId: String?) async throws -> Result<OwnedFirstHomeResponse, HTTPError>
     func wear(uid: String, recipe: OwnedFirstRecipe, targetDate: String, maxTemp: Int?) async throws -> Result<OwnedFirstWearResponse, HTTPError>
     func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe]) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError>
+    func examples(uid: String, poolIds: [String]) async throws -> Result<OwnedFirstExamplesResponse, HTTPError>
 }
 
 final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
@@ -173,6 +215,18 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
             families: Array(Set(recipes.map(\.main_family)))
         )
         return try await post(path: "api/home/owned-first/feedback", uid: uid, body: body)
+    }
+
+    func examples(uid: String, poolIds: [String]) async throws -> Result<OwnedFirstExamplesResponse, HTTPError> {
+        var components = URLComponents(string: "\(baseURL)/api/home/owned-first/examples")!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: uid),
+            URLQueryItem(name: "pool_ids", value: poolIds.joined(separator: ",")),
+        ]
+        guard let url = components.url else { return .failure(.responseError) }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        return try await send(request)
     }
 
     private func post<B: Encodable, T: Decodable>(path: String, uid: String, body: B) async throws -> Result<T, HTTPError> {
