@@ -195,9 +195,11 @@ struct RenewalLiveHomeView: View {
     @State private var detailRecipe: OwnedFirstRecipe?
     @State private var showPivot = false
     @State private var showDislike = false
+    @AppStorage(RenewalFirstViewLayout.storageKey) private var layoutRaw = RenewalFirstViewLayout.list.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var response: OwnedFirstHomeResponse? { model.responses[scope] }
+    private var layout: RenewalFirstViewLayout { RenewalFirstViewLayout(rawValue: layoutRaw) ?? .current }
 
     var body: some View {
         ScrollView {
@@ -207,8 +209,9 @@ struct RenewalLiveHomeView: View {
                 if let error = model.errors[scope] {
                     errorCard(error)
                 }
+                RenewalLayoutSwitcher(layoutRaw: $layoutRaw)
                 if let response {
-                    carousel(response)
+                    recipesView(response)
                     passButton
                 } else if model.loading.contains(scope) {
                     loadingCard
@@ -359,7 +362,31 @@ struct RenewalLiveHomeView: View {
         return "sun.max"
     }
 
-    // MARK: ③ 3案
+    // MARK: ③ 3案 (レイアウト候補の切り替え)
+
+    @ViewBuilder
+    private func recipesView(_ response: OwnedFirstHomeResponse) -> some View {
+        let actions = RenewalRecipeActions(
+            scope: scope,
+            decidedId: response.decided_recipe_id,
+            isSending: model.isSending,
+            showCharCount: store.showCharCount,
+            onDetail: { detailRecipe = $0 },
+            onDecide: { recipe in Task { await model.decide(recipe, scope: scope) } },
+            onPivot: { showPivot = true }
+        )
+        Group {
+            switch layout {
+            case .current: carousel(response)
+            case .list: RenewalListLayout(recipes: response.recipes, actions: actions)
+            case .featured: RenewalFeaturedLayout(recipes: response.recipes, actions: actions)
+            case .columns: RenewalColumnsLayout(recipes: response.recipes, actions: actions)
+            case .peek: RenewalPeekLayout(recipes: response.recipes, actions: actions)
+            }
+        }
+        .opacity(model.loading.contains(scope) ? 0.5 : 1)
+        .overlay { if model.loading.contains(scope) && layout != .current { ProgressView() } }
+    }
 
     private func carousel(_ response: OwnedFirstHomeResponse) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -789,6 +816,7 @@ struct RenewalRemoteItemTile: View {
 struct RenewalRemoteExampleImage: View {
     let example: OwnedFirstExample?
     var height: CGFloat = 200
+    var showBadge: Bool = true
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -806,14 +834,16 @@ struct RenewalRemoteExampleImage: View {
                     .foregroundStyle(RenewalTokens.muted)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            Text("着こなしイメージ")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(RenewalTokens.ink)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(.white.opacity(0.92))
-                .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius))
-                .padding(8)
+            if showBadge {
+                Text("着こなしイメージ")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(.white.opacity(0.92))
+                    .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius))
+                    .padding(8)
+            }
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
