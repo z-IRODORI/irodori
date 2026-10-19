@@ -188,6 +188,8 @@ struct RenewalItemTile: View {
 struct RenewalExampleImage: View {
     let recipe: RenewalRecipe
     var height: CGFloat = 220
+    /// 左上のラベル。写真発掘では「全身写真」、カレンダーでは nil (ラベルなし)
+    var badge: String? = "着こなしイメージ"
 
     private func staple(_ c: RenewalCategory) -> RenewalStaple? {
         recipe.allStaples.first { $0.category == c }
@@ -203,27 +205,33 @@ struct RenewalExampleImage: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.vertical, 14)
 
-            Text("着こなしイメージ")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(RenewalTokens.ink)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(.white.opacity(0.92))
-                .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius))
-                .padding(8)
+            if let badge {
+                Text(badge)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .lineLimit(1)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(.white.opacity(0.92))
+                    .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius))
+                    .padding(8)
+            }
 
             Text("SAMPLE")
                 .font(.system(size: 26, weight: .heavy))
                 .tracking(4)
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
                 .foregroundStyle(RenewalTokens.ink.opacity(0.07))
                 .rotationEffect(.degrees(-24))
+                .padding(.horizontal, 8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(false)
         }
         .frame(height: height)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("着こなしイメージ (サンプル): \(recipe.mainFamily.vibe)")
+        .accessibilityLabel("\(badge ?? "コーデ") (サンプル): \(recipe.mainFamily.vibe)")
     }
 
     private var mannequin: some View {

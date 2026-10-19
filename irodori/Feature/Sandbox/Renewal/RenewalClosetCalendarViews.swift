@@ -224,7 +224,8 @@ struct RenewalCalendarView: View {
                 HStack(spacing: 12) {
                     RenewalExampleImage(
                         recipe: RenewalRecipe(ownedItems: [], missingItems: staples, kind: .zero, heroID: nil, mainFamily: staples[0].family),
-                        height: 150
+                        height: 150,
+                        badge: nil
                     )
                     .frame(width: 110)
                     VStack(alignment: .leading, spacing: 8) {

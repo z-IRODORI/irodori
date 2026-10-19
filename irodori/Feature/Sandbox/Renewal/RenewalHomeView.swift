@@ -235,13 +235,13 @@ struct RenewalHomeView: View {
                         Button {
                             showPivot = true
                         } label: {
-                            RenewalItemTile(staple: item.staple, size: 60, owned: true)
+                            RenewalItemTile(staple: item.staple, size: recipe.allStaples.count > 3 ? 50 : 60, owned: true)
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("タップで使う服を変えられます")
                     }
                     ForEach(recipe.missingItems) { staple in
-                        RenewalItemTile(staple: staple, size: 60, owned: false)
+                        RenewalItemTile(staple: staple, size: recipe.allStaples.count > 3 ? 50 : 60, owned: false)
                     }
                 }
             }

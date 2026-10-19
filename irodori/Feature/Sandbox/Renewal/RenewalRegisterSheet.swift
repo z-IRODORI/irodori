@@ -226,7 +226,8 @@ struct RenewalPhotoFinderView: View {
                     VStack(spacing: 6) {
                         RenewalExampleImage(
                             recipe: RenewalRecipe(ownedItems: [], missingItems: photo.staples, kind: .zero, heroID: nil, mainFamily: photo.staples[0].family),
-                            height: 170
+                            height: 170,
+                            badge: "全身写真"
                         )
                         Text(store.dateLabel(store.state.today - photo.daysAgo))
                             .font(.system(size: 11, weight: .medium))

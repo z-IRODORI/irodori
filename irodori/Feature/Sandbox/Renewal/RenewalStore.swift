@@ -186,8 +186,13 @@ final class RenewalStore {
         case .birth:
             return nil
         case .newItem:
+            // 新着のうち、まだ着ていない服 → 直近2日に着ていない服 の順で主役にする (被り防止)
             let fresh = state.closet.filter { $0.addedDay >= day - 2 }.sorted { $0.addedDay > $1.addedDay }
-            return fresh.first { $0.category == .top || $0.category == .bottom } ?? fresh.first
+            let main = fresh.filter { $0.category == .top || $0.category == .bottom }
+            return main.first { lastWornDay($0.id, before: day) == nil }
+                ?? main.first { !recent.contains($0.id) }
+                ?? fresh.first { !recent.contains($0.id) }
+                ?? main.first ?? fresh.first
         case .rotation:
             let yesterday = Set(wear(on: day - 1)?.itemIDs ?? [])
             return bestOwned(.bottom, at: day, avoid: yesterday) ?? bestOwned(.top, at: day, avoid: yesterday)
@@ -733,9 +738,9 @@ extension RenewalStore {
         return rows
     }
 
-    /// 一軍アイテム (着用回数 → 新しさ順)
+    /// 一軍アイテム (着用回数 → 新しさ順)。靴は「軸服」として語らないので除く
     var coreItems: [RenewalOwnedItem] {
-        state.closet.sorted {
+        state.closet.filter { $0.category != .shoes }.sorted {
             let l = wearCount($0.id), r = wearCount($1.id)
             return l == r ? $0.addedDay > $1.addedDay : l > r
         }

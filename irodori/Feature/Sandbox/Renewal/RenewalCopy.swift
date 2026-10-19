@@ -120,6 +120,16 @@ enum RenewalCopy {
         let b = r.ownedItems.dropFirst().first?.name ?? r.missingItems.dropFirst().first?.name ?? "定番の服"
         let m = r.missingItems.first?.name ?? "羽織り"
         let t = w.tempMax
+        // 羽織りを含む手持ち100%の案は、軽やかさではなく「重ねて完成」を伝える
+        if r.kind == .owned, let outer = r.ownedItems.first(where: { $0.category == .outer })?.name {
+            switch tone {
+            case .gentle: return "手持ちの\(a)×\(b)に\(outer)を重ねれば完成。\(t)℃の肌寒さも、これなら心地よく過ごせるよ。"
+            case .casual: return "手持ちの\(a)×\(b)に\(outer)を重ねて完成！\(t)℃でもこれならちょうどいいよ。"
+            case .cool: return "手持ちの\(a)×\(b)に\(outer)を重ねる構成です。\(t)℃の気温に対して過不足ありません。"
+            case .spicy: return "手持ちの\(a)×\(b)に\(outer)を重ねなさい。\(t)℃なんだから、羽織りは必須よ。"
+            case .kansai: return "手持ちの\(a)×\(b)に\(outer)重ねたら完成やで。\(t)℃でもこれならちょうどええよ。"
+            }
+        }
         switch (r.kind, tone) {
         case (.owned, .gentle): return "手持ちの\(a)×\(b)だけで完成。写真みたいに袖をひと折りすると、\(t)℃の日に軽やかに見えるよ。"
         case (.owned, .casual): return "手持ちの\(a)×\(b)だけで完成！袖をひと折りすると、写真っぽく軽やかになるよ。"

@@ -368,19 +368,18 @@ struct HomeView: View {
                     Haptic.impact(.soft)
                     showRenewalSandbox = true
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("リニューアル体験")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.black)
-                    .clipShape(Capsule())
+                    // 中央の「ホーム」タイトルと重ならないよう、アイコンのみにする
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 26)
+                        .background(Color.black)
+                        .clipShape(Capsule())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("リニューアル後アプリ体験 (Sandbox)")
                 #endif
                 Spacer()
                 Button(action: { path.append(.favorites) }) {

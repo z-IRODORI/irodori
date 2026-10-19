@@ -161,8 +161,12 @@ struct RenewalOnboardingView: View {
                     .padding(.vertical, 16)
                 }
                 .onChange(of: answeredCount) {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
-                        proxy.scrollTo("options", anchor: .bottom)
+                    // レイアウト確定後に、次の質問が画面上部に来るようスクロール
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(80))
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
+                            proxy.scrollTo("q\(min(answeredCount, 3))", anchor: .top)
+                        }
                     }
                 }
             }
@@ -196,7 +200,8 @@ struct RenewalOnboardingView: View {
 
     private func partnerBubble(_ text: String, axis: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            RenewalPartnerAvatar(typeName: answers.typeName, size: 32, colorless: true)
+            // 誕生前はタイプを明かさないよう、固定の無色シルエットにする
+            RenewalPartnerAvatar(typeName: "クリーン・スタンダード", size: 32, colorless: true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(axis)
                     .font(.system(size: 11, weight: .semibold))
