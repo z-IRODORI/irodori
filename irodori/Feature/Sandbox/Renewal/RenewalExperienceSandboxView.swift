@@ -32,6 +32,9 @@ struct RenewalExperienceSandboxView: View {
     @State private var showToneSheet = false
     @State private var showControls = false
     @State private var confirmReset = false
+    /// ホームのデータ接続先 (モック / 実API ローカル / 実API 本番)
+    @AppStorage(RenewalHomeDataSource.storageKey) private var homeSourceRaw = RenewalHomeDataSource.local.rawValue
+    @State private var liveModel: RenewalLiveHomeModel?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -82,13 +85,7 @@ struct RenewalExperienceSandboxView: View {
         TabView(selection: $tab) {
             Tab("ホーム", systemImage: "house", value: TabKey.home) {
                 NavigationStack(path: $homePath) {
-                    RenewalHomeView(
-                        store: store,
-                        onOpenPartner: { homePath.append(.partner) },
-                        onOpenToneSheet: { showToneSheet = true },
-                        onOpenPhotoPicker: { registerRequest = RegisterRequest(method: .photo) },
-                        onOpenCalendar: { tab = .calendar }
-                    )
+                    homeContent
                     .toolbar { closeToolbar }
                     .navigationDestination(for: Route.self) { route in
                         switch route {
@@ -135,6 +132,36 @@ struct RenewalExperienceSandboxView: View {
         }
     }
 
+    private var homeSource: RenewalHomeDataSource {
+        RenewalHomeDataSource(rawValue: homeSourceRaw) ?? .mock
+    }
+
+    @ViewBuilder
+    private var homeContent: some View {
+        if homeSource == .mock {
+            RenewalHomeView(
+                store: store,
+                onOpenPartner: { homePath.append(.partner) },
+                onOpenToneSheet: { showToneSheet = true },
+                onOpenPhotoPicker: { registerRequest = RegisterRequest(method: .photo) },
+                onOpenCalendar: { tab = .calendar }
+            )
+        } else if let liveModel, liveModel.source == homeSource {
+            RenewalLiveHomeView(
+                store: store,
+                model: liveModel,
+                onOpenPartner: { homePath.append(.partner) },
+                onOpenToneSheet: { showToneSheet = true },
+                onOpenPhotoPicker: { registerRequest = RegisterRequest(method: .photo) },
+                onOpenCalendar: { tab = .calendar }
+            )
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onAppear { liveModel = RenewalLiveHomeModel(source: homeSource) }
+        }
+    }
+
     @ToolbarContentBuilder
     private var closeToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
@@ -176,6 +203,18 @@ struct RenewalExperienceSandboxView: View {
                     Text("時間を進める")
                 } footer: {
                     Text("翌朝になると、昨日着た服の被り防止・日替わり着眼点 (A〜E) のローテーション・天気の変化がホームに反映されます。")
+                }
+
+                Section {
+                    Picker("ホームのデータ", selection: $homeSourceRaw) {
+                        ForEach(RenewalHomeDataSource.allCases) { source in
+                            Text(source.label).tag(source.rawValue)
+                        }
+                    }
+                } header: {
+                    Text("データ接続")
+                } footer: {
+                    Text("実API はログイン中のアカウントのクローゼット・天気・相棒の話し方で api/home/owned-first から3案を取得し、「今日着る」は実際のカレンダーに保存されます。ローカルは irodori-api を ./run.sh で起動 (port 8080)。カレンダー・クローゼット・相棒タブは引き続きモックです。")
                 }
 
                 Section {
