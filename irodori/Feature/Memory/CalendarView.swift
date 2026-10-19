@@ -53,6 +53,7 @@ struct CalendarView: View {
     #if DEBUG
     /// Sandbox 検証画面の入口 (週間プランナー / 同日複数コーデUI)。実uidのまま実APIを叩いて確認する
     @State private var showSandboxMenu = false
+    @State private var showRenewalSandbox = false
     #endif
 
     var body: some View {
@@ -102,6 +103,9 @@ struct CalendarView: View {
         .sheet(isPresented: $showSandboxMenu) {
             NavigationStack {
                 List {
+                    Button("リニューアル後アプリ体験 (Mock)") {
+                        showRenewalSandbox = true
+                    }
                     NavigationLink("相棒統合ホーム画面 (改善案 A/B/C)") {
                         PartnerIntegratedHomeSandboxView()
                             .environment(tabViewModel)
@@ -120,6 +124,9 @@ struct CalendarView: View {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button("閉じる") { showSandboxMenu = false }
                     }
+                }
+                .fullScreenCover(isPresented: $showRenewalSandbox) {
+                    RenewalExperienceSandboxView()
                 }
             }
         }

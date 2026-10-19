@@ -23,6 +23,8 @@ struct HomeView: View {
     @State private var showTasteVoteSheet = false
     #if DEBUG
     @State private var showHomeSandboxSheet = false
+    /// リニューアル後アプリの体験 Sandbox (Feature/Sandbox/Renewal)
+    @State private var showRenewalSandbox = false
     #endif
     @Environment(MainTabViewModel.self) private var tabViewModel
 
@@ -331,6 +333,9 @@ struct HomeView: View {
                     }
             }
         }
+        .fullScreenCover(isPresented: $showRenewalSandbox) {
+            RenewalExperienceSandboxView()
+        }
         #endif
     }
 
@@ -356,6 +361,23 @@ struct HomeView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Color.gray.opacity(0.1))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                Button {
+                    Haptic.impact(.soft)
+                    showRenewalSandbox = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("リニューアル体験")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.black)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
