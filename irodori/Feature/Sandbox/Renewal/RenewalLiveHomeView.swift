@@ -5,7 +5,7 @@
 //  リニューアル版ホームの「実 API 接続」版。
 //  レイアウトはモック版 (RenewalHomeView) と同じ3要素 (相棒ヘッダー / 今日・明日・週末 + 気温 / 3案) で、
 //  データは GET api/home/owned-first (手持ち起点の推薦) から取る。
-//   - 手持ちアイテムはクローゼットの実画像、お手本は母集団 (Pinterest) の実画像
+//   - 手持ちアイテムはクローゼットの実画像、コーデモデルは母集団 (Pinterest) の実画像
 //   - 相棒のひとこと・理由は Gemini 生成 (失敗時はサーバ側テンプレート)
 //   - 「今日着る」は api/home/owned-first/wear でカレンダー (calendar_outfits) に保存
 //   - 見送りは api/home/owned-first/feedback、「使う服を変える」は pivot_item_id で再取得
@@ -55,7 +55,7 @@ final class RenewalLiveHomeModel {
     private(set) var loading: Set<RenewalScope> = []
     private(set) var errors: [RenewalScope: String] = [:]
     private(set) var pivots: [RenewalScope: String] = [:]
-    /// お手本コーデから抽出したアイテム (pool_id → 最新の状況)。ポーリングで更新する
+    /// コーデモデルから抽出したアイテム (pool_id → 最新の状況)。ポーリングで更新する
     private(set) var extractions: [String: OwnedFirstExtraction] = [:]
     var sendoff: Sendoff?
     var isSending = false
@@ -141,7 +141,7 @@ final class RenewalLiveHomeModel {
         return extractions[pid] ?? recipe.example?.extraction
     }
 
-    /// 抽出中のお手本があれば、完了するまで数秒おきに状況を取りに行く (画面表示中のみ)
+    /// 抽出中のコーデモデルがあれば、完了するまで数秒おきに状況を取りに行く (画面表示中のみ)
     func pollExtractions(_ scope: RenewalScope) async {
         for _ in 0..<40 {
             let pending = (responses[scope]?.recipes ?? []).compactMap { r -> String? in
@@ -423,7 +423,7 @@ struct RenewalLiveHomeView: View {
         .opacity(model.loading.contains(scope) ? 0.5 : 1)
         .overlay { if model.loading.contains(scope) { ProgressView() } }
         .task(id: response.recipes.map(\.recipe_id).joined()) {
-            // ピボット・見送りで案が入れ替わったら、新しいお手本の抽出状況も追う
+            // ピボット・見送りで案が入れ替わったら、新しいコーデモデルの抽出状況も追う
             await model.pollExtractions(scope)
         }
     }
@@ -639,7 +639,7 @@ struct RenewalLiveRecipeDetailView: View {
                     }
                     if !isItemMode, let vibe = recipe.example?.vibe, !vibe.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("着こなしのお手本")
+                            Text("コーデモデル")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(RenewalTokens.muted)
                             Text(vibe)
@@ -648,11 +648,13 @@ struct RenewalLiveRecipeDetailView: View {
                         }
                     }
                     if isItemMode {
+                        RenewalOwnedLegend()
                         Text(recipe.reason)
                             .font(.system(size: 14))
                             .foregroundStyle(RenewalTokens.ink)
                             .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
+                        coordeModelSection
                     }
                     ForEach(recipe.climate_warnings ?? [], id: \.self) { w in
                         Label(w, systemImage: "thermometer.medium")
@@ -661,13 +663,14 @@ struct RenewalLiveRecipeDetailView: View {
                     }
                     if let e = model.extraction(for: recipe), !e.items.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            RenewalSectionTitle(title: "お手本コーデのアイテム",
-                                                caption: e.isInProgress ? "商品画像を生成中…" : "お手本の写真から抽出 (Nano Banana)")
+                            RenewalSectionTitle(title: "コーデモデルのアイテム",
+                                                caption: e.isInProgress ? "商品画像を生成中…" : "コーデモデルの写真から抽出 (Nano Banana)")
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(alignment: .top, spacing: 10) {
                                     ForEach(e.items) { it in
                                         VStack(spacing: 4) {
-                                            RenewalRemoteItemTile(label: it.label, imageURL: it.displayURL, slot: it.slot, size: 76, owned: true, showName: false)
+                                            RenewalRemoteItemTile(label: it.label, imageURL: it.displayURL, slot: it.slot, size: 76,
+                                                                  owned: it.owned_item_id != nil, showName: false)
                                             Text(it.label)
                                                 .font(.system(size: 10))
                                                 .foregroundStyle(RenewalTokens.ink)
@@ -678,7 +681,7 @@ struct RenewalLiveRecipeDetailView: View {
                                                     .font(.system(size: 9, weight: .semibold))
                                                     .foregroundStyle(.white)
                                                     .padding(.horizontal, 4)
-                                                    .background(RenewalTokens.primaryFill)
+                                                    .background(RenewalTokens.owned)
                                                     .clipShape(RoundedRectangle(cornerRadius: 3))
                                             }
                                         }
@@ -722,6 +725,36 @@ struct RenewalLiveRecipeDetailView: View {
         }
     }
 
+    /// 参考にした着こなし写真。アイテムを並べる見せ方でも「元になったコーデ」として添える
+    @ViewBuilder
+    private var coordeModelSection: some View {
+        if let example = recipe.example, example.image_url != nil {
+            VStack(alignment: .leading, spacing: 8) {
+                RenewalSectionTitle(title: "コーデモデル", caption: "この着こなしを参考に、手持ちで組み直した案です")
+                HStack(alignment: .top, spacing: 12) {
+                    RenewalRemoteExampleImage(example: example, height: 200, showBadge: false)
+                        .frame(width: 150)
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let vibe = example.vibe, !vibe.isEmpty {
+                            Text(vibe)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(RenewalTokens.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let e = model.extraction(for: recipe), !e.items.isEmpty {
+                            let owned = e.items.filter { $0.owned_item_id != nil }.count
+                            Text("このモデルのアイテムのうち \(owned)/\(e.items.count) 点が手持ちにあります")
+                                .font(.system(size: 12))
+                                .foregroundStyle(RenewalTokens.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
     private func row(label: String, imageURL: String?, slot: String, owned: Bool) -> some View {
         HStack(spacing: 12) {
             RenewalRemoteItemTile(label: label, imageURL: imageURL, slot: slot, size: 48, owned: owned, showName: false)
@@ -734,7 +767,7 @@ struct RenewalLiveRecipeDetailView: View {
             Spacer(minLength: 0)
             if owned {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(RenewalTokens.ink)
+                    .foregroundStyle(RenewalTokens.owned)
                     .accessibilityLabel("手持ち")
             }
         }
@@ -774,8 +807,8 @@ struct RenewalRemoteItemTile: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(owned ? RenewalTokens.border : RenewalTokens.controlBorder,
-                            style: StrokeStyle(lineWidth: 1, dash: owned ? [] : [3, 2.5]))
+                    .strokeBorder(owned ? RenewalTokens.owned : RenewalTokens.controlBorder,
+                                  style: StrokeStyle(lineWidth: owned ? 1.5 : 1, dash: owned ? [] : [3, 2.5]))
             )
             if showName {
                 Text(label)

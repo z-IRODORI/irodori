@@ -6,9 +6,9 @@
 //  検証の結果、レイアウトは「リスト」(本命) と「のぞき見カルーセル」の2つに絞った。
 //
 //  見せ方 (RenewalVisualMode)
-//   - 写真         : お手本コーデ (Pinterest) の写真
-//   - 手持ち＋お手本 : 手持ちアイテムを並べ、足りない分だけお手本コーデから抽出したアイテムで埋める
-//   - お手本のアイテム: お手本コーデから抽出したアイテムをそのまま並べ、手持ちにあるものに印を付ける
+//   - 写真         : コーデモデル (Pinterest) の写真
+//   - 手持ち＋コーデモデル : 手持ちアイテムを並べ、足りない分だけコーデモデルから抽出したアイテムで埋める
+//   - コーデモデルのアイテム: コーデモデルから抽出したアイテムをそのまま並べ、手持ちにあるものに印を付ける
 //  抽出はサーバ側で Nano Banana (outfit_item_generator と同じロジック) がバックグラウンド実行し、
 //  切り抜き → 商品風画像 の順に差し替わる。
 //
@@ -34,16 +34,16 @@ enum RenewalVisualMode: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .photo: return "写真"
-        case .ownedPlusExample: return "手持ち＋お手本"
-        case .exampleItems: return "お手本のアイテム"
+        case .ownedPlusExample: return "手持ち＋コーデモデル"
+        case .exampleItems: return "コーデモデルのアイテム"
         }
     }
 
     var summary: String {
         switch self {
-        case .photo: return "お手本コーデ (Pinterest) の写真で雰囲気を見せる"
-        case .ownedPlusExample: return "手持ちの服を並べ、足りない分だけお手本コーデのアイテムで埋める"
-        case .exampleItems: return "お手本コーデのアイテムを並べ、手持ちにあるものに印を付ける"
+        case .photo: return "コーデモデル (Pinterest) の写真で雰囲気を見せる"
+        case .ownedPlusExample: return "手持ちの服を並べ、足りない分だけコーデモデルのアイテムで埋める"
+        case .exampleItems: return "コーデモデルのアイテムを並べ、手持ちにあるものを緑の枠で示す"
         }
     }
 }
@@ -225,11 +225,11 @@ private struct ItemStrip: View {
     }
 }
 
-/// 見せ方に応じたステータス。「お手本のアイテム」では、お手本のうち手持ちにある数を出す
+/// 見せ方に応じたステータス。「コーデモデルのアイテム」では、コーデモデルのうち手持ちにある数を出す
 private func statusText(_ r: OwnedFirstRecipe, _ actions: RenewalRecipeActions) -> String {
     if actions.visualMode == .exampleItems, let e = actions.extraction(r), !e.items.isEmpty {
         let owned = e.items.filter { $0.owned_item_id != nil }.count
-        return "お手本のうち手持ち\(owned)/\(e.items.count)点"
+        return "モデルのうち手持ち\(owned)/\(e.items.count)点"
     }
     return shortStatus(r)
 }
@@ -250,12 +250,12 @@ struct RenewalFlatPiece: Identifiable, Hashable {
     let imageURL: String?
     let label: String
     let kind: Kind
-    /// お手本のアイテムが手持ちにもある (見せ方「お手本のアイテム」用)
+    /// コーデモデルのアイテムが手持ちにもある (見せ方「コーデモデルのアイテム」用)
     let ownedMatch: Bool
 }
 
 enum RenewalFlatLayBuilder {
-    /// 手持ちを並べ、足りないスロットはお手本コーデから抽出したアイテムで埋める
+    /// 手持ちを並べ、足りないスロットはコーデモデルから抽出したアイテムで埋める
     static func ownedPlusExample(_ r: OwnedFirstRecipe, extraction: OwnedFirstExtraction?) -> [RenewalFlatPiece] {
         var pieces = r.owned_items.map {
             RenewalFlatPiece(id: "o_\($0.item_id)", slot: $0.slot, imageURL: $0.image_url, label: $0.label, kind: .owned, ownedMatch: true)
@@ -272,7 +272,7 @@ enum RenewalFlatLayBuilder {
         return pieces
     }
 
-    /// お手本コーデのアイテムをそのまま並べる
+    /// コーデモデルのアイテムをそのまま並べる
     static func exampleItems(_ extraction: OwnedFirstExtraction?) -> [RenewalFlatPiece] {
         (extraction?.items ?? []).filter { !$0.displayURL.isEmpty }.map {
             RenewalFlatPiece(id: "x_\($0.id)", slot: $0.slot, imageURL: $0.displayURL, label: $0.label,
@@ -281,11 +281,16 @@ enum RenewalFlatLayBuilder {
     }
 }
 
-/// 羽織り (左の縦長) / トップス (右上) / ボトムス (右下) / 靴 (左下) に並べるボード
+/// アイテムを重ねて並べるボード (フラットレイ)。
+/// 手持ち = 服のシルエットに沿った緑の縁取り (クローゼット画像は透過 PNG)、持っていない = 点線の枠。
+/// 配置: 羽織りあり = 羽織り (左上・最前面) / トップス (右上) / ボトムス (中央下) / 靴 (左下)
+///       羽織りなし = トップス (左上・ボトムスの上に重ねる) / ボトムス (右下) / 靴 (左下)
 struct RenewalFlatLayBoard: View {
     let pieces: [RenewalFlatPiece]
     var showsExampleTag = true
     var height: CGFloat = 200
+
+    private var large: Bool { height >= 300 }
 
     var body: some View {
         GeometryReader { geo in
@@ -295,66 +300,178 @@ struct RenewalFlatLayBoard: View {
             let top = tops.last { $0.id != outer?.id }
             let bottom = pieces.first { $0.slot == "bottoms" }
             let shoes = pieces.first { $0.slot == "shoes" }
+            // 後に書いたものが手前
             ZStack(alignment: .topLeading) {
                 if let outer {
-                    piece(outer).frame(width: w * 0.52, height: h * 0.64).position(x: w * 0.27, y: h * 0.33)
-                    if let top { piece(top).frame(width: w * 0.50, height: h * 0.46).position(x: w * 0.75, y: h * 0.24) }
-                    if let bottom { piece(bottom).frame(width: w * 0.48, height: h * 0.54).position(x: w * 0.75, y: h * 0.73) }
-                    if let shoes { piece(shoes).frame(width: w * 0.46, height: h * 0.30).position(x: w * 0.26, y: h * 0.84) }
+                    if let top { piece(top).frame(width: w * 0.60, height: h * 0.48).position(x: w * 0.70, y: h * 0.26) }
+                    if let bottom { piece(bottom).frame(width: w * 0.64, height: h * 0.60).position(x: w * 0.62, y: h * 0.69) }
+                    piece(outer).frame(width: w * 0.70, height: h * 0.58).position(x: w * 0.35, y: h * 0.30)
+                    if let shoes { piece(shoes).frame(width: w * 0.46, height: h * 0.27).position(x: w * 0.23, y: h * 0.85) }
                 } else {
-                    if let top { piece(top).frame(width: w * 0.62, height: h * 0.56).position(x: w * 0.33, y: h * 0.29) }
-                    if let bottom { piece(bottom).frame(width: w * 0.46, height: h * 0.86).position(x: w * 0.76, y: h * 0.50) }
-                    if let shoes { piece(shoes).frame(width: w * 0.50, height: h * 0.34).position(x: w * 0.29, y: h * 0.81) }
+                    if let bottom { piece(bottom).frame(width: w * 0.72, height: h * 0.68).position(x: w * 0.63, y: h * 0.65) }
+                    if let top { piece(top).frame(width: w * 0.84, height: h * 0.56).position(x: w * 0.42, y: h * 0.28) }
+                    if let shoes { piece(shoes).frame(width: w * 0.48, height: h * 0.29).position(x: w * 0.24, y: h * 0.84) }
                 }
             }
         }
         .frame(height: height)
-        .background(RenewalTokens.raised)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(RenewalTokens.surface)
+        .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.cardRadius))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("並べたアイテム: " + pieces.map(\.label).joined(separator: "、"))
+        .accessibilityLabel("並べたアイテム: " + pieces.map { "\($0.label)(\(isOwned($0) ? "手持ち" : "持っていない"))" }.joined(separator: "、"))
+    }
+
+    private func isOwned(_ p: RenewalFlatPiece) -> Bool { p.kind == .owned || p.ownedMatch }
+
+    /// 手持ちは常に手前に出す (持っていないアイテムで手持ちが隠れないように)
+    private func piece(_ p: RenewalFlatPiece) -> some View {
+        pieceBody(p).zIndex(isOwned(p) ? 1 : 0)
     }
 
     @ViewBuilder
-    private func piece(_ p: RenewalFlatPiece) -> some View {
-        ZStack(alignment: .bottomLeading) {
+    private func pieceBody(_ p: RenewalFlatPiece) -> some View {
+        if isOwned(p), p.kind == .owned, let url = p.imageURL.flatMap(URL.init(string:)) {
+            // 透過 PNG のシルエットに沿って縁取る (影を4方向にずらして重ねる)
+            let c = RenewalTokens.owned
+            let d: CGFloat = large ? 2.2 : 1.6
+            KFImage(url)
+                .placeholder { ProgressView() }
+                .resizable()
+                .scaledToFit()
+                .compositingGroup()
+                .shadow(color: c, radius: 0, x: d, y: 0)
+                .shadow(color: c, radius: 0, x: -d, y: 0)
+                .shadow(color: c, radius: 0, x: 0, y: d)
+                .shadow(color: c, radius: 0, x: 0, y: -d)
+                .shadow(color: .black.opacity(0.12), radius: 3, y: 2)
+                .padding(d)
+        } else {
+            notOwned(p)
+        }
+    }
+
+    /// 持っていない (コーデモデルのアイテム / 未抽出) は、画像にぴったり沿った正方形のカード + 点線枠。
+    /// 手持ち (切り抜き + 緑の縁) との違いが形でも分かるようにし、少し小さめに置く
+    private func notOwned(_ p: RenewalFlatPiece) -> some View {
+        let radius: CGFloat = large ? 12 : 8
+        let matched = p.ownedMatch
+        return ZStack {
+            RenewalTokens.raised
             if let s = p.imageURL, let url = URL(string: s) {
                 KFImage(url)
                     .placeholder { ProgressView() }
                     .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(1)
+                    .scaledToFill()
             } else {
-                VStack(spacing: 2) {
+                VStack(spacing: 3) {
                     Image(systemName: p.slot == "tops" ? "tshirt" : (p.slot == "shoes" ? "shoe" : "hanger"))
-                        .font(.system(size: 16))
+                        .font(.system(size: large ? 24 : 16))
                     Text(p.label)
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: large ? 12 : 10, weight: .medium))
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
                 }
                 .foregroundStyle(RenewalTokens.muted)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(RenewalTokens.controlBorder, style: StrokeStyle(lineWidth: 1, dash: [3, 2.5])))
-            }
-            if p.kind == .example && showsExampleTag && !p.ownedMatch {
-                tag("お手本", filled: false)
-            } else if p.ownedMatch && p.kind == .example {
-                tag("手持ちにあり", filled: true)
+                .padding(4)
             }
         }
+        .aspectRatio(1, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: radius))
+        .overlay(
+            RoundedRectangle(cornerRadius: radius)
+                .strokeBorder(matched ? RenewalTokens.owned : RenewalTokens.muted.opacity(0.55),
+                              style: StrokeStyle(lineWidth: matched ? 2 : 1.5, dash: matched ? [] : [5, 3]))
+        )
+        .overlay(alignment: .bottomLeading) { label(p) }
+        .scaleEffect(matched ? 1 : 0.86)
+        .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
     }
 
-    private func tag(_ text: String, filled: Bool) -> some View {
-        Text(text)
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(filled ? .white : RenewalTokens.ink)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 1)
-            .background(filled ? RenewalTokens.primaryFill : Color.white.opacity(0.92))
-            .clipShape(RoundedRectangle(cornerRadius: 3))
-            .overlay(RoundedRectangle(cornerRadius: 3).stroke(filled ? Color.clear : RenewalTokens.controlBorder, lineWidth: 0.5))
+    private func label(_ p: RenewalFlatPiece) -> some View {
+        let owned = p.ownedMatch
+        let text = owned ? "手持ちにあり" : (p.kind == .example && showsExampleTag ? "コーデモデル" : "持っていない")
+        return Text(text)
+            .font(.system(size: large ? 11 : 10, weight: .semibold))
+            .foregroundStyle(owned ? .white : RenewalTokens.ink)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(owned ? RenewalTokens.owned : Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius))
+            .overlay(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius)
+                .stroke(owned ? Color.clear : RenewalTokens.controlBorder, lineWidth: 1))
+            .padding(4)
+    }
+}
+
+/// 手持ち / 持っていない の凡例 (アイテムを並べる見せ方の一覧の上)
+struct RenewalOwnedLegend: View {
+    var body: some View {
+        HStack(spacing: 14) {
+            HStack(spacing: 5) {
+                Image(systemName: "tshirt.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(RenewalTokens.surface)
+                    .shadow(color: RenewalTokens.owned, radius: 0, x: 1.2, y: 0)
+                    .shadow(color: RenewalTokens.owned, radius: 0, x: -1.2, y: 0)
+                    .shadow(color: RenewalTokens.owned, radius: 0, x: 0, y: 1.2)
+                    .shadow(color: RenewalTokens.owned, radius: 0, x: 0, y: -1.2)
+                Text("緑の縁 = 手持ち")
+            }
+            HStack(spacing: 5) {
+                RoundedRectangle(cornerRadius: 3)
+                    .strokeBorder(RenewalTokens.muted.opacity(0.55), style: StrokeStyle(lineWidth: 1.2, dash: [3, 2]))
+                    .frame(width: 14, height: 14)
+                Text("点線 = 持っていない")
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(RenewalTokens.muted)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("緑の縁取りは手持ち、点線の枠は持っていないアイテム")
+    }
+}
+
+/// カードに添える「コーデモデル」(このコーデの参考にした着こなし写真)。列幅いっぱいのバナーで見せる
+struct RenewalCoordeModelChip: View {
+    let example: OwnedFirstExample?
+    var height: CGFloat = 76
+    var onTap: () -> Void
+
+    var body: some View {
+        if let s = example?.image_url, let url = URL(string: s) {
+            Button(action: onTap) {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
+                    .overlay(alignment: .top) {
+                        // 全身写真の上寄り (上半身) が見えるようにする
+                        KFImage(url)
+                            .placeholder { RenewalTokens.raised }
+                            .resizable()
+                            .scaledToFill()
+                            .offset(y: -height * 0.25)
+                    }
+                    .clipped()
+                    .overlay(alignment: .bottom) {
+                        HStack(spacing: 3) {
+                            Text("コーデモデル")
+                                .font(.system(size: 11, weight: .semibold))
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(LinearGradient(colors: [.black.opacity(0), .black.opacity(0.65)], startPoint: .top, endPoint: .bottom))
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("コーデモデルの着こなしを見る")
+        }
     }
 }
 
@@ -377,7 +494,7 @@ struct RenewalRecipeVisual: View {
             if pieces.isEmpty {
                 // 抽出が終わるまでは写真を出さず、手持ち＋不足アイテムで仮に並べておく
                 RenewalFlatLayBoard(pieces: RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: nil), height: height)
-                    .overlay(alignment: .topLeading) { progressBadge(extraction, needed: true, fallback: "お手本からアイテムを抽出中") }
+                    .overlay(alignment: .topLeading) { progressBadge(extraction, needed: true, fallback: "コーデモデルからアイテムを抽出中") }
             } else {
                 RenewalFlatLayBoard(pieces: pieces, showsExampleTag: false, height: height)
                     .overlay(alignment: .topLeading) { progressBadge(extraction, needed: true) }
@@ -409,9 +526,12 @@ struct RenewalListLayout: View {
     let actions: RenewalRecipeActions
 
     private var isItemMode: Bool { actions.visualMode != .photo }
+    /// アイテムを並べる見せ方では、カードを画面幅いっぱいに近づけてボードを大きくする
+    private var edge: CGFloat { isItemMode ? 16 : RenewalTokens.edge }
 
     var body: some View {
         VStack(spacing: 10) {
+            if isItemMode { RenewalOwnedLegend().padding(.horizontal, 4) }
             ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                 row(recipe, index: index)
             }
@@ -423,14 +543,59 @@ struct RenewalListLayout: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, RenewalTokens.edge)
+        .padding(.horizontal, edge)
     }
 
+    @ViewBuilder
     private func row(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
+        if isItemMode { itemRow(recipe, index: index) } else { photoRow(recipe, index: index) }
+    }
+
+    /// 左: アイテムのボード (カード幅の約57%) / 右: 理由・コーデモデル・決定
+    private func itemRow(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button { actions.onDetail(recipe) } label: {
+                RenewalRecipeVisual(recipe: recipe, actions: actions, height: 248)
+                    .containerRelativeFrame(.horizontal) { w, _ in (w - edge * 2 - 20) * 0.58 }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("案\(index + 1)。タップで詳細")
+
+            VStack(alignment: .leading, spacing: 6) {
+                if index == 0 || recipe.isDiscovery {
+                    HStack(spacing: 4) {
+                        if index == 0 { PickTag() }
+                        if recipe.isDiscovery { DiscoveryTag() }
+                    }
+                }
+                Text(statusText(recipe, actions))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Text(recipe.reason)
+                    .font(.system(size: 12))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .lineSpacing(1)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
+                if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w).lineLimit(2) }
+                Spacer(minLength: 0)
+                RenewalCoordeModelChip(example: recipe.example) { actions.onDetail(recipe) }
+                CompactDecideButton(recipe: recipe, actions: actions, fullWidth: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(10)
+        .renewalCard()
+    }
+
+    private func photoRow(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Button { actions.onDetail(recipe) } label: {
-                RenewalRecipeVisual(recipe: recipe, actions: actions, height: isItemMode ? 196 : 112)
-                    .frame(width: isItemMode ? 164 : 84)
+                RenewalRecipeVisual(recipe: recipe, actions: actions, height: 112)
+                    .frame(width: 84)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("案\(index + 1)。タップで詳細")
@@ -444,12 +609,11 @@ struct RenewalListLayout: View {
                         .foregroundStyle(RenewalTokens.ink)
                         .lineLimit(1)
                 }
-                // 並べる見せ方では左のボードにアイテムが出るので、写真のときだけ小さい列を出す
-                if !isItemMode { ItemStrip(recipe: recipe, size: 30) }
+                ItemStrip(recipe: recipe, size: 30)
                 Text(recipe.reason)
                     .font(.system(size: 12))
                     .foregroundStyle(RenewalTokens.ink)
-                    .lineLimit(isItemMode ? 3 : 2)
+                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
                 if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w) }
@@ -513,6 +677,9 @@ struct RenewalPeekLayout: View {
             if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
             if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w) }
             Spacer(minLength: 0)
+            if actions.visualMode != .photo {
+                RenewalCoordeModelChip(example: recipe.example) { actions.onDetail(recipe) }
+            }
             CompactDecideButton(recipe: recipe, actions: actions, fullWidth: true)
         }
         .padding(10)

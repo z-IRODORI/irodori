@@ -5,7 +5,7 @@
 //  新ホーム画面 (app_ecosystem_and_improvement_design.md §3・§5①②)
 //   ① 相棒ヘッダー (アイコン + 提案理由の吹き出し。手持ち0〜2着の間だけ1行リンク)
 //   ② 今日 / 明日 / 週末 + 日付・気温の1行バー
-//   ③ 手持ち起点の3案カルーセル (主役=手持ちの組み合わせ / お手本=着こなしイメージ / 理由 / ボタン1つ)
+//   ③ 手持ち起点の3案カルーセル (主役=手持ちの組み合わせ / コーデモデル=着こなしイメージ / 理由 / ボタン1つ)
 //  直近コーデ一覧・常設データ獲得カード・右上の📅/？は置かない (右上は♡のみ)。
 //
 
@@ -246,7 +246,7 @@ struct RenewalHomeView: View {
                 }
             }
 
-            // お手本: 近い着こなしイメージ
+            // コーデモデル: 近い着こなしイメージ
             Button {
                 detailRecipe = recipe
             } label: {
@@ -403,7 +403,7 @@ struct RenewalRecipeDetailView: View {
                     RenewalExampleImage(recipe: recipe, height: 300)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("着こなしのお手本")
+                        Text("コーデモデル")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(RenewalTokens.muted)
                         Text(recipe.mainFamily.vibe)

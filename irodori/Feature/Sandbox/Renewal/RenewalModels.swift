@@ -25,6 +25,7 @@ enum RenewalTokens {
     static let primaryFill = Color(red: 0x1D / 255, green: 0x1F / 255, blue: 0x20 / 255) // #1D1F20
     static let learned = Color(red: 0x1D / 255, green: 0x5F / 255, blue: 0xBF / 255)    // #1D5FBF 「行動から学習」の印
     static let discovery = Color.teal                                                   // 発見枠 (既存ホームと同じ)
+    static let owned = Color(red: 0x15 / 255, green: 0x80 / 255, blue: 0x3D / 255)     // #15803D 手持ちの印 (白地で AA)
 
     static let cardRadius: CGFloat = 10
     static let controlRadius: CGFloat = 6
