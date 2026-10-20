@@ -227,12 +227,12 @@ struct RenewalLiveHomeView: View {
     @State private var showPivot = false
     @State private var showDislike = false
     @AppStorage(RenewalFirstViewLayout.storageKey) private var layoutRaw = RenewalFirstViewLayout.list.rawValue
-    @AppStorage(RenewalVisualMode.storageKey) private var visualRaw = RenewalVisualMode.ownedPlusExample.rawValue
+    @AppStorage(RenewalVisualMode.storageKey) private var visualRaw = RenewalVisualMode.exampleItems.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var response: OwnedFirstHomeResponse? { model.responses[scope] }
     private var layout: RenewalFirstViewLayout { RenewalFirstViewLayout(rawValue: layoutRaw) ?? .list }
-    private var visualMode: RenewalVisualMode { RenewalVisualMode(rawValue: visualRaw) ?? .ownedPlusExample }
+    private var visualMode: RenewalVisualMode { RenewalVisualMode(rawValue: visualRaw) ?? .exampleItems }
 
     var body: some View {
         ScrollView {
@@ -659,9 +659,10 @@ struct RenewalLiveRecipeDetailView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     if isItemMode {
                         let extraction = model.extraction(for: recipe)
-                        let pieces = visualMode == .exampleItems
-                            ? RenewalFlatLayBuilder.exampleItems(extraction)
-                            : RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: extraction)
+                        let modelPieces = visualMode == .exampleItems
+                            ? RenewalFlatLayBuilder.exampleItems(recipe, extraction: extraction) : []
+                        let pieces = modelPieces.isEmpty
+                            ? RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: extraction) : modelPieces
                         RenewalFlatLayBoard(pieces: pieces, showsExampleTag: visualMode == .ownedPlusExample, height: 380)
                     } else {
                         RenewalRemoteExampleImage(example: recipe.example, height: 380)

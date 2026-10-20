@@ -29,13 +29,13 @@ enum RenewalVisualMode: String, CaseIterable, Identifiable {
     case photo, ownedPlusExample, exampleItems
 
     var id: String { rawValue }
-    static let storageKey = "renewalSandbox.visualMode"
+    static let storageKey = "renewalSandbox.visualMode.v2"
 
     var label: String {
         switch self {
         case .photo: return "写真"
-        case .ownedPlusExample: return "手持ち＋コーデモデル"
-        case .exampleItems: return "コーデモデルのアイテム"
+        case .ownedPlusExample: return "提案アイテム"
+        case .exampleItems: return "コーデモデルのアイテム (推奨)"
         }
     }
 
@@ -167,9 +167,12 @@ private struct ItemStrip: View {
 
 /// 見せ方に応じたステータス。「コーデモデルのアイテム」では、コーデモデルのうち手持ちにある数を出す
 private func statusText(_ r: OwnedFirstRecipe, _ actions: RenewalRecipeActions) -> String {
-    if actions.visualMode == .exampleItems, let e = actions.extraction(r), !e.items.isEmpty {
-        let owned = e.items.filter { $0.owned_item_id != nil }.count
-        return "モデルのうち手持ち\(owned)/\(e.items.count)点"
+    if actions.visualMode == .exampleItems {
+        let pieces = RenewalFlatLayBuilder.exampleItems(r, extraction: actions.extraction(r))
+        if !pieces.isEmpty {
+            let buy = pieces.filter { !$0.ownedMatch }.count
+            return buy == 0 ? "手持ち\(pieces.count)点で完成" : "手持ち\(pieces.count - buy)点 ＋ 買い足す\(buy)点"
+        }
     }
     return shortStatus(r)
 }
@@ -213,12 +216,30 @@ enum RenewalFlatLayBuilder {
         return pieces
     }
 
-    /// コーデモデルのアイテムをそのまま並べる
-    static func exampleItems(_ extraction: OwnedFirstExtraction?) -> [RenewalFlatPiece] {
-        (extraction?.items ?? []).filter { !$0.displayURL.isEmpty }.map {
-            RenewalFlatPiece(id: "x_\($0.id)", slot: $0.slot, imageURL: $0.displayURL, label: $0.label,
-                             kind: .example, ownedMatch: $0.owned_item_id != nil)
+    /// コーデモデルが着ているアイテムを並べる。
+    /// - 同じスロットの手持ちがある (サーバ側で色・形が一致するモデルだけを選んでいる) → 手持ちの写真をそのまま置く
+    /// - 手持ちに無い → 「買い足す」アイテムとして商品風画像 (生成前は点線の枠)
+    /// - モデルに写っていない手持ち (靴など) は最後に足して、コーデとして欠けないようにする
+    static func exampleItems(_ r: OwnedFirstRecipe, extraction: OwnedFirstExtraction?) -> [RenewalFlatPiece] {
+        guard let items = extraction?.items, !items.isEmpty else { return [] }
+        var usedOwned: Set<String> = []
+        var pieces: [RenewalFlatPiece] = []
+        for it in items {
+            if let o = r.owned_items.first(where: { $0.slot == it.slot && !usedOwned.contains($0.item_id) }) {
+                usedOwned.insert(o.item_id)
+                pieces.append(RenewalFlatPiece(id: "o_\(o.item_id)", slot: o.slot, imageURL: o.image_url, label: o.label, kind: .owned, ownedMatch: true))
+            } else if let ownedURL = it.owned_image_url, !ownedURL.isEmpty {
+                pieces.append(RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: ownedURL, label: it.label, kind: .owned, ownedMatch: true))
+            } else {
+                pieces.append(RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: it.image_url.isEmpty ? nil : it.image_url,
+                                               label: it.label, kind: it.image_url.isEmpty ? .placeholder : .example, ownedMatch: false))
+            }
         }
+        let slots = Set(pieces.map(\.slot))
+        for o in r.owned_items where !usedOwned.contains(o.item_id) && !slots.contains(o.slot) {
+            pieces.append(RenewalFlatPiece(id: "o_\(o.item_id)", slot: o.slot, imageURL: o.image_url, label: o.label, kind: .owned, ownedMatch: true))
+        }
+        return pieces
     }
 }
 
@@ -291,16 +312,10 @@ struct RenewalFlatLayBoard: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                VStack(spacing: 3) {
-                    Image(systemName: p.slot == "tops" ? "tshirt" : (p.slot == "shoes" ? "shoe" : "hanger"))
-                        .font(.system(size: large ? 24 : 16))
-                    Text(p.label)
-                        .font(.system(size: large ? 12 : 10, weight: .medium))
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                }
-                .foregroundStyle(RenewalTokens.muted)
-                .padding(4)
+                // 画像の準備中はアイコンだけ (名前と「買い足す」が重なって読みにくくなるため)
+                Image(systemName: p.slot == "tops" ? "tshirt" : (p.slot == "shoes" ? "shoe" : "hanger"))
+                    .font(.system(size: large ? 24 : 16))
+                    .foregroundStyle(RenewalTokens.muted)
             }
         }
         .aspectRatio(1, contentMode: .fit)
@@ -317,9 +332,11 @@ struct RenewalFlatLayBoard: View {
 
     private func label(_ p: RenewalFlatPiece) -> some View {
         let owned = p.ownedMatch
-        let text = owned ? "手持ちにあり" : (p.kind == .example && showsExampleTag ? "コーデモデル" : "持っていない")
+        let text = owned ? "手持ちにあり" : "買い足す"
         return Text(text)
             .font(.system(size: large ? 11 : 10, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(owned ? .white : RenewalTokens.ink)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
@@ -429,11 +446,11 @@ struct RenewalRecipeVisual: View {
             RenewalFlatLayBoard(pieces: RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: extraction), height: height)
                 .overlay(alignment: .topLeading) { progressBadge(extraction, needed: !recipe.missing_items.isEmpty) }
         case .exampleItems:
-            let pieces = RenewalFlatLayBuilder.exampleItems(extraction)
+            let pieces = RenewalFlatLayBuilder.exampleItems(recipe, extraction: extraction)
             if pieces.isEmpty {
-                // 抽出が終わるまでは写真を出さず、手持ち＋不足アイテムで仮に並べておく
+                // コーデモデルが無い / 抽出が終わっていない → 提案アイテム (手持ち＋買い足す枠) で並べる
                 RenewalFlatLayBoard(pieces: RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: nil), height: height)
-                    .overlay(alignment: .topLeading) { progressBadge(extraction, needed: true, fallback: "コーデモデルからアイテムを抽出中") }
+                    .overlay(alignment: .topLeading) { progressBadge(extraction, needed: recipe.example != nil, fallback: "アイテムを準備中") }
             } else {
                 RenewalFlatLayBoard(pieces: pieces, showsExampleTag: false, height: height)
                     .overlay(alignment: .topLeading) { progressBadge(extraction, needed: true) }
@@ -482,6 +499,8 @@ struct RenewalListLayout: View {
         if isItemMode { itemRow(recipe, index: index) } else { photoRow(recipe, index: index) }
     }
 
+    private func hasModel(_ r: OwnedFirstRecipe) -> Bool { (r.example?.image_url ?? "").isEmpty == false }
+
     /// 上: 見出し (左上・大きめ) / 左: アイテムのボード (カード幅の約58%) / 右: 状態・説明 (控えめ)・コーデモデル・決定
     private func itemRow(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -509,12 +528,18 @@ struct RenewalListLayout: View {
                         .foregroundStyle(RenewalTokens.muted)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
+                    // コーデモデルが無い案は、その分の高さを説明に回す (空白を作らない)
                     Text(recipe.reason)
                         .font(.system(size: 12, weight: .regular))
                         .foregroundStyle(RenewalTokens.muted)
                         .lineSpacing(2)
-                        .lineLimit(2)
+                        .lineLimit(hasModel(recipe) ? 2 : 6)
                         .fixedSize(horizontal: false, vertical: true)
+                    if !hasModel(recipe) {
+                        Label("手持ちだけで組んだ案", systemImage: "hanger")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(RenewalTokens.muted)
+                    }
                     if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
                     if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w).lineLimit(2) }
                     Spacer(minLength: 0)
