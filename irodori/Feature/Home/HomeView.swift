@@ -278,42 +278,18 @@ struct HomeView: View {
 
     // MARK: - 3案の下に続くセクション
 
-    /// 服の登録導線と直近コーデ。新ホームのファーストビュー (3案) の下にそのまま残す
+    /// 3案の下: 相棒を育てる導線 (直近のコーデは 2026-10 に一旦廃止)
     @ViewBuilder
     private var homeFooter: some View {
-        VStack(spacing: 22) {
-            PartnerDataAcquisitionCard(
-                closetCount: viewModel.closetItems.count,
-                onTapPhotoAutoPick: { showFullBodyPickerSheet = true },
-                onTapSelectStandardItems: { showStandardItemPickerSheet = true },
-                onTapKeywordSearch: { path.append(.addItemBySearch) },
-                onTapTasteVote: { showTasteVoteSheet = true }
-            )
-            if viewModel.isLoadingHome {
-                recentCoordinatesSkeleton
-            } else if viewModel.hasLoadError {
-                recentCoordinatesError
-            } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
-                RecentCoordinates(
-                    recentCoordinates: viewModel.homeResponse.recent_coordinates,
-                    isEditMode: viewModel.isEditMode,
-                    onToggleEditMode: { viewModel.toggleEditMode() },
-                    onDeleteRequest: { coordinateId in
-                        viewModel.requestDelete(coordinateId: coordinateId)
-                    },
-                    onTapCoordinate: { coordinate in
-                        path.append(.coordinateDetail(.init(
-                            coordinateId: coordinate.id,
-                            coordinateImageURL: coordinate.displayImageURL,
-                            showHeader: true
-                        )))
-                    }
-                )
-                .padding(.horizontal, -24)
-            }
-            Spacer().frame(height: 32)
-        }
-        .padding(.horizontal, 24)
+        PartnerGrowthCard(
+            typeName: ownedFirstModel.responses.values.first?.partner_type_name ?? viewModel.partnerHome?.type_name ?? "",
+            closetCount: viewModel.closetItems.count,
+            onTapFullBody: { showFullBodyPickerSheet = true },
+            onTapStandardItems: { showStandardItemPickerSheet = true },
+            onTapTasteVote: { showTasteVoteSheet = true }
+        )
+        .padding(.horizontal, RenewalTokens.edge)
+        .padding(.bottom, 32)
     }
 
     // MARK: - Header

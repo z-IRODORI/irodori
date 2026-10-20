@@ -253,7 +253,6 @@ struct RenewalLiveHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 partnerHeader
-                nextWearRow
                 if let error = model.errors[scope] {
                     errorCard(error)
                 }
@@ -302,12 +301,14 @@ struct RenewalLiveHomeView: View {
 
     // MARK: ① 相棒ヘッダー
 
+    /// 相棒のアバターと、吹き出しの枠を持たないひとこと。日付と気温は名前の横に小さく添える
+    /// (枠・チップを減らしてシンプルにし、「相棒が話しかけている」ことだけを残す)
     private var partnerHeader: some View {
         HStack(alignment: .top, spacing: 12) {
             Button(action: onOpenPartner) {
-                RenewalPartnerAvatar(typeName: partnerTypeName, size: 40)
-                    .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
+                RenewalPartnerAvatar(typeName: partnerTypeName, size: 48)
+                    .frame(minWidth: 48, minHeight: 48)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
@@ -316,12 +317,13 @@ struct RenewalLiveHomeView: View {
             })
             .accessibilityLabel("相棒画面を開く")
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 5) {
+                nextWearMeta
                 if let response {
                     Text(response.greeting)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(RenewalTokens.ink)
-                        .lineSpacing(2)
+                        .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                     if host.showCharCount {
                         HStack(spacing: 6) {
@@ -331,64 +333,48 @@ struct RenewalLiveHomeView: View {
                                 .foregroundStyle(RenewalTokens.muted)
                         }
                     }
-                    if let nudge = response.data_nudge {
-                        Divider().overlay(RenewalTokens.rule)
-                        Button(action: onOpenPhotoPicker) {
-                            HStack(spacing: 4) {
-                                Text(nudge).font(.system(size: 13, weight: .semibold))
-                                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
-                            }
-                            .foregroundStyle(RenewalTokens.ink)
-                            .frame(minHeight: 32)
-                        }
-                        .buttonStyle(.plain)
-                    }
                 } else {
                     Text("相棒があなたの手持ち服から3案を組んでいます…")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(RenewalTokens.muted)
                         .redacted(reason: .placeholder)
                 }
             }
-            .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .renewalCard()
         }
         .padding(.horizontal, RenewalTokens.edge)
+        .padding(.top, 4)
+    }
+
+    /// 「明日 10/21(水) ・ 29° / 20°」(季節ラベルはテキストだけで添える)
+    private var nextWearMeta: some View {
+        HStack(spacing: 5) {
+            Text("\(scope == .today ? "今日" : "明日") \(RenewalLiveHomeModel.dateLabel(scope))")
+            if let w = response?.weather {
+                Text("・")
+                Image(systemName: weatherSymbol(w.condition)).font(.system(size: 11))
+                Text("\(w.max_temp)° / \(w.min_temp)°").monospacedDigit()
+            }
+            if let climate = response?.climate {
+                Text("・\(climate.label)")
+            }
+        }
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(RenewalTokens.muted)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(metaAccessibility)
+    }
+
+    private var metaAccessibility: String {
+        var s = "\(scope == .today ? "今日" : "明日")着るなら、\(RenewalLiveHomeModel.dateLabel(scope))"
+        if let w = response?.weather { s += "、最高\(w.max_temp)度、最低\(w.min_temp)度" }
+        if let c = response?.climate { s += "、\(c.label)。\(c.guidance)" }
+        return s
     }
 
     private var partnerTypeName: String {
         if let name = response?.partner_type_name, !name.isEmpty { return name }
         return host.fallbackTypeName
-    }
-
-    // MARK: ② 次に着る日 + 気温 + 服装の目安 (日付は選ばせない)
-
-    private var nextWearRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(scope == .today ? "今日着るなら" : "明日着るなら")
-                    .font(.system(size: 13, weight: .semibold))
-                Text(RenewalLiveHomeModel.dateLabel(scope))
-                    .font(.system(size: 13))
-                if let w = response?.weather {
-                    Image(systemName: weatherSymbol(w.condition)).font(.system(size: 12))
-                    Text("\(w.max_temp)℃ / \(w.min_temp)℃").font(.system(size: 13).monospacedDigit())
-                }
-                if let climate = response?.climate {
-                    Text(climate.label)
-                        .font(.system(size: 11, weight: .semibold))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .overlay(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius).stroke(RenewalTokens.controlBorder, lineWidth: 1))
-                        .accessibilityLabel("\(climate.label)。\(climate.guidance)")
-                }
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(RenewalTokens.ink)
-            .accessibilityElement(children: .combine)
-        }
-        .padding(.horizontal, RenewalTokens.edge)
     }
 
     private func weatherSymbol(_ condition: String) -> String {
