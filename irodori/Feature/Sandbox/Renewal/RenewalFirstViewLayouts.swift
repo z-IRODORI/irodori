@@ -375,7 +375,8 @@ struct RenewalRecipeVisual: View {
         case .exampleItems:
             let pieces = RenewalFlatLayBuilder.exampleItems(extraction)
             if pieces.isEmpty {
-                RenewalRemoteExampleImage(example: recipe.example, height: height, showBadge: false)
+                // 抽出が終わるまでは写真を出さず、手持ち＋不足アイテムで仮に並べておく
+                RenewalFlatLayBoard(pieces: RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: nil), height: height)
                     .overlay(alignment: .topLeading) { progressBadge(extraction, needed: true, fallback: "お手本からアイテムを抽出中") }
             } else {
                 RenewalFlatLayBoard(pieces: pieces, showsExampleTag: false, height: height)

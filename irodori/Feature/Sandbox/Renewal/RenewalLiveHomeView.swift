@@ -262,7 +262,7 @@ struct RenewalLiveHomeView: View {
             await model.pollExtractions(scope)
         }
         .sheet(item: $detailRecipe) { recipe in
-            RenewalLiveRecipeDetailView(model: model, recipe: recipe, scope: scope)
+            RenewalLiveRecipeDetailView(model: model, recipe: recipe, scope: scope, visualMode: visualMode)
         }
         .sheet(isPresented: $showPivot) {
             pivotSheet
@@ -618,14 +618,26 @@ struct RenewalLiveRecipeDetailView: View {
     let model: RenewalLiveHomeModel
     let recipe: OwnedFirstRecipe
     let scope: RenewalScope
+    var visualMode: RenewalVisualMode = .photo
     @Environment(\.dismiss) private var dismiss
+
+    /// アイテムを並べる見せ方では Pinterest の写真を出さず、並べたアイテムを大きく見せる
+    private var isItemMode: Bool { visualMode != .photo }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    RenewalRemoteExampleImage(example: recipe.example, height: 380)
-                    if let vibe = recipe.example?.vibe, !vibe.isEmpty {
+                    if isItemMode {
+                        let extraction = model.extraction(for: recipe)
+                        let pieces = visualMode == .exampleItems
+                            ? RenewalFlatLayBuilder.exampleItems(extraction)
+                            : RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: extraction)
+                        RenewalFlatLayBoard(pieces: pieces, showsExampleTag: visualMode == .ownedPlusExample, height: 380)
+                    } else {
+                        RenewalRemoteExampleImage(example: recipe.example, height: 380)
+                    }
+                    if !isItemMode, let vibe = recipe.example?.vibe, !vibe.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("着こなしのお手本")
                                 .font(.system(size: 12, weight: .semibold))
@@ -634,6 +646,13 @@ struct RenewalLiveRecipeDetailView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(RenewalTokens.ink)
                         }
+                    }
+                    if isItemMode {
+                        Text(recipe.reason)
+                            .font(.system(size: 14))
+                            .foregroundStyle(RenewalTokens.ink)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     ForEach(recipe.climate_warnings ?? [], id: \.self) { w in
                         Label(w, systemImage: "thermometer.medium")
