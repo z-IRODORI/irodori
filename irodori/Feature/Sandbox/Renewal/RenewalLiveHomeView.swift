@@ -244,7 +244,7 @@ struct RenewalLiveHomeView: View {
                 }
                 if let response {
                     recipesView(response)
-                    passButton
+                    partnerFollowUp
                 } else if model.loading.contains(scope) {
                     loadingCard
                 }
@@ -359,26 +359,18 @@ struct RenewalLiveHomeView: View {
                     Image(systemName: weatherSymbol(w.condition)).font(.system(size: 12))
                     Text("\(w.max_temp)℃ / \(w.min_temp)℃").font(.system(size: 13).monospacedDigit())
                 }
+                if let climate = response?.climate {
+                    Text(climate.label)
+                        .font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .overlay(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius).stroke(RenewalTokens.controlBorder, lineWidth: 1))
+                        .accessibilityLabel("\(climate.label)。\(climate.guidance)")
+                }
                 Spacer(minLength: 0)
             }
             .foregroundStyle(RenewalTokens.ink)
             .accessibilityElement(children: .combine)
-            if let climate = response?.climate {
-                HStack(spacing: 6) {
-                    Text(climate.label)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(RenewalTokens.ink)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .overlay(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius).stroke(RenewalTokens.controlBorder, lineWidth: 1))
-                    Text(climate.guidance)
-                        .font(.system(size: 12))
-                        .foregroundStyle(RenewalTokens.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                }
-                .accessibilityElement(children: .combine)
-            }
         }
         .padding(.horizontal, RenewalTokens.edge)
     }
@@ -417,6 +409,14 @@ struct RenewalLiveHomeView: View {
             // ピボット・見送りで案が入れ替わったら、新しいコーデモデルの抽出状況も追う
             await model.pollExtractions(scope)
         }
+    }
+
+    private var followUpMessage: String {
+        if let id = model.pivotItemId(scope),
+           let item = response?.closet_items.first(where: { $0.item_id == id }) {
+            return "\(item.label)を軸に組み直したよ。ほかの服にもできるよ"
+        }
+        return "ピンとこなかったら、教えてね"
     }
 
     private var pivotLabel: String {
@@ -459,6 +459,44 @@ struct RenewalLiveHomeView: View {
     }
 
     // MARK: 見送り
+
+    /// 3案の後に相棒が問いかけ、ユーザーは返事のチップで「服の指定」か「見送り」を選ぶ
+    private var partnerFollowUp: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
+                RenewalPartnerAvatar(typeName: partnerTypeName, size: 28)
+                Text(followUpMessage)
+                    .font(.system(size: 13))
+                    .foregroundStyle(RenewalTokens.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            HStack(spacing: 8) {
+                replyChip("この服を着たい", systemImage: "hanger") { showPivot = true }
+                replyChip("どれも違うかも", systemImage: "arrow.triangle.2.circlepath") { showDislike = true }
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 36)
+        }
+        .padding(.horizontal, RenewalTokens.edge)
+        .padding(.top, 2)
+    }
+
+    private func replyChip(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(RenewalTokens.ink)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 32)
+                .background(RenewalTokens.surface)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(RenewalTokens.border, lineWidth: 1))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 
     private var passButton: some View {
         Button {
@@ -639,7 +677,6 @@ struct RenewalLiveRecipeDetailView: View {
                         }
                     }
                     if isItemMode {
-                        RenewalOwnedLegend()
                         Text(recipe.reason)
                             .font(.system(size: 14))
                             .foregroundStyle(RenewalTokens.ink)
@@ -798,8 +835,8 @@ struct RenewalRemoteItemTile: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(owned ? RenewalTokens.owned : RenewalTokens.controlBorder,
-                                  style: StrokeStyle(lineWidth: owned ? 1.5 : 1, dash: owned ? [] : [3, 2.5]))
+                    .strokeBorder(owned ? RenewalTokens.border : RenewalTokens.controlBorder,
+                                  style: StrokeStyle(lineWidth: 1, dash: owned ? [] : [3, 2.5]))
             )
             if showName {
                 Text(label)

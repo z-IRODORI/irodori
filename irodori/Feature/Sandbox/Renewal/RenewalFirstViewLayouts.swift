@@ -202,9 +202,10 @@ enum RenewalFlatLayBuilder {
         }
         var usedExample: Set<String> = []
         for m in r.missing_items {
-            if let ex = extraction?.items.first(where: { $0.slot == m.slot && !usedExample.contains($0.id) && !$0.displayURL.isEmpty }) {
+            // 写真の切り抜き (背景つき) は並べると浮くので、商品風画像ができてから差し替える
+            if let ex = extraction?.items.first(where: { $0.slot == m.slot && !usedExample.contains($0.id) && !$0.image_url.isEmpty }) {
                 usedExample.insert(ex.id)
-                pieces.append(RenewalFlatPiece(id: "e_\(ex.id)", slot: m.slot, imageURL: ex.displayURL, label: ex.label, kind: .example, ownedMatch: false))
+                pieces.append(RenewalFlatPiece(id: "e_\(ex.id)", slot: m.slot, imageURL: ex.image_url, label: ex.label, kind: .example, ownedMatch: false))
             } else {
                 pieces.append(RenewalFlatPiece(id: "m_\(m.id)", slot: m.slot, imageURL: nil, label: m.label, kind: .placeholder, ownedMatch: false))
             }
@@ -222,7 +223,7 @@ enum RenewalFlatLayBuilder {
 }
 
 /// アイテムを重ねて並べるボード (フラットレイ)。
-/// 手持ち = 服のシルエットに沿った影で浮かせる (クローゼット画像は透過 PNG)、持っていない = 点線の枠。
+/// 手持ち = 切り抜きをそのまま置く (クローゼット画像は透過 PNG)、持っていない = 点線の枠。
 /// 配置: 羽織りあり = 羽織り (左上・最前面) / トップス (右上) / ボトムス (中央下) / 靴 (左下)
 ///       羽織りなし = トップス (左上・ボトムスの上に重ねる) / ボトムス (右下) / 靴 (左下)
 struct RenewalFlatLayBoard: View {
@@ -330,27 +331,21 @@ struct RenewalFlatLayBoard: View {
     }
 }
 
-/// 手持ちの切り抜き (透過 PNG)。色は足さず、シルエットに沿った影で「手に取れる実物」として浮かせる。
-/// 影は画像の読み込みが終わってから付ける (プレースホルダーに影がにじまないように)。
+/// 手持ちの切り抜き (透過 PNG)。特別な強調はせず、そのまま置く (持っていない物だけ点線で区別する)
 struct RenewalLiftedCutout: View {
     let url: URL
     var large = false
 
-    @State private var loaded = false
-
     var body: some View {
         KFImage(url)
             .placeholder { RenewalTokens.raised.opacity(0.6).clipShape(RoundedRectangle(cornerRadius: 8)) }
-            .onSuccess { _ in loaded = true }
             .resizable()
             .scaledToFit()
-            .shadow(color: .black.opacity(loaded ? 0.22 : 0), radius: large ? 8 : 5, x: 0, y: large ? 6 : 4)
-            .shadow(color: .black.opacity(loaded ? 0.10 : 0), radius: 1, x: 0, y: 1)
             .padding(2)
     }
 }
 
-/// 手持ち / 持っていない の凡例 (アイテムを並べる見せ方の一覧の上)
+/// 手持ち / 持っていない の凡例 (詳細シート用)
 struct RenewalOwnedLegend: View {
     var body: some View {
         HStack(spacing: 14) {
@@ -475,17 +470,9 @@ struct RenewalListLayout: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            if isItemMode { RenewalOwnedLegend().padding(.horizontal, 4) }
             ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                 row(recipe, index: index)
             }
-            Button(action: actions.onPivot) {
-                Text("使う服を変える")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(RenewalTokens.muted)
-                    .frame(maxWidth: .infinity, minHeight: 36)
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, edge)
     }
@@ -510,7 +497,7 @@ struct RenewalListLayout: View {
             }
             HStack(alignment: .top, spacing: 10) {
                 Button { actions.onDetail(recipe) } label: {
-                    RenewalRecipeVisual(recipe: recipe, actions: actions, height: 228)
+                    RenewalRecipeVisual(recipe: recipe, actions: actions, height: 184)
                         .containerRelativeFrame(.horizontal) { w, _ in (w - edge * 2 - 20) * 0.58 }
                 }
                 .buttonStyle(.plain)
@@ -526,18 +513,19 @@ struct RenewalListLayout: View {
                         .font(.system(size: 12, weight: .regular))
                         .foregroundStyle(RenewalTokens.muted)
                         .lineSpacing(2)
-                        .lineLimit(3)
+                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                     if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
                     if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w).lineLimit(2) }
                     Spacer(minLength: 0)
-                    RenewalCoordeModelChip(example: recipe.example, height: 92) { actions.onDetail(recipe) }
+                    RenewalCoordeModelChip(example: recipe.example, height: 76) { actions.onDetail(recipe) }
                     CompactDecideButton(recipe: recipe, actions: actions, fullWidth: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .renewalCard()
     }
 
