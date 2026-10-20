@@ -416,7 +416,12 @@ struct RenewalFlatLayBoard: View {
 
     /// 手持ちは常に手前に出す (持っていないアイテムで手持ちが隠れないように)
     private func piece(_ p: RenewalFlatPiece) -> some View {
-        pieceBody(p).zIndex(isOwned(p) ? 1 : 0)
+        // 入場時は「羽織り → トップス → ボトムス → 靴」の順に置く
+        let order = ["outer": 0, "tops": 1, "bottoms": 2, "shoes": 3][p.slot] ?? 4
+        let itemId = p.id.hasPrefix("o_") ? String(p.id.dropFirst(2)) : nil
+        return pieceBody(p)
+            .modifier(RenewalIntroPlace(order: order, itemId: itemId))
+            .zIndex(isOwned(p) ? 1 : 0)
     }
 
     @ViewBuilder
@@ -602,6 +607,8 @@ struct RenewalRecipeVisual: View {
 struct RenewalListLayout: View {
     let recipes: [OwnedFirstRecipe]
     let actions: RenewalRecipeActions
+    /// 入場演出の開始秒 (nil = 演出なし)
+    var introDelay: Double? = nil
 
     private var isItemMode: Bool { actions.visualMode != .photo }
     /// アイテムを並べる見せ方では、カードを画面幅いっぱいに近づけてボードを大きくする
@@ -610,7 +617,10 @@ struct RenewalListLayout: View {
     var body: some View {
         VStack(spacing: 14) {
             ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
+                let start = introDelay.map { $0 + Double(index) * 0.08 }
                 row(recipe, index: index)
+                    .modifier(RenewalIntroRise(delay: start))
+                    .environment(\.renewalIntroDelay, start.map { $0 + 0.15 })
             }
         }
         .padding(.horizontal, edge)
@@ -789,7 +799,9 @@ struct RenewalPivotStrip: View {
     let items: [OwnedFirstItem]
     let pinnedId: String?
     let isLoading: Bool
-    let onSelect: (String?) -> Void
+    /// 選んだ服の id と、そのチップの画面上の位置 (主役の服が相棒へ飛ぶ演出用)
+    let onSelect: (String?, CGRect?) -> Void
+    @State private var chipFrames: [String: CGRect] = [:]
 
     private static let slotOrder = ["tops", "outer", "bottoms", "shoes"]
 
@@ -810,7 +822,7 @@ struct RenewalPivotStrip: View {
                 if pinnedId != nil {
                     Button("おまかせに戻す") {
                         Haptic.selection()
-                        onSelect(nil)
+                        onSelect(nil, nil)
                     }
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(RenewalTokens.muted)
@@ -836,7 +848,7 @@ struct RenewalPivotStrip: View {
         return Button {
             guard !on else { return }
             Haptic.selection()
-            onSelect(nil)
+            onSelect(nil, nil)
         } label: {
             VStack(spacing: 5) {
                 ZStack {
@@ -866,7 +878,7 @@ struct RenewalPivotStrip: View {
         return Button {
             guard !on else { return }
             Haptic.selection()
-            onSelect(item.item_id)
+            onSelect(item.item_id, chipFrames[item.item_id])
         } label: {
             VStack(spacing: 5) {
                 ZStack {
@@ -884,6 +896,7 @@ struct RenewalPivotStrip: View {
                     }
                 }
                 .frame(width: 64, height: 64)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { chipFrames[item.item_id] = $0 }
                 .overlay(RoundedRectangle(cornerRadius: 14)
                     .stroke(on ? RenewalTokens.ink : RenewalTokens.border, lineWidth: on ? 2 : 1))
                 .overlay(alignment: .topTrailing) {

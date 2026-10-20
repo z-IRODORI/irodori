@@ -239,6 +239,15 @@ struct RenewalLiveHomeView: View {
     @State private var scope: RenewalScope = .next()
     @State private var detailRecipe: OwnedFirstRecipe?
     @State private var showPivot = false
+    // 動き: 入場 (1日1回 / 主役を選んだ直後)・主役の服が飛ぶ・ひとことを話すように
+    @AppStorage("renewalHome.introDay") private var introDay = ""
+    @AppStorage("renewalHome.spokenDay") private var spokenDay = ""
+    @State private var introDelay: Double? = nil
+    @State private var introKey = 0
+    @State private var pulseItemId: String?
+    @State private var pendingPivotIntro: String?
+    @State private var flying: (url: String, from: CGRect)?
+    @State private var memoryShown = false
     @State private var showDislike = false
     @AppStorage(RenewalFirstViewLayout.storageKey) private var layoutRaw = RenewalFirstViewLayout.list.rawValue
     @AppStorage(RenewalVisualMode.storageKey) private var visualRaw = RenewalVisualMode.exampleItems.rawValue
@@ -258,7 +267,7 @@ struct RenewalLiveHomeView: View {
                         items: items,
                         pinnedId: model.pivotItemId(scope),
                         isLoading: model.loading.contains(scope),
-                        onSelect: { id in Task { await model.pivot(id, scope: scope) } }
+                        onSelect: { id, frame in selectPivot(id, frame: frame) }
                     )
                 }
                 if let error = model.errors[scope] {
@@ -279,6 +288,20 @@ struct RenewalLiveHomeView: View {
         .background(RenewalTokens.ground)
         .overlay {
             if model.loading.contains(scope) { loadingSquare }
+        }
+        .overlay {
+            GeometryReader { geo in
+                let g = geo.frame(in: .global)
+                if let flying {
+                    RenewalFlyingItem(imageURL: flying.url, from: flying.from,
+                                      to: CGPoint(x: g.midX, y: g.midY), origin: g.origin)
+                }
+            }
+            .allowsHitTesting(false)
+        }
+        .onChange(of: response?.recipes.map(\.recipe_id) ?? []) { _, ids in
+            guard !ids.isEmpty else { return }
+            startIntroIfNeeded()
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.loading.contains(scope))
         .refreshable {
@@ -334,7 +357,14 @@ struct RenewalLiveHomeView: View {
                     .padding(.leading, 10)
                 VStack(alignment: .leading, spacing: 6) {
                     if let response {
-                        Text(response.greeting)
+                        RenewalSpokenText(
+                            text: response.greeting,
+                            animate: !reduceMotion && spokenDay != Self.todayKey,
+                            onFinished: {
+                                spokenDay = Self.todayKey
+                                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.4).delay(0.25)) { memoryShown = true }
+                            }
+                        )
                             .font(.system(size: 14, weight: .regular))
                             .foregroundStyle(RenewalTokens.ink)
                             .lineSpacing(3)
@@ -363,12 +393,60 @@ struct RenewalLiveHomeView: View {
                 if let memory = response?.memory {
                     memoryNote(memory)
                         .padding(.leading, 12)
+                        .opacity(memoryShown ? 1 : 0)
+                        .offset(y: memoryShown ? 0 : 4)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, RenewalTokens.edge)
         .padding(.top, 4)
+    }
+
+    // MARK: 動き
+
+    static var todayKey: String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
+
+    /// 案がそろったとき: 主役を選んだ直後か、その日の最初の表示なら入場演出を流す
+    private func startIntroIfNeeded() {
+        if let pinned = pendingPivotIntro {
+            pulseItemId = pinned
+            pendingPivotIntro = nil
+        } else if introDay != Self.todayKey {
+            introDay = Self.todayKey
+            pulseItemId = nil
+        } else {
+            return
+        }
+        guard !reduceMotion else { return }
+        introDelay = 0.05
+        introKey += 1
+        // 演出が終わったら通常表示に戻す (再描画で再生しないように)
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            introDelay = nil
+        }
+    }
+
+    /// 主役の服を選ぶ: チップの服を画面中央 (相棒) へ飛ばしてから組み直す
+    private func selectPivot(_ id: String?, frame: CGRect?) {
+        if let id, let frame, !reduceMotion,
+           let url = response?.closet_items.first(where: { $0.item_id == id })?.image_url, !url.isEmpty {
+            flying = (url, frame)
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.55))
+                flying = nil
+            }
+        }
+        pendingPivotIntro = id
+        Task { await model.pivot(id, scope: scope) }
     }
 
     /// ひとことの根拠になった「相棒が覚えていること」(さりげなく1行)
@@ -441,7 +519,10 @@ struct RenewalLiveHomeView: View {
         )
         Group {
             switch layout {
-            case .list: RenewalListLayout(recipes: response.recipes, actions: actions)
+            case .list:
+                RenewalListLayout(recipes: response.recipes, actions: actions, introDelay: introDelay)
+                    .environment(\.renewalPulseItemId, pulseItemId)
+                    .id(introKey)
             case .peek: RenewalPeekLayout(recipes: response.recipes, actions: actions)
             }
         }
