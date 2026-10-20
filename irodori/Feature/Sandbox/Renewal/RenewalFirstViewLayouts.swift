@@ -43,7 +43,7 @@ enum RenewalVisualMode: String, CaseIterable, Identifiable {
         switch self {
         case .photo: return "コーデモデル (Pinterest) の写真で雰囲気を見せる"
         case .ownedPlusExample: return "手持ちの服を並べ、足りない分だけコーデモデルのアイテムで埋める"
-        case .exampleItems: return "コーデモデルのアイテムを並べ、手持ちにあるものを緑の枠で示す"
+        case .exampleItems: return "コーデモデルのアイテムを並べ、手持ちにあるものをピンクの枠で示す"
         }
     }
 }
@@ -234,7 +234,7 @@ enum RenewalFlatLayBuilder {
 }
 
 /// アイテムを重ねて並べるボード (フラットレイ)。
-/// 手持ち = 服のシルエットに沿った緑の縁取り (クローゼット画像は透過 PNG)、持っていない = 点線の枠。
+/// 手持ち = 服のシルエットに沿ったピンクの縁取り (クローゼット画像は透過 PNG)、持っていない = 点線の枠。
 /// 配置: 羽織りあり = 羽織り (左上・最前面) / トップス (右上) / ボトムス (中央下) / 靴 (左下)
 ///       羽織りなし = トップス (左上・ボトムスの上に重ねる) / ボトムス (右下) / 靴 (左下)
 struct RenewalFlatLayBoard: View {
@@ -283,27 +283,14 @@ struct RenewalFlatLayBoard: View {
     @ViewBuilder
     private func pieceBody(_ p: RenewalFlatPiece) -> some View {
         if isOwned(p), p.kind == .owned, let url = p.imageURL.flatMap(URL.init(string:)) {
-            // 透過 PNG のシルエットに沿って縁取る (影を4方向にずらして重ねる)
-            let c = RenewalTokens.owned
-            let d: CGFloat = large ? 2.2 : 1.6
-            KFImage(url)
-                .placeholder { ProgressView() }
-                .resizable()
-                .scaledToFit()
-                .compositingGroup()
-                .shadow(color: c, radius: 0, x: d, y: 0)
-                .shadow(color: c, radius: 0, x: -d, y: 0)
-                .shadow(color: c, radius: 0, x: 0, y: d)
-                .shadow(color: c, radius: 0, x: 0, y: -d)
-                .shadow(color: .black.opacity(0.12), radius: 3, y: 2)
-                .padding(d)
+            RenewalOutlinedCutout(url: url, color: RenewalTokens.owned, width: large ? 2.2 : 1.6)
         } else {
             notOwned(p)
         }
     }
 
     /// 持っていない (コーデモデルのアイテム / 未抽出) は、画像にぴったり沿った正方形のカード + 点線枠。
-    /// 手持ち (切り抜き + 緑の縁) との違いが形でも分かるようにし、少し小さめに置く
+    /// 手持ち (切り抜き + ピンクの縁) との違いが形でも分かるようにし、少し小さめに置く
     private func notOwned(_ p: RenewalFlatPiece) -> some View {
         let radius: CGFloat = large ? 12 : 8
         let matched = p.ownedMatch
@@ -355,6 +342,33 @@ struct RenewalFlatLayBoard: View {
     }
 }
 
+/// 透過 PNG の切り抜きを、シルエットに沿って縁取る。
+/// 縁取り (影を4方向にずらして重ねる) は画像の読み込みが終わってから付ける。
+/// 読み込み中のプレースホルダーに影が乗ると色付きのぼかしに見えるため。
+struct RenewalOutlinedCutout: View {
+    let url: URL
+    let color: Color
+    var width: CGFloat = 2
+
+    @State private var loaded = false
+
+    var body: some View {
+        let c = loaded ? color : .clear
+        KFImage(url)
+            .placeholder { RenewalTokens.raised.opacity(0.6).clipShape(RoundedRectangle(cornerRadius: 8)) }
+            .onSuccess { _ in loaded = true }
+            .resizable()
+            .scaledToFit()
+            .compositingGroup()
+            .shadow(color: c, radius: 0, x: width, y: 0)
+            .shadow(color: c, radius: 0, x: -width, y: 0)
+            .shadow(color: c, radius: 0, x: 0, y: width)
+            .shadow(color: c, radius: 0, x: 0, y: -width)
+            .shadow(color: .black.opacity(loaded ? 0.12 : 0), radius: 3, y: 2)
+            .padding(width)
+    }
+}
+
 /// 手持ち / 持っていない の凡例 (アイテムを並べる見せ方の一覧の上)
 struct RenewalOwnedLegend: View {
     var body: some View {
@@ -367,7 +381,7 @@ struct RenewalOwnedLegend: View {
                     .shadow(color: RenewalTokens.owned, radius: 0, x: -1.2, y: 0)
                     .shadow(color: RenewalTokens.owned, radius: 0, x: 0, y: 1.2)
                     .shadow(color: RenewalTokens.owned, radius: 0, x: 0, y: -1.2)
-                Text("緑の縁 = 手持ち")
+                Text("ピンクの縁 = 手持ち")
             }
             HStack(spacing: 5) {
                 RoundedRectangle(cornerRadius: 3)
@@ -380,7 +394,7 @@ struct RenewalOwnedLegend: View {
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(RenewalTokens.muted)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("緑の縁取りは手持ち、点線の枠は持っていないアイテム")
+        .accessibilityLabel("ピンクの縁取りは手持ち、点線の枠は持っていないアイテム")
     }
 }
 
@@ -503,7 +517,7 @@ struct RenewalListLayout: View {
         if isItemMode { itemRow(recipe, index: index) } else { photoRow(recipe, index: index) }
     }
 
-    /// 左: アイテムのボード (カード幅の約58%・タグはボード左上) / 右: 状態・コーデモデル・理由・決定
+    /// 左: アイテムのボード (カード幅の約58%・タグはボード左上) / 右: 状態・理由・コーデモデル・決定
     private func itemRow(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Button { actions.onDetail(recipe) } label: {
@@ -526,7 +540,6 @@ struct RenewalListLayout: View {
                     .foregroundStyle(RenewalTokens.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
-                RenewalCoordeModelChip(example: recipe.example, height: 64) { actions.onDetail(recipe) }
                 Text(recipe.reason)
                     .font(.system(size: 12))
                     .foregroundStyle(RenewalTokens.ink)
@@ -536,6 +549,7 @@ struct RenewalListLayout: View {
                 if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
                 if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w).lineLimit(2) }
                 Spacer(minLength: 0)
+                RenewalCoordeModelChip(example: recipe.example, height: 64) { actions.onDetail(recipe) }
                 CompactDecideButton(recipe: recipe, actions: actions, fullWidth: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
