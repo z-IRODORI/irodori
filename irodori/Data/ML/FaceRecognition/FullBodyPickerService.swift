@@ -53,23 +53,55 @@ final class FullBodyPickerService {
         }
     }
 
-    /// 直近 monthsBack ヶ月の写真から全身候補を返す。progress は 0...1。
-    /// threshold は本人判定のコサイン類似度のしきい値（高いほど厳しい）。
-    func pickFullBodyPhotos(
-        targetEmbedding: [Float],
-        months: Int = 12,
-        limit: Int = 1000,
-        threshold: Float = 0.45,
-        progress: @escaping @Sendable (Double) -> Void
-    ) async -> [FullBodyCandidate] {
-        guard await requestAuthorization() else { return [] }
+    // MARK: - 対象期間の枚数と所要時間の見積もり
 
+    private static func fetchOptions(months: Int) -> PHFetchOptions {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         if let from = Calendar.current.date(byAdding: .month, value: -months, to: Date()) {
             options.predicate = NSPredicate(format: "creationDate >= %@", from as NSDate)
         }
-        let fetched = PHAsset.fetchAssets(with: .image, options: options)
+        return options
+    }
+
+    /// 対象期間の写真の枚数 (メタデータだけなので一瞬で終わる)
+    func photoCount(months: Int) -> Int {
+        PHAsset.fetchAssets(with: .image, options: Self.fetchOptions(months: months)).count
+    }
+
+    /// 実際の解析と同じ処理 (画像の読み込み → 顔検出・整列 → 顔の特徴量) を
+    /// 対象期間から均等に選んだ数枚に掛け、1枚あたりの秒数を測る。
+    /// 本人判定後の全身判定は一致した数枚にしか走らないため、計測には含めない。
+    func measureSecondsPerPhoto(months: Int, sample: Int = 8) async -> Double? {
+        let fetched = PHAsset.fetchAssets(with: .image, options: Self.fetchOptions(months: months))
+        guard fetched.count > 0 else { return nil }
+        let n = min(sample, fetched.count)
+        let step = max(1, fetched.count / n)
+        let assets = (0..<n).map { fetched.object(at: min($0 * step, fetched.count - 1)) }
+        let manager = PHImageManager.default()
+        let start = Date()
+        for asset in assets {
+            guard let ui = await Self.requestImage(asset, manager: manager, target: CGSize(width: 720, height: 720)),
+                  let cg = ui.cgImage else { continue }
+            if let aligned = aligner.alignedFace(in: cg) {
+                _ = faceEmbedder?.embedding(from: aligned)
+            }
+        }
+        return Date().timeIntervalSince(start) / Double(n)
+    }
+
+    /// 直近 monthsBack ヶ月の写真から全身候補を返す。progress は 0...1。
+    /// threshold は本人判定のコサイン類似度のしきい値（高いほど厳しい）。
+    func pickFullBodyPhotos(
+        targetEmbedding: [Float],
+        months: Int = 12,
+        limit: Int = .max,
+        threshold: Float = 0.45,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async -> [FullBodyCandidate] {
+        guard await requestAuthorization() else { return [] }
+
+        let fetched = PHAsset.fetchAssets(with: .image, options: Self.fetchOptions(months: months))
         guard fetched.count > 0 else { progress(1); return [] }
 
         var assets: [PHAsset] = []

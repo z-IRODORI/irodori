@@ -2,12 +2,11 @@
 //  FullBodyPickerView.swift
 //  irodori
 //
-//  顔写真から、フォトライブラリの「対象ユーザーの全身写真」をピックアップする機能。
-//  Tinder の「AIフォトセレクト」風の4ステップフロー:
-//    ① エントリ（AIで選ぶ / ライブラリから選ぶ）
-//    ② 顔写真を使う（撮影 or 選択 → 正方形に自動切り抜き）
-//    ③ 検索中（ローディング・進捗）
-//    ④ 結果の確認（候補グリッドから選んで追加）
+//  本人が写った写真1枚をもとに、フォトライブラリから「本人の全身写真」をピックアップする機能。
+//  3ステップ (開いてすぐ ① から始め、タップ数を減らす):
+//    ① 準備: 本人が写った写真を1枚選ぶ + 対象期間 (枚数と所要時間は実測から見積もる)
+//    ② 検索中 (進捗と残り時間)
+//    ③ 結果の確認 (候補グリッドから選んで追加)
 //
 
 import SwiftUI
@@ -36,38 +35,80 @@ enum ScanPeriod: Int, CaseIterable, Identifiable {
     }
 }
 
-enum ScanLimit: Int, CaseIterable, Identifiable {
-    case n300 = 300, n500 = 500, n1000 = 1000, n2000 = 2000
-    var id: Int { rawValue }
-    var label: String { "\(rawValue)枚" }
-}
-
 // MARK: - ViewModel
 
 @MainActor
 @Observable
 final class FullBodyPickerViewModel {
-    enum Step { case entry, faceInput, searching, result }
+    enum Step { case setup, searching, result }
 
-    var step: Step = .entry
+    var step: Step = .setup
     var faceImage: UIImage?
     var progress: Double = 0
     var candidates: [FullBodyCandidate] = []
     var selected: Set<String> = []
     var errorMessage: String?
-    var scanPeriod: ScanPeriod = .year1
-    var scanLimit: ScanLimit = .n1000
-
-    private let service = FullBodyPickerService()
-
-    /// 最大枚数からのおおよその所要時間（1枚あたり約0.1秒を目安）
-    static func estimatedTime(forLimit limit: Int) -> String {
-        let seconds = Double(limit) * 0.1
-        if seconds < 60 { return "約\(Int(seconds))秒" }
-        return "約\(Int((seconds / 60).rounded(.up)))分"
+    var scanPeriod: ScanPeriod = .year1 {
+        didSet { if oldValue != scanPeriod { refreshEstimate() } }
     }
 
-    /// 選択/撮影した画像を顔中心の正方形に切り抜いてセット
+    /// 対象期間の写真の枚数 (nil = 未取得 / 写真へのアクセス不可)
+    var photoCount: Int?
+    /// 1枚あたりの解析秒数 (端末で実測。前回の実行結果があればそれを優先)
+    var secondsPerPhoto: Double?
+    var isMeasuring = false
+    var photoAccessDenied = false
+    /// 検索中の残り秒数 (実際の進み具合から算出)
+    var remainingSeconds: Double?
+
+    private let service = FullBodyPickerService()
+    private static let measuredRateKey = "fullBodyPicker.secondsPerPhoto"
+
+    /// 見積もりの所要時間 (秒)
+    var estimatedSeconds: Double? {
+        guard let photoCount, let secondsPerPhoto else { return nil }
+        return Double(photoCount) * secondsPerPhoto
+    }
+
+    /// 「約40秒」「約1分30秒」の形に整える (10秒未満は5秒刻み、それ以上は10秒刻み)
+    static func durationLabel(_ seconds: Double) -> String {
+        let s = max(5, seconds)
+        if s < 60 { return "約\(Int((s / 5).rounded()) * 5)秒" }
+        let rounded = Int((s / 10).rounded()) * 10
+        let m = rounded / 60, r = rounded % 60
+        return r == 0 ? "約\(m)分" : "約\(m)分\(r)秒"
+    }
+
+    /// 画面表示時: 写真へのアクセスを確認し、枚数と1枚あたりの秒数を測る
+    func prepare() async {
+        guard await service.requestAuthorization() else {
+            photoAccessDenied = true
+            return
+        }
+        if let saved = UserDefaults.standard.object(forKey: Self.measuredRateKey) as? Double, saved > 0 {
+            secondsPerPhoto = saved
+        }
+        refreshEstimate()
+    }
+
+    private func refreshEstimate() {
+        guard !photoAccessDenied else { return }
+        let months = scanPeriod.rawValue
+        photoCount = service.photoCount(months: months)
+        // 前回の実行で測った値が無いときだけ、数枚を実際に解析して測る
+        guard UserDefaults.standard.object(forKey: Self.measuredRateKey) == nil, !isMeasuring else { return }
+        isMeasuring = true
+        let service = self.service
+        Task {
+            let rate = await Task.detached(priority: .utility) {
+                await service.measureSecondsPerPhoto(months: months)
+            }.value
+            if let rate { self.secondsPerPhoto = rate }
+            self.isMeasuring = false
+        }
+    }
+
+    /// 選択した画像を顔中心の正方形に切り抜いてセット
     func setFaceImage(_ image: UIImage) {
         faceImage = Self.squareFaceCrop(image)
         errorMessage = nil
@@ -77,6 +118,7 @@ final class FullBodyPickerViewModel {
         guard let faceImage else { return }
         step = .searching
         progress = 0
+        remainingSeconds = estimatedSeconds
         candidates = []
         selected = []
 
@@ -89,14 +131,27 @@ final class FullBodyPickerViewModel {
 
             guard let emb else {
                 self.errorMessage = "顔を認識できませんでした。顔がはっきり写った写真を選んでください。"
-                self.step = .faceInput
+                self.step = .setup
                 return
             }
 
             let months = self.scanPeriod.rawValue
-            let limit = self.scanLimit.rawValue
-            let result = await service.pickFullBodyPhotos(targetEmbedding: emb, months: months, limit: limit) { p in
-                Task { @MainActor in self.progress = p }
+            let total = self.photoCount ?? 0
+            let start = Date()
+            let result = await service.pickFullBodyPhotos(targetEmbedding: emb, months: months) { p in
+                Task { @MainActor in
+                    self.progress = p
+                    // 実際の進み具合から残り時間を出す (序盤は見積もりのまま)
+                    let elapsed = Date().timeIntervalSince(start)
+                    if p > 0.05 { self.remainingSeconds = elapsed / p * (1 - p) }
+                }
+            }
+            // 次回の見積もりに使うため、今回の1枚あたりの秒数を保存
+            let elapsed = Date().timeIntervalSince(start)
+            if total >= 20 {
+                let rate = elapsed / Double(total)
+                UserDefaults.standard.set(rate, forKey: Self.measuredRateKey)
+                self.secondsPerPhoto = rate
             }
             self.candidates = result
             self.step = .result
@@ -141,10 +196,8 @@ struct FullBodyPickerView: View {
     var body: some View {
         VStack(spacing: 0) {
             switch viewModel.step {
-            case .entry:
-                EntryStep(viewModel: viewModel, onClose: onClose, onComplete: onComplete)
-            case .faceInput:
-                FaceInputStep(viewModel: viewModel, onClose: onClose)
+            case .setup:
+                SetupStep(viewModel: viewModel, onClose: onClose)
             case .searching:
                 SearchingStep(viewModel: viewModel, onClose: onClose)
             case .result:
@@ -193,121 +246,27 @@ private struct PickerHeader: View {
     }
 }
 
-// MARK: - ① エントリ
+// MARK: - ① 準備 (写真1枚 + 対象期間)
 
-private struct EntryStep: View {
-    let viewModel: FullBodyPickerViewModel
-    let onClose: () -> Void
-    let onComplete: ([UIImage]) -> Void
-
-    @State private var libraryItem: PhotosPickerItem?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            PickerHeader(title: "全身写真を追加", onClose: onClose)
-
-            VStack(spacing: 12) {
-                Button {
-                    Haptic.impact(.soft)
-                    viewModel.step = .faceInput
-                } label: {
-                    EntryRow(
-                        icon: "person.crop.square.badge.camera",
-                        title: "AIで全身写真を選ぶ",
-                        subtitle: "顔写真から、自分が全身で写った写真を自動で探します。",
-                        highlighted: true
-                    )
-                }
-                .buttonStyle(.plain)
-
-                PhotosPicker(selection: $libraryItem, matching: .images) {
-                    EntryRow(
-                        icon: "photo.on.rectangle",
-                        title: "写真ライブラリから選ぶ",
-                        subtitle: "自分で写真を選んで追加します。",
-                        highlighted: false
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(20)
-
-            Spacer()
-        }
-        .onChange(of: libraryItem) { _, item in
-            guard let item else { return }
-            Task {
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    onComplete([image])
-                }
-            }
-        }
-    }
-}
-
-private struct EntryRow: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let highlighted: Bool
-
-    var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(highlighted ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.gray.opacity(0.85)))
-                    .frame(width: 44, height: 44)
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundStyle(.white)
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.black)
-                Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.leading)
-            }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.gray.opacity(0.5))
-        }
-        .padding(16)
-        .background(Color.gray.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-}
-
-// MARK: - ② 顔写真を使う
-
-private struct FaceInputStep: View {
+private struct SetupStep: View {
     @Bindable var viewModel: FullBodyPickerViewModel
     let onClose: () -> Void
 
     @State private var libraryItem: PhotosPickerItem?
-    @State private var showCamera = false
 
     var body: some View {
         VStack(spacing: 0) {
-            PickerHeader(title: "AIで全身写真を選ぶ", onClose: onClose)
+            PickerHeader(title: "AIで全身写真を選ぶ", onClose: onClose, showProgress: true, activeSegments: 1)
 
             ScrollView {
                 VStack(spacing: 18) {
-                    Text("顔写真を使う")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(.black)
-                        .padding(.top, 8)
-
-                    Text("顔写真をもとに、写真ライブラリから\nあなたが全身で写った写真を探します。")
+                    Text("あなたが写った写真を1枚選ぶと、写真ライブラリから\nあなたが全身で写った写真を探します。")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                        .padding(.top, 12)
 
-                    // 顔プレビュー（正方形）
+                    // 写真プレビュー（正方形・顔中心に切り抜き）
                     facePreview
 
                     if let msg = viewModel.errorMessage {
@@ -317,11 +276,13 @@ private struct FaceInputStep: View {
                             .multilineTextAlignment(.center)
                     }
 
-                    PhotosPicker(selection: $libraryItem, matching: .images) {
-                        Text("写真ライブラリから選ぶ")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.pink)
-                            .underline()
+                    if viewModel.faceImage != nil {
+                        PhotosPicker(selection: $libraryItem, matching: .images) {
+                            Text("別の写真にする")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.pink)
+                                .underline()
+                        }
                     }
 
                     scanSettings
@@ -330,34 +291,23 @@ private struct FaceInputStep: View {
                 .padding(.bottom, 12)
             }
 
-            // 下部アクション
-            VStack(spacing: 14) {
-                Button {
-                    Haptic.impact(.medium)
-                    viewModel.startSearch()
-                } label: {
-                    Text("全身写真を探す")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(viewModel.faceImage == nil ? AnyShapeStyle(Color.gray.opacity(0.3)) : AnyShapeStyle(brandGradient))
-                        .clipShape(Capsule())
-                }
-                .disabled(viewModel.faceImage == nil)
-
-                Button {
-                    Haptic.impact(.soft)
-                    showCamera = true
-                } label: {
-                    Text("自撮り写真を撮る")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.black)
-                }
+            Button {
+                Haptic.impact(.medium)
+                viewModel.startSearch()
+            } label: {
+                Text("全身写真を探す")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(viewModel.faceImage == nil ? AnyShapeStyle(Color.gray.opacity(0.3)) : AnyShapeStyle(brandGradient))
+                    .clipShape(Capsule())
             }
+            .disabled(viewModel.faceImage == nil || viewModel.photoCount == 0)
             .padding(.horizontal, 24)
             .padding(.bottom, 16)
         }
+        .task { await viewModel.prepare() }
         .onChange(of: libraryItem) { _, item in
             guard let item else { return }
             Task {
@@ -367,49 +317,76 @@ private struct FaceInputStep: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showCamera) {
-            CameraImagePicker(sourceType: .camera) { image in
-                if let image { viewModel.setFaceImage(image) }
-                showCamera = false
-            }
-            .ignoresSafeArea()
-        }
     }
 
+    /// 対象期間を選ぶだけ。枚数と所要時間はその場で見積もって伝える
     private var scanSettings: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Text("対象期間")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.black)
-                Spacer()
-                Picker("対象期間", selection: $viewModel.scanPeriod) {
-                    ForEach(ScanPeriod.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
-                .tint(.pink)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("対象期間")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.black)
+            Picker("対象期間", selection: $viewModel.scanPeriod) {
+                ForEach(ScanPeriod.allCases) { Text($0.label).tag($0) }
             }
-            Divider()
-            HStack {
-                Text("最大枚数")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.black)
-                Spacer()
-                Picker("最大枚数", selection: $viewModel.scanLimit) {
-                    ForEach(ScanLimit.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
-                .tint(.pink)
-            }
-            Text("直近\(viewModel.scanPeriod.label)の写真を最大\(viewModel.scanLimit.rawValue)枚調べます（\(FullBodyPickerViewModel.estimatedTime(forLimit: viewModel.scanLimit.rawValue))ほどかかります）")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 2)
+            .pickerStyle(.segmented)
+
+            estimateRow
         }
         .padding(14)
         .background(Color.gray.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private var estimateRow: some View {
+        if viewModel.photoAccessDenied {
+            Text("写真へのアクセスが許可されていません。設定アプリから許可してください。")
+                .font(.system(size: 12))
+                .foregroundStyle(.red)
+        } else if let count = viewModel.photoCount {
+            HStack(spacing: 16) {
+                estimateItem(icon: "photo.on.rectangle", title: "写真", value: "\(count.formatted())枚")
+                estimateItem(icon: "clock", title: "所要時間", value: timeText(count: count))
+                Spacer(minLength: 0)
+            }
+            if count == 0 {
+                Text("この期間の写真はありません。期間を広げてください。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("写真の枚数を数えています")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func timeText(count: Int) -> String {
+        if count == 0 { return "—" }
+        if let s = viewModel.estimatedSeconds { return FullBodyPickerViewModel.durationLabel(s) }
+        return viewModel.isMeasuring ? "計測中…" : "—"
+    }
+
+    private func estimateItem(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(.pink)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.system(size: 15, weight: .bold).monospacedDigit())
+                    .foregroundStyle(.black)
+                    .contentTransition(.numericText())
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -427,7 +404,7 @@ private struct FaceInputStep: View {
                     Image(systemName: "face.smiling")
                         .font(.system(size: 44))
                         .foregroundStyle(.gray.opacity(0.5))
-                    Text("顔写真を選ぶ")
+                    Text("あなたが写った写真を選ぶ")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.gray)
                 }
@@ -441,7 +418,7 @@ private struct FaceInputStep: View {
     }
 }
 
-// MARK: - ③ 検索中
+// MARK: - ② 検索中
 
 private struct SearchingStep: View {
     let viewModel: FullBodyPickerViewModel
@@ -483,6 +460,13 @@ private struct SearchingStep: View {
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(.black)
                 .monospacedDigit()
+            if let remaining = viewModel.remainingSeconds, viewModel.progress < 1 {
+                Text("残り\(FullBodyPickerViewModel.durationLabel(remaining))")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .padding(.top, 2)
+            }
 
             ProgressView(value: viewModel.progress)
                 .tint(.pink)
@@ -500,7 +484,7 @@ private struct SearchingStep: View {
     }
 }
 
-// MARK: - ④ 結果の確認
+// MARK: - ③ 結果の確認
 
 private struct ResultStep: View {
     let viewModel: FullBodyPickerViewModel
@@ -605,12 +589,12 @@ private struct ResultStep: View {
             Text("全身が写った写真が見つかりませんでした")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.black)
-            Text("別の顔写真でもう一度試すか、ライブラリから直接選んでください。")
+            Text("別の写真や、より長い対象期間でもう一度お試しください。")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            Button("顔写真を選び直す") { viewModel.step = .faceInput }
+            Button("条件を変えて探す") { viewModel.step = .setup }
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.pink)
                 .padding(.top, 4)
@@ -619,7 +603,7 @@ private struct ResultStep: View {
     }
 }
 
-// MARK: - カメラ（自撮り）
+// MARK: - カメラ（FaceRegistrationSheet で使用）
 
 struct CameraImagePicker: UIViewControllerRepresentable {
     let sourceType: UIImagePickerController.SourceType
