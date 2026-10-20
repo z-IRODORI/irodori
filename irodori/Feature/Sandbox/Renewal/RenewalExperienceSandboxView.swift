@@ -148,7 +148,8 @@ struct RenewalExperienceSandboxView: View {
             )
         } else if let liveModel, liveModel.source == homeSource {
             RenewalLiveHomeView(
-                store: store,
+                host: .init(isSandbox: true, showCharCount: store.showCharCount,
+                            fallbackTypeName: store.typeName, showToast: { store.showToast($0) }),
                 model: liveModel,
                 onOpenPartner: { homePath.append(.partner) },
                 onOpenToneSheet: { showToneSheet = true },

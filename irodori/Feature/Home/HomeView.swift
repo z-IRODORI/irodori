@@ -4,6 +4,7 @@
 //
 //  Created by yuki.hamada on 2025/11/30.
 //
+//  2026-10: ファーストビューを手持ち起点ホーム (RenewalLiveHomeView + api/home/owned-first) に置き換え。
 //  2026-07: ファーストビューを「明日のコーデ」3案カルーセル (TomorrowPickSection) に刷新。
 //  旧・相棒カード(週間分析)と3×3グリッドはカルーセル+アクションカードに集約した。
 //  デザイン検証の経緯は Feature/Sandbox/HomeDesignD.swift を参照。
@@ -21,6 +22,8 @@ struct HomeView: View {
     @State private var showFullBodyPickerSheet = false
     @State private var showStandardItemPickerSheet = false
     @State private var showTasteVoteSheet = false
+    /// 手持ち起点ホームの3案 (本番 API)
+    @State private var ownedFirstModel = RenewalLiveHomeModel(source: .render)
     #if DEBUG
     @State private var showHomeSandboxSheet = false
     /// リニューアル後アプリの体験 Sandbox (Feature/Sandbox/Renewal)
@@ -36,107 +39,34 @@ struct HomeView: View {
                 .padding(.bottom, 12)
                 .background(.white)
 
-            ScrollViewReader { scrollProxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 22) {
-                    // Layer 1: 相棒のデイリーブリーフィング（タップで相棒画面へ遷移）
-                    PartnerHomeBriefingCard(
-                        partnerHome: viewModel.partnerHome,
-                        persistedOnboarding: viewModel.persistedOnboarding,
-                        closetCount: viewModel.closetItems.count,
-                        partnerCommentFromDaily: viewModel.dailyRecommendation?.partner_comment,
-                        onTapPartnerProfile: {
-                            Haptic.impact(.soft)
-                            path.append(.partner)
-                        },
-                        onTapRetakeOnboarding: {
-                            Haptic.impact(.soft)
-                            showPartnerOnboardingSheet = true
-                        }
-                    )
-
-                    // Layer 2: 今日/明日/週末の3案カルーセル + 構成アイテム比較 + これにする
-                    TomorrowPickSection(
-                        viewModel: viewModel,
-                        onLocationTap: {
-                            Haptic.impact(.soft)
-                            if viewModel.canChangePrefectureToday {
-                                showingPrefecturePicker = true
-                            } else {
-                                ToastManager.shared.show("お住まいの地域は1日1回まで変更できます")
-                            }
-                        }
-                    )
-                    .padding(.horizontal, -24)
-                    .id("hero")
-
-                    // Layer 3: 相棒からのデータ獲得提案カード（コンパクト3タイル）
-                    PartnerDataAcquisitionCard(
-                        closetCount: viewModel.closetItems.count,
-                        onTapPhotoAutoPick: {
-                            showFullBodyPickerSheet = true
-                        },
-                        onTapSelectStandardItems: {
-                            showStandardItemPickerSheet = true
-                        },
-                        onTapKeywordSearch: {
-                            path.append(.addItemBySearch)
-                        },
-                        onTapTasteVote: {
-                            showTasteVoteSheet = true
-                        }
-                    )
-
-                    // 直近コーデ（登録済みのときのみ表示し、未登録時は上の3タイル登録カードに集約）
-                    if viewModel.isLoadingHome {
-                        recentCoordinatesSkeleton
-                    } else if viewModel.hasLoadError {
-                        recentCoordinatesError
-                    } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
-                        RecentCoordinates(
-                            recentCoordinates: viewModel.homeResponse.recent_coordinates,
-                            isEditMode: viewModel.isEditMode,
-                            onToggleEditMode: { viewModel.toggleEditMode() },
-                            onDeleteRequest: { coordinateId in
-                                viewModel.requestDelete(coordinateId: coordinateId)
-                            },
-                            onTapCoordinate: { coordinate in
-                                path.append(.coordinateDetail(.init(
-                                    coordinateId: coordinate.id,
-                                    coordinateImageURL: coordinate.displayImageURL,
-                                    showHeader: true
-                                )))
-                            }
-                        )
-                        .padding(.horizontal, -24)
-                    }
-
-                    // 20時以降の「明日の先取り」ティザー (夜→朝ループのトリガー)
-                    DailyTeaserSection(
-                        viewModel: viewModel,
-                        onOpenTomorrow: {
-                            viewModel.selectPickScope(.tomorrow)
-                            withAnimation(.easeInOut(duration: 0.4)) {
-                                scrollProxy.scrollTo("hero", anchor: .top)
-                            }
-                        }
-                    )
-
-                    Spacer().frame(height: 48)
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-            }
-            .refreshable {
-                await viewModel.onAppear()
-            }
-            }
+            // 2026-10: 手持ち起点ホーム (相棒のひとこと / 次に着る日の気温 / 3案 / 相棒の問いかけ)。
+            // 推薦は api/home/owned-first。UI は Sandbox で検証した Feature/Sandbox/Renewal の部品を使う。
+            RenewalLiveHomeView(
+                host: .init(
+                    isSandbox: false,
+                    fallbackTypeName: viewModel.partnerHome?.type_name ?? "",
+                    showToast: { ToastManager.shared.show($0) }
+                ),
+                model: ownedFirstModel,
+                onOpenPartner: {
+                    Haptic.impact(.soft)
+                    path.append(.partner)
+                },
+                onOpenToneSheet: {
+                    Haptic.impact(.soft)
+                    path.append(.partner)
+                },
+                onOpenPhotoPicker: { showFullBodyPickerSheet = true },
+                onOpenCalendar: { tabViewModel.selectedTab = .calendar },
+                footer: AnyView(homeFooter),
+                onRefresh: { await viewModel.onAppearOwnedFirst() }
+            )
         }
-        .background(Color.gray.opacity(0.08))
+        .background(RenewalTokens.ground)
         .onAppear {
             Task {
                 if viewModel.homeResponse.recent_coordinates.isEmpty || viewModel.partnerHome == nil {
-                    await viewModel.onAppear()
+                    await viewModel.onAppearOwnedFirst()
                 }
             }
         }
@@ -179,7 +109,7 @@ struct HomeView: View {
             )
         }
         .sheet(isPresented: $showStandardItemPickerSheet, onDismiss: {
-            Task { await viewModel.onAppear() }
+            Task { await refreshAll() }
         }) {
             NavigationStack {
                 SelectStandardItemView(
@@ -252,7 +182,7 @@ struct HomeView: View {
             WebViewContainer(url: link.url)
         }
         .sheet(isPresented: $showFirstTakePhotoSheet, onDismiss: {
-            Task { await viewModel.onAppear() }
+            Task { await refreshAll() }
         }) {
             FirstTakePhotoView(
                 path: $path,
@@ -337,6 +267,53 @@ struct HomeView: View {
             RenewalExperienceSandboxView()
         }
         #endif
+    }
+
+    /// 服の登録などから戻ったとき: 下部セクションと3案の両方を取り直す (手持ちが増えると案が変わるため)
+    private func refreshAll() async {
+        async let home: Void = viewModel.onAppearOwnedFirst()
+        async let picks: Void = ownedFirstModel.load(RenewalScope.next(), force: true)
+        _ = await (home, picks)
+    }
+
+    // MARK: - 3案の下に続くセクション
+
+    /// 服の登録導線と直近コーデ。新ホームのファーストビュー (3案) の下にそのまま残す
+    @ViewBuilder
+    private var homeFooter: some View {
+        VStack(spacing: 22) {
+            PartnerDataAcquisitionCard(
+                closetCount: viewModel.closetItems.count,
+                onTapPhotoAutoPick: { showFullBodyPickerSheet = true },
+                onTapSelectStandardItems: { showStandardItemPickerSheet = true },
+                onTapKeywordSearch: { path.append(.addItemBySearch) },
+                onTapTasteVote: { showTasteVoteSheet = true }
+            )
+            if viewModel.isLoadingHome {
+                recentCoordinatesSkeleton
+            } else if viewModel.hasLoadError {
+                recentCoordinatesError
+            } else if !viewModel.homeResponse.recent_coordinates.isEmpty {
+                RecentCoordinates(
+                    recentCoordinates: viewModel.homeResponse.recent_coordinates,
+                    isEditMode: viewModel.isEditMode,
+                    onToggleEditMode: { viewModel.toggleEditMode() },
+                    onDeleteRequest: { coordinateId in
+                        viewModel.requestDelete(coordinateId: coordinateId)
+                    },
+                    onTapCoordinate: { coordinate in
+                        path.append(.coordinateDetail(.init(
+                            coordinateId: coordinate.id,
+                            coordinateImageURL: coordinate.displayImageURL,
+                            showHeader: true
+                        )))
+                    }
+                )
+                .padding(.horizontal, -24)
+            }
+            Spacer().frame(height: 32)
+        }
+        .padding(.horizontal, 24)
     }
 
     // MARK: - Header
@@ -505,7 +482,7 @@ struct HomeView: View {
                 Text("読み込めませんでした")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.black)
-                Button(action: { Task { await viewModel.onAppear() } }) {
+                Button(action: { Task { await refreshAll() } }) {
                     Text("再試行する")
                         .font(.system(size: 13))
                         .foregroundStyle(.black)

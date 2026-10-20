@@ -163,6 +163,27 @@ final class HomeViewModel {
         loadPlannerCache()
     }
 
+    /// 手持ち起点ホーム (2026-10 リニューアル) 用の軽量ロード。
+    /// 3案は RenewalLiveHomeModel (api/home/owned-first) が取るので、ここでは
+    /// 相棒プロフィール・直近コーデ・クローゼット件数 (下部セクション用) だけを取得する。
+    /// 旧ファーストビューの日次推薦・分析・コラージュは呼ばない (表示しないため)。
+    func onAppearOwnedFirst() async {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        persistedOnboarding = PartnerOnboardingFlowViewModel.loadPersistedResponse()
+        if homeResponse.recent_coordinates.isEmpty,
+           let cached = HomeSectionCache.load(HomeResponse.self, section: "home", uid: uid),
+           !cached.recent_coordinates.isEmpty {
+            homeResponse = cached
+        }
+        isLoadingHome = homeResponse.recent_coordinates.isEmpty
+        hasLoadError = false
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.loadHomeSection(uid: uid) }
+            group.addTask { await self.loadPartnerHomeSection(uid: uid) }
+            group.addTask { await self.fetchClosetItems() }
+        }
+    }
+
     func onAppear() async {
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
         let gender = Gender.fromWithDefault(

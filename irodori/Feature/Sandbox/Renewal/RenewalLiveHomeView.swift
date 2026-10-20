@@ -201,6 +201,9 @@ final class RenewalLiveHomeModel {
     }
 
     private func message(for error: HTTPError) -> String {
+        if case .notFound = error, source == .render {
+            return "コーデの提案を準備中です。少し時間をおいて、下に引っぱって更新してください。"
+        }
         if case .notFound = error {
             return "このサーバにはまだ api/home/owned-first がありません。Sandbox 操作で「実API (ローカル :8080)」に切り替えるか、API をデプロイしてください。"
         }
@@ -214,12 +217,23 @@ final class RenewalLiveHomeModel {
 // MARK: - 画面
 
 struct RenewalLiveHomeView: View {
-    let store: RenewalStore
+    /// 本番ホームと Sandbox で異なる部分
+    struct Host {
+        var isSandbox = true
+        var showCharCount = false
+        var fallbackTypeName = ""
+        var showToast: (String) -> Void = { _ in }
+    }
+
+    let host: Host
     let model: RenewalLiveHomeModel
     var onOpenPartner: () -> Void
     var onOpenToneSheet: () -> Void
     var onOpenPhotoPicker: () -> Void
     var onOpenCalendar: () -> Void
+    /// 3案と相棒の問いかけの下に続ける本番ホームの既存セクション (登録カード・直近コーデなど)
+    var footer: AnyView? = nil
+    var onRefresh: (() async -> Void)? = nil
 
     /// 次に着る日 (選択肢は出さない)
     @State private var scope: RenewalScope = .next()
@@ -231,8 +245,9 @@ struct RenewalLiveHomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var response: OwnedFirstHomeResponse? { model.responses[scope] }
-    private var layout: RenewalFirstViewLayout { RenewalFirstViewLayout(rawValue: layoutRaw) ?? .list }
-    private var visualMode: RenewalVisualMode { RenewalVisualMode(rawValue: visualRaw) ?? .exampleItems }
+    // 本番はリスト × コーデモデルのアイテムで固定 (切替は Sandbox のみ)
+    private var layout: RenewalFirstViewLayout { host.isSandbox ? (RenewalFirstViewLayout(rawValue: layoutRaw) ?? .list) : .list }
+    private var visualMode: RenewalVisualMode { host.isSandbox ? (RenewalVisualMode(rawValue: visualRaw) ?? .exampleItems) : .exampleItems }
 
     var body: some View {
         ScrollView {
@@ -248,17 +263,18 @@ struct RenewalLiveHomeView: View {
                 } else if model.loading.contains(scope) {
                     loadingCard
                 }
+                if let footer {
+                    footer.padding(.top, 10)
+                }
             }
             .padding(.vertical, 12)
         }
         .background(RenewalTokens.ground)
-        .refreshable { await model.load(scope, force: true) }
-        .navigationTitle("ホーム")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // Sandbox の見せ方切替はファーストビューを圧迫しないようナビバーのメニューに置く
-            ToolbarItem(placement: .topBarTrailing) { RenewalViewModeMenu(layoutRaw: $layoutRaw, visualRaw: $visualRaw) }
+        .refreshable {
+            await model.load(scope, force: true)
+            await onRefresh?()
         }
+        .modifier(SandboxNavigation(enabled: host.isSandbox, layoutRaw: $layoutRaw, visualRaw: $visualRaw))
         .task(id: scope) {
             await model.load(scope)
             await model.pollExtractions(scope)
@@ -307,7 +323,7 @@ struct RenewalLiveHomeView: View {
                         .foregroundStyle(RenewalTokens.ink)
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
-                    if store.showCharCount {
+                    if host.showCharCount {
                         HStack(spacing: 6) {
                             RenewalCharCountBadge(text: response.greeting)
                             Text("\(response.daily_angle_label) ・ \(response.text_source == "gemini" ? "Gemini" : "テンプレート")")
@@ -343,7 +359,7 @@ struct RenewalLiveHomeView: View {
 
     private var partnerTypeName: String {
         if let name = response?.partner_type_name, !name.isEmpty { return name }
-        return store.typeName
+        return host.fallbackTypeName
     }
 
     // MARK: ② 次に着る日 + 気温 + 服装の目安 (日付は選ばせない)
@@ -390,7 +406,7 @@ struct RenewalLiveHomeView: View {
             scope: scope,
             decidedId: response.decided_recipe_id,
             isSending: model.isSending,
-            showCharCount: store.showCharCount,
+            showCharCount: host.showCharCount,
             visualMode: visualMode,
             extraction: { model.extraction(for: $0) },
             onDetail: { detailRecipe = $0 },
@@ -527,7 +543,7 @@ struct RenewalLiveHomeView: View {
                         showDislike = false
                         Task {
                             if let ack = await model.dislike(reason: reason, scope: scope) {
-                                store.showToast(ack)
+                                host.showToast(ack)
                             }
                         }
                     } label: {
@@ -637,6 +653,26 @@ struct RenewalLiveHomeView: View {
             .renewalCard()
             .padding(.horizontal, RenewalTokens.edge)
             .accessibilityAddTraits(.isModal)
+        }
+    }
+}
+
+/// Sandbox だけナビバーにタイトルと見せ方の切替を出す (本番ホームは独自ヘッダーを持つ)
+private struct SandboxNavigation: ViewModifier {
+    let enabled: Bool
+    @Binding var layoutRaw: String
+    @Binding var visualRaw: String
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .navigationTitle("ホーム")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) { RenewalViewModeMenu(layoutRaw: $layoutRaw, visualRaw: $visualRaw) }
+                }
+        } else {
+            content
         }
     }
 }
