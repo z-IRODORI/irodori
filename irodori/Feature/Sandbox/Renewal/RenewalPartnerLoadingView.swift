@@ -18,8 +18,8 @@ struct RenewalPartnerLoadingView: View {
     @State private var dim = false
 
     private var message: String {
-        if let pinnedLabel { return "\(pinnedLabel)で組んでいます…" }
-        return "相棒がコーデを組んでいます…"
+        if let pinnedLabel { return "\(pinnedLabel)で\n組んでいます…" }
+        return "相棒がコーデを\n組んでいます…"
     }
 
     var body: some View {
@@ -27,9 +27,10 @@ struct RenewalPartnerLoadingView: View {
             RenewalPartnerAvatar(typeName: typeName, size: compact ? 44 : 56)
                 .opacity(dim ? 0.45 : 1)
             Text(message)
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .foregroundStyle(RenewalTokens.muted)
-                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
                 .minimumScaleFactor(0.85)
         }
         .frame(maxWidth: .infinity)

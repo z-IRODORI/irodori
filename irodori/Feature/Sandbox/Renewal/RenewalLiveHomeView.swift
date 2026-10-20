@@ -277,6 +277,10 @@ struct RenewalLiveHomeView: View {
             .padding(.vertical, 12)
         }
         .background(RenewalTokens.ground)
+        .overlay {
+            if model.loading.contains(scope) { loadingSquare }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.loading.contains(scope))
         .refreshable {
             await model.load(scope, force: true)
             await onRefresh?()
@@ -423,17 +427,6 @@ struct RenewalLiveHomeView: View {
             }
         }
         .opacity(model.loading.contains(scope) ? 0.5 : 1)
-        .overlay(alignment: .top) {
-            // 主役の服を選んで組み直している間: 相棒が色を集めて組んでいる様子
-            if model.loading.contains(scope) {
-                RenewalPartnerLoadingView(typeName: partnerTypeName, pinnedLabel: pinnedItemLabel, compact: true)
-                    .background(RenewalTokens.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 18))
-                    .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
-                    .padding(.horizontal, RenewalTokens.edge + 20)
-                    .padding(.top, 40)
-                    .transition(.opacity)
-            }
-        }
         .task(id: response.recipes.map(\.recipe_id).joined()) {
             // ピボット・見送りで案が入れ替わったら、新しいコーデモデルの抽出状況も追う
             await model.pollExtractions(scope)
@@ -458,12 +451,19 @@ struct RenewalLiveHomeView: View {
 
     // MARK: 状態表示
 
+    /// 初回の読み込み中は案の場所だけ空けておく (ローディングは画面中央の正方形)
     private var loadingCard: some View {
-        RenewalPartnerLoadingView(typeName: partnerTypeName, pinnedLabel: pinnedItemLabel)
-            .frame(minHeight: 260)
-            .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 18))
-            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
-            .padding(.horizontal, RenewalTokens.edge)
+        Color.clear.frame(height: 320)
+    }
+
+    /// 画面中央に出す正方形のローディング (初回の読み込みと、主役の服で組み直す間)
+    private var loadingSquare: some View {
+        RenewalPartnerLoadingView(typeName: partnerTypeName, pinnedLabel: pinnedItemLabel, compact: true)
+            .padding(.horizontal, 12)
+            .frame(width: 168, height: 168)
+            .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 22))
+            .shadow(color: .black.opacity(0.12), radius: 18, y: 6)
+            .transition(.opacity.combined(with: .scale(scale: 0.96)))
     }
 
     private var pinnedItemLabel: String? {
