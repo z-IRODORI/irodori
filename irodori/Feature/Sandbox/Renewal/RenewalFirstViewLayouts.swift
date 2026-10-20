@@ -310,6 +310,8 @@ struct RenewalFlatPiece: Identifiable, Hashable {
     let kind: Kind
     /// コーデモデルのアイテムが手持ちにもある (見せ方「コーデモデルのアイテム」用)
     let ownedMatch: Bool
+    /// 画像を生成中 (きらめかせる)。false の placeholder は画像が来ない「買い足す」枠
+    var preparing: Bool = false
 }
 
 enum RenewalFlatLayBuilder {
@@ -325,7 +327,8 @@ enum RenewalFlatLayBuilder {
                 usedExample.insert(ex.id)
                 pieces.append(RenewalFlatPiece(id: "e_\(ex.id)", slot: m.slot, imageURL: ex.image_url, label: ex.label, kind: .example, ownedMatch: false))
             } else {
-                pieces.append(RenewalFlatPiece(id: "m_\(m.id)", slot: m.slot, imageURL: nil, label: m.label, kind: .placeholder, ownedMatch: false))
+                pieces.append(RenewalFlatPiece(id: "m_\(m.id)", slot: m.slot, imageURL: nil, label: m.label, kind: .placeholder,
+                                               ownedMatch: false, preparing: extraction?.isInProgress ?? false))
             }
         }
         return pieces
@@ -344,7 +347,8 @@ enum RenewalFlatLayBuilder {
         var pieces: [RenewalFlatPiece] = []
         func buy(_ it: OwnedFirstExtractedItem) -> RenewalFlatPiece {
             RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: it.image_url.isEmpty ? nil : it.image_url,
-                             label: it.label, kind: it.image_url.isEmpty ? .placeholder : .example, ownedMatch: false)
+                             label: it.label, kind: it.image_url.isEmpty ? .placeholder : .example, ownedMatch: false,
+                             preparing: it.image_url.isEmpty)
         }
         for it in items {
             if let o = r.owned_items.first(where: { $0.slot == it.slot && !usedOwned.contains($0.item_id) }) {
@@ -437,8 +441,8 @@ struct RenewalFlatLayBoard: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                // 画像の準備中: きらめくシルエット (名前は「買い足す」と重なるので出さない)
-                RenewalShimmer()
+                // 画像の準備中だけきらめかせる。画像が来ない枠は静かなシルエットのまま
+                if p.preparing { RenewalShimmer() }
                 Image(systemName: p.slot == "tops" ? "tshirt.fill" : (p.slot == "shoes" ? "shoe.fill" : "hanger"))
                     .font(.system(size: large ? 30 : 20))
                     .foregroundStyle(RenewalTokens.controlBorder)
@@ -660,7 +664,7 @@ struct RenewalListLayout: View {
                         .lineSpacing(2)
                         .lineLimit(hasModel(recipe) ? 2 : 6)
                         .fixedSize(horizontal: false, vertical: true)
-                    if !hasModel(recipe) {
+                    if !hasModel(recipe) && recipe.missing_items.isEmpty {
                         Label("手持ちだけで組んだ案", systemImage: "hanger")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(RenewalTokens.muted)
