@@ -423,7 +423,17 @@ struct RenewalLiveHomeView: View {
             }
         }
         .opacity(model.loading.contains(scope) ? 0.5 : 1)
-        .overlay { if model.loading.contains(scope) { ProgressView() } }
+        .overlay(alignment: .top) {
+            // 主役の服を選んで組み直している間: 相棒が色を集めて組んでいる様子
+            if model.loading.contains(scope) {
+                RenewalPartnerLoadingView(typeName: partnerTypeName, pinnedLabel: pinnedItemLabel, compact: true)
+                    .background(RenewalTokens.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 18))
+                    .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+                    .padding(.horizontal, RenewalTokens.edge + 20)
+                    .padding(.top, 40)
+                    .transition(.opacity)
+            }
+        }
         .task(id: response.recipes.map(\.recipe_id).joined()) {
             // ピボット・見送りで案が入れ替わったら、新しいコーデモデルの抽出状況も追う
             await model.pollExtractions(scope)
@@ -449,15 +459,16 @@ struct RenewalLiveHomeView: View {
     // MARK: 状態表示
 
     private var loadingCard: some View {
-        VStack(spacing: 10) {
-            ProgressView()
-            Text("クローゼットの服から組み合わせを作っています")
-                .font(.system(size: 13))
-                .foregroundStyle(RenewalTokens.muted)
-        }
-        .frame(maxWidth: .infinity, minHeight: 260)
-        .renewalCard()
-        .padding(.horizontal, RenewalTokens.edge)
+        RenewalPartnerLoadingView(typeName: partnerTypeName, pinnedLabel: pinnedItemLabel)
+            .frame(minHeight: 260)
+            .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+            .padding(.horizontal, RenewalTokens.edge)
+    }
+
+    private var pinnedItemLabel: String? {
+        guard let id = model.pivotItemId(scope) else { return nil }
+        return response?.closet_items.first(where: { $0.item_id == id })?.label
     }
 
     private func errorCard(_ message: String) -> some View {
