@@ -70,9 +70,10 @@ final class FullBodyPickerViewModel {
         return Double(photoCount) * secondsPerPhoto
     }
 
-    /// 「約40秒」「約1分30秒」の形に整える (10秒未満は5秒刻み、それ以上は10秒刻み)
+    /// 「数秒」「約40秒」「約1分30秒」の形に整える (8秒未満は「数秒」、1分未満は5秒刻み、それ以上は10秒刻み)
     static func durationLabel(_ seconds: Double) -> String {
-        let s = max(5, seconds)
+        if seconds < 8 { return "数秒" }
+        let s = seconds
         if s < 60 { return "約\(Int((s / 5).rounded()) * 5)秒" }
         let rounded = Int((s / 10).rounded()) * 10
         let m = rounded / 60, r = rounded % 60
