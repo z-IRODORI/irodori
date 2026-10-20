@@ -99,6 +99,13 @@ struct OwnedFirstWeather: Codable, Hashable {
     let diff_from_yesterday: Int?
 }
 
+/// 相棒のひとことが触れた「覚えていること」(サーバで実在を確認済み)
+struct OwnedFirstMemory: Codable, Hashable {
+    let id: String
+    let kind: String     // dislike | worn | favorite | new | sleeping | chat | answer | vote
+    let label: String    // 「10/21『色が好みじゃない』で見送り」
+}
+
 struct OwnedFirstHomeResponse: Codable, Hashable {
     let target_date: String
     let weather: OwnedFirstWeather
@@ -115,6 +122,7 @@ struct OwnedFirstHomeResponse: Codable, Hashable {
     let pivot_item_id: String?
     let decided_recipe_id: String?
     let text_source: String   // gemini | template
+    let memory: OwnedFirstMemory?
     let recipes: [OwnedFirstRecipe]
     let closet_items: [OwnedFirstItem]
 }

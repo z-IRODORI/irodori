@@ -360,11 +360,30 @@ struct RenewalLiveHomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RenewalSpeechBubble().fill(RenewalTokens.surface))
                 .overlay(RenewalSpeechBubble().stroke(RenewalTokens.border, lineWidth: 1))
+                if let memory = response?.memory {
+                    memoryNote(memory)
+                        .padding(.leading, 12)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, RenewalTokens.edge)
         .padding(.top, 4)
+    }
+
+    /// ひとことの根拠になった「相棒が覚えていること」(さりげなく1行)
+    private func memoryNote(_ m: OwnedFirstMemory) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 10, weight: .semibold))
+            Text("覚えてるよ ・ \(m.label)")
+                .font(.system(size: 11))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .foregroundStyle(RenewalTokens.muted)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("相棒が覚えていること: \(m.label)")
     }
 
     /// 「明日 10/21(水) ・ 29° / 20°」(季節ラベルはテキストだけで添える)
