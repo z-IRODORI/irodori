@@ -22,7 +22,12 @@ struct RenewalOnboardingView: View {
 
     @State private var step: Step = .intro
     @State private var answers = RenewalAnswers()
-    @State private var answeredCount = 0
+    /// 画面に出した質問の数 (1〜4)
+    @State private var revealedCount = 1
+    /// 回答済みの質問 (選び直しても後続は消さない)
+    @State private var answered: Set<Int> = []
+    /// 画面上部へスクロールさせたい質問
+    @State private var focusIndex: Int?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -130,72 +135,107 @@ struct RenewalOnboardingView: View {
         ]
     }
 
-    private func answerLabel(_ index: Int) -> String {
+    private func selectedValue(_ index: Int) -> String {
         switch index {
-        case 0: return answers.impression.label
-        case 1: return answers.priority.label
-        case 2: return answers.range.label
-        default: return answers.tone.label
+        case 0: return answers.impression.rawValue
+        case 1: return answers.priority.rawValue
+        case 2: return answers.range.rawValue
+        default: return answers.tone.rawValue
         }
     }
 
+    /// 1問ずつチャットで出し、新しい質問は画面上部までスクロールして見せる。
+    /// 回答済みの質問はスクロールで戻って選び直せる (後続の回答は消さない)。
     private var questions: some View {
-        VStack(spacing: 0) {
-            progressHeader
-            ScrollViewReader { proxy in
+        ScrollViewReader { proxy in
+            VStack(spacing: 0) {
+                progressHeader(proxy)
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        ForEach(0...min(answeredCount, 3), id: \.self) { i in
-                            partnerBubble(questionList[i].text, axis: "Q\(i + 1) \(questionList[i].axis)")
-                                .id("q\(i)")
-                            if i < answeredCount {
-                                userBubble(answerLabel(i))
-                            }
+                    VStack(alignment: .leading, spacing: 28) {
+                        ForEach(0..<revealedCount, id: \.self) { i in
+                            // 上部へ移動したとき、ヘッダーとの間に余白が残るよう id の内側に余白を持たせる
+                            questionBlock(i)
+                                .padding(.top, 16)
+                                .id(i)
+                                .transition(reduceMotion ? .opacity : .asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .opacity))
                         }
-                        if answeredCount < 4 {
-                            options(for: answeredCount)
-                                .id("options")
-                        }
+                        // 最後の質問も画面上部まで上げられるよう、下に余白を取る
+                        Color.clear
+                            .frame(height: 1)
+                            .containerRelativeFrame(.vertical) { h, _ in h * 0.6 }
+                            .accessibilityHidden(true)
                     }
                     .padding(.horizontal, RenewalTokens.edge)
-                    .padding(.vertical, 16)
+                    .padding(.top, 4)
                 }
-                .onChange(of: answeredCount) {
-                    // レイアウト確定後に、次の質問が画面上部に来るようスクロール
-                    Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(80))
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
-                            proxy.scrollTo("q\(min(answeredCount, 3))", anchor: .top)
-                        }
+                .scrollDismissesKeyboard(.never)
+            }
+            .safeAreaInset(edge: .bottom) {
+                if answered.count == 4 { finishBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
+            }
+            .onChange(of: focusIndex) {
+                guard let target = focusIndex else { return }
+                // 挿入アニメーションの後に、質問を画面上部へ移動させる
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 120))
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.55, dampingFraction: 0.9)) {
+                        proxy.scrollTo(target, anchor: .top)
                     }
+                    focusIndex = nil
                 }
+            }
+        }
+        .onAppear {
+            if mode == .edit {
+                revealedCount = 4
+                answered = [0, 1, 2, 3]
             }
         }
     }
 
-    private var progressHeader: some View {
-        VStack(spacing: 8) {
+    private func progressHeader(_ proxy: ScrollViewProxy) -> some View {
+        VStack(spacing: 4) {
             HStack {
                 Text(mode == .edit ? "4問の回答を変更" : "相棒をカスタマイズ")
                     .font(.system(size: 15, weight: .semibold))
                 Spacer()
-                Text("\(min(answeredCount + 1, 4)) / 4")
+                Text("\(answered.count) / 4 回答")
                     .font(.system(size: 13, weight: .medium).monospacedDigit())
                     .foregroundStyle(RenewalTokens.muted)
             }
+            // 各セグメントをタップすると、その質問へ戻れる
             HStack(spacing: 4) {
                 ForEach(0..<4, id: \.self) { i in
-                    Capsule()
-                        .fill(i < answeredCount ? RenewalTokens.ink : RenewalTokens.border)
-                        .frame(height: 3)
+                    Button {
+                        guard i < revealedCount else { return }
+                        Haptic.selection()
+                        focusIndex = i
+                    } label: {
+                        Capsule()
+                            .fill(answered.contains(i) ? RenewalTokens.ink : RenewalTokens.border)
+                            .frame(height: 3)
+                            .frame(maxWidth: .infinity, minHeight: 28)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(i >= revealedCount)
+                    .accessibilityLabel("Q\(i + 1) \(questionList[i].axis)へ移動")
                 }
             }
-            .accessibilityHidden(true)
         }
         .padding(.horizontal, RenewalTokens.edge)
         .padding(.top, 12)
-        .padding(.bottom, 8)
         .background(RenewalTokens.surface)
+        .overlay(alignment: .bottom) { Divider().overlay(RenewalTokens.rule) }
+    }
+
+    private func questionBlock(_ i: Int) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            partnerBubble(questionList[i].text, axis: "Q\(i + 1) \(questionList[i].axis)")
+            options(for: i)
+        }
     }
 
     private func partnerBubble(_ text: String, axis: String) -> some View {
@@ -207,84 +247,109 @@ struct RenewalOnboardingView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(RenewalTokens.muted)
                 Text(text)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(RenewalTokens.ink)
+                    .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
             .renewalCard()
-            Spacer(minLength: 32)
+            Spacer(minLength: 24)
         }
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
-    private func userBubble(_ text: String) -> some View {
-        HStack {
-            Spacer(minLength: 56)
-            Text(text)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(RenewalTokens.primaryFill)
-                .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.cardRadius))
-        }
-        .accessibilityLabel("あなたの回答: \(text)")
-    }
-
+    /// 選択肢は画面幅いっぱい。選んだものは「自分の発言」と同じ濃い色で示す
     private func options(for index: Int) -> some View {
         VStack(spacing: 8) {
             ForEach(questionList[index].options) { opt in
+                let on = answered.contains(index) && selectedValue(index) == opt.id
                 Button {
                     select(index: index, value: opt.id)
                 } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(opt.label)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(RenewalTokens.ink)
-                        Text(opt.sub)
-                            .font(.system(size: 12))
-                            .foregroundStyle(RenewalTokens.muted)
-                            .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .center, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(opt.label)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(on ? .white : RenewalTokens.ink)
+                            Text(opt.sub)
+                                .font(.system(size: 12))
+                                .foregroundStyle(on ? .white.opacity(0.82) : RenewalTokens.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        if on {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
                     }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .renewalCard()
+                    .padding(.vertical, 12)
+                    .background(on ? RenewalTokens.primaryFill : RenewalTokens.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.cardRadius))
+                    .overlay(RoundedRectangle(cornerRadius: RenewalTokens.cardRadius)
+                        .stroke(on ? Color.clear : RenewalTokens.border, lineWidth: 1))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(on ? .isSelected : [])
             }
         }
-        .padding(.leading, 42)
+    }
+
+    private var finishBar: some View {
+        VStack(spacing: 6) {
+            Text("回答はスクロールで戻って変更できます")
+                .font(.system(size: 11))
+                .foregroundStyle(RenewalTokens.muted)
+            Button(mode == .edit ? "この回答で保存" : "この4つの回答で相棒をつくる") { finish() }
+                .buttonStyle(RenewalPrimaryButtonStyle())
+        }
+        .padding(.horizontal, RenewalTokens.edge)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .background(RenewalTokens.surface.shadow(.drop(color: .black.opacity(0.06), radius: 6, y: -2)))
     }
 
     private func select(index: Int, value: String) {
         Haptic.selection()
-        switch index {
-        case 0: answers.impression = RenewalImpression(rawValue: value) ?? .soft
-        case 1: answers.priority = RenewalPriority(rawValue: value) ?? .F
-        case 2: answers.range = RenewalRange(rawValue: value) ?? .C
-        default: answers.tone = RenewalTone(rawValue: value) ?? .gentle
-        }
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-            answeredCount += 1
-        }
-        if answeredCount == 4 {
-            if mode == .edit {
-                store.updateAnswers(answers)
-                store.showToast(RenewalCopy.toneChanged(answers.tone))
-                onFinish()
-                return
+        let isChange = answered.contains(index)
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+            switch index {
+            case 0: answers.impression = RenewalImpression(rawValue: value) ?? .soft
+            case 1: answers.priority = RenewalPriority(rawValue: value) ?? .F
+            case 2: answers.range = RenewalRange(rawValue: value) ?? .C
+            default: answers.tone = RenewalTone(rawValue: value) ?? .gentle
             }
-            step = .birthing
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(reduceMotion ? 300 : 1400))
-                withAnimation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82)) {
-                    step = .born
-                }
-                Haptic.notify(.success)
+            answered.insert(index)
+        }
+        // 過去の質問の選び直しでは、画面を動かさない
+        guard !isChange, index == revealedCount - 1, revealedCount < 4 else { return }
+        Task { @MainActor in
+            // 選んだ選択肢を一瞬見せてから次の質問を出す
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 220))
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) { revealedCount += 1 }
+            focusIndex = revealedCount - 1
+        }
+    }
+
+    private func finish() {
+        if mode == .edit {
+            store.updateAnswers(answers)
+            store.showToast(RenewalCopy.toneChanged(answers.tone))
+            onFinish()
+            return
+        }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { step = .birthing }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 300 : 1400))
+            withAnimation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82)) {
+                step = .born
             }
+            Haptic.notify(.success)
         }
     }
 
