@@ -216,23 +216,33 @@ enum RenewalFlatLayBuilder {
         return pieces
     }
 
-    /// コーデモデルが着ているアイテムを並べる。
-    /// - 同じスロットの手持ちがある (サーバ側で色・形が一致するモデルだけを選んでいる) → 手持ちの写真をそのまま置く
-    /// - 手持ちに無い → 「買い足す」アイテムとして商品風画像 (生成前は点線の枠)
-    /// - モデルに写っていない手持ち (靴など) は最後に足して、コーデとして欠けないようにする
+    /// コーデモデルが着ているアイテムを並べる。モデルの各アイテムを次の順で置き換える:
+    ///  1. 案の手持ち (サーバがモデルと色・形の一致を確認済み) が同じスロットにある → 手持ちの写真
+    ///  2. 案の「買い足す」が同じスロットにある → モデルのアイテム画像に「買い足す」
+    ///  3. 抽出時に手持ちと一致した (インナーの白T など) → 手持ちの写真
+    ///  4. それ以外 → 「買い足す」
+    /// 抽出時の一致は色だけで判定しているため (青白ストライプ → 白シャツ 等)、1・2 を優先する。
     static func exampleItems(_ r: OwnedFirstRecipe, extraction: OwnedFirstExtraction?) -> [RenewalFlatPiece] {
         guard let items = extraction?.items, !items.isEmpty else { return [] }
         var usedOwned: Set<String> = []
+        var usedMissing: Set<String> = []
         var pieces: [RenewalFlatPiece] = []
+        func buy(_ it: OwnedFirstExtractedItem) -> RenewalFlatPiece {
+            RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: it.image_url.isEmpty ? nil : it.image_url,
+                             label: it.label, kind: it.image_url.isEmpty ? .placeholder : .example, ownedMatch: false)
+        }
         for it in items {
             if let o = r.owned_items.first(where: { $0.slot == it.slot && !usedOwned.contains($0.item_id) }) {
                 usedOwned.insert(o.item_id)
                 pieces.append(RenewalFlatPiece(id: "o_\(o.item_id)", slot: o.slot, imageURL: o.image_url, label: o.label, kind: .owned, ownedMatch: true))
-            } else if let ownedURL = it.owned_image_url, !ownedURL.isEmpty {
-                pieces.append(RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: ownedURL, label: it.label, kind: .owned, ownedMatch: true))
+            } else if let m = r.missing_items.first(where: { $0.slot == it.slot && !usedMissing.contains($0.id) }) {
+                usedMissing.insert(m.id)
+                pieces.append(buy(it))
+            } else if let oid = it.owned_item_id, !usedOwned.contains(oid), let url = it.owned_image_url, !url.isEmpty {
+                usedOwned.insert(oid)
+                pieces.append(RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: url, label: it.label, kind: .owned, ownedMatch: true))
             } else {
-                pieces.append(RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: it.image_url.isEmpty ? nil : it.image_url,
-                                               label: it.label, kind: it.image_url.isEmpty ? .placeholder : .example, ownedMatch: false))
+                pieces.append(buy(it))
             }
         }
         let slots = Set(pieces.map(\.slot))
