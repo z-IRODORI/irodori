@@ -91,15 +91,121 @@ struct RenewalViewModeMenu: View {
 
 // MARK: - 共通の小部品
 
+/// イチオシ: 既存ホーム (DailyIchioshiBadge) と同じピンクのきらめきバッジ
 private struct PickTag: View {
     var body: some View {
-        Text("イチオシ")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(RenewalTokens.primaryFill)
-            .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius))
+        HStack(spacing: 3) {
+            Image(systemName: "sparkle").font(.system(size: 10, weight: .semibold))
+            Text("イチオシ").font(.system(size: 11, weight: .semibold))
+        }
+        .foregroundStyle(RenewalTokens.accentPink)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .background(.white)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(RenewalTokens.accentPink.opacity(0.35), lineWidth: 0.8))
+        .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
+    }
+}
+
+// MARK: - 彩り (アイテムの色)
+
+/// アイテム名の色の言葉から表示用の色を引く (服の色の見本。厳密な色ではない)
+enum RenewalColorPalette {
+    private static let table: [(String, String, Color)] = [
+        ("ライトブルー", "ライトブルー", Color(red: 0.61, green: 0.76, blue: 0.90)),
+        ("サックス", "サックス", Color(red: 0.61, green: 0.76, blue: 0.90)),
+        ("ライトベージュ", "ベージュ", Color(red: 0.87, green: 0.80, blue: 0.69)),
+        ("オフホワイト", "ホワイト", Color(red: 0.96, green: 0.95, blue: 0.92)),
+        ("ホワイト", "ホワイト", Color(red: 0.97, green: 0.97, blue: 0.96)),
+        ("白", "ホワイト", Color(red: 0.97, green: 0.97, blue: 0.96)),
+        ("ブラック", "ブラック", Color(red: 0.13, green: 0.13, blue: 0.13)),
+        ("黒", "ブラック", Color(red: 0.13, green: 0.13, blue: 0.13)),
+        ("チャコール", "グレー", Color(red: 0.36, green: 0.37, blue: 0.39)),
+        ("ダークグレー", "グレー", Color(red: 0.36, green: 0.37, blue: 0.39)),
+        ("グレー", "グレー", Color(red: 0.62, green: 0.64, blue: 0.67)),
+        ("ネイビー", "ネイビー", Color(red: 0.13, green: 0.21, blue: 0.36)),
+        ("ブルー", "ブルー", Color(red: 0.25, green: 0.44, blue: 0.71)),
+        ("デニム", "ブルー", Color(red: 0.25, green: 0.44, blue: 0.71)),
+        ("ベージュ", "ベージュ", Color(red: 0.85, green: 0.76, blue: 0.64)),
+        ("キャメル", "キャメル", Color(red: 0.73, green: 0.53, blue: 0.32)),
+        ("ブラウン", "ブラウン", Color(red: 0.48, green: 0.31, blue: 0.20)),
+        ("茶", "ブラウン", Color(red: 0.48, green: 0.31, blue: 0.20)),
+        ("カーキ", "カーキ", Color(red: 0.45, green: 0.45, blue: 0.27)),
+        ("オリーブ", "カーキ", Color(red: 0.45, green: 0.45, blue: 0.27)),
+        ("グリーン", "グリーン", Color(red: 0.27, green: 0.50, blue: 0.34)),
+        ("緑", "グリーン", Color(red: 0.27, green: 0.50, blue: 0.34)),
+        ("オレンジ", "オレンジ", Color(red: 0.88, green: 0.48, blue: 0.20)),
+        ("テラコッタ", "テラコッタ", Color(red: 0.78, green: 0.40, blue: 0.27)),
+        ("レッド", "レッド", Color(red: 0.75, green: 0.22, blue: 0.20)),
+        ("ボルドー", "ボルドー", Color(red: 0.45, green: 0.12, blue: 0.18)),
+        ("赤", "レッド", Color(red: 0.75, green: 0.22, blue: 0.20)),
+        ("イエロー", "イエロー", Color(red: 0.91, green: 0.78, blue: 0.30)),
+        ("マスタード", "マスタード", Color(red: 0.80, green: 0.62, blue: 0.18)),
+        ("ピンク", "ピンク", Color(red: 0.91, green: 0.63, blue: 0.71)),
+        ("パープル", "パープル", Color(red: 0.49, green: 0.36, blue: 0.65)),
+        ("ラベンダー", "ラベンダー", Color(red: 0.73, green: 0.67, blue: 0.85)),
+    ]
+
+    struct Swatch: Hashable { let name: String; let color: Color }
+
+    static func swatch(for label: String) -> Swatch? {
+        table.first { label.contains($0.0) }.map { Swatch(name: $0.1, color: $0.2) }
+    }
+
+    /// 案のアイテムから重複なしの色の並び (最大4色)
+    static func swatches(_ r: OwnedFirstRecipe) -> [Swatch] {
+        var seen: [Swatch] = []
+        for label in r.owned_items.map(\.label) + r.missing_items.map(\.label) {
+            if let sw = swatch(for: label), !seen.contains(where: { $0.name == sw.name }) { seen.append(sw) }
+        }
+        return Array(seen.prefix(4))
+    }
+}
+
+/// 見出しの下に添える、そのコーデの「彩り」(色の見本と色名)
+struct RenewalPaletteRow: View {
+    let swatches: [RenewalColorPalette.Swatch]
+
+    var body: some View {
+        if !swatches.isEmpty {
+            HStack(spacing: 6) {
+                HStack(spacing: -4) {
+                    ForEach(swatches, id: \.name) { sw in
+                        Circle()
+                            .fill(sw.color)
+                            .frame(width: 14, height: 14)
+                            .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
+                            .overlay(Circle().stroke(RenewalTokens.border, lineWidth: 0.5).padding(-0.75))
+                    }
+                }
+                Text(swatches.map(\.name).joined(separator: " × "))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(RenewalTokens.muted)
+                    .lineLimit(1)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("色の組み合わせ: " + swatches.map(\.name).joined(separator: "、"))
+        }
+    }
+}
+
+/// 手持ち (濃い) と買い足す (点線) を1コマずつ並べた、完成までの目盛り
+struct RenewalCompletionSegments: View {
+    let owned: Int
+    let total: Int
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<max(total, 1), id: \.self) { i in
+                Capsule()
+                    .fill(i < owned ? RenewalTokens.ink : Color.clear)
+                    .overlay(Capsule().strokeBorder(i < owned ? Color.clear : RenewalTokens.controlBorder,
+                                                    style: StrokeStyle(lineWidth: 1, dash: [2, 1.5])))
+                    .frame(width: 14, height: 5)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -175,6 +281,15 @@ private func statusText(_ r: OwnedFirstRecipe, _ actions: RenewalRecipeActions) 
         }
     }
     return shortStatus(r)
+}
+
+/// 完成までの目盛り用 (手持ち数, 全体数)。見せ方「コーデモデルのアイテム」ではボードに並ぶ数に合わせる
+private func completionCounts(_ r: OwnedFirstRecipe, _ actions: RenewalRecipeActions) -> (Int, Int) {
+    if actions.visualMode == .exampleItems {
+        let pieces = RenewalFlatLayBuilder.exampleItems(r, extraction: actions.extraction(r))
+        if !pieces.isEmpty { return (pieces.filter(\.ownedMatch).count, pieces.count) }
+    }
+    return (r.owned_items.count, r.owned_items.count + r.missing_items.count)
 }
 
 private func shortStatus(_ r: OwnedFirstRecipe) -> String {
@@ -318,14 +433,15 @@ struct RenewalFlatLayBoard: View {
             RenewalTokens.raised
             if let s = p.imageURL, let url = URL(string: s) {
                 KFImage(url)
-                    .placeholder { ProgressView() }
+                    .placeholder { RenewalShimmer() }
                     .resizable()
                     .scaledToFill()
             } else {
-                // 画像の準備中はアイコンだけ (名前と「買い足す」が重なって読みにくくなるため)
-                Image(systemName: p.slot == "tops" ? "tshirt" : (p.slot == "shoes" ? "shoe" : "hanger"))
-                    .font(.system(size: large ? 24 : 16))
-                    .foregroundStyle(RenewalTokens.muted)
+                // 画像の準備中: きらめくシルエット (名前は「買い足す」と重なるので出さない)
+                RenewalShimmer()
+                Image(systemName: p.slot == "tops" ? "tshirt.fill" : (p.slot == "shoes" ? "shoe.fill" : "hanger"))
+                    .font(.system(size: large ? 30 : 20))
+                    .foregroundStyle(RenewalTokens.controlBorder)
             }
         }
         .aspectRatio(1, contentMode: .fit)
@@ -454,16 +570,16 @@ struct RenewalRecipeVisual: View {
             RenewalRemoteExampleImage(example: recipe.example, height: height, showBadge: false)
         case .ownedPlusExample:
             RenewalFlatLayBoard(pieces: RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: extraction), height: height)
-                .overlay(alignment: .topLeading) { progressBadge(extraction, needed: !recipe.missing_items.isEmpty) }
+                .overlay(alignment: .bottom) { progressBadge(extraction, needed: !recipe.missing_items.isEmpty) }
         case .exampleItems:
             let pieces = RenewalFlatLayBuilder.exampleItems(recipe, extraction: extraction)
             if pieces.isEmpty {
                 // コーデモデルが無い / 抽出が終わっていない → 提案アイテム (手持ち＋買い足す枠) で並べる
                 RenewalFlatLayBoard(pieces: RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: nil), height: height)
-                    .overlay(alignment: .topLeading) { progressBadge(extraction, needed: recipe.example != nil, fallback: "アイテムを準備中") }
+                    .overlay(alignment: .bottom) { progressBadge(extraction, needed: recipe.example != nil) }
             } else {
                 RenewalFlatLayBoard(pieces: pieces, showsExampleTag: false, height: height)
-                    .overlay(alignment: .topLeading) { progressBadge(extraction, needed: true) }
+                    .overlay(alignment: .bottom) { progressBadge(extraction, needed: true) }
             }
         }
     }
@@ -471,16 +587,8 @@ struct RenewalRecipeVisual: View {
     @ViewBuilder
     private func progressBadge(_ e: OwnedFirstExtraction?, needed: Bool, fallback: String = "抽出中") -> some View {
         if needed, let e, e.isInProgress {
-            HStack(spacing: 4) {
-                ProgressView().controlSize(.mini)
-                Text(e.status == "cropped" ? "商品画像を生成中" : fallback)
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(.white.opacity(0.92))
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .padding(4)
+            RenewalPreparingBadge(text: "買い足すアイテムを用意中")
+                .padding(6)
         }
     }
 }
@@ -513,16 +621,19 @@ struct RenewalListLayout: View {
 
     /// 上: 見出し (左上・大きめ) / 左: アイテムのボード (カード幅の約58%) / 右: 状態・説明 (控えめ)・コーデモデル・決定
     private func itemRow(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(recipe.displayTitle)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(RenewalTokens.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 0)
-                if index == 0 { PickTag() }
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(recipe.displayTitle)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(RenewalTokens.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 0)
+                    if index == 0 { PickTag() }
+                }
+                RenewalPaletteRow(swatches: RenewalColorPalette.swatches(recipe))
             }
             HStack(alignment: .top, spacing: 10) {
                 Button { actions.onDetail(recipe) } label: {
@@ -533,11 +644,15 @@ struct RenewalListLayout: View {
                 .accessibilityLabel("案\(index + 1)。タップで詳細")
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(statusText(recipe, actions))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(RenewalTokens.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                    VStack(alignment: .leading, spacing: 4) {
+                        let counts = completionCounts(recipe, actions)
+                        RenewalCompletionSegments(owned: counts.0, total: counts.1)
+                        Text(statusText(recipe, actions))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(RenewalTokens.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
                     // コーデモデルが無い案は、その分の高さを説明に回す (空白を作らない)
                     Text(recipe.reason)
                         .font(.system(size: 12, weight: .regular))
@@ -560,9 +675,11 @@ struct RenewalListLayout: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 18)
+        .padding(.top, 16)
         .padding(.bottom, 14)
-        .renewalCard()
+        .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(RenewalTokens.border.opacity(0.7), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
     }
 
     private func photoRow(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
@@ -657,5 +774,192 @@ struct RenewalPeekLayout: View {
         .padding(10)
         .frame(maxHeight: .infinity, alignment: .top)
         .renewalCard()
+    }
+}
+
+// MARK: - 主役の服を選んで組む (アイテム軸)
+
+/// ホーム上部の「主役の服を選んで組む」。クローゼットの服を横に並べ、
+/// タップした服を主役に固定して3案を組み直す (api/home/owned-first?pivot_item_id=)。
+struct RenewalPivotStrip: View {
+    let items: [OwnedFirstItem]
+    let pinnedId: String?
+    let isLoading: Bool
+    let onSelect: (String?) -> Void
+
+    private static let slotOrder = ["tops", "outer", "bottoms", "shoes"]
+
+    private var sorted: [OwnedFirstItem] {
+        items.sorted {
+            (Self.slotOrder.firstIndex(of: $0.slot) ?? 9, $0.label) < (Self.slotOrder.firstIndex(of: $1.slot) ?? 9, $1.label)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("主役の服を選んで組む")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                if pinnedId != nil {
+                    Button("おまかせに戻す") {
+                        Haptic.selection()
+                        onSelect(nil)
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(RenewalTokens.muted)
+                    .frame(minHeight: 44)
+                }
+            }
+            .padding(.horizontal, RenewalTokens.edge)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 10) {
+                    autoChip
+                    ForEach(sorted) { item in itemChip(item) }
+                }
+                .padding(.top, 8)      // 固定中のピンがはみ出しても切れないように
+                .padding(.bottom, 2)
+            }
+            .contentMargins(.horizontal, RenewalTokens.edge, for: .scrollContent)
+        }
+    }
+
+    private var autoChip: some View {
+        let on = pinnedId == nil
+        return Button {
+            guard !on else { return }
+            Haptic.selection()
+            onSelect(nil)
+        } label: {
+            VStack(spacing: 5) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14).fill(on ? RenewalTokens.primaryFill : RenewalTokens.surface)
+                    VStack(spacing: 3) {
+                        Image(systemName: "sparkles").font(.system(size: 18, weight: .semibold))
+                        Text("相棒").font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(on ? .white : RenewalTokens.ink)
+                }
+                .frame(width: 64, height: 64)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(on ? Color.clear : RenewalTokens.border, lineWidth: 1))
+                Text("おまかせ")
+                    .font(.system(size: 11, weight: on ? .semibold : .regular))
+                    .foregroundStyle(on ? RenewalTokens.ink : RenewalTokens.muted)
+            }
+            .frame(width: 68)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("相棒のおまかせ")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private func itemChip(_ item: OwnedFirstItem) -> some View {
+        let on = pinnedId == item.item_id
+        return Button {
+            guard !on else { return }
+            Haptic.selection()
+            onSelect(item.item_id)
+        } label: {
+            VStack(spacing: 5) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14).fill(RenewalTokens.surface)
+                    if let url = URL(string: item.image_url), !item.image_url.isEmpty {
+                        KFImage(url)
+                            .placeholder { RenewalShimmer().clipShape(RoundedRectangle(cornerRadius: 10)) }
+                            .resizable()
+                            .scaledToFit()
+                            .padding(6)
+                    }
+                    if on && isLoading {
+                        RoundedRectangle(cornerRadius: 14).fill(.white.opacity(0.6))
+                        ProgressView()
+                    }
+                }
+                .frame(width: 64, height: 64)
+                .overlay(RoundedRectangle(cornerRadius: 14)
+                    .stroke(on ? RenewalTokens.ink : RenewalTokens.border, lineWidth: on ? 2 : 1))
+                .overlay(alignment: .topTrailing) {
+                    if on {
+                        Image(systemName: "pin.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white, RenewalTokens.ink)
+                            .offset(x: 5, y: -5)
+                    }
+                }
+                // 「グレー パーカー」→「パーカー」(色は写真で分かるので、狭い幅では種類だけ)
+                Text(item.label.split(separator: " ").last.map(String.init) ?? item.label)
+                    .font(.system(size: 11, weight: on ? .semibold : .regular))
+                    .foregroundStyle(on ? RenewalTokens.ink : RenewalTokens.muted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .frame(width: 68)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading)
+        .accessibilityLabel(on ? "\(item.label)を主役に固定中" : "\(item.label)を主役にして組む")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// 「買い足すアイテムを用意中」: ボード下部の白いカプセル (きらめくアイコン付き)
+struct RenewalPreparingBadge: View {
+    let text: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(RenewalTokens.accentPink)
+                .opacity(pulse ? 1 : 0.35)
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(RenewalTokens.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(.white, in: Capsule())
+        .shadow(color: .black.opacity(0.10), radius: 6, y: 2)
+        .onAppear {
+            guard !reduceMotion else { pulse = true; return }
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulse = true }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+    }
+}
+
+/// 読み込み中のきらめき (Reduce Motion では静止したグレー)
+struct RenewalShimmer: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = -1
+
+    var body: some View {
+        GeometryReader { geo in
+            RenewalTokens.raised
+                .overlay {
+                    if !reduceMotion {
+                        LinearGradient(colors: [.white.opacity(0), .white.opacity(0.75), .white.opacity(0)],
+                                       startPoint: .leading, endPoint: .trailing)
+                            .frame(width: geo.size.width * 0.6)
+                            .offset(x: phase * geo.size.width * 1.3)
+                    }
+                }
+                .clipped()
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.linear(duration: 1.3).repeatForever(autoreverses: false)) { phase = 1 }
+        }
+        .accessibilityHidden(true)
     }
 }

@@ -253,6 +253,14 @@ struct RenewalLiveHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 partnerHeader
+                if let items = response?.closet_items, !items.isEmpty {
+                    RenewalPivotStrip(
+                        items: items,
+                        pinnedId: model.pivotItemId(scope),
+                        isLoading: model.loading.contains(scope),
+                        onSelect: { id in Task { await model.pivot(id, scope: scope) } }
+                    )
+                }
                 if let error = model.errors[scope] {
                     errorCard(error)
                 }
@@ -306,8 +314,8 @@ struct RenewalLiveHomeView: View {
     private var partnerHeader: some View {
         HStack(alignment: .top, spacing: 10) {
             Button(action: onOpenPartner) {
-                RenewalPartnerAvatar(typeName: partnerTypeName, size: 48)
-                    .frame(minWidth: 48, minHeight: 48)
+                RenewalPartnerAvatar(typeName: partnerTypeName, size: 44)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -317,15 +325,15 @@ struct RenewalLiveHomeView: View {
             })
             .accessibilityLabel("相棒画面を開く")
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 nextWearMeta
                     .padding(.leading, 10)
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     if let response {
                         Text(response.greeting)
-                            .font(.system(size: 15, weight: .regular))
+                            .font(.system(size: 14, weight: .regular))
                             .foregroundStyle(RenewalTokens.ink)
-                            .lineSpacing(6)
+                            .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
                         if host.showCharCount {
                             HStack(spacing: 6) {
@@ -342,9 +350,9 @@ struct RenewalLiveHomeView: View {
                             .redacted(reason: .placeholder)
                     }
                 }
-                .padding(.vertical, 14)
-                .padding(.leading, 24)   // しっぽの分
-                .padding(.trailing, 16)
+                .padding(.vertical, 10)
+                .padding(.leading, 22)   // しっぽの分
+                .padding(.trailing, 14)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RenewalSpeechBubble().fill(RenewalTokens.surface))
                 .overlay(RenewalSpeechBubble().stroke(RenewalTokens.border, lineWidth: 1))
@@ -352,8 +360,7 @@ struct RenewalLiveHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, RenewalTokens.edge)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
+        .padding(.top, 4)
     }
 
     /// 「明日 10/21(水) ・ 29° / 20°」(季節ラベルはテキストだけで添える)
@@ -426,7 +433,7 @@ struct RenewalLiveHomeView: View {
     private var followUpMessage: String {
         if let id = model.pivotItemId(scope),
            let item = response?.closet_items.first(where: { $0.item_id == id }) {
-            return "\(item.label)を軸に組み直したよ。ほかの服にもできるよ"
+            return "\(item.label)を主役に組み直したよ。ピンとこなかったら教えてね"
         }
         return "ピンとこなかったら、教えてね"
     }
@@ -484,7 +491,6 @@ struct RenewalLiveHomeView: View {
                     .minimumScaleFactor(0.85)
             }
             HStack(spacing: 8) {
-                replyChip("この服を着たい", systemImage: "hanger") { showPivot = true }
                 replyChip("どれも違うかも", systemImage: "arrow.triangle.2.circlepath") { showDislike = true }
                 Spacer(minLength: 0)
             }
