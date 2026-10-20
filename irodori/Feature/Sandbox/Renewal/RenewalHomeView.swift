@@ -145,33 +145,13 @@ struct RenewalHomeView: View {
         .padding(.horizontal, RenewalTokens.edge)
     }
 
-    // MARK: - ② 今日 / 明日 / 週末 + 日付・気温 (1行)
+    // MARK: - ② 次に着る日の日付・気温 (1行・日付は選ばせない)
 
     private var scopeBar: some View {
         HStack(spacing: 10) {
-            HStack(spacing: 2) {
-                ForEach(RenewalScope.allCases) { s in
-                    Button {
-                        Haptic.selection()
-                        scope = s
-                    } label: {
-                        Text(s.label)
-                            .font(.system(size: 13, weight: scope == s ? .semibold : .regular))
-                            .foregroundStyle(scope == s ? .white : RenewalTokens.ink)
-                            .frame(minWidth: 44, minHeight: 32)
-                            .padding(.horizontal, 4)
-                            .background(scope == s ? RenewalTokens.primaryFill : Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.controlRadius))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(scope == s ? .isSelected : [])
-                }
-            }
-            .padding(2)
-            .background(RenewalTokens.surface)
-            .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.controlRadius + 2))
-            .overlay(RoundedRectangle(cornerRadius: RenewalTokens.controlRadius + 2).stroke(RenewalTokens.border, lineWidth: 1))
-
+            Text("次に着るなら")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(RenewalTokens.ink)
             Spacer(minLength: 0)
 
             HStack(spacing: 5) {

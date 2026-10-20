@@ -3,7 +3,8 @@
 //  irodori - Sandbox
 //
 //  リニューアル版ホームの「実 API 接続」版。
-//  レイアウトはモック版 (RenewalHomeView) と同じ3要素 (相棒ヘッダー / 今日・明日・週末 + 気温 / 3案) で、
+//  レイアウトは3要素 (相棒ヘッダー / 次に着る日の気温と目安 / 3案)。日付は選ばせず「次に着る日」を自動で決める
+//  (15時までは今日、以降は明日)。
 //  データは GET api/home/owned-first (手持ち起点の推薦) から取る。
 //   - 手持ちアイテムはクローゼットの実画像、コーデモデルは母集団 (Pinterest) の実画像
 //   - 相棒のひとこと・理由は Gemini 生成 (失敗時はサーバ側テンプレート)
@@ -220,7 +221,8 @@ struct RenewalLiveHomeView: View {
     var onOpenPhotoPicker: () -> Void
     var onOpenCalendar: () -> Void
 
-    @State private var scope: RenewalScope = .today
+    /// 次に着る日 (選択肢は出さない)
+    @State private var scope: RenewalScope = .next()
     @State private var detailRecipe: OwnedFirstRecipe?
     @State private var showPivot = false
     @State private var showDislike = false
@@ -234,16 +236,12 @@ struct RenewalLiveHomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 14) {
                 partnerHeader
-                scopeBar
-                if let climate = response?.climate {
-                    RenewalClimateRow(climate: climate)
-                }
+                nextWearRow
                 if let error = model.errors[scope] {
                     errorCard(error)
                 }
-                RenewalViewModeSwitcher(layoutRaw: $layoutRaw, visualRaw: $visualRaw)
                 if let response {
                     recipesView(response)
                     passButton
@@ -257,6 +255,10 @@ struct RenewalLiveHomeView: View {
         .refreshable { await model.load(scope, force: true) }
         .navigationTitle("ホーム")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Sandbox の見せ方切替はファーストビューを圧迫しないようナビバーのメニューに置く
+            ToolbarItem(placement: .topBarTrailing) { RenewalViewModeMenu(layoutRaw: $layoutRaw, visualRaw: $visualRaw) }
+        }
         .task(id: scope) {
             await model.load(scope)
             await model.pollExtractions(scope)
@@ -287,13 +289,8 @@ struct RenewalLiveHomeView: View {
     private var partnerHeader: some View {
         HStack(alignment: .top, spacing: 12) {
             Button(action: onOpenPartner) {
-                VStack(spacing: 4) {
-                    RenewalPartnerAvatar(typeName: partnerTypeName, size: 48)
-                    Text("相棒")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(RenewalTokens.muted)
-                }
-                .frame(minWidth: 52, minHeight: 64)
+                RenewalPartnerAvatar(typeName: partnerTypeName, size: 40)
+                    .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -306,9 +303,9 @@ struct RenewalLiveHomeView: View {
             VStack(alignment: .leading, spacing: 8) {
                 if let response {
                     Text(response.greeting)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(RenewalTokens.ink)
-                        .lineSpacing(3)
+                        .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
                     if store.showCharCount {
                         HStack(spacing: 6) {
@@ -337,7 +334,7 @@ struct RenewalLiveHomeView: View {
                         .redacted(reason: .placeholder)
                 }
             }
-            .padding(12)
+            .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .renewalCard()
         }
@@ -349,45 +346,39 @@ struct RenewalLiveHomeView: View {
         return store.typeName
     }
 
-    // MARK: ② 今日 / 明日 / 週末 + 気温
+    // MARK: ② 次に着る日 + 気温 + 服装の目安 (日付は選ばせない)
 
-    private var scopeBar: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 2) {
-                ForEach(RenewalScope.allCases) { s in
-                    Button {
-                        Haptic.selection()
-                        scope = s
-                    } label: {
-                        Text(s.label)
-                            .font(.system(size: 13, weight: scope == s ? .semibold : .regular))
-                            .foregroundStyle(scope == s ? .white : RenewalTokens.ink)
-                            .frame(minWidth: 44, minHeight: 32)
-                            .padding(.horizontal, 4)
-                            .background(scope == s ? RenewalTokens.primaryFill : Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.controlRadius))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(scope == s ? .isSelected : [])
-                }
-            }
-            .padding(2)
-            .background(RenewalTokens.surface)
-            .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.controlRadius + 2))
-            .overlay(RoundedRectangle(cornerRadius: RenewalTokens.controlRadius + 2).stroke(RenewalTokens.border, lineWidth: 1))
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: 5) {
-                Text(RenewalLiveHomeModel.dateLabel(scope))
+    private var nextWearRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(scope == .today ? "今日着るなら" : "明日着るなら")
                     .font(.system(size: 13, weight: .semibold))
+                Text(RenewalLiveHomeModel.dateLabel(scope))
+                    .font(.system(size: 13))
                 if let w = response?.weather {
                     Image(systemName: weatherSymbol(w.condition)).font(.system(size: 12))
                     Text("\(w.max_temp)℃ / \(w.min_temp)℃").font(.system(size: 13).monospacedDigit())
                 }
+                Spacer(minLength: 0)
             }
             .foregroundStyle(RenewalTokens.ink)
             .accessibilityElement(children: .combine)
+            if let climate = response?.climate {
+                HStack(spacing: 6) {
+                    Text(climate.label)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(RenewalTokens.ink)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .overlay(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius).stroke(RenewalTokens.controlBorder, lineWidth: 1))
+                    Text(climate.guidance)
+                        .font(.system(size: 12))
+                        .foregroundStyle(RenewalTokens.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                .accessibilityElement(children: .combine)
+            }
         }
         .padding(.horizontal, RenewalTokens.edge)
     }

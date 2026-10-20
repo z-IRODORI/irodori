@@ -410,6 +410,12 @@ enum RenewalScope: String, CaseIterable, Identifiable {
         case .weekend: return "週末"
         }
     }
+    /// 「次に着る日」。15時までは今日、それ以降は明日の服を提案する (選択肢は出さない)
+    static func next(now: Date = Date()) -> RenewalScope {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        return cal.component(.hour, from: now) < 15 ? .today : .tomorrow
+    }
     var actionLabel: String {
         switch self {
         case .today: return "今日着る"

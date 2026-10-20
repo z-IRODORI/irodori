@@ -63,77 +63,29 @@ struct RenewalRecipeActions {
     func isDecided(_ r: OwnedFirstRecipe) -> Bool { decidedId == r.recipe_id }
 }
 
-// MARK: - 切替バー (Sandbox 用)
+// MARK: - 切替メニュー (Sandbox 用)
 
-struct RenewalViewModeSwitcher: View {
+/// ナビバー右上の「表示の切替」メニュー (ファーストビューの縦幅を使わない)
+struct RenewalViewModeMenu: View {
     @Binding var layoutRaw: String
     @Binding var visualRaw: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            chipRow(title: "レイアウト", options: RenewalFirstViewLayout.allCases.map { ($0.rawValue, $0.label) }, selection: $layoutRaw)
-            chipRow(title: "見せ方", options: RenewalVisualMode.allCases.map { ($0.rawValue, $0.label) }, selection: $visualRaw)
-            Text((RenewalVisualMode(rawValue: visualRaw) ?? .photo).summary)
-                .font(.system(size: 11))
-                .foregroundStyle(RenewalTokens.muted)
-                .padding(.horizontal, RenewalTokens.edge)
-        }
-    }
-
-    private func chipRow(title: String, options: [(String, String)], selection: Binding<String>) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(RenewalTokens.muted)
-                    .frame(width: 56, alignment: .leading)
-                ForEach(options, id: \.0) { value, label in
-                    let on = value == selection.wrappedValue
-                    Button {
-                        Haptic.selection()
-                        selection.wrappedValue = value
-                    } label: {
-                        Text(label)
-                            .font(.system(size: 12, weight: on ? .semibold : .regular))
-                            .foregroundStyle(on ? .white : RenewalTokens.ink)
-                            .padding(.horizontal, 10)
-                            .frame(minHeight: 30)
-                            .background(on ? RenewalTokens.primaryFill : RenewalTokens.surface)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(on ? Color.clear : RenewalTokens.border, lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(on ? .isSelected : [])
-                }
+        Menu {
+            Picker("レイアウト", selection: $layoutRaw) {
+                ForEach(RenewalFirstViewLayout.allCases) { Text($0.label).tag($0.rawValue) }
             }
-            .padding(.horizontal, RenewalTokens.edge)
-        }
-    }
-}
-
-// MARK: - 気候の目安 (日付バーの下)
-
-struct RenewalClimateRow: View {
-    let climate: OwnedFirstClimate
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Text(climate.label)
-                .font(.system(size: 11, weight: .semibold))
+            .pickerStyle(.inline)
+            Picker("見せ方", selection: $visualRaw) {
+                ForEach(RenewalVisualMode.allCases) { Text($0.label).tag($0.rawValue) }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: "slider.horizontal.3")
                 .foregroundStyle(RenewalTokens.ink)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .overlay(RoundedRectangle(cornerRadius: RenewalTokens.chipRadius).stroke(RenewalTokens.controlBorder, lineWidth: 1))
-            Text(climate.guidance)
-                .font(.system(size: 12))
-                .foregroundStyle(RenewalTokens.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            Spacer(minLength: 0)
+                .frame(minWidth: 44, minHeight: 44)
         }
-        .padding(.horizontal, RenewalTokens.edge)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(climate.label)。服装の目安: \(climate.guidance)")
+        .accessibilityLabel("表示の切替")
     }
 }
 
@@ -551,28 +503,30 @@ struct RenewalListLayout: View {
         if isItemMode { itemRow(recipe, index: index) } else { photoRow(recipe, index: index) }
     }
 
-    /// 左: アイテムのボード (カード幅の約57%) / 右: 理由・コーデモデル・決定
+    /// 左: アイテムのボード (カード幅の約58%・タグはボード左上) / 右: 状態・コーデモデル・理由・決定
     private func itemRow(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Button { actions.onDetail(recipe) } label: {
-                RenewalRecipeVisual(recipe: recipe, actions: actions, height: 248)
+                RenewalRecipeVisual(recipe: recipe, actions: actions, height: 212)
+                    .overlay(alignment: .topLeading) {
+                        HStack(spacing: 4) {
+                            if index == 0 { PickTag() }
+                            if recipe.isDiscovery { DiscoveryTag().background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: RenewalTokens.chipRadius)) }
+                        }
+                        .padding(2)
+                    }
                     .containerRelativeFrame(.horizontal) { w, _ in (w - edge * 2 - 20) * 0.58 }
             }
             .buttonStyle(.plain)
             .accessibilityLabel("案\(index + 1)。タップで詳細")
 
             VStack(alignment: .leading, spacing: 6) {
-                if index == 0 || recipe.isDiscovery {
-                    HStack(spacing: 4) {
-                        if index == 0 { PickTag() }
-                        if recipe.isDiscovery { DiscoveryTag() }
-                    }
-                }
                 Text(statusText(recipe, actions))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(RenewalTokens.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
+                RenewalCoordeModelChip(example: recipe.example, height: 64) { actions.onDetail(recipe) }
                 Text(recipe.reason)
                     .font(.system(size: 12))
                     .foregroundStyle(RenewalTokens.ink)
@@ -582,7 +536,6 @@ struct RenewalListLayout: View {
                 if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
                 if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w).lineLimit(2) }
                 Spacer(minLength: 0)
-                RenewalCoordeModelChip(example: recipe.example) { actions.onDetail(recipe) }
                 CompactDecideButton(recipe: recipe, actions: actions, fullWidth: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
