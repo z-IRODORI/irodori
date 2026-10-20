@@ -496,7 +496,7 @@ struct RenewalListLayout: View {
     private var edge: CGFloat { isItemMode ? 16 : RenewalTokens.edge }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
             ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                 row(recipe, index: index)
             }
@@ -513,7 +513,7 @@ struct RenewalListLayout: View {
 
     /// 上: 見出し (左上・大きめ) / 左: アイテムのボード (カード幅の約58%) / 右: 状態・説明 (控えめ)・コーデモデル・決定
     private func itemRow(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(recipe.displayTitle)
                     .font(.system(size: 18, weight: .bold))
@@ -527,7 +527,7 @@ struct RenewalListLayout: View {
             HStack(alignment: .top, spacing: 10) {
                 Button { actions.onDetail(recipe) } label: {
                     RenewalRecipeVisual(recipe: recipe, actions: actions, height: 184)
-                        .containerRelativeFrame(.horizontal) { w, _ in (w - edge * 2 - 20) * 0.58 }
+                        .containerRelativeFrame(.horizontal) { w, _ in (w - edge * 2 - 32) * 0.58 }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("案\(index + 1)。タップで詳細")
@@ -559,8 +559,9 @@ struct RenewalListLayout: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
         .renewalCard()
     }
 

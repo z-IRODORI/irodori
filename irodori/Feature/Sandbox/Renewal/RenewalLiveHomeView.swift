@@ -301,10 +301,10 @@ struct RenewalLiveHomeView: View {
 
     // MARK: ① 相棒ヘッダー
 
-    /// 相棒のアバターと、吹き出しの枠を持たないひとこと。日付と気温は名前の横に小さく添える
-    /// (枠・チップを減らしてシンプルにし、「相棒が話しかけている」ことだけを残す)
+    /// 相棒がコメントしている形: アバター + (名前と日付・気温) + しっぽ付きの吹き出し。
+    /// 吹き出しの中は余白と行間を広めに取り、窮屈に見せない
     private var partnerHeader: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 10) {
             Button(action: onOpenPartner) {
                 RenewalPartnerAvatar(typeName: partnerTypeName, size: 48)
                     .frame(minWidth: 48, minHeight: 48)
@@ -317,33 +317,43 @@ struct RenewalLiveHomeView: View {
             })
             .accessibilityLabel("相棒画面を開く")
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 6) {
                 nextWearMeta
-                if let response {
-                    Text(response.greeting)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(RenewalTokens.ink)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if host.showCharCount {
-                        HStack(spacing: 6) {
-                            RenewalCharCountBadge(text: response.greeting)
-                            Text("\(response.daily_angle_label) ・ \(response.text_source == "gemini" ? "Gemini" : "テンプレート")")
-                                .font(.system(size: 11))
-                                .foregroundStyle(RenewalTokens.muted)
+                    .padding(.leading, 10)
+                VStack(alignment: .leading, spacing: 8) {
+                    if let response {
+                        Text(response.greeting)
+                            .font(.system(size: 15, weight: .regular))
+                            .foregroundStyle(RenewalTokens.ink)
+                            .lineSpacing(6)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if host.showCharCount {
+                            HStack(spacing: 6) {
+                                RenewalCharCountBadge(text: response.greeting)
+                                Text("\(response.daily_angle_label) ・ \(response.text_source == "gemini" ? "Gemini" : "テンプレート")")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(RenewalTokens.muted)
+                            }
                         }
+                    } else {
+                        Text("相棒があなたの手持ち服から3案を組んでいます…")
+                            .font(.system(size: 15))
+                            .foregroundStyle(RenewalTokens.muted)
+                            .redacted(reason: .placeholder)
                     }
-                } else {
-                    Text("相棒があなたの手持ち服から3案を組んでいます…")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(RenewalTokens.muted)
-                        .redacted(reason: .placeholder)
                 }
+                .padding(.vertical, 14)
+                .padding(.leading, 24)   // しっぽの分
+                .padding(.trailing, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RenewalSpeechBubble().fill(RenewalTokens.surface))
+                .overlay(RenewalSpeechBubble().stroke(RenewalTokens.border, lineWidth: 1))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, RenewalTokens.edge)
-        .padding(.top, 4)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
     }
 
     /// 「明日 10/21(水) ・ 29° / 20°」(季節ラベルはテキストだけで添える)
@@ -660,6 +670,26 @@ private struct SandboxNavigation: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// 左上にしっぽが付いた吹き出し (しっぽは相棒のアバターの方を向く)
+struct RenewalSpeechBubble: Shape {
+    var radius: CGFloat = 16
+    var tailWidth: CGFloat = 10
+    var tailTop: CGFloat = 10
+    var tailHeight: CGFloat = 16
+
+    func path(in rect: CGRect) -> Path {
+        let body = CGRect(x: rect.minX + tailWidth, y: rect.minY, width: rect.width - tailWidth, height: rect.height)
+        var p = Path(roundedRect: body, cornerRadius: radius)
+        var tail = Path()
+        tail.move(to: CGPoint(x: body.minX + 1, y: body.minY + tailTop))
+        tail.addLine(to: CGPoint(x: rect.minX, y: body.minY + tailTop))
+        tail.addLine(to: CGPoint(x: body.minX + 1, y: body.minY + tailTop + tailHeight))
+        tail.closeSubpath()
+        p.addPath(tail)
+        return p.normalized()
     }
 }
 
