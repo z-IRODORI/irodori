@@ -297,14 +297,14 @@ struct RenewalFlatLayBoard: View {
             let shoes = pieces.first { $0.slot == "shoes" }
             ZStack(alignment: .topLeading) {
                 if let outer {
-                    piece(outer).frame(width: w * 0.46, height: h * 0.62).position(x: w * 0.25, y: h * 0.33)
-                    if let top { piece(top).frame(width: w * 0.48, height: h * 0.44).position(x: w * 0.74, y: h * 0.24) }
-                    if let bottom { piece(bottom).frame(width: w * 0.42, height: h * 0.52).position(x: w * 0.74, y: h * 0.73) }
-                    if let shoes { piece(shoes).frame(width: w * 0.40, height: h * 0.30).position(x: w * 0.25, y: h * 0.83) }
+                    piece(outer).frame(width: w * 0.52, height: h * 0.64).position(x: w * 0.27, y: h * 0.33)
+                    if let top { piece(top).frame(width: w * 0.50, height: h * 0.46).position(x: w * 0.75, y: h * 0.24) }
+                    if let bottom { piece(bottom).frame(width: w * 0.48, height: h * 0.54).position(x: w * 0.75, y: h * 0.73) }
+                    if let shoes { piece(shoes).frame(width: w * 0.46, height: h * 0.30).position(x: w * 0.26, y: h * 0.84) }
                 } else {
-                    if let top { piece(top).frame(width: w * 0.56, height: h * 0.50).position(x: w * 0.31, y: h * 0.28) }
-                    if let bottom { piece(bottom).frame(width: w * 0.42, height: h * 0.80).position(x: w * 0.76, y: h * 0.48) }
-                    if let shoes { piece(shoes).frame(width: w * 0.44, height: h * 0.32).position(x: w * 0.28, y: h * 0.80) }
+                    if let top { piece(top).frame(width: w * 0.62, height: h * 0.56).position(x: w * 0.33, y: h * 0.29) }
+                    if let bottom { piece(bottom).frame(width: w * 0.46, height: h * 0.86).position(x: w * 0.76, y: h * 0.50) }
+                    if let shoes { piece(shoes).frame(width: w * 0.50, height: h * 0.34).position(x: w * 0.29, y: h * 0.81) }
                 }
             }
         }
@@ -324,7 +324,7 @@ struct RenewalFlatLayBoard: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(3)
+                    .padding(1)
             } else {
                 VStack(spacing: 2) {
                     Image(systemName: p.slot == "tops" ? "tshirt" : (p.slot == "shoes" ? "shoe" : "hanger"))
@@ -428,8 +428,8 @@ struct RenewalListLayout: View {
     private func row(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Button { actions.onDetail(recipe) } label: {
-                RenewalRecipeVisual(recipe: recipe, actions: actions, height: isItemMode ? 136 : 112)
-                    .frame(width: isItemMode ? 124 : 84)
+                RenewalRecipeVisual(recipe: recipe, actions: actions, height: isItemMode ? 196 : 112)
+                    .frame(width: isItemMode ? 164 : 84)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("案\(index + 1)。タップで詳細")
@@ -490,7 +490,7 @@ struct RenewalPeekLayout: View {
     private func card(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Button { actions.onDetail(recipe) } label: {
-                RenewalRecipeVisual(recipe: recipe, actions: actions, height: 210)
+                RenewalRecipeVisual(recipe: recipe, actions: actions, height: actions.visualMode == .photo ? 210 : 240)
             }
             .buttonStyle(.plain)
             HStack(spacing: 4) {
