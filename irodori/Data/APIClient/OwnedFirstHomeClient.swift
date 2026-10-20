@@ -82,9 +82,12 @@ struct OwnedFirstRecipe: Codable, Hashable, Identifiable {
     let missing_items: [OwnedFirstMissingItem]
     let example: OwnedFirstExample?
     let reason: String
+    /// カードの見出し (目を引く短いコピー)。古いサーバでは nil
+    let title: String?
     let climate_warnings: [String]?
 
     var id: String { recipe_id }
+    var displayTitle: String { (title?.isEmpty == false ? title : nil) ?? status_label }
     var isDiscovery: Bool { kind == "discovery" }
 }
 
