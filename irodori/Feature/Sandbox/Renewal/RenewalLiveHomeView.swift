@@ -60,6 +60,8 @@ final class RenewalLiveHomeModel {
     private(set) var extractions: [String: OwnedFirstExtraction] = [:]
     var sendoff: Sendoff?
     var isSending = false
+    /// 案ごとのフィードバック (recipe_id → 状態)。案が入れ替われば使われなくなる
+    var reactions: [String: RenewalRecipeReaction] = [:]
 
     let source: RenewalHomeDataSource
     private let client: OwnedFirstHomeClientProtocol
@@ -111,6 +113,32 @@ final class RenewalLiveHomeModel {
     }
 
     func pivotItemId(_ scope: RenewalScope) -> String? { pivots[scope] }
+
+    /// 案ごとの「いいね」。相棒の返事をその案のカードに出す (案は入れ替えない)
+    func like(_ recipe: OwnedFirstRecipe, scope: RenewalScope) async {
+        reactions[recipe.recipe_id] = .sending
+        Haptic.impact(.soft)
+        do {
+            if case .success(let res) = try await client.feedback(uid: uid, targetDate: Self.isoDate(scope), reason: "like", recipes: [recipe]) {
+                reactions[recipe.recipe_id] = .liked(res.ack_message)
+                return
+            }
+        } catch {}
+        reactions[recipe.recipe_id] = .failed
+    }
+
+    /// 案ごとの見送り。理由を相棒に伝え、その案だけ見送り済みにする (ほかの案はそのまま)
+    func dislike(_ recipe: OwnedFirstRecipe, reason: RenewalDislikeReason, scope: RenewalScope) async {
+        reactions[recipe.recipe_id] = .sending
+        Haptic.impact(.soft)
+        do {
+            if case .success(let res) = try await client.feedback(uid: uid, targetDate: Self.isoDate(scope), reason: reason.rawValue, recipes: [recipe]) {
+                reactions[recipe.recipe_id] = .disliked(reason, res.ack_message)
+                return
+            }
+        } catch {}
+        reactions[recipe.recipe_id] = .failed
+    }
 
     func load(_ scope: RenewalScope, force: Bool = false) async {
         guard force || responses[scope] == nil, !loading.contains(scope) else { return }
@@ -531,7 +559,11 @@ struct RenewalLiveHomeView: View {
             extraction: { model.extraction(for: $0) },
             onDetail: { detailRecipe = $0 },
             onDecide: { recipe in Task { await model.decide(recipe, scope: scope) } },
-            onPivot: { showPivot = true }
+            onPivot: { showPivot = true },
+            partnerTypeName: partnerTypeName,
+            reaction: { model.reactions[$0.recipe_id] },
+            onLike: { recipe in Task { await model.like(recipe, scope: scope) } },
+            onDislike: { recipe, reason in Task { await model.dislike(recipe, reason: reason, scope: scope) } }
         )
         Group {
             switch layout {

@@ -59,6 +59,11 @@ struct RenewalRecipeActions {
     let onDetail: (OwnedFirstRecipe) -> Void
     let onDecide: (OwnedFirstRecipe) -> Void
     let onPivot: () -> Void
+    /// 案ごとのフィードバック (相棒に返す)。nil の画面では行を出さない
+    var partnerTypeName: String = ""
+    var reaction: (OwnedFirstRecipe) -> RenewalRecipeReaction? = { _ in nil }
+    var onLike: ((OwnedFirstRecipe) -> Void)? = nil
+    var onDislike: ((OwnedFirstRecipe, RenewalDislikeReason) -> Void)? = nil
 
     func isDecided(_ r: OwnedFirstRecipe) -> Bool { decidedId == r.recipe_id }
 }
@@ -695,6 +700,17 @@ struct RenewalListLayout: View {
                     CompactDecideButton(recipe: recipe, actions: actions, fullWidth: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            // 見送った案は薄くして、相棒の返事だけをはっきり見せる
+            .opacity(actions.reaction(recipe)?.isDisliked == true ? 0.4 : 1)
+            if let onLike = actions.onLike, let onDislike = actions.onDislike {
+                Rectangle().fill(RenewalTokens.rule).frame(height: 1)
+                RenewalRecipeFeedbackRow(
+                    typeName: actions.partnerTypeName,
+                    reaction: actions.reaction(recipe),
+                    onLike: { onLike(recipe) },
+                    onDislike: { onDislike(recipe, $0) }
+                )
             }
         }
         .padding(.horizontal, 16)

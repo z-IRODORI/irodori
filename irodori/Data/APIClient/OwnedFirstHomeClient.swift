@@ -152,6 +152,7 @@ struct OwnedFirstFeedbackResponse: Codable {
 protocol OwnedFirstHomeClientProtocol {
     func get(uid: String, gender: String, targetDate: String, pivotItemId: String?) async throws -> Result<OwnedFirstHomeResponse, HTTPError>
     func wear(uid: String, recipe: OwnedFirstRecipe, targetDate: String, maxTemp: Int?) async throws -> Result<OwnedFirstWearResponse, HTTPError>
+    /// reason: like (案ごとのいいね) | cold | color | style | mood (見送り)。recipes が1件なら案ごと
     func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe]) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError>
     func examples(uid: String, poolIds: [String]) async throws -> Result<OwnedFirstExamplesResponse, HTTPError>
 }
@@ -181,6 +182,9 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
         let reason: String
         let recipe_ids: [String]
         let families: [String]
+        /// 案ごとのフィードバックのとき、相棒が覚えておく案の名前と服
+        let title: String
+        let item_ids: [String]
     }
 
     func get(uid: String, gender: String, targetDate: String, pivotItemId: String?) async throws -> Result<OwnedFirstHomeResponse, HTTPError> {
@@ -219,12 +223,15 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
         return try await post(path: "api/home/owned-first/wear", uid: uid, body: body)
     }
 
+    /// reason: like (案ごとのいいね) | cold | color | style | mood (見送り)。recipes が1件なら案ごと
     func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe]) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError> {
         let body = FeedbackBody(
             target_date: targetDate,
             reason: reason,
             recipe_ids: recipes.map(\.recipe_id),
-            families: Array(Set(recipes.map(\.main_family)))
+            families: Array(Set(recipes.map(\.main_family))),
+            title: recipes.count == 1 ? recipes[0].displayTitle : "",
+            item_ids: recipes.count == 1 ? recipes[0].owned_items.map(\.item_id) : []
         )
         return try await post(path: "api/home/owned-first/feedback", uid: uid, body: body)
     }
