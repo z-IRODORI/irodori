@@ -17,12 +17,19 @@ struct RenewalPartnerAvatar: View {
     /// 誕生前の「無色の相棒」
     var colorless: Bool = false
 
+    /// タイプ名がまだ届いていない (起動直後) ときは、前回端末に保存した相棒のアイコンを使う
+    private var cachedIcon: String? {
+        UserDefaults.standard.string(forKey: UserDefaultsKey.partnerIconImage.rawValue)
+    }
+
     var body: some View {
         Group {
-            if UIImage(named: "\(typeName)_icon") != nil {
+            if !typeName.isEmpty, UIImage(named: "\(typeName)_icon") != nil {
                 Image("\(typeName)_icon").resizable().scaledToFill()
-            } else if UIImage(named: typeName) != nil {
+            } else if !typeName.isEmpty, UIImage(named: typeName) != nil {
                 Image(typeName).resizable().scaledToFill()
+            } else if let icon = cachedIcon, UIImage(named: icon) != nil {
+                Image(icon).resizable().scaledToFill()
             } else {
                 Image(systemName: "person.crop.circle.fill")
                     .resizable()

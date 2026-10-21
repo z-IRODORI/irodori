@@ -201,7 +201,11 @@ final class RenewalLiveHomeModel {
         defer { isSending = false }
         let maxTemp = responses[scope]?.weather.max_temp
         do {
-            switch try await client.wear(uid: uid, recipe: recipe, targetDate: Self.isoDate(scope), maxTemp: maxTemp) {
+            // カレンダーにはボードに並んでいた服 (コーデモデルの写真ではなく) を残す
+            let pieces = RenewalFlatLayBuilder.boardPieces(recipe, extraction: extraction(for: recipe), mode: .exampleItems)
+                .map { OwnedFirstBoardPiece(slot: $0.slot, image_url: $0.imageURL, label: $0.label,
+                                            owned: $0.kind == .owned || $0.ownedMatch) }
+            switch try await client.wear(uid: uid, recipe: recipe, targetDate: Self.isoDate(scope), maxTemp: maxTemp, pieces: pieces) {
             case .success(let res):
                 Haptic.notify(.success)
                 sendoff = Sendoff(message: res.sendoff_message, dateLabel: Self.dateLabel(scope))
@@ -304,22 +308,28 @@ struct RenewalLiveHomeView: View {
                 if let error = model.errors[scope] {
                     errorCard(error)
                 }
+                if let decided = response?.decided_recipe,
+                   !(response?.recipes.contains { $0.recipe_id == decided.recipe_id } ?? false) {
+                    decidedCard(decided)
+                }
                 if let response {
                     recipesView(response)
+                        .overlay(alignment: .top) {
+                            // 組み直し中: 案の上に出す (主役の服の列は隠さない)
+                            if model.loading.contains(scope) { loadingSquare.padding(.top, 48) }
+                        }
                     partnerFollowUp
                 } else if model.loading.contains(scope) {
                     loadingCard
                 }
-                if let footer {
+                // 案がそろってから出す (読み込み中に先に見えて、後から押し下げられないように)
+                if let footer, response != nil {
                     footer.padding(.top, 10)
                 }
             }
             .padding(.vertical, 12)
         }
         .background(RenewalTokens.ground)
-        .overlay {
-            if model.loading.contains(scope) { loadingSquare }
-        }
         .overlay {
             GeometryReader { geo in
                 let g = geo.frame(in: .global)
@@ -354,7 +364,7 @@ struct RenewalLiveHomeView: View {
         }
         .sheet(isPresented: $showDislike) {
             dislikeSheet
-                .presentationDetents([.height(320)])
+                .presentationDetents([.height(230)])
                 .presentationDragIndicator(.visible)
         }
         .overlay {
@@ -581,13 +591,8 @@ struct RenewalLiveHomeView: View {
         }
     }
 
-    private var followUpMessage: String {
-        if let id = model.pivotItemId(scope),
-           let item = response?.closet_items.first(where: { $0.item_id == id }) {
-            return "\(item.label)を主役に組み直したよ。ピンとこなかったら教えてね"
-        }
-        return "ピンとこなかったら教えてね"
-    }
+    /// 主役を選んだことは相棒カードが伝えるので、ここは短く1行にする
+    private var followUpMessage: String { "3案ともピンとこなかったら教えてね" }
 
     private var pivotLabel: String {
         if let id = model.pivotItemId(scope),
@@ -600,8 +605,59 @@ struct RenewalLiveHomeView: View {
     // MARK: 状態表示
 
     /// 初回の読み込み中は案の場所だけ空けておく (ローディングは画面中央の正方形)
+    /// 初回の読み込み中: 案3枚分の場所をスケルトンで取り、真ん中に相棒の正方形を置く
     private var loadingCard: some View {
-        Color.clear.frame(height: 320)
+        VStack(spacing: 14) {
+            ForEach(0..<2, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(RenewalTokens.surface)
+                    .frame(height: 300)
+                    .overlay(alignment: .topLeading) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            RoundedRectangle(cornerRadius: 4).fill(RenewalTokens.raised).frame(width: 180, height: 18)
+                            RoundedRectangle(cornerRadius: 12).fill(RenewalTokens.raised).frame(height: 184)
+                        }
+                        .padding(16)
+                    }
+            }
+        }
+        .padding(.horizontal, 16)
+        .overlay(alignment: .top) { loadingSquare.padding(.top, 70) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("相棒がコーデを組んでいます")
+    }
+
+    /// その日に「着る」と決めた案。案が入れ替わっても、決めたものを一番上に出し続ける
+    private func decidedCard(_ d: OwnedFirstDecidedRecipe) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            Group {
+                if let s = d.board_image_url, let url = URL(string: s) {
+                    KFImage(url).placeholder { RenewalShimmer() }.resizable().scaledToFit()
+                } else {
+                    Image(systemName: "hanger").font(.system(size: 26)).foregroundStyle(RenewalTokens.muted)
+                }
+            }
+            .frame(width: 88, height: 110)
+            .background(RenewalTokens.raised, in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 4) {
+                Label("\(scope == .today ? "今日" : "明日")はこれに決めています", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(RenewalTokens.ink)
+                Text(d.title ?? d.pair_text ?? "決めたコーデ")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .lineLimit(2)
+                Text("下の案から選び直すこともできます")
+                    .font(.system(size: 11))
+                    .foregroundStyle(RenewalTokens.muted)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(RenewalTokens.ink, lineWidth: 1.5))
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .combine)
     }
 
     /// 画面中央に出す正方形のローディング (初回の読み込みと、主役の服で組み直す間)
@@ -647,7 +703,7 @@ struct RenewalLiveHomeView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(RenewalTokens.ink)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("理由を選ぶと次から外すよ")
+                Text("1案だけなら各カードの「ちょっと違う」へ")
                     .font(.system(size: 11))
                     .foregroundStyle(RenewalTokens.muted)
                     .lineLimit(1)
@@ -658,7 +714,7 @@ struct RenewalLiveHomeView: View {
                 Haptic.impact(.soft)
                 showDislike = true
             } label: {
-                Text("どれも違うかも")
+                Text("3案とも違う")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(RenewalTokens.ink)
                     .lineLimit(1)
@@ -694,16 +750,21 @@ struct RenewalLiveHomeView: View {
         .padding(.horizontal, RenewalTokens.edge)
     }
 
+    /// 3案まとめての見送り。理由の選び方はカードの「ちょっと違う」と同じ2列のチップ
     private var dislikeSheet: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 10) {
                 RenewalPartnerAvatar(typeName: partnerTypeName, size: 36)
-                Text("どこが違った？ひとつだけ教えてくれたら、次の提案から外すね。")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(RenewalTokens.ink)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("3案とも違ったんだね。どこが違った？")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(RenewalTokens.ink)
+                    Text("ひとつ選ぶと、次の提案から外すよ")
+                        .font(.system(size: 12))
+                        .foregroundStyle(RenewalTokens.muted)
+                }
             }
-            VStack(spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 ForEach(RenewalDislikeReason.allCases) { reason in
                     Button {
                         showDislike = false
@@ -713,15 +774,15 @@ struct RenewalLiveHomeView: View {
                             }
                         }
                     } label: {
-                        HStack {
-                            Text(reason.label).font(.system(size: 14, weight: .medium))
-                            Spacer()
-                        }
-                        .foregroundStyle(RenewalTokens.ink)
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 44)
-                        .renewalCard()
-                        .contentShape(Rectangle())
+                        Text(reason.label)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(RenewalTokens.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(RenewalTokens.surface, in: Capsule())
+                            .overlay(Capsule().stroke(RenewalTokens.controlBorder, lineWidth: 1))
+                            .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -874,17 +935,18 @@ struct RenewalLiveRecipeDetailView: View {
 
     /// アイテムを並べる見せ方では Pinterest の写真を出さず、並べたアイテムを大きく見せる
     private var isItemMode: Bool { visualMode != .photo }
+    @State private var searchQuery: SimilarSearch?
+    @State private var zoomModel = false
+
+    private var pieces: [RenewalFlatPiece] {
+        RenewalFlatLayBuilder.boardPieces(recipe, extraction: model.extraction(for: recipe), mode: visualMode)
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     if isItemMode {
-                        let extraction = model.extraction(for: recipe)
-                        let modelPieces = visualMode == .exampleItems
-                            ? RenewalFlatLayBuilder.exampleItems(recipe, extraction: extraction) : []
-                        let pieces = modelPieces.isEmpty
-                            ? RenewalFlatLayBuilder.ownedPlusExample(recipe, extraction: extraction) : modelPieces
                         RenewalFlatLayBoard(pieces: pieces, showsExampleTag: visualMode == .ownedPlusExample, height: 380)
                     } else {
                         RenewalRemoteExampleImage(example: recipe.example, height: 380)
@@ -905,56 +967,24 @@ struct RenewalLiveRecipeDetailView: View {
                             .foregroundStyle(RenewalTokens.ink)
                             .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
-                        coordeModelSection
                     }
                     ForEach(recipe.climate_warnings ?? [], id: \.self) { w in
                         Label(w, systemImage: "thermometer.medium")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Color(red: 0.70, green: 0.33, blue: 0.04))
                     }
-                    if let e = model.extraction(for: recipe), !e.items.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            RenewalSectionTitle(title: "コーデモデルのアイテム",
-                                                caption: e.isInProgress ? "商品画像を用意中…" : "コーデモデルのアイテム (アイテムカタログ)")
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(alignment: .top, spacing: 10) {
-                                    ForEach(e.items) { it in
-                                        VStack(spacing: 4) {
-                                            RenewalRemoteItemTile(label: it.label, imageURL: it.displayURL, slot: it.slot, size: 76,
-                                                                  owned: it.owned_item_id != nil, showName: false)
-                                            Text(it.label)
-                                                .font(.system(size: 10))
-                                                .foregroundStyle(RenewalTokens.ink)
-                                                .lineLimit(2)
-                                                .frame(width: 84)
-                                            if it.owned_item_id != nil {
-                                                Text("手持ちにあり")
-                                                    .font(.system(size: 9, weight: .semibold))
-                                                    .foregroundStyle(.white)
-                                                    .padding(.horizontal, 4)
-                                                    .background(RenewalTokens.owned)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 3))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    // ボードと同じ服・同じ数で並べる (カードの「手持ち◯点 ＋ 買い足す◯点」と一致させる)
                     VStack(alignment: .leading, spacing: 0) {
-                        RenewalSectionTitle(title: "このコーデで使う服", caption: recipe.status_label)
+                        RenewalSectionTitle(title: "このコーデで使う服", caption: RenewalFlatLayBuilder.summary(pieces))
                             .padding(14)
                         Divider().overlay(RenewalTokens.rule)
-                        ForEach(recipe.owned_items) { item in
-                            row(label: item.label, imageURL: item.image_url, slot: item.slot, owned: true)
-                            Divider().overlay(RenewalTokens.rule)
-                        }
-                        ForEach(recipe.missing_items) { m in
-                            row(label: m.label, imageURL: nil, slot: m.slot, owned: false)
+                        ForEach(pieces) { p in
+                            row(p)
                             Divider().overlay(RenewalTokens.rule)
                         }
                     }
                     .renewalCard()
+                    if isItemMode { coordeModelSection }
 
                     Button(scope.actionLabel) {
                         Task { await model.decide(recipe, scope: scope) }
@@ -969,9 +999,12 @@ struct RenewalLiveRecipeDetailView: View {
             .navigationTitle("コーデの詳細")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("閉じる") { dismiss() }.foregroundStyle(RenewalTokens.ink)
                 }
+            }
+            .navigationDestination(item: $searchQuery) { q in
+                KeywordItemSearchView(initialQuery: q.query)
             }
         }
     }
@@ -992,25 +1025,27 @@ struct RenewalLiveRecipeDetailView: View {
                                 .foregroundStyle(RenewalTokens.ink)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        if let e = model.extraction(for: recipe), !e.items.isEmpty {
-                            let owned = e.items.filter { $0.owned_item_id != nil }.count
-                            Text("このモデルのアイテムのうち \(owned)/\(e.items.count) 点が手持ちにあります")
-                                .font(.system(size: 12))
-                                .foregroundStyle(RenewalTokens.muted)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        Text("写真をタップすると大きく見られます")
+                            .font(.system(size: 12))
+                            .foregroundStyle(RenewalTokens.muted)
                     }
                     Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { zoomModel = true }
+                .fullScreenCover(isPresented: $zoomModel) {
+                    RenewalModelPhotoViewer(example: example)
                 }
             }
         }
     }
 
-    private func row(label: String, imageURL: String?, slot: String, owned: Bool) -> some View {
-        HStack(spacing: 12) {
-            RenewalRemoteItemTile(label: label, imageURL: imageURL, slot: slot, size: 48, owned: owned, showName: false)
+    private func row(_ p: RenewalFlatPiece) -> some View {
+        let owned = p.kind == .owned || p.ownedMatch
+        return HStack(spacing: 12) {
+            RenewalRemoteItemTile(label: p.label, imageURL: p.imageURL, slot: p.slot, size: 48, owned: owned, showName: false)
             VStack(alignment: .leading, spacing: 3) {
-                Text(label).font(.system(size: 14, weight: .semibold)).foregroundStyle(RenewalTokens.ink)
+                Text(p.label).font(.system(size: 14, weight: .semibold)).foregroundStyle(RenewalTokens.ink)
                 Text(owned ? "手持ち" : "まだ持っていない")
                     .font(.system(size: 12))
                     .foregroundStyle(RenewalTokens.muted)
@@ -1020,10 +1055,57 @@ struct RenewalLiveRecipeDetailView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(RenewalTokens.owned)
                     .accessibilityLabel("手持ち")
+            } else {
+                Button {
+                    searchQuery = SimilarSearch(query: p.label)
+                } label: {
+                    Text("似たアイテム")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(RenewalTokens.ink)
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .overlay(Capsule().stroke(RenewalTokens.controlBorder, lineWidth: 1))
+                        .contentShape(Rectangle().inset(by: -8))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(p.label)に似たアイテムを探す")
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+
+}
+
+/// 似たアイテムを探すときの検索語
+struct SimilarSearch: Identifiable, Hashable {
+    let query: String
+    var id: String { query }
+}
+
+/// コーデモデルの写真を全画面で見る
+struct RenewalModelPhotoViewer: View {
+    let example: OwnedFirstExample
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            if let s = example.image_url, let url = URL(string: s) {
+                KFImage(url).resizable().scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.white.opacity(0.18), in: Circle())
+            }
+            .padding(16)
+            .accessibilityLabel("閉じる")
+        }
+        .onTapGesture { dismiss() }
     }
 }
 

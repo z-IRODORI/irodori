@@ -524,7 +524,9 @@ struct PartnerExpEvent: Decodable, Hashable {
     let label: String
     let exp: Int
     let at: String
-    let kind: String?           // coordinate | partner（活動ログの種別）
+    let kind: String?           // coordinate | partner | like | dislike（活動ログの種別）
+    /// 同じ日に同じ行動が続いたときの回数 (サーバで1行にまとめたもの)
+    var count: Int? = nil
 }
 
 struct PartnerGrowthResponse: Decodable, Hashable {

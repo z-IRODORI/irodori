@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var showFullBodyPickerSheet = false
     @State private var showStandardItemPickerSheet = false
     @State private var showTasteVoteSheet = false
+    @State private var showItemReplaceSheet = false
     /// 手持ち起点ホームの3案 (本番 API)
     @State private var ownedFirstModel = RenewalLiveHomeModel(source: .render)
     #if DEBUG
@@ -128,6 +129,12 @@ struct HomeView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showItemReplaceSheet, onDismiss: { Task { await viewModel.onAppearOwnedFirst() } }) {
+            ItemImageReplaceListView(
+                items: viewModel.closetItems.filter(\.isPhotoCropImage),
+                onReplaced: { _, _ in }
+            )
         }
         .sheet(isPresented: $showTasteVoteSheet, onDismiss: {
             Task {
@@ -284,11 +291,14 @@ struct HomeView: View {
         PartnerGrowthCard(
             typeName: ownedFirstModel.responses.values.first?.partner_type_name ?? viewModel.partnerHome?.type_name ?? "",
             closetCount: viewModel.closetItems.count,
+            understandingPct: viewModel.partnerHome?.state.understanding_pct,
+            roughImageCount: viewModel.closetItems.filter(\.isPhotoCropImage).count,
             onTapFullBody: { showFullBodyPickerSheet = true },
             onTapStandardItems: { showStandardItemPickerSheet = true },
-            onTapTasteVote: { showTasteVoteSheet = true }
+            onTapTasteVote: { showTasteVoteSheet = true },
+            onTapCleanImages: { showItemReplaceSheet = true }
         )
-        .padding(.horizontal, RenewalTokens.edge)
+        .padding(.horizontal, 16)
         .padding(.bottom, 32)
     }
 

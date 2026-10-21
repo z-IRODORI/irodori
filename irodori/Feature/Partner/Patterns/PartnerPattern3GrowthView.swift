@@ -259,21 +259,42 @@ struct PartnerPattern3GrowthView: View {
     // ふたりのきろくの1行（活動ログ。exp は出さず、種別アイコンで表す）
     private func eventRow(_ event: PartnerExpEvent) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: event.kind == "coordinate" ? "tshirt.fill" : "checkmark.circle.fill")
+            Image(systemName: Self.eventIcon(event.kind))
                 .font(.system(size: 12))
                 .foregroundColor(.black.opacity(0.75))
+                .frame(width: 16)
 
-            Text(event.label)
+            Text(event.label + ((event.count ?? 1) > 1 ? " ×\(event.count ?? 1)" : ""))
                 .font(.system(size: 13))
                 .foregroundColor(.black)
                 .lineLimit(2)
 
             Spacer(minLength: 0)
+
+            Text(Self.eventDate(event.at))
+                .font(.system(size: 11).monospacedDigit())
+                .foregroundColor(.gray)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(Color.gray.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private static func eventIcon(_ kind: String?) -> String {
+        switch kind {
+        case "coordinate": return "tshirt.fill"
+        case "like": return "heart.fill"
+        case "dislike": return "hand.raised.fill"
+        default: return "checkmark.circle.fill"
+        }
+    }
+
+    /// 「10/21」(ISO 8601 の先頭10文字から)
+    private static func eventDate(_ at: String) -> String {
+        let day = at.prefix(10).split(separator: "-")
+        guard day.count == 3, let m = Int(day[1]), let d = Int(day[2]) else { return "" }
+        return "\(m)/\(d)"
     }
 
     // 全件をスクロールで見るシート

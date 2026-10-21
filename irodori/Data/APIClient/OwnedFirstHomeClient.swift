@@ -124,10 +124,31 @@ struct OwnedFirstHomeResponse: Codable, Hashable {
     let hero_item_id: String?
     let pivot_item_id: String?
     let decided_recipe_id: String?
+    /// その日に「着る」と決めた案 (決めたときのまま)。案が入れ替わっても上に出し続ける
+    let decided_recipe: OwnedFirstDecidedRecipe?
     let text_source: String   // gemini | template
     let memory: OwnedFirstMemory?
     let recipes: [OwnedFirstRecipe]
     let closet_items: [OwnedFirstItem]
+}
+
+/// 決めた案の控え (サーバに保存したもの)
+struct OwnedFirstDecidedRecipe: Codable, Hashable {
+    let recipe_id: String
+    let title: String?
+    let reason: String?
+    let pair_text: String?
+    let board_image_url: String?
+    let owned_items: [OwnedFirstItem]?
+    let missing_items: [OwnedFirstMissingItem]?
+}
+
+/// ボードに並んでいた服 (決めたときにサーバへ送り、カレンダー用の1枚画像にする)
+struct OwnedFirstBoardPiece: Codable, Hashable {
+    let slot: String
+    let image_url: String?
+    let label: String
+    let owned: Bool
 }
 
 struct OwnedFirstWearResponse: Codable {
@@ -153,7 +174,7 @@ struct OwnedFirstFeedbackResponse: Codable {
 
 protocol OwnedFirstHomeClientProtocol {
     func get(uid: String, gender: String, targetDate: String, pivotItemId: String?) async throws -> Result<OwnedFirstHomeResponse, HTTPError>
-    func wear(uid: String, recipe: OwnedFirstRecipe, targetDate: String, maxTemp: Int?) async throws -> Result<OwnedFirstWearResponse, HTTPError>
+    func wear(uid: String, recipe: OwnedFirstRecipe, targetDate: String, maxTemp: Int?, pieces: [OwnedFirstBoardPiece]) async throws -> Result<OwnedFirstWearResponse, HTTPError>
     /// reason: like (案ごとのいいね) | cold | color | style | mood (見送り)。recipes が1件なら案ごと
     func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe]) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError>
     func examples(uid: String, poolIds: [String]) async throws -> Result<OwnedFirstExamplesResponse, HTTPError>
@@ -177,6 +198,8 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
         let is_discovery: Bool
         let pair_text: String
         let max_temp: Int?
+        let pieces: [OwnedFirstBoardPiece]
+        let recipe: OwnedFirstRecipe
     }
 
     private struct FeedbackBody: Encodable {
@@ -211,7 +234,7 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
         return try await send(request)
     }
 
-    func wear(uid: String, recipe: OwnedFirstRecipe, targetDate: String, maxTemp: Int?) async throws -> Result<OwnedFirstWearResponse, HTTPError> {
+    func wear(uid: String, recipe: OwnedFirstRecipe, targetDate: String, maxTemp: Int?, pieces: [OwnedFirstBoardPiece]) async throws -> Result<OwnedFirstWearResponse, HTTPError> {
         let body = WearBody(
             target_date: targetDate,
             recipe_id: recipe.recipe_id,
@@ -220,7 +243,9 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
             image_url: recipe.example?.image_url ?? recipe.owned_items.first?.image_url ?? "",
             is_discovery: recipe.isDiscovery,
             pair_text: recipe.pair_text,
-            max_temp: maxTemp
+            max_temp: maxTemp,
+            pieces: pieces,
+            recipe: recipe
         )
         return try await post(path: "api/home/owned-first/wear", uid: uid, body: body)
     }

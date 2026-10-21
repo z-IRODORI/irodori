@@ -315,9 +315,10 @@
 				};
 			};
 			buildConfigurationList = D4C87F572D8AA64600FA8A08 /* Build configuration list for PBXProject "irodori" */;
-			developmentRegion = en;
+			developmentRegion = ja;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				ja,
 				en,
 				Base,
 			);

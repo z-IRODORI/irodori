@@ -77,13 +77,10 @@ struct PartnerUnderstandingChip: View {
                 .font(.system(size: 11))
                 .foregroundColor(.pink)
 
-            Text("Lv.\(state.level) \(state.level_name)")
+            // 相棒の「わかってる度」は全画面で理解度 (%) だけにそろえる (Lv などのゲーム用語は出さない)
+            Text("相棒の理解度 \(state.understanding_pct)%")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.black)
-
-            Text("理解度 \(state.understanding_pct)%")
-                .font(.system(size: 12))
-                .foregroundColor(.gray)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

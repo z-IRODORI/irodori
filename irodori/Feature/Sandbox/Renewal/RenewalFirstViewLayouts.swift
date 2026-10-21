@@ -280,10 +280,7 @@ private struct ItemStrip: View {
 private func statusText(_ r: OwnedFirstRecipe, _ actions: RenewalRecipeActions) -> String {
     if actions.visualMode == .exampleItems {
         let pieces = RenewalFlatLayBuilder.exampleItems(r, extraction: actions.extraction(r))
-        if !pieces.isEmpty {
-            let buy = pieces.filter { !$0.ownedMatch }.count
-            return buy == 0 ? "手持ち\(pieces.count)点で完成" : "手持ち\(pieces.count - buy)点 ＋ 買い足す\(buy)点"
-        }
+        if !pieces.isEmpty { return RenewalFlatLayBuilder.summary(pieces) }
     }
     return shortStatus(r)
 }
@@ -320,6 +317,25 @@ struct RenewalFlatPiece: Identifiable, Hashable {
 }
 
 enum RenewalFlatLayBuilder {
+    /// カード・詳細・決定で同じ服を使うための入口。コーデモデルの服で並べ、無ければ提案アイテムで並べる
+    static func boardPieces(_ r: OwnedFirstRecipe, extraction: OwnedFirstExtraction?, mode: RenewalVisualMode) -> [RenewalFlatPiece] {
+        if mode == .exampleItems {
+            let pieces = exampleItems(r, extraction: extraction)
+            if !pieces.isEmpty { return pieces }
+            return ownedPlusExample(r, extraction: nil)
+        }
+        return ownedPlusExample(r, extraction: extraction)
+    }
+
+    /// 「手持ち2点 ＋ 買い足す1点」(ボードに並ぶ服で数える)
+    static func summary(_ pieces: [RenewalFlatPiece]) -> String {
+        let owned = pieces.filter { $0.kind == .owned || $0.ownedMatch }.count
+        let buy = pieces.count - owned
+        if buy == 0 { return "手持ち\(owned)点で完成" }
+        if owned == 0 { return "買い足す\(buy)点で組む案" }
+        return "手持ち\(owned)点 ＋ 買い足す\(buy)点"
+    }
+
     /// 手持ちを並べ、足りないスロットはコーデモデルから抽出したアイテムで埋める
     static func ownedPlusExample(_ r: OwnedFirstRecipe, extraction: OwnedFirstExtraction?) -> [RenewalFlatPiece] {
         var pieces = r.owned_items.map {
@@ -421,9 +437,13 @@ struct RenewalFlatLayBoard: View {
             // 後に書いたものが手前
             ZStack(alignment: .topLeading) {
                 if let outer {
+                    // トップスを2枚重ねるときは「羽織り」「インナー」と添え、どちらをどう着るか分かるようにする
+                    let layered = outer.slot == "tops"
                     if let top { piece(top).frame(width: w * 0.60, height: h * 0.48).position(x: w * 0.70, y: h * 0.26) }
+                    if layered && top != nil { layerTag("インナー").position(x: w * 0.88, y: h * 0.06) }
                     if let bottom { piece(bottom).frame(width: w * 0.64, height: h * 0.60).position(x: w * 0.62, y: h * 0.69) }
                     piece(outer).frame(width: w * 0.70, height: h * 0.58).position(x: w * 0.35, y: h * 0.30)
+                    if layered { layerTag("羽織り").position(x: w * 0.12, y: h * 0.06) }
                     if let shoes { piece(shoes).frame(width: w * 0.46, height: h * 0.27).position(x: w * 0.23, y: h * 0.85) }
                 } else {
                     if let bottom { piece(bottom).frame(width: w * 0.72, height: h * 0.68).position(x: w * 0.63, y: h * 0.65) }
@@ -490,6 +510,17 @@ struct RenewalFlatLayBoard: View {
         .overlay(alignment: .bottomLeading) { label(p) }
         .scaleEffect(matched ? 1 : 0.86)
         .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
+    }
+
+    private func layerTag(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: large ? 11 : 9, weight: .semibold))
+            .foregroundStyle(RenewalTokens.muted)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(RenewalTokens.surface.opacity(0.9), in: Capsule())
+            .overlay(Capsule().stroke(RenewalTokens.border, lineWidth: 1))
+            .fixedSize()
     }
 
     private func label(_ p: RenewalFlatPiece) -> some View {

@@ -9,9 +9,18 @@
 import SwiftUI
 
 struct KeywordItemSearchView: View {
+    /// 開いたらすぐ検索する語 (コーデの「似たアイテム」から開いたとき)
+    var initialQuery: String? = nil
+
     @State private var viewModel = KeywordItemSearchViewModel()
     @State private var picked: SearchImageResult?
     @FocusState private var searchFocused: Bool
+    @State private var didRunInitial = false
+
+    /// 何を打てばよいか迷わないように、よく登録される定番を候補として並べる
+    private let suggestions = ["白 Tシャツ", "黒 Tシャツ", "白 シャツ", "ネイビー ニット", "グレー スウェット",
+                               "ブルー ジーンズ", "黒 スラックス", "ベージュ チノパン", "デニムジャケット",
+                               "ネイビー カーディガン", "白 スニーカー", "黒 ローファー"]
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -26,6 +35,12 @@ struct KeywordItemSearchView: View {
         }
         .navigationTitle("検索して追加")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard !didRunInitial, let q = initialQuery, !q.isEmpty else { return }
+            didRunInitial = true
+            viewModel.keyword = q
+            await viewModel.search()
+        }
         .background(Color.gray.opacity(0.05))
         .sheet(item: $picked) { result in
             SearchedItemRegisterView(
@@ -108,12 +123,10 @@ struct KeywordItemSearchView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = viewModel.errorMessage {
             messageView(icon: "magnifyingglass", text: error, showRetry: true)
+        } else if viewModel.results.isEmpty && viewModel.hasSearched {
+            messageView(icon: "tshirt", text: "画像が見つかりませんでした", showRetry: false)
         } else if viewModel.results.isEmpty {
-            messageView(
-                icon: "tshirt",
-                text: viewModel.hasSearched ? "画像が見つかりませんでした" : "キーワードを入力して、登録したい服の画像を探しましょう",
-                showRetry: false
-            )
+            suggestionList
         } else {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
@@ -123,6 +136,23 @@ struct KeywordItemSearchView: View {
                 }
                 .padding(16)
             }
+        }
+    }
+
+    /// 検索前: 定番のキーワードをタップで検索できるようにする
+    private var suggestionList: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("よく登録される服")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                FlowChips(items: suggestions) { word in
+                    viewModel.keyword = word
+                    runSearch()
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -181,3 +211,55 @@ struct KeywordItemSearchView: View {
     }
 }
 
+
+
+/// 折り返して並ぶチップ
+private struct FlowChips: View {
+    let items: [String]
+    let onTap: (String) -> Void
+
+    var body: some View {
+        WrapLayout(spacing: 8) {
+            ForEach(items, id: \.self) { word in
+                Button { onTap(word) } label: {
+                    Text(word)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 12)
+                        .frame(height: 34)
+                        .background(Color.white, in: Capsule())
+                        .overlay(Capsule().stroke(Color.black.opacity(0.12), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+/// 横に並べ、はみ出したら次の行へ送るレイアウト
+private struct WrapLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 320
+        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x + s.width > width, x > 0 { x = 0; y += rowH + spacing; rowH = 0 }
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
+        }
+        return CGSize(width: width, height: y + rowH)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x + s.width > bounds.maxX, x > bounds.minX { x = bounds.minX; y += rowH + spacing; rowH = 0 }
+            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
+        }
+    }
+}
