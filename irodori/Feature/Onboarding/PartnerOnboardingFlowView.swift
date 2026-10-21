@@ -84,6 +84,8 @@ final class PartnerOnboardingFlowViewModel {
     enum Step {
         case intro
         case question(Int)
+        /// 4問に答えたあとの確認 (選んだだけでは送らない)
+        case confirm
         case loading
         case birth(PartnerOnboardingResponse)
     }
@@ -99,6 +101,20 @@ final class PartnerOnboardingFlowViewModel {
 
     init(partnerClient: PartnerClientProtocol = FallbackPartnerClient()) {
         self.partnerClient = partnerClient
+    }
+
+    /// 確認画面に並べる「質問 → 選んだ答え」
+    var answerSummary: [(index: Int, badge: String, label: String)] {
+        let values = [impression, priority, rangeVal, tone]
+        return PartnerOnboardingQuestion.all.map { q in
+            let v = q.index < values.count ? values[q.index] : ""
+            return (q.index, q.axisBadge, q.options.first { $0.value == v }?.label ?? "未回答")
+        }
+    }
+
+    func jump(to index: Int) {
+        Haptic.selection()
+        withAnimation(.easeInOut(duration: 0.25)) { step = .question(index) }
     }
 
     func startQuestions() {
@@ -120,6 +136,10 @@ final class PartnerOnboardingFlowViewModel {
                 } else {
                     step = .question(idx - 1)
                 }
+            }
+        case .confirm:
+            withAnimation(.easeInOut(duration: 0.25)) {
+                step = .question(PartnerOnboardingQuestion.all.count - 1)
             }
         case .loading, .birth:
             break
@@ -151,8 +171,9 @@ final class PartnerOnboardingFlowViewModel {
                     self.step = .question(nextIdx)
                 }
             } else {
-                Task {
-                    await self.submitOnboarding()
+                // 最後の質問でも、選んだ瞬間には送らない (確認してから相棒を育てる)
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    self.step = .confirm
                 }
             }
         }
@@ -233,6 +254,8 @@ struct PartnerOnboardingFlowView: View {
                 introStepView
             case .question(let index):
                 questionStepView(question: PartnerOnboardingQuestion.all[index])
+            case .confirm:
+                confirmStepView
             case .loading:
                 loadingStepView
             case .birth(let response):
@@ -240,6 +263,101 @@ struct PartnerOnboardingFlowView: View {
             }
         }
         .background(Color.white.ignoresSafeArea())
+    }
+
+    /// すでに相棒がいる (オンボーディング済みで、アプリ内から開いた) ときの相棒アイコン
+    private var existingPartnerIcon: String? {
+        guard showCloseButton,
+              let icon = UserDefaults.standard.string(forKey: UserDefaultsKey.partnerIconImage.rawValue),
+              UIImage(named: icon) != nil else { return nil }
+        return icon
+    }
+
+    // MARK: - 確認 (4問に答えたあと)
+
+    private var confirmStepView: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button(action: { viewModel.goBack() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left").font(.system(size: 14, weight: .semibold))
+                        Text("戻る").font(.system(size: 14))
+                    }
+                    .foregroundStyle(.black)
+                    .frame(minHeight: 44)
+                }
+                Spacer()
+                if showCloseButton { closeButton }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("この内容で相棒を育てます")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.black)
+                    Text(existingPartnerIcon == nil
+                         ? "変えたい答えはタップして選び直せます。"
+                         : "今の相棒の話し方や提案の方向が、この答えに合わせて変わります。変えたい答えはタップして選び直せます。")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 10) {
+                        ForEach(viewModel.answerSummary, id: \.index) { row in
+                            Button { viewModel.jump(to: row.index) } label: {
+                                HStack(alignment: .center, spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(row.badge)
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundStyle(.secondary)
+                                        Text(row.label)
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(.black)
+                                            .multilineTextAlignment(.leading)
+                                    }
+                                    Spacer(minLength: 0)
+                                    Text("変更")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(16)
+                                .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.black.opacity(0.1), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+            }
+
+            Button {
+                Task { await viewModel.submitOnboarding() }
+            } label: {
+                Text("この内容で相棒を育てる")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .background(Color.black, in: RoundedRectangle(cornerRadius: 16))
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+        }
+    }
+
+    private var closeButton: some View {
+        Button(action: onComplete) {
+            Image(systemName: "xmark")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.black)
+                .frame(width: 36, height: 36)
+                .background(Color.gray.opacity(0.1))
+                .clipShape(Circle())
+        }
+        .frame(minWidth: 44, minHeight: 44)
+        .accessibilityLabel("閉じる")
     }
 
     // MARK: - Step 0: 相棒の紹介カード
@@ -252,7 +370,7 @@ struct PartnerOnboardingFlowView: View {
                     Button(action: onComplete) {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.black)
                             .frame(width: 36, height: 36)
                             .background(Color.gray.opacity(0.1))
                             .clipShape(Circle())
@@ -268,6 +386,23 @@ struct PartnerOnboardingFlowView: View {
                 VStack(spacing: 24) {
                     Spacer().frame(height: 12)
 
+                    if let icon = existingPartnerIcon {
+                        // すでに相棒がいる人には、今の相棒を見せる (答え直す前提の説明にする)
+                        VStack(spacing: 10) {
+                            Image(icon)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 96, height: 96)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.black.opacity(0.08), lineWidth: 1))
+                            Text("今の相棒")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Text("答え直すと、相棒の話し方や提案の方向が変わります")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.black)
+                        }
+                    } else {
                     // まだ特徴のない相棒シルエット
                     VStack(spacing: 10) {
                         ZStack {
@@ -289,6 +424,7 @@ struct PartnerOnboardingFlowView: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
+                    }
 
                     // タイトル・説明
                     VStack(spacing: 10) {
@@ -298,7 +434,7 @@ struct PartnerOnboardingFlowView: View {
                             .multilineTextAlignment(.center)
                             .lineSpacing(4)
 
-                        Text("IRODORIの中心にいるのは、あなた専属の相棒です。\n毎朝の服選びの迷いをなくしてくれます。")
+                        Text("IRODORIの中心にいるのは、あなた専属の相棒です。\n次に着る服を選ぶ迷いをなくしてくれます。")
                             .font(.system(size: 14))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -314,7 +450,7 @@ struct PartnerOnboardingFlowView: View {
 
                         benefitRow(
                             icon: "sun.max",
-                            title: "天気や気温差に合わせて毎朝3案を提案",
+                            title: "天気や気温差に合わせて次に着る日の3案を提案",
                             subtitle: "朝晩の寒暖差や雨の日も、迷わず選べるコーデを用意します"
                         )
                         benefitRow(
@@ -405,7 +541,8 @@ struct PartnerOnboardingFlowView: View {
                             Text("戻る")
                                 .font(.system(size: 14))
                         }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.black)
+                        .frame(minHeight: 44)
                     }
 
                     Spacer()
@@ -413,6 +550,7 @@ struct PartnerOnboardingFlowView: View {
                     Text("\(question.index + 1) / \(total)")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
+                    if showCloseButton { closeButton }
                 }
 
                 GeometryReader { geo in

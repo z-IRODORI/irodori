@@ -91,7 +91,8 @@ struct CameraView: View {
                 .frame(maxHeight: .infinity, alignment: .top)
             }
         }
-//        .navigationBarBackButtonHidden()
+        .navigationBarBackButtonHidden()
+        .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea()
         // 解析エンジン切替 (デバッグ検証用。Release ビルドには入らない)。
         // Header 内ではなくルートのオーバーレイに置く: カメラ準備中 (.initial) や
@@ -199,9 +200,27 @@ struct CameraView: View {
 
     private func Header() -> some View {
         ZStack {
-            Text("IRODORI")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(.black)
+            VStack(spacing: 4) {
+                Text("コーデを記録")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.black)
+                Text("全身が入るように、1.5〜2m 離れて撮ろう")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            // 撮影は一時的な画面なので、戻るではなく ✕ で閉じる
+            HStack {
+                Button {
+                    if !path.isEmpty { path.removeLast() }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("閉じる")
+                Spacer()
+            }
 //            HStack(spacing: 24) {
 //                Button(action: {
 //                    AnalyticsLogger.shared.log(action: .calendarDateSelected, parameters: [
@@ -304,23 +323,22 @@ extension CameraView {
             Haptic.impact(.soft)
             showFullBodyPicker = true
         }) {
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(
-                        colors: [Color(red: 1.0, green: 0.27, blue: 0.42), Color(red: 1.0, green: 0.45, blue: 0.30)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    ))
-                    .frame(width: 64, height: 64)
-                VStack(spacing: 1) {
+            VStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: 64, height: 64)
                     Image(systemName: "person.crop.square.badge.camera")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white)
-                    Text("AI")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: 22))
                         .foregroundStyle(.white)
                 }
+                Text("全身写真を探す")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .fixedSize()
             }
         }
+        .accessibilityLabel("写真フォルダから全身写真を探す")
     }
 
     private func CaptureButton() -> some View {

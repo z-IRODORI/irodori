@@ -286,6 +286,8 @@ struct RenewalLiveHomeView: View {
     @AppStorage(RenewalFirstViewLayout.storageKey) private var layoutRaw = RenewalFirstViewLayout.list.rawValue
     @AppStorage(RenewalVisualMode.storageKey) private var visualRaw = RenewalVisualMode.exampleItems.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 「いいね」した案のコーデモデルをお気に入りにも入れる (Sandbox では無いことがある)
+    @Environment(FavoritesStore.self) private var favorites: FavoritesStore?
 
     private var response: OwnedFirstHomeResponse? { model.responses[scope] }
     // 本番はリスト × コーデモデルのアイテムで固定 (切替は Sandbox のみ)
@@ -572,7 +574,13 @@ struct RenewalLiveHomeView: View {
             onPivot: { showPivot = true },
             partnerTypeName: partnerTypeName,
             reaction: { model.reactions[$0.recipe_id] },
-            onLike: { recipe in Task { await model.like(recipe, scope: scope) } },
+            onLike: { recipe in
+                Task { await model.like(recipe, scope: scope) }
+                // 「いいね」とお気に入りの♡を1つの動作にまとめる (コーデモデルをお気に入りに残す)
+                if let ex = recipe.example, let pid = ex.pool_id {
+                    Task { await favorites?.setFavorite(true, kind: .pool, targetId: pid, imageURL: ex.image_url) }
+                }
+            },
             onDislike: { recipe, reason in Task { await model.dislike(recipe, reason: reason, scope: scope) } }
         )
         Group {

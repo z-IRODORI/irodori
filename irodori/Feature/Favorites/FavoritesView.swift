@@ -215,8 +215,8 @@ struct FavoritesView: View {
                 .font(.system(size: 32))
                 .foregroundStyle(.gray.opacity(0.5))
             Text(selectedKind == .pool
-                 ? "気になるおすすめコーデを♡してみましょう"
-                 : "自分のコーデを♡しておくと明日の提案に混ざります")
+                 ? "ホームの案に「いいね」すると、そのコーデモデルがここに集まります"
+                 : "カレンダーの自分のコーデを♡しておくと、明日の提案に混ざります")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
