@@ -32,9 +32,9 @@ struct RenewalRecipeFeedbackRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 8) {
-                RenewalPartnerAvatar(typeName: typeName, size: 26)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
+                RenewalPartnerAvatar(typeName: typeName, size: 22)
                 content
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -53,15 +53,14 @@ struct RenewalRecipeFeedbackRow: View {
         case .none:
             HStack(spacing: 6) {
                 Text(asking ? "どこが違った？" : "この案どう？")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(RenewalTokens.ink)
-                    .padding(.top, 4)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(asking ? RenewalTokens.ink : RenewalTokens.muted)
                 Spacer(minLength: 4)
                 if asking {
                     Button("やめる") { asking = false }
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(RenewalTokens.muted)
-                        .frame(minHeight: 32)
+                        .contentShape(Rectangle().inset(by: -12))
                 } else {
                     chip("いいね", systemImage: "heart", action: onLike)
                     chip("ちょっと違う", systemImage: nil) {
@@ -77,22 +76,16 @@ struct RenewalRecipeFeedbackRow: View {
                     .font(.system(size: 12))
                     .foregroundStyle(RenewalTokens.muted)
             }
-            .padding(.top, 4)
+            .frame(minHeight: 28)
         case .liked(let ack):
             reply(ack, mark: Image(systemName: "heart.fill"), markColor: RenewalTokens.accentPink)
-        case .disliked(let reason, let ack):
-            VStack(alignment: .leading, spacing: 4) {
-                reply(ack, mark: nil, markColor: RenewalTokens.muted)
-                Text("この案は見送りました ・ \(reason.label)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(RenewalTokens.muted)
-            }
+        case .disliked(_, let ack):
+            reply(ack, mark: Image(systemName: "hand.raised"), markColor: RenewalTokens.muted)
         case .failed:
             HStack(spacing: 6) {
                 Text("うまく届かなかったみたい")
                     .font(.system(size: 12))
                     .foregroundStyle(RenewalTokens.muted)
-                    .padding(.top, 4)
                 Spacer(minLength: 4)
                 chip("いいね", systemImage: "heart", action: onLike)
                 chip("ちょっと違う", systemImage: nil) { asking = true }
@@ -104,7 +97,7 @@ struct RenewalRecipeFeedbackRow: View {
     private func reply(_ text: String, mark: Image?, markColor: Color) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Text(text)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 12))
                 .foregroundStyle(RenewalTokens.ink)
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -112,10 +105,10 @@ struct RenewalRecipeFeedbackRow: View {
                 mark.font(.system(size: 11)).foregroundStyle(markColor).padding(.top, 2)
             }
         }
-        .padding(.vertical, 8)
-        .padding(.leading, 16)
+        .padding(.vertical, 6)
+        .padding(.leading, 14)
         .padding(.trailing, 10)
-        .background(RenewalSpeechBubble().fill(RenewalTokens.raised))
+        .background(RenewalSpeechBubble(radius: 12, tailWidth: 7, tailTop: 8).fill(RenewalTokens.raised))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("相棒: \(text)")
     }
@@ -132,7 +125,7 @@ struct RenewalRecipeFeedbackRow: View {
                         .foregroundStyle(RenewalTokens.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .frame(maxWidth: .infinity, minHeight: 32)
                         .background(RenewalTokens.surface, in: Capsule())
                         .overlay(Capsule().stroke(RenewalTokens.controlBorder, lineWidth: 1))
                         .contentShape(Capsule())
@@ -140,23 +133,23 @@ struct RenewalRecipeFeedbackRow: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.leading, 34)
+        .padding(.leading, 30)
     }
 
     private func chip(_ title: String, systemImage: String?, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 4) {
-                if let systemImage { Image(systemName: systemImage).font(.system(size: 11, weight: .semibold)) }
-                Text(title).font(.system(size: 12, weight: .semibold))
+                if let systemImage { Image(systemName: systemImage).font(.system(size: 10, weight: .semibold)) }
+                Text(title).font(.system(size: 11, weight: .semibold))
             }
             .foregroundStyle(RenewalTokens.ink)
             .lineLimit(1)
             .fixedSize()
             .padding(.horizontal, 10)
-            .frame(minHeight: 30)
+            .frame(height: 28)
             .overlay(Capsule().stroke(RenewalTokens.controlBorder, lineWidth: 1))
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
+            // 見た目は小さく、押せる範囲は 44pt 相当に広げる
+            .contentShape(Rectangle().inset(by: -8))
         }
         .buttonStyle(.plain)
     }

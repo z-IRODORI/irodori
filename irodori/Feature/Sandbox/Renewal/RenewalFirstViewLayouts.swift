@@ -704,13 +704,13 @@ struct RenewalListLayout: View {
             // 見送った案は薄くして、相棒の返事だけをはっきり見せる
             .opacity(actions.reaction(recipe)?.isDisliked == true ? 0.4 : 1)
             if let onLike = actions.onLike, let onDislike = actions.onDislike {
-                Rectangle().fill(RenewalTokens.rule).frame(height: 1)
                 RenewalRecipeFeedbackRow(
                     typeName: actions.partnerTypeName,
                     reaction: actions.reaction(recipe),
                     onLike: { onLike(recipe) },
                     onDislike: { onDislike(recipe, $0) }
                 )
+                .padding(.top, -2)
             }
         }
         .padding(.horizontal, 16)
