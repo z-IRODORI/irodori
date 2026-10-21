@@ -25,13 +25,14 @@ struct CalendarView: View {
         case calendar
         case grid
     }
-    @AppStorage("calendar.displayMode") private var displayModeRaw = DisplayMode.calendar.rawValue
+    /// タブ名どおり、開くたびに月のカレンダーから始める (グリッドは切り替えたときだけ)
+    @State private var displayModeRaw = DisplayMode.calendar.rawValue
     private var displayMode: DisplayMode { DisplayMode(rawValue: displayModeRaw) ?? .calendar }
 
     /// 表示中の月 (viewModel.months への索引。months は新しい順)。nil は今月で未初期化
     @State private var selectedMonthIndex: Int? = nil
 
-    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
     private let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
 
     // 予定コーデのタップ操作。ダイアログを挟まず詳細を直接開き、削除は詳細画面内で行う
@@ -280,6 +281,10 @@ struct CalendarView: View {
         // コーデ詳細と同じく、画像の視認性優先で半モーダルではなく全画面で見せる
         .fullScreenCover(item: $suggestionData) { data in
             NavigationStack {
+                // 今日〜6日後はホームと同じ「手持ち＋買い足す」の3案。それより先は従来の候補
+                if CalendarOwnedFirstSuggestionView.supports(date: data.date) {
+                    CalendarOwnedFirstSuggestionView(data: data, onDecided: { await viewModel.loadPlanned() })
+                } else {
                 CalendarDaySuggestionSheet(
                     data: data,
                     load: { await viewModel.suggest(forDate: data.date) },
@@ -291,6 +296,7 @@ struct CalendarView: View {
                         }
                     }
                 )
+                }
             }
         }
         .overlay {
@@ -305,26 +311,50 @@ struct CalendarView: View {
 
     // MARK: - プランナー導線 (まとめて提案)
 
+    /// 今日〜6日後で、まだ着るコーデを決めていない一番近い日 ("2026-10-23", "10月23日(金)")
+    private var nextUndecidedDay: (date: String, label: String)? {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        let iso = DateFormatter()
+        iso.calendar = cal
+        iso.locale = Locale(identifier: "en_US_POSIX")
+        iso.timeZone = cal.timeZone
+        iso.dateFormat = "yyyy-MM-dd"
+        let jp = DateFormatter()
+        jp.calendar = cal
+        jp.locale = Locale(identifier: "ja_JP")
+        jp.timeZone = cal.timeZone
+        jp.dateFormat = "M月d日(E)"
+        let today = cal.startOfDay(for: Date())
+        for offset in 0...6 {
+            guard let d = cal.date(byAdding: .day, value: offset, to: today) else { continue }
+            let key = iso.string(from: d)
+            if viewModel.plannedByDate[key] == nil {
+                return (key, offset == 0 ? "今日" : (offset == 1 ? "明日" : jp.string(from: d)))
+            }
+        }
+        return nil
+    }
+
     /// 予定コーデの残弾で文言が変わる常設の導線カード。
     /// 残り2日以下で「仕込む?」と促す (残弾駆動 — 固定曜日の儀式にせずユーザーのペースに追従)
     private var plannerEntryCard: some View {
-        let upcoming = viewModel.upcomingPlannedCount
+        // ホームと同じ提案 (手持ち＋買い足す) で、まだ決めていない一番近い日を決める
+        let next = nextUndecidedDay
         let (title, subtitle): (String, String) = {
-            if upcoming == 0 {
-                return ("相棒にコーデプランを考えてもらう",
-                        "天気と手持ちに合わせて、1週間分まで先取り提案します")
+            if let next {
+                return ("\(next.label)のコーデを決める", "ホームと同じく、手持ちの服から相棒が3案を組みます")
             }
-            if upcoming <= 2 {
-                return ("予定コーデが残り\(upcoming)日分",
-                        "次の1週間ぶんを仕込みませんか？")
-            }
-            return ("予定コーデを\(upcoming)日分ストック中",
-                    "タップで追加の提案が作れます")
+            return ("1週間ぶんのコーデが決まっています", "タップでさらに先の日もまとめて決められます")
         }()
 
         return Button {
             Haptic.impact(.soft)
-            path.append(.outfitPlanner)
+            if let next {
+                suggestionData = CalendarDaySuggestionData(date: next.date, dateLabel: next.label)
+            } else {
+                path.append(.outfitPlanner)
+            }
         } label: {
             HStack(spacing: 12) {
                 // 「相棒が考える」ことが伝わるよう、機能アイコンではなく相棒の顔を出す
@@ -552,7 +582,7 @@ struct CalendarView: View {
                     .padding(.horizontal, 16)
                 monthSkeletonGrid
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 28)
             case .loaded(let responses):
                 if !hasAnyEntry(month: month, responses: responses) {
                     emptyMonthHint
@@ -562,7 +592,7 @@ struct CalendarView: View {
                     .padding(.horizontal, 16)
                 gridArea(month: month, responses: responses)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 28)
             case .failed:
                 // 失敗時も日付グリッドは描画し、予定コーデだけでも見せる (従来挙動の踏襲)
                 if !viewModel.hasPlanned(year: month.year, month: month.monthOfTheYear) {
@@ -573,7 +603,7 @@ struct CalendarView: View {
                     .padding(.horizontal, 16)
                 gridArea(month: month, responses: [])
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 28)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -602,9 +632,9 @@ struct CalendarView: View {
         let plannedCount = monthOutfits.filter { !$0.value.isAdopted }.count
         let adoptedCount = monthOutfits.filter { $0.value.isAdopted }.count
         return HStack(spacing: 10) {
-            Label("記録 \(recordCount)件", systemImage: "camera.fill")
+            Label("撮った記録 \(recordCount)件", systemImage: "camera.fill")
             if adoptedCount > 0 {
-                Label("採用 \(adoptedCount)件", systemImage: "checkmark.circle")
+                Label("着ると決めた \(adoptedCount)件", systemImage: "checkmark.circle")
             }
             if plannedCount > 0 {
                 Label("予定 \(plannedCount)件", systemImage: "clock")
@@ -641,10 +671,11 @@ struct CalendarView: View {
         GeometryReader { geo in
             let spacing: CGFloat = 5
             let weekRows = weeks(for: month)
-            let rowHeight = max(
+            // 行を縦に伸ばしすぎない (1か月が見渡せ、下に余白が残る高さで止める)
+            let rowHeight = min(104, max(
                 30,
                 (geo.size.height - spacing * CGFloat(weekRows.count - 1)) / CGFloat(weekRows.count)
-            )
+            ))
 
             VStack(spacing: spacing) {
                 ForEach(Array(weekRows.enumerated()), id: \.offset) { _, week in
@@ -969,13 +1000,26 @@ struct CalendarView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 100)
             } else {
-                LazyVGrid(columns: gridColumns, spacing: 2) {
+                if !viewModel.allLoaded {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("記録を読み込んでいます…")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 12)
+                }
+                // 写真どうしと画面端に余白を取り、タブバーに隠れないよう下にも余白を残す
+                LazyVGrid(columns: gridColumns, spacing: 8) {
                     ForEach(allRecordEntries) { entry in
                         recordTile(entry)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                 }
-                .padding(.top, 2)
-                .padding(.bottom, 40)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 120)
             }
         }
         .transition(.opacity)

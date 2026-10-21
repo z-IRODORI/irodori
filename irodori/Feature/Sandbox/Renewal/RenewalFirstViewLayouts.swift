@@ -64,7 +64,10 @@ struct RenewalRecipeActions {
     var reaction: (OwnedFirstRecipe) -> RenewalRecipeReaction? = { _ in nil }
     var onLike: ((OwnedFirstRecipe) -> Void)? = nil
     var onDislike: ((OwnedFirstRecipe, RenewalDislikeReason) -> Void)? = nil
+    /// 今日・明日以外の日 (カレンダーから開いたとき) の決定ボタンの文言
+    var actionLabelOverride: String? = nil
 
+    var actionLabel: String { actionLabelOverride ?? scope.actionLabel }
     func isDecided(_ r: OwnedFirstRecipe) -> Bool { decidedId == r.recipe_id }
 }
 
@@ -238,7 +241,7 @@ private struct CompactDecideButton: View {
         } label: {
             HStack(spacing: 4) {
                 if decided { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)) }
-                Text(decided ? "決定済み" : actions.scope.actionLabel)
+                Text(decided ? "決定済み" : actions.actionLabel)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }

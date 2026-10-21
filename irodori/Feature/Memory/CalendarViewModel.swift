@@ -190,13 +190,15 @@ final class CalendarViewModel {
 
     /// 予定コーデ (kind=pool) の詳細アイテムを取得。失敗時は最低限の表示用フォールバック
     func fetchPoolItem(_ outfit: CalendarOutfit) async -> DailyRecommendationItem {
-        if let result = try? await poolClient.get(poolId: outfit.target_id, uid: uid),
+        // ホームで「着る」と決めた日 (kind=closet) は、自分の服を合成した1枚画像をそのまま見せる
+        if outfit.kind != "closet",
+           let result = try? await poolClient.get(poolId: outfit.target_id, uid: uid),
            case .success(let item) = result {
             return item
         }
         return DailyRecommendationItem(
             pool_id: outfit.target_id,
-            kind: "pool",
+            kind: outfit.kind == "closet" ? "closet" : "pool",
             image_url: outfit.image_url,
             reason: nil,
             main_colors: [],
