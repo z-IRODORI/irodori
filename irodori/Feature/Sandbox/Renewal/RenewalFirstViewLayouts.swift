@@ -332,11 +332,19 @@ enum RenewalFlatLayBuilder {
                 usedExample.insert(ex.id)
                 pieces.append(RenewalFlatPiece(id: "e_\(ex.id)", slot: m.slot, imageURL: ex.image_url, label: ex.label, kind: .example, ownedMatch: false))
             } else {
-                pieces.append(RenewalFlatPiece(id: "m_\(m.id)", slot: m.slot, imageURL: nil, label: m.label, kind: .placeholder,
-                                               ownedMatch: false, preparing: extraction?.isInProgress ?? false))
+                pieces.append(missingPiece(m, preparing: extraction?.isInProgress ?? false))
             }
         }
         return pieces
+    }
+
+    /// 買い足す服: カタログに同じ種類の画像があればそれを、無ければ点線の枠だけ
+    static func missingPiece(_ m: OwnedFirstMissingItem, preparing: Bool = false) -> RenewalFlatPiece {
+        if let url = m.image_url, !url.isEmpty {
+            return RenewalFlatPiece(id: "m_\(m.id)", slot: m.slot, imageURL: url, label: m.label, kind: .example, ownedMatch: false)
+        }
+        return RenewalFlatPiece(id: "m_\(m.id)", slot: m.slot, imageURL: nil, label: m.label, kind: .placeholder,
+                                ownedMatch: false, preparing: preparing)
     }
 
     /// コーデモデルが着ているアイテムを並べる。モデルの各アイテムを次の順で置き換える:
@@ -381,6 +389,11 @@ enum RenewalFlatLayBuilder {
         let slots = Set(pieces.map(\.slot))
         for o in r.owned_items where !usedOwned.contains(o.item_id) && !slots.contains(o.slot) {
             pieces.append(RenewalFlatPiece(id: "o_\(o.item_id)", slot: o.slot, imageURL: o.image_url, label: o.label, kind: .owned, ownedMatch: true))
+        }
+        // モデルの写真に写っていないスロットの買い足し (羽織りなど) も落とさない
+        let placed = Set(pieces.map(\.slot))
+        for m in r.missing_items where !usedMissing.contains(m.id) && !placed.contains(m.slot) {
+            pieces.append(missingPiece(m))
         }
         return pieces
     }

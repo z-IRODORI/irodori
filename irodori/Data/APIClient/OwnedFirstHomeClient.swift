@@ -28,6 +28,8 @@ struct OwnedFirstMissingItem: Codable, Hashable, Identifiable {
     let label: String
     let family: String
     let fit: String?
+    /// 同じ種類のアイテムカタログ画像 (コーデモデルが無い案の定番などに付く)
+    let image_url: String?
 
     var id: String { "\(slot)_\(label)" }
 }
