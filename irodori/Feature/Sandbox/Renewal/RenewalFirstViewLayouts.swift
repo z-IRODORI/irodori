@@ -808,15 +808,21 @@ struct RenewalPivotStrip: View {
     let items: [OwnedFirstItem]
     let pinnedId: String?
     let isLoading: Bool
+    /// 最近主役に選んだ服 (新しい順)。前に並べる
+    var recentIds: [String] = []
     /// 選んだ服の id と、そのチップの画面上の位置 (主役の服が相棒へ飛ぶ演出用)
     let onSelect: (String?, CGRect?) -> Void
     @State private var chipFrames: [String: CGRect] = [:]
 
     private static let slotOrder = ["tops", "outer", "bottoms", "shoes"]
 
+    /// 最近選んだ服 (新しい順) → それ以外はスロット順・名前順
     private var sorted: [OwnedFirstItem] {
         items.sorted {
-            (Self.slotOrder.firstIndex(of: $0.slot) ?? 9, $0.label) < (Self.slotOrder.firstIndex(of: $1.slot) ?? 9, $1.label)
+            let r0 = recentIds.firstIndex(of: $0.item_id) ?? Int.max
+            let r1 = recentIds.firstIndex(of: $1.item_id) ?? Int.max
+            if r0 != r1 { return r0 < r1 }
+            return (Self.slotOrder.firstIndex(of: $0.slot) ?? 9, $0.label) < (Self.slotOrder.firstIndex(of: $1.slot) ?? 9, $1.label)
         }
     }
 

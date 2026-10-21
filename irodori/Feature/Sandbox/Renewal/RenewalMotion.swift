@@ -114,6 +114,8 @@ struct RenewalSpokenText: View {
     let text: String
     /// false のときは最初から全文 (2回目以降・Reduce Motion)
     let animate: Bool
+    /// タップで全文を出す (ボタンの中に置くときは false にしてタップをボタンへ通す)
+    var tapToFinish = true
     var onFinished: () -> Void = {}
 
     @State private var count = 0
@@ -128,6 +130,7 @@ struct RenewalSpokenText: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { finish() }
+            .allowsHitTesting(tapToFinish)
             .task(id: text) {
                 guard animate else { finish(); return }
                 count = 0

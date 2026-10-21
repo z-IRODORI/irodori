@@ -249,6 +249,8 @@ struct RenewalLiveHomeView: View {
     @State private var flying: (url: String, from: CGRect)?
     @State private var memoryShown = false
     @State private var showDislike = false
+    /// 最近主役に選んだ服 (新しい順・カンマ区切り)
+    @AppStorage("renewalHome.recentPivots") private var recentPivotsRaw = ""
     @AppStorage(RenewalFirstViewLayout.storageKey) private var layoutRaw = RenewalFirstViewLayout.list.rawValue
     @AppStorage(RenewalVisualMode.storageKey) private var visualRaw = RenewalVisualMode.exampleItems.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -267,6 +269,7 @@ struct RenewalLiveHomeView: View {
                         items: items,
                         pinnedId: model.pivotItemId(scope),
                         isLoading: model.loading.contains(scope),
+                        recentIds: recentPivots,
                         onSelect: { id, frame in selectPivot(id, frame: frame) }
                     )
                 }
@@ -334,41 +337,37 @@ struct RenewalLiveHomeView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: model.sendoff)
     }
 
-    // MARK: ① 相棒ヘッダー
+    // MARK: ① 相棒カード
 
-    /// 相棒がコメントしている形: アバター + (名前と日付・気温) + しっぽ付きの吹き出し。
-    /// 吹き出しの中は余白と行間を広めに取り、窮屈に見せない
+    /// 案C (1画面凝縮) の相棒カード: 白いカード1枚に アバター + 日付・気温 + ひとこと (2〜3行) + ›。
+    /// カード全体で相棒画面を開く (長押しで話し方)。覚えていることはひとことの下に1行だけ
     private var partnerHeader: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Button(action: onOpenPartner) {
-                RenewalPartnerAvatar(typeName: partnerTypeName, size: 44)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
-                Haptic.impact(.medium)
-                onOpenToneSheet()
-            })
-            .accessibilityLabel("相棒画面を開く")
-
-            VStack(alignment: .leading, spacing: 4) {
-                nextWearMeta
-                    .padding(.leading, 10)
-                VStack(alignment: .leading, spacing: 6) {
+        Button(action: onOpenPartner) {
+            HStack(alignment: .center, spacing: 12) {
+                RenewalPartnerAvatar(typeName: partnerTypeName, size: 40)
+                VStack(alignment: .leading, spacing: 4) {
+                    nextWearMeta
                     if let response {
                         RenewalSpokenText(
                             text: response.greeting,
                             animate: !reduceMotion && spokenDay != Self.todayKey,
+                            tapToFinish: false,
                             onFinished: {
                                 spokenDay = Self.todayKey
                                 withAnimation(reduceMotion ? nil : .easeOut(duration: 0.4).delay(0.25)) { memoryShown = true }
                             }
                         )
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundStyle(RenewalTokens.ink)
-                            .lineSpacing(3)
-                            .fixedSize(horizontal: false, vertical: true)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(RenewalTokens.ink)
+                        .lineSpacing(2)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        if let memory = response.memory {
+                            memoryNote(memory)
+                                .opacity(memoryShown ? 1 : 0)
+                                .offset(y: memoryShown ? 0 : 3)
+                        }
                         if host.showCharCount {
                             HStack(spacing: 6) {
                                 RenewalCharCountBadge(text: response.greeting)
@@ -379,27 +378,29 @@ struct RenewalLiveHomeView: View {
                         }
                     } else {
                         Text("相棒があなたの手持ち服から3案を組んでいます…")
-                            .font(.system(size: 15))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(RenewalTokens.muted)
                             .redacted(reason: .placeholder)
                     }
                 }
-                .padding(.vertical, 10)
-                .padding(.leading, 22)   // しっぽの分
-                .padding(.trailing, 14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RenewalSpeechBubble().fill(RenewalTokens.surface))
-                .overlay(RenewalSpeechBubble().stroke(RenewalTokens.border, lineWidth: 1))
-                if let memory = response?.memory {
-                    memoryNote(memory)
-                        .padding(.leading, 12)
-                        .opacity(memoryShown ? 1 : 0)
-                        .offset(y: memoryShown ? 0 : 4)
-                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(RenewalTokens.muted)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
+            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
-        .padding(.horizontal, RenewalTokens.edge)
+        .buttonStyle(.plain)
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+            Haptic.impact(.medium)
+            onOpenToneSheet()
+        })
+        .accessibilityHint("相棒画面を開く")
+        .padding(.horizontal, 16)   // 3案のカードと端をそろえる
         .padding(.top, 4)
     }
 
@@ -446,7 +447,22 @@ struct RenewalLiveHomeView: View {
             }
         }
         pendingPivotIntro = id
-        Task { await model.pivot(id, scope: scope) }
+        Task {
+            await model.pivot(id, scope: scope)
+            // 組み直した案が出てから、選んだ服を主役の服の先頭へ
+            if let id { rememberPivot(id) }
+        }
+    }
+
+    private var recentPivots: [String] {
+        recentPivotsRaw.split(separator: ",").map(String.init)
+    }
+
+    private func rememberPivot(_ id: String) {
+        let ids = [id] + recentPivots.filter { $0 != id }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+            recentPivotsRaw = ids.prefix(12).joined(separator: ",")
+        }
     }
 
     /// ひとことの根拠になった「相棒が覚えていること」(さりげなく1行)
@@ -538,7 +554,7 @@ struct RenewalLiveHomeView: View {
            let item = response?.closet_items.first(where: { $0.item_id == id }) {
             return "\(item.label)を主役に組み直したよ。ピンとこなかったら教えてね"
         }
-        return "ピンとこなかったら、教えてね"
+        return "ピンとこなかったら教えてね"
     }
 
     private var pivotLabel: String {
@@ -590,41 +606,46 @@ struct RenewalLiveHomeView: View {
 
     // MARK: 見送り
 
-    /// 3案の後に相棒が問いかけ、ユーザーは返事のチップで「服の指定」か「見送り」を選ぶ
+    /// 3案の後の相棒のひとこと。上の相棒カードと同じ白いカードにして、返事 (どれも違うかも) を右に置く
     private var partnerFollowUp: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
-                RenewalPartnerAvatar(typeName: partnerTypeName, size: 28)
+        HStack(alignment: .center, spacing: 12) {
+            RenewalPartnerAvatar(typeName: partnerTypeName, size: 32)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(followUpMessage)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("理由を選ぶと次から外すよ")
+                    .font(.system(size: 11))
                     .foregroundStyle(RenewalTokens.muted)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
-            HStack(spacing: 8) {
-                replyChip("どれも違うかも", systemImage: "arrow.triangle.2.circlepath") { showDislike = true }
-                Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                Haptic.impact(.soft)
+                showDislike = true
+            } label: {
+                Text("どれも違うかも")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 32)
+                    .overlay(Capsule().stroke(RenewalTokens.controlBorder, lineWidth: 1))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
-            .padding(.leading, 36)
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal, RenewalTokens.edge)
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .padding(.vertical, 8)
+        .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
+        .padding(.horizontal, 16)   // 3案のカードと端をそろえる
         .padding(.top, 2)
-    }
-
-    private func replyChip(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(RenewalTokens.ink)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 32)
-                .background(RenewalTokens.surface)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(RenewalTokens.border, lineWidth: 1))
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     private var passButton: some View {
