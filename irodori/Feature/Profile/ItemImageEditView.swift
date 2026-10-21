@@ -36,6 +36,9 @@ struct ItemImageEditView: View {
     // 商品画像への差し替え
     @State private var showReplacePicker = false
     @State private var showReplaceConfirmation = false
+    /// 服の特徴 (key → 値)。開いたときの値から始め、タップで直す
+    @State private var features: [String: String] = [:]
+    @State private var showImageTools = false
 
     var body: some View {
         NavigationStack {
@@ -55,7 +58,7 @@ struct ItemImageEditView: View {
                     }
                 }
             }
-            .navigationTitle(viewModel.step == .edit ? "アイテムを編集" : "変更の確認")
+            .navigationTitle(viewModel.step == .edit ? "アイテムの詳細" : "変更の確認")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -90,10 +93,7 @@ struct ItemImageEditView: View {
     private var editView: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("「ノイズ除去」で背景を自動で透明にできます。気になる部分は消しゴムでなぞって透明にできます（市松模様 = 透明）。")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-
+                // タップで開くのは「服の詳細」。画像の消しゴム編集は「画像を整える」を開いたときだけ
                 editorCanvas
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1, contentMode: .fit)
@@ -101,26 +101,60 @@ struct ItemImageEditView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                            .stroke(showImageTools ? Color.black : Color.black.opacity(0.1), lineWidth: showImageTools ? 1.5 : 1)
                     )
+                    .allowsHitTesting(showImageTools)
 
-                toolRow
-
-                HStack(spacing: 10) {
-                    Text("消しゴムの太さ")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    Slider(value: $brushSize, in: 10...60)
-                        .tint(.black)
-                    Circle()
-                        .stroke(Color.black.opacity(0.3), lineWidth: 1)
-                        .frame(width: brushSize / 2, height: brushSize / 2)
-                        .frame(width: 30, height: 30)
-                }
-
-                webReferenceImagesCard
+                featuresSection
+                    .onAppear {
+                        let a = viewModel.item.attrs
+                        features = ["sleeve": a?.sleeve, "pattern": a?.pattern, "material": a?.material,
+                                    "silhouette": a?.silhouette, "formality": a?.formality]
+                            .compactMapValues { $0 }
+                    }
 
                 attributesSection
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { showImageTools.toggle() }
+                    } label: {
+                        HStack {
+                            Label("画像を整える", systemImage: "eraser")
+                                .font(.system(size: 14, weight: .bold))
+                            Spacer()
+                            Image(systemName: showImageTools ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundStyle(.black)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    if showImageTools {
+                        Text("「ノイズ除去」で背景を自動で透明にできます。気になる部分は上の画像を消しゴムでなぞって透明にできます（市松模様 = 透明）。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        toolRow
+                        HStack(spacing: 10) {
+                            Text("消しゴムの太さ")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            Slider(value: $brushSize, in: 10...60)
+                                .tint(.black)
+                            Circle()
+                                .stroke(Color.black.opacity(0.3), lineWidth: 1)
+                                .frame(width: brushSize / 2, height: brushSize / 2)
+                                .frame(width: 30, height: 30)
+                        }
+                        webReferenceImagesCard
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
+                .background(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.07), lineWidth: 1))
 
                 Color.clear.frame(height: 8)
             }
@@ -133,6 +167,48 @@ struct ItemImageEditView: View {
     }
 
     // MARK: - アイテム情報 (属性編集)
+
+    /// 服の特徴 (袖丈・柄・素材など)。タップで直すとすぐ保存し、提案に使われる
+    private var featuresSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("服の特徴")
+                    .font(.system(size: 14, weight: .bold))
+                Text("相棒が写真と名前から読み取りました。違っていたらタップで直せます")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(ItemFeature.all, id: \.key) { feature in
+                VStack(alignment: .leading, spacing: 8) {
+                    attributeLabel(feature.title)
+                    FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                        ForEach(feature.options, id: \.value) { opt in
+                            pill(opt.label, selected: features[feature.key] == opt.value) {
+                                setFeature(feature.key, opt.value)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.07), lineWidth: 1))
+    }
+
+    private func setFeature(_ key: String, _ value: String) {
+        Haptic.selection()
+        features[key] = value
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        let id = viewModel.item.id
+        Task {
+            if !(await ClosetAttrsClient.update(uid: uid, itemId: id, attrs: [key: value])) {
+                ToastManager.shared.show("特徴を保存できませんでした")
+            }
+        }
+    }
 
     private var attributesSection: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -689,4 +765,37 @@ private struct CheckerboardBackground: View {
         ),
         onSaved: { _, _ in }
     )
+}
+
+
+/// 服の特徴の選択肢 (サーバの item_vocab.ATTR_VALUES のうち、よく使うもの)
+struct ItemFeature {
+    struct Option { let value: String; let label: String }
+    let key: String
+    let title: String
+    let options: [Option]
+
+    static let all: [ItemFeature] = [
+        .init(key: "sleeve", title: "袖丈", options: [
+            .init(value: "sleeveless", label: "袖なし"), .init(value: "short", label: "半袖"),
+            .init(value: "three_quarter", label: "七分袖"), .init(value: "long", label: "長袖")]),
+        .init(key: "pattern", title: "柄", options: [
+            .init(value: "solid", label: "無地"), .init(value: "stripe", label: "ストライプ"),
+            .init(value: "border", label: "ボーダー"), .init(value: "check", label: "チェック"),
+            .init(value: "dot", label: "ドット"), .init(value: "floral", label: "花柄"),
+            .init(value: "logo", label: "ロゴ"), .init(value: "graphic", label: "プリント")]),
+        .init(key: "material", title: "素材", options: [
+            .init(value: "cotton", label: "コットン"), .init(value: "denim", label: "デニム"),
+            .init(value: "knit", label: "ニット"), .init(value: "wool", label: "ウール"),
+            .init(value: "linen", label: "リネン"), .init(value: "leather", label: "レザー"),
+            .init(value: "nylon", label: "ナイロン"), .init(value: "sweat", label: "スウェット"),
+            .init(value: "down", label: "ダウン")]),
+        .init(key: "silhouette", title: "シルエット", options: [
+            .init(value: "slim", label: "細め"), .init(value: "regular", label: "ふつう"),
+            .init(value: "wide", label: "ワイド"), .init(value: "oversized", label: "オーバーサイズ"),
+            .init(value: "tapered", label: "テーパード"), .init(value: "straight", label: "ストレート")]),
+        .init(key: "formality", title: "きちんと度", options: [
+            .init(value: "relaxed", label: "ラク"), .init(value: "casual", label: "普段着"),
+            .init(value: "smart_casual", label: "きれいめ"), .init(value: "formal", label: "フォーマル")]),
+    ]
 }

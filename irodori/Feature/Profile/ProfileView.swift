@@ -11,6 +11,7 @@ struct ProfileView: View {
     @State private var itemToEdit: ClosetItem?
     @State private var showStandardItemSheet = false
     @State private var showItemReplaceSheet = false
+    @State private var showSettingsSheet = false
 
     let itemSpacing: CGFloat = 4
     // グリッドのレイアウト設定 (3列)
@@ -29,17 +30,7 @@ struct ProfileView: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 20) {
-                    userProfileHeader
-                    actionButton(title: "プロフィールを編集") {
-                        path.append(.profileEdit)
-                    }
-                    .padding(.horizontal, 20)
-                    // 試着用の顔写真の再登録・削除 (登録本体は Feature/TryOn/FaceRegistrationSheet)
-                    TryOnFaceSettingCard()
-                    // 玄関カメラ (Raspberry Pi) の連携・設置ガイド
-                    DeviceSettingCard { path.append(.deviceSetup) }
-//                    tabSegmentView  // コーデタブ未実装のためコメントアウト
-
+                    // クローゼットの主役は服の一覧。プロフィール・顔写真・玄関カメラは右上の設定へ
                     VStack(spacing: 16) {
                         addItemButtons
                         // 撮影切り抜きのアイテムがある時だけ、商品画像への差し替え導線を出す
@@ -67,6 +58,31 @@ struct ProfileView: View {
                     viewModel.replaceItem(oldId: oldId, with: newItem)
                 }
             )
+        }
+        .sheet(isPresented: $showSettingsSheet) {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        userProfileHeader
+                        actionButton(title: "プロフィールを編集") {
+                            openFromSettings(.profileEdit)
+                        }
+                        .padding(.horizontal, 20)
+                        // 試着用の顔写真の再登録・削除 (登録本体は Feature/TryOn/FaceRegistrationSheet)
+                        TryOnFaceSettingCard()
+                        // 玄関カメラ (Raspberry Pi) の連携・設置ガイド
+                        DeviceSettingCard { openFromSettings(.deviceSetup) }
+                    }
+                    .padding(.vertical, 16)
+                }
+                .navigationTitle("プロフィールと設定")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("閉じる") { showSettingsSheet = false }
+                    }
+                }
+            }
         }
         .sheet(isPresented: $showItemReplaceSheet) {
             ItemImageReplaceListView(
@@ -135,22 +151,39 @@ struct ProfileView: View {
     // MARK: - 1. headerNavigationBar
     private var headerNavigationBar: some View {
         ZStack {
-            Text("プロフィール")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
+            HStack(spacing: 6) {
+                Text("クローゼット")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.black)
+                if !viewModel.closetItems.isEmpty {
+                    Text("\(viewModel.closetItems.count)点")
+                        .font(.system(size: 13, weight: .medium).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             HStack {
                 Spacer()
-                // カレンダーはタブに昇格したため、プッシュではなくタブ切り替えで開く
-                Button(action: { tabViewModel.selectedTab = .calendar }) {
-                    Image(systemName: "calendar")
+                Button(action: { showSettingsSheet = true }) {
+                    Image(systemName: "person.crop.circle")
+                        .frame(width: 44, height: 44)
                 }
-                .font(.system(size: 20))
+                .font(.system(size: 22))
                 .foregroundStyle(.black)
+                .accessibilityLabel("プロフィールと設定")
             }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
+    }
+
+    /// 設定シートから画面を開く (シートを閉じてから push する)
+    private func openFromSettings(_ destination: ViewType) {
+        showSettingsSheet = false
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            path.append(destination)
+        }
     }
 
     // MARK: - 2. userProfileHeader
@@ -387,7 +420,7 @@ struct ProfileView: View {
                 viewModel.toggleEditMode()
             }
             .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(.blue)
+            .foregroundStyle(.black)
             .padding(.horizontal, 20)
         }
     }
@@ -415,10 +448,11 @@ struct ProfileView: View {
                                     CachedAsyncImage(url: url) { phase in
                                         switch phase {
                                         case .empty:
-                                            ProgressView()
-                                                .frame(maxWidth: .infinity)
+                                            // 読み込み中も正方形の大きさを保つ (グリッドの高さが跳ねないように)
+                                            Color.gray.opacity(0.1)
                                                 .aspectRatio(1, contentMode: .fit)
-                                                .background(Color.gray.opacity(0.1))
+                                                .frame(maxWidth: .infinity)
+                                                .overlay(RenewalShimmer())
                                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                         case .success(let image):
                                             image

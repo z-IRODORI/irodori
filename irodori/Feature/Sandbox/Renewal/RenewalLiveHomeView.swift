@@ -46,6 +46,9 @@ enum RenewalHomeDataSource: String, CaseIterable, Identifiable {
 @MainActor
 @Observable
 final class RenewalLiveHomeModel {
+    static let lastGreetingKey = "renewalHome.lastGreeting"
+    static let lastGreetingDateKey = "renewalHome.lastGreetingDate"
+
     struct Sendoff: Identifiable, Equatable {
         let id = UUID()
         let message: String
@@ -154,6 +157,11 @@ final class RenewalLiveHomeModel {
             switch result {
             case .success(let res):
                 responses[scope] = res
+                // 相棒画面の吹き出しを、ホームのひとことと同じ話題にそろえる
+                if source == .render {
+                    UserDefaults.standard.set(res.greeting, forKey: RenewalLiveHomeModel.lastGreetingKey)
+                    UserDefaults.standard.set(res.target_date, forKey: RenewalLiveHomeModel.lastGreetingDateKey)
+                }
                 for r in res.recipes {
                     if let pid = r.example?.pool_id, let e = r.example?.extraction { extractions[pid] = e }
                 }

@@ -208,9 +208,6 @@ struct CalendarView: View {
                 )
                 .navigationTitle(plannedTitle(planned))
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("閉じる") { presentedSelfPlanned = nil }
-                    }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Menu {
                             // 採用 = 提案(予定)のままでも削除でもない第3の状態「その日のコーデ」
@@ -251,6 +248,9 @@ struct CalendarView: View {
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.black)
                         }
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") { presentedSelfPlanned = nil }
                     }
                 }
             }

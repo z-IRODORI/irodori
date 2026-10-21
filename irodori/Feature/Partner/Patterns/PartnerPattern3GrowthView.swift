@@ -56,7 +56,8 @@ struct PartnerPattern3GrowthView: View {
                     VStack(spacing: 24) {
                         gaugeSection(state: growth.state)
 
-                        if let greeting = viewModel.greeting {
+                        // ホームで相棒が今日話したひとことがあれば、同じ話題を出す (画面ごとに話がずれないように)
+                        if let greeting = Self.recentHomeGreeting ?? viewModel.greeting {
                             PartnerTalkBubble(text: greeting)
                         }
 
@@ -213,6 +214,21 @@ struct PartnerPattern3GrowthView: View {
                 }
             }
         }
+    }
+
+    /// ホームのひとこと (今日・明日の提案のもの)。古ければ nil
+    private static var recentHomeGreeting: String? {
+        let d = UserDefaults.standard
+        guard let text = d.string(forKey: RenewalLiveHomeModel.lastGreetingKey), !text.isEmpty,
+              let date = d.string(forKey: RenewalLiveHomeModel.lastGreetingDateKey) else { return nil }
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        f.dateFormat = "yyyy-MM-dd"
+        let today = f.string(from: Date())
+        let tomorrow = f.string(from: Date().addingTimeInterval(86_400))
+        return (date == today || date == tomorrow) ? text : nil
     }
 
     // MARK: - ふたりのきろく

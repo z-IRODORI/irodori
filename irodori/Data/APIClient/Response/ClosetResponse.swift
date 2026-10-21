@@ -18,6 +18,8 @@ struct ClosetItem: Codable, Identifiable, Hashable {
     let color: String?
     let image_url: String?
     let date: String?
+    /// 柄・袖丈・素材など (相棒が写真と名前から読み取ったもの。ユーザーが直せる)
+    var attrs: ClosetItemAttrs? = nil
 
     /// コーデ撮影から自動で切り抜かれた画像か (Storage の items/{uid}/tops|bottoms/ 配下)。
     /// 検索追加・スタンダード追加・画像編集後の登録は items/{uid}/{item_type=日本語}/ に
@@ -53,5 +55,32 @@ struct ClosetItem: Codable, Identifiable, Hashable {
         default:
             return .tops // 未知の種別はトップス扱い (従来互換)
         }
+    }
+}
+
+
+/// 服の特徴 (サーバの item_vocab の値)
+struct ClosetItemAttrs: Codable, Hashable {
+    var pattern: String?
+    var sleeve: String?
+    var neckline: String?
+    var silhouette: String?
+    var length: String?
+    var material: String?
+    var formality: String?
+    var warmth: String?
+    var style_tags: [String]?
+}
+
+/// 服の特徴を直す (PATCH /api/closet/{uid}/items/{id}/attrs)
+enum ClosetAttrsClient {
+    static func update(uid: String, itemId: String, attrs: [String: String]) async -> Bool {
+        guard let url = URL(string: "https://irodori-api.onrender.com/api/closet/\(uid)/items/\(itemId)/attrs") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["attrs": attrs])
+        guard let (_, resp) = try? await URLSession.shared.data(for: req) else { return false }
+        return (resp as? HTTPURLResponse)?.statusCode == 200
     }
 }

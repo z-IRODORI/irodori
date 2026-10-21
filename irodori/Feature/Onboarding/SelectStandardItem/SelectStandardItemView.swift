@@ -167,7 +167,7 @@ struct SelectStandardItemView: View {
             .toolbar {
                 // 通常モード（onComplete が nil）の場合のみ「閉じる」ボタンを表示
                 if onComplete == nil {
-                    ToolbarItem(placement: .cancellationAction) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button("閉じる") {
                             dismiss()
                         }
@@ -175,7 +175,9 @@ struct SelectStandardItemView: View {
                 }
             }
             .task {
+                async let owned: Void = viewModel.loadOwned()
                 await viewModel.fetchItems()
+                await owned
             }
             .onChange(of: viewModel.registrationSuccess) { _, success in
                 if success {
@@ -344,12 +346,23 @@ struct SelectStandardItemView: View {
                             .resizable()
                             .scaledToFill()
                     } placeholder: {
-                        Color.gray.opacity(0.15)
+                        RenewalShimmer()
                     }
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .clipped()
+
+                    if viewModel.isOwned(item) {
+                        Text("登録済み")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color.black.opacity(0.75), in: Capsule())
+                            .padding(6)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    }
 
                     // Selection indicator
                     if onSelect == nil {

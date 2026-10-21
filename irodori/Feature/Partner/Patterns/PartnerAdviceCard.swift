@@ -143,15 +143,15 @@ struct PartnerAdviceCard: View {
     private func stepsTimeline(advice: PartnerAdvice) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             adviceStep(
-                icon: "hand.thumbsup.fill", color: .green, label: "いいところ",
+                icon: "hand.thumbsup.fill", color: Color(red: 0x11 / 255, green: 0x11 / 255, blue: 0x11 / 255), label: "いいところ",
                 text: advice.good_point, isLast: false
             )
             adviceStep(
-                icon: "exclamationmark.bubble.fill", color: .orange, label: "気になるところ",
+                icon: "exclamationmark.bubble.fill", color: Color(red: 0x11 / 255, green: 0x11 / 255, blue: 0x11 / 255), label: "気になるところ",
                 text: advice.concern, isLast: false
             )
             adviceStep(
-                icon: "wand.and.stars", color: .pink, label: "ワンポイントアドバイス",
+                icon: "wand.and.stars", color: Color(red: 0xD8 / 255, green: 0x1B / 255, blue: 0x60 / 255), label: "ワンポイントアドバイス",
                 text: advice.advice, isLast: true
             )
         }
@@ -221,9 +221,10 @@ struct PartnerAdviceCard: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             } else {
                 HStack(spacing: 8) {
-                    feedbackButton(title: "やってみる", emoji: "💪", reaction: "try_it", color: .pink)
-                    feedbackButton(title: "参考になった", emoji: "🤍", reaction: "helpful", color: .blue)
-                    feedbackButton(title: "今はいいかな", emoji: "🌷", reaction: "not_for_me", color: .gray)
+                    // ホームと同じ黒＋ピンクにそろえ、絵文字はアイコンにする
+                    feedbackButton(title: "やってみる", emoji: "figure.walk", reaction: "try_it", color: .black)
+                    feedbackButton(title: "参考になった", emoji: "lightbulb", reaction: "helpful", color: .black)
+                    feedbackButton(title: "今はいいかな", emoji: "hand.raised", reaction: "not_for_me", color: .gray)
                 }
             }
         }
@@ -236,16 +237,16 @@ struct PartnerAdviceCard: View {
             Task { await viewModel.sendFeedback(reaction) }
         } label: {
             HStack(spacing: 4) {
-                Text(emoji)
-                    .font(.system(size: 13))
+                Image(systemName: emoji)
+                    .font(.system(size: 11, weight: .semibold))
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(color == .gray ? .gray : color)
             }
+            .foregroundColor(color == .gray ? .gray : .black)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 9)
-            .background(color.opacity(0.08))
-            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.black.opacity(color == .gray ? 0.12 : 0.25), lineWidth: 1))
+            .contentShape(Capsule())
         }
         .disabled(viewModel.isSending)
     }

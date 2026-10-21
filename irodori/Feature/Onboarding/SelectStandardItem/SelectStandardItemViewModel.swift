@@ -24,6 +24,8 @@ final class SelectStandardItemViewModel {
 
     // 選択管理
     var selectedItems: Set<String> = []
+    /// すでにクローゼットにある服 (「カテゴリ|色」)。同じ服を2回登録しないよう「登録済み」を出す
+    var ownedKeys: Set<String> = []
 
     // コーデ提案結果
     var coordinateRecommendResults: [CoordinateRecommendResult] = []
@@ -157,6 +159,24 @@ final class SelectStandardItemViewModel {
         } else {
             selectedItems.insert(item.id)
         }
+    }
+
+    func isOwned(_ item: StandardItem) -> Bool {
+        ownedKeys.contains(Self.ownedKey(item.sub_category, item.color))
+    }
+
+    static func ownedKey(_ category: String?, _ color: String?) -> String {
+        let c = (category ?? "").precomposedStringWithCanonicalMapping.trimmingCharacters(in: .whitespaces)
+        let k = (color ?? "").precomposedStringWithCanonicalMapping.trimmingCharacters(in: .whitespaces)
+        return "\(c)|\(k)"
+    }
+
+    /// クローゼットを読み、持っている服のキーを作る (失敗しても一覧は出す)
+    func loadOwned() async {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        guard !uid.isEmpty, let result = try? await ClosetClient().get(uid: uid, itemType: nil),
+              case .success(let res) = result else { return }
+        ownedKeys = Set(res.items.map { Self.ownedKey($0.category, $0.color) })
     }
 
     func isSelected(_ item: StandardItem) -> Bool {
