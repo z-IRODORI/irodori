@@ -29,9 +29,17 @@ struct ClosetItem: Codable, Identifiable, Hashable {
         return decoded.contains("/tops/") || decoded.contains("/bottoms/")
     }
 
+    /// item_type の大分類部分。定番アイテムは「ボトムス_ジーンズ」のように
+    /// 「大分類_小分類」で保存されているため、先頭の大分類だけを取り出す。
+    /// 濁点が分かれた表記 (NFD) も同じ文字列として扱う。
+    var mainItemType: String {
+        let normalized = item_type.precomposedStringWithCanonicalMapping
+        return normalized.split(separator: "_", maxSplits: 1).first.map(String.init) ?? normalized
+    }
+
     // ClothingCategoryへの変換
     var clothingCategory: ClothingCategory {
-        switch item_type {
+        switch mainItemType {
         case "トップス":
             return .tops
         case "ボトムス":

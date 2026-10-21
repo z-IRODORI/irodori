@@ -16,11 +16,11 @@ struct ClosetItemPickerView: View {
     @State private var selectedTab = 0
 
     private var topsItems: [ClosetItem] {
-        closetItems.filter { $0.item_type == "トップス" }
+        closetItems.filter { $0.mainItemType == ClothingCategory.tops.rawValue }
     }
 
     private var bottomsItems: [ClosetItem] {
-        closetItems.filter { $0.item_type == "ボトムス" }
+        closetItems.filter { $0.mainItemType == ClothingCategory.bottoms.rawValue }
     }
 
     private var currentItems: [ClosetItem] {

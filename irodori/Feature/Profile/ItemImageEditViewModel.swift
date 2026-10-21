@@ -36,7 +36,7 @@ final class ItemImageEditViewModel {
 
     var imageChanged: Bool { !undoStack.isEmpty }
     var attributesChanged: Bool {
-        editedItemType != item.item_type
+        editedItemType != item.mainItemType
             || trimmed(editedCategory) != (item.category ?? "")
             || trimmed(editedColor) != (item.color ?? "")
     }
@@ -57,7 +57,8 @@ final class ItemImageEditViewModel {
         self.item = item
         self.registerClient = registerClient
         self.deleteClient = deleteClient
-        self.editedItemType = item.item_type
+        // 定番アイテムの「トップス_Tシャツ」も種類の選択肢 (トップス) に合わせる
+        self.editedItemType = item.mainItemType
         self.editedCategory = item.category ?? ""
         self.editedColor = item.color ?? ""
     }

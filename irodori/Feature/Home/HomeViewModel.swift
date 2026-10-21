@@ -976,7 +976,7 @@ final class HomeViewModel {
             switch result {
             case .success(let response):
                 self.closetItems = response.items.filter {
-                    $0.item_type == "トップス" || $0.item_type == "ボトムス"
+                    $0.mainItemType == ClothingCategory.tops.rawValue || $0.mainItemType == ClothingCategory.bottoms.rawValue
                 }
                 self.hasLoadedCloset = true
             case .failure:

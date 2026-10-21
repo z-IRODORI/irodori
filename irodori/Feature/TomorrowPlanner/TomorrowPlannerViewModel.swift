@@ -138,7 +138,7 @@ final class TomorrowPlannerViewModel {
             let result = try await closetClient.get(uid: uid, itemType: nil)
             if case .success(let response) = result {
                 closetItems = response.items.filter {
-                    $0.item_type == "トップス" || $0.item_type == "ボトムス"
+                    $0.mainItemType == ClothingCategory.tops.rawValue || $0.mainItemType == ClothingCategory.bottoms.rawValue
                 }
             }
         } catch {}
