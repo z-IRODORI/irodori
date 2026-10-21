@@ -345,10 +345,19 @@ enum RenewalFlatLayBuilder {
         var usedOwned: Set<String> = []
         var usedMissing: Set<String> = []
         var pieces: [RenewalFlatPiece] = []
+        let inProgress = extraction?.isInProgress ?? false
         func buy(_ it: OwnedFirstExtractedItem) -> RenewalFlatPiece {
-            RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: it.image_url.isEmpty ? nil : it.image_url,
-                             label: it.label, kind: it.image_url.isEmpty ? .placeholder : .example, ownedMatch: false,
-                             preparing: it.image_url.isEmpty)
+            if !it.image_url.isEmpty {
+                return RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: it.image_url,
+                                        label: it.label, kind: .example, ownedMatch: false)
+            }
+            // 商品画像を用意している間はきらめかせる。用意しない (1日の上限など) ときは写真の切り抜きで見せる
+            if !inProgress, !it.crop_url.isEmpty {
+                return RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: it.crop_url,
+                                        label: it.label, kind: .example, ownedMatch: false)
+            }
+            return RenewalFlatPiece(id: "x_\(it.id)", slot: it.slot, imageURL: nil, label: it.label,
+                                    kind: .placeholder, ownedMatch: false, preparing: inProgress)
         }
         for it in items {
             if let o = r.owned_items.first(where: { $0.slot == it.slot && !usedOwned.contains($0.item_id) }) {

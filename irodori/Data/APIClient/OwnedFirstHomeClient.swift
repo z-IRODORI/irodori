@@ -40,7 +40,8 @@ struct OwnedFirstExample: Codable, Hashable {
     let extraction: OwnedFirstExtraction?
 }
 
-/// お手本コーデから抽出したアイテム (Nano Banana)。status: none | pending | cropped | ready | failed
+/// コーデモデルが着ているアイテム (サーバのアイテムカタログ)。status: none | pending | ready
+/// (旧形式の cropped / failed も受け付ける)
 struct OwnedFirstExtraction: Codable, Hashable {
     let status: String
     let items: [OwnedFirstExtractedItem]

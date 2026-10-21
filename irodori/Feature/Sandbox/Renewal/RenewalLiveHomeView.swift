@@ -862,7 +862,7 @@ struct RenewalLiveRecipeDetailView: View {
                     if let e = model.extraction(for: recipe), !e.items.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             RenewalSectionTitle(title: "コーデモデルのアイテム",
-                                                caption: e.isInProgress ? "商品画像を生成中…" : "コーデモデルの写真から抽出 (Nano Banana)")
+                                                caption: e.isInProgress ? "商品画像を用意中…" : "コーデモデルのアイテム (アイテムカタログ)")
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(alignment: .top, spacing: 10) {
                                     ForEach(e.items) { it in
