@@ -10,14 +10,15 @@ import SwiftUI
 
 struct PartnerProfileSandboxView: View {
     enum Tab: String, CaseIterable, Identifiable {
+        case d = "D シンプル"
         case a = "A カルテ"
         case b = "B 実績"
         case c = "C 見立て"
-        case json = "レスポンス"
+        case json = "JSON"
         var id: String { rawValue }
     }
 
-    @State private var tab: Tab = .a
+    @State private var tab: Tab = .d
     @State private var preset: PartnerProfileSandboxStore.Preset = .day3
     @State private var store = PartnerProfileSandboxStore(preset: .day3)
 
@@ -40,6 +41,7 @@ struct PartnerProfileSandboxView: View {
 
             Group {
                 switch tab {
+                case .d: PartnerProfileDesignD(store: store)
                 case .a: PartnerProfileDesignA(store: store)
                 case .b: PartnerProfileDesignB(store: store)
                 case .c: PartnerProfileDesignC(store: store)

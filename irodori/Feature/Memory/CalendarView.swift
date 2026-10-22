@@ -107,7 +107,7 @@ struct CalendarView: View {
                     Button("リニューアル後アプリ体験 (Mock)") {
                         showRenewalSandbox = true
                     }
-                    NavigationLink("相棒画面: あなたの特徴とミッション (案 A/B/C)") {
+                    NavigationLink("相棒画面: あなたの特徴とミッション (案 A〜D)") {
                         PartnerProfileSandboxView()
                     }
                     NavigationLink("相棒統合ホーム画面 (改善案 A/B/C)") {
