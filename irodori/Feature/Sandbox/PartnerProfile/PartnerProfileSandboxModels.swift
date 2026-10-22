@@ -18,6 +18,8 @@ struct PartnerProfileResponseDraft: Codable {
     /// 相棒が一文でまとめたあなた (Gemini で1日1回だけ作る。ほかは集計だけで出す)
     let summary: String
     let traits: [Trait]
+    /// 相棒の発見 (日記・カード・ストーリーの1件)。新しい順
+    let discoveries: [Discovery]
     let missions: [Mission]
     let unlocks: [Unlock]
     /// 前回見たあとにクリアしたミッション (お祝いの表示に使う)
@@ -49,6 +51,35 @@ struct PartnerProfileResponseDraft: Codable {
         let swatches: [String]? // 色の特徴だけ。#RRGGBB
         let meter: Meter?       // 2択の傾き (カジュアル ↔ きれいめ など)
         let unlock_hint: String? // locked のときの条件 (「あと2日『着る』を決めるとわかる」)
+    }
+
+    struct Discovery: Codable, Identifiable, Hashable {
+        let id: String
+        let date: String            // 2026-10-22
+        let hue: String             // pink | sky | lemon | mint | lilac | peach
+        let rarity: String          // normal | surprise | rare
+        let headline: String?       // locked のときは nil
+        let body: String?
+        let viz: Viz?
+        let dig: Dig?
+        let unlock_at: Int
+        let teaser: String          // まだのときの予告
+        let status: String          // locked | new | read | answered
+    }
+
+    struct Viz: Codable, Hashable {
+        let type: String            // color_share | weekday | compare | garments
+        let labels: [String]
+        let values: [Double]
+        let unit: String?
+        let item_ids: [String]?     // garments のときは手持ちの服 id (画像はクローゼットから)
+    }
+
+    struct Dig: Codable, Hashable {
+        let question: String
+        let options: [String]
+        let answer: String?         // 返事済みなら選んだ答え
+        let reply: String?          // 相棒の返事 (答えに応じて生成)
     }
 
     struct Evidence: Codable, Hashable {
@@ -123,7 +154,7 @@ enum PartnerMissionCatalog {
         .init(id: "closet_10", stage: 2, title: "服を10点おぼえさせる", hint: "トップス・ボトムス・靴がそろうと提案が広がる", points: 5, target: 10, action: "open_closet", icon: "square.grid.2x2"),
         .init(id: "pivot", stage: 2, title: "主役の服を選んで組む", hint: "着たい服から3案を作り直す", points: 4, target: 1, action: "open_home", icon: "star"),
         .init(id: "react_3", stage: 2, title: "3案への反応を3回", hint: "いいね／ちょっと違うの合計", points: 3, target: 3, action: "open_home", icon: "hand.thumbsup"),
-        .init(id: "trait_check_2", stage: 2, title: "相棒の見立てを2つ答え合わせ", hint: "「合ってる／ちょっと違う」を押す", points: 4, target: 2, action: "check_traits", icon: "checklist"),
+        .init(id: "trait_check_2", stage: 2, title: "相棒の発見に2回返事する", hint: "日記やカードの問いかけに答える", points: 4, target: 2, action: "check_traits", icon: "checklist"),
         // ステージ3 ともだち (3〜5日目) 計17
         .init(id: "login_3", stage: 3, title: "3日会いに来る", hint: "連続でなくてもOK", points: 4, target: 3, action: "open_home", icon: "calendar"),
         .init(id: "decide_3", stage: 3, title: "3日分「着る」と決める", hint: "決めた日はカレンダーに残る", points: 5, target: 3, action: "open_home", icon: "checkmark.seal"),
@@ -134,7 +165,7 @@ enum PartnerMissionCatalog {
         .init(id: "decide_7", stage: 4, title: "7日分「着る」と決める", hint: "1週間分の癖が見えてくる", points: 5, target: 7, action: "open_home", icon: "checkmark.seal"),
         .init(id: "closet_20", stage: 4, title: "服を20点おぼえさせる", hint: "アウターや小物も", points: 4, target: 20, action: "open_closet", icon: "cabinet"),
         .init(id: "photo_3", stage: 4, title: "全身写真を3枚撮る", hint: "", points: 3, target: 3, action: "open_camera", icon: "camera.on.rectangle"),
-        .init(id: "trait_check_all", stage: 4, title: "見立てを全部答え合わせ", hint: "わかった特徴すべて", points: 3, target: 8, action: "check_traits", icon: "checklist.checked"),
+        .init(id: "trait_check_all", stage: 4, title: "相棒の発見に8回返事する", hint: "返事するほど提案が変わる", points: 3, target: 8, action: "check_traits", icon: "checklist.checked"),
         // ステージ5 あいぼう (1〜2か月) 計18
         .init(id: "login_20", stage: 5, title: "20日会いに来る", hint: "", points: 6, target: 20, action: "open_home", icon: "heart"),
         .init(id: "season", stage: 5, title: "季節の変わり目をいっしょに越える", hint: "気温帯が2つ以上の日に「着る」を決める", points: 5, target: 2, action: "open_home", icon: "leaf"),

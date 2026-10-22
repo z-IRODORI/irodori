@@ -2,366 +2,201 @@
 //  PartnerProfileDesignA.swift
 //  irodori - Sandbox
 //
-//  案A「あなたのカルテ」
-//  上: 理解度のバーと今のステージ。中: 相棒がまとめたあなた + 特徴を4つのグループで一覧。
-//  下: 今のステージのミッション。特徴の行は「合ってる／ちょっと違う」で答え合わせできる。
+//  案A「ふたりの交換日記」
+//  相棒が見つけたあなたのことを、日付つきの日記として1ページずつ書いてくれる。
+//  ページの最後には必ず相棒からの問いかけがあり、返事をするとその場で相棒が返す (= 交換日記)。
+//  返事は次の提案に効き、ページの色テープで「何の発見か」がひと目でわかる。
 //
 
 import SwiftUI
 
 struct PartnerProfileDesignA: View {
     @Bindable var store: PartnerProfileSandboxStore
-    @State private var openTrait: PartnerTraitMock?
+    @Bindable var discoveries: PartnerDiscoveryState
+    @State private var showMissions = false
+
+    private var pages: [PartnerDiscovery] { discoveries.discoveries(pct: store.pct) }
+    private var waitingCount: Int { pages.filter { discoveries.answers[$0.id] == nil }.count }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                header
-                summaryCard
-                ForEach(PartnerTraitMock.Group.allCases, id: \.self) { group in
-                    traitGroup(group)
+            VStack(alignment: .leading, spacing: 22) {
+                PartnerUnderstandingStrip(store: store) { showMissions = true }
+                cover
+                if pages.isEmpty {
+                    emptyPage
+                } else {
+                    ForEach(Array(pages.enumerated()), id: \.element.id) { i, d in
+                        page(d, isNew: i == 0)
+                    }
                 }
-                missionsSection
+                if let next = discoveries.upcoming(pct: store.pct).first {
+                    nextPage(next)
+                }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
             .padding(.top, 16)
             .padding(.bottom, 60)
         }
         .background(RenewalTokens.ground)
-        .sheet(item: $openTrait) { trait in
-            PartnerTraitDetailSheet(trait: trait, store: store)
-                .presentationDetents([.medium])
+        .sheet(isPresented: $showMissions) {
+            PartnerAllMissionsSheet(store: store).presentationCornerRadius(28)
         }
     }
 
-    // MARK: - ヘッダー (理解度)
+    // MARK: - 表紙
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 14) {
-            PartnerIconImage(size: 56)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("理解度")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(RenewalTokens.muted)
-                    Text("\(store.pct)%")
-                        .font(.system(size: 26, weight: .bold))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                    Spacer()
-                    Text(store.stage.name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(RenewalTokens.raised)
-                        .clipShape(Capsule())
-                }
-                stagedBar
-                if let next = store.nextStage {
-                    Text("あと\(next.at_pct - store.pct)%で「\(next.name)」")
-                        .font(.system(size: 11))
-                        .foregroundStyle(RenewalTokens.muted)
-                }
-            }
-        }
-        .animation(.easeOut(duration: 0.4), value: store.pct)
-    }
-
-    /// ステージの区切りが入ったバー
-    private var stagedBar: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(RenewalTokens.border)
-                Capsule().fill(RenewalTokens.ink)
-                    .frame(width: geo.size.width * CGFloat(store.pct) / 100)
-                ForEach(PartnerMissionCatalog.stages.dropFirst(), id: \.index) { s in
-                    Rectangle().fill(RenewalTokens.ground)
-                        .frame(width: 2)
-                        .offset(x: geo.size.width * CGFloat(s.at_pct) / 100 - 1)
-                }
-            }
-        }
-        .frame(height: 6)
-        .accessibilityHidden(true)
-    }
-
-    // MARK: - 相棒のまとめ
-
-    private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("相棒から見たあなた")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(RenewalTokens.muted)
-            Text(store.summary)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(RenewalTokens.ink)
-                .lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .renewalCard()
-    }
-
-    // MARK: - 特徴
-
-    private func traitGroup(_ group: PartnerTraitMock.Group) -> some View {
-        let all = PartnerTraitCatalog.all.filter { $0.group == group }
-        let open = all.filter { store.pct >= $0.unlockAt }
-        let locked = all.filter { store.pct < $0.unlockAt }
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(group.rawValue)
-                    .font(.system(size: 15, weight: .semibold))
-                Spacer()
-                Text("\(open.count)/\(all.count)")
-                    .font(.system(size: 12))
-                    .monospacedDigit()
-                    .foregroundStyle(RenewalTokens.muted)
-            }
-            VStack(spacing: 0) {
-                ForEach(Array(open.enumerated()), id: \.element.id) { i, t in
-                    if i > 0 { Divider().padding(.leading, 44) }
-                    Button { openTrait = t } label: { traitRow(t) }
-                        .buttonStyle(.plain)
-                }
-                if let next = locked.first {
-                    if !open.isEmpty { Divider().padding(.leading, 44) }
-                    lockedRow(next, more: locked.count - 1)
-                }
-            }
-            .renewalCard()
-        }
-    }
-
-    private func traitRow(_ t: PartnerTraitMock) -> some View {
+    private var cover: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: t.icon)
-                .font(.system(size: 14))
-                .frame(width: 20)
-                .foregroundStyle(RenewalTokens.muted)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(t.title)
-                    .font(.system(size: 11))
-                    .foregroundStyle(RenewalTokens.muted)
-                HStack(spacing: 6) {
-                    Text(t.value)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(RenewalTokens.ink)
-                    if !t.swatches.isEmpty { PartnerProfileSwatches(colors: t.swatches, size: 12) }
-                }
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 4) {
-                verdictMark(t)
-                PartnerProfileConfidenceDots(level: store.confidence(t))
-            }
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(RenewalTokens.controlBorder)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private func verdictMark(_ t: PartnerTraitMock) -> some View {
-        switch store.verdicts[t.id] {
-        case true?:
-            Text("合ってる").font(.system(size: 10, weight: .semibold)).foregroundStyle(RenewalTokens.ink)
-        case false?:
-            Text("見直し中").font(.system(size: 10, weight: .semibold)).foregroundStyle(RenewalTokens.muted)
-        case nil:
-            Text(store.confidence(t) == 3 ? "わかった" : "答え合わせ待ち")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(store.confidence(t) == 3 ? RenewalTokens.ink : RenewalTokens.accentPink)
-        }
-    }
-
-    private func lockedRow(_ t: PartnerTraitMock, more: Int) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "lock")
-                .font(.system(size: 13))
-                .frame(width: 20)
-                .foregroundStyle(RenewalTokens.controlBorder)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(t.title + (more > 0 ? " ほか\(more)つ" : ""))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(RenewalTokens.muted)
-                Text(t.unlockHint)
-                    .font(.system(size: 11))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("ふたりの交換日記")
+                    .font(.system(size: 22, weight: .bold))
+                Text(waitingCount > 0 ? "返事待ちのページが\(waitingCount)つあるよ" : "ぜんぶ返事したね。次のページを書いてるところ")
+                    .font(.system(size: 12))
                     .foregroundStyle(RenewalTokens.muted)
             }
             Spacer()
+            // 色テープの束 (ページの色の数)
+            HStack(spacing: -6) {
+                ForEach(Array(Set(pages.map(\.hue))).sorted { $0.rawValue < $1.rawValue }, id: \.self) { h in
+                    RoundedRectangle(cornerRadius: 3).fill(h.wash)
+                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(h.mid, lineWidth: 1))
+                        .frame(width: 14, height: 34)
+                        .rotationEffect(.degrees(Double(h.rawValue.count % 3) * 6 - 6))
+                }
+            }
         }
-        .padding(12)
-        .background(RenewalTokens.raised.opacity(0.5))
+        .padding(.top, 6)
     }
 
-    // MARK: - ミッション
+    // MARK: - ページ
 
-    private var missionsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("理解度を上げるミッション")
-                    .font(.system(size: 15, weight: .semibold))
+    private func page(_ d: PartnerDiscovery, isNew: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // 日付 + テープ
+            HStack(alignment: .center) {
+                Text(d.date)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(d.hue.ink)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 3).fill(d.hue.wash)
+                            .overlay(RoundedRectangle(cornerRadius: 3).stroke(d.hue.mid.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
+                    )
+                    .rotationEffect(.degrees(-2))
+                if d.rarity != .normal {
+                    PartnerRarityBadge(rarity: d.rarity, hue: d.hue)
+                }
                 Spacer()
-                if let s = store.activeMissions.first?.stage {
-                    Text("目安 \(PartnerMissionCatalog.stageDays[s] ?? "")")
-                        .font(.system(size: 11))
-                        .foregroundStyle(RenewalTokens.muted)
+                if isNew && discoveries.answers[d.id] == nil {
+                    Text("NEW")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundStyle(RenewalTokens.accentPink)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .overlay(Capsule().stroke(RenewalTokens.accentPink, lineWidth: 1.5))
+                        .rotationEffect(.degrees(8))
                 }
             }
-            VStack(spacing: 0) {
-                ForEach(Array(store.activeMissions.enumerated()), id: \.element.id) { i, m in
-                    if i > 0 { Divider().padding(.leading, 44) }
-                    PartnerMissionRow(mission: m, store: store)
-                }
-            }
-            .renewalCard()
-            Text("Sandbox: ミッションをタップすると1つ進みます")
-                .font(.system(size: 10))
-                .foregroundStyle(RenewalTokens.muted)
-        }
-    }
-}
 
-// MARK: - ミッションの行 (案A・案C で共用)
-
-struct PartnerMissionRow: View {
-    let mission: PartnerMissionCatalog.Def
-    @Bindable var store: PartnerProfileSandboxStore
-
-    var body: some View {
-        let done = store.isDone(mission)
-        let cur = store.current(mission)
-        Button {
-            Haptic.impact(.soft)
-            withAnimation(.easeOut(duration: 0.3)) { store.tap(mission) }
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .stroke(done ? Color.clear : RenewalTokens.controlBorder, lineWidth: 1.5)
-                        .background(Circle().fill(done ? RenewalTokens.ink : Color.clear))
-                    if done {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                    } else {
-                        Image(systemName: mission.icon)
-                            .font(.system(size: 10))
-                            .foregroundStyle(RenewalTokens.muted)
-                    }
-                }
-                .frame(width: 22, height: 22)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(mission.title)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(done ? RenewalTokens.muted : RenewalTokens.ink)
-                        .strikethrough(done, color: RenewalTokens.muted)
-                    if !mission.hint.isEmpty && !done {
-                        Text(mission.hint)
-                            .font(.system(size: 11))
-                            .foregroundStyle(RenewalTokens.muted)
-                    }
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("+\(mission.points)%")
-                        .font(.system(size: 12, weight: .bold))
-                        .monospacedDigit()
-                        .foregroundStyle(done ? RenewalTokens.muted : RenewalTokens.ink)
-                    if mission.target > 1 && !done {
-                        Text("\(cur)/\(mission.target)")
-                            .font(.system(size: 10))
-                            .monospacedDigit()
-                            .foregroundStyle(RenewalTokens.muted)
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(mission.title)、\(done ? "クリア" : "\(cur)/\(mission.target)")、理解度プラス\(mission.points)%")
-    }
-}
-
-// MARK: - 特徴の詳細シート (答え合わせ)
-
-struct PartnerTraitDetailSheet: View {
-    let trait: PartnerTraitMock
-    @Bindable var store: PartnerProfileSandboxStore
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Label(trait.title, systemImage: trait.icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(RenewalTokens.muted)
-                Spacer()
-                Button("閉じる") { dismiss() }
-                    .font(.system(size: 14))
+            // 相棒の文
+            VStack(alignment: .leading, spacing: 8) {
+                Text(d.headline)
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(RenewalTokens.ink)
-            }
-            HStack(spacing: 8) {
-                Text(trait.value)
-                    .font(.system(size: 22, weight: .bold))
-                if !trait.swatches.isEmpty { PartnerProfileSwatches(colors: trait.swatches, size: 18) }
-            }
-            if let m = trait.meter {
-                PartnerProfileMeter(left: m.left, right: m.right, value: m.value)
-            }
-            HStack(alignment: .top, spacing: 10) {
-                PartnerIconImage(size: 32)
-                Text(trait.detail)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(d.body)
                     .font(.system(size: 14))
-                    .lineSpacing(3)
+                    .foregroundStyle(RenewalTokens.ink.opacity(0.85))
+                    .lineSpacing(5)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("そう思った理由")
-                    .font(.system(size: 12, weight: .semibold))
+
+            PartnerDiscoveryVizView(viz: d.viz, hue: d.hue)
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(d.hue.wash.opacity(0.6)))
+
+            // 交換日記の返事欄
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 4) {
+                    Image(systemName: "pencil.line").font(.system(size: 10, weight: .semibold))
+                    Text("あなたの返事")
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(d.hue.ink)
+                .padding(.bottom, 8)
+                PartnerDigView(discovery: d, state: discoveries)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(d.hue.wash))
+        }
+        .padding(16)
+        .background(
+            // うすい罫線の紙
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(RenewalTokens.surface)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(d.hue.mid.opacity(0.6)).frame(width: 3).padding(.vertical, 18)
+                }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 12, y: 4)
+    }
+
+    private var emptyPage: some View {
+        VStack(spacing: 10) {
+            PartnerIconImage(size: 56)
+            Text("まだ1ページ目を書いてるところ")
+                .font(.system(size: 14, weight: .semibold))
+            Text("服を5点おぼえさせると、最初のページが届くよ")
+                .font(.system(size: 12))
+                .foregroundStyle(RenewalTokens.muted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .partnerSoftCard(20)
+    }
+
+    // MARK: - 次のページ (予告)
+
+    private func nextPage(_ d: PartnerDiscovery) -> some View {
+        let need = max(0, d.unlockAt - store.pct)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("次のページ")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(d.hue.ink)
+                Spacer()
+                Text("理解度 あと\(need)%")
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
                     .foregroundStyle(RenewalTokens.muted)
-                ForEach(trait.evidence, id: \.self) { e in
-                    Label(e, systemImage: "circle.fill")
-                        .labelStyle(PartnerBulletLabelStyle())
-                        .font(.system(size: 12))
-                        .foregroundStyle(RenewalTokens.ink)
+            }
+            Text(d.teaser)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(RenewalTokens.ink)
+            // 伏せ字の本文
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach([0.9, 0.75, 0.5], id: \.self) { w in
+                    GeometryReader { geo in
+                        Capsule().fill(d.hue.mid.opacity(0.35)).frame(width: geo.size.width * w)
+                    }
+                    .frame(height: 9)
                 }
             }
-            Spacer(minLength: 0)
-            HStack(spacing: 10) {
-                verdictButton("ちょっと違う", agree: false)
-                verdictButton("合ってる", agree: true)
+            HStack(spacing: 6) {
+                PartnerIconImage(size: 22)
+                Text("いま書いてるところ。もう少しで見せられそう")
+                    .font(.system(size: 11))
+                    .foregroundStyle(RenewalTokens.muted)
             }
         }
-        .padding(20)
-    }
-
-    private func verdictButton(_ title: String, agree: Bool) -> some View {
-        let selected = store.verdicts[trait.id] == agree
-        return Button {
-            Haptic.impact(.soft)
-            store.verdict(trait, agree: agree)
-            dismiss()
-        } label: {
-            Text(title)
-        }
-        .buttonStyle(RenewalPrimaryButtonStyle(filled: agree || selected))
-    }
-}
-
-struct PartnerBulletLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            configuration.icon.font(.system(size: 4)).foregroundStyle(RenewalTokens.muted)
-            configuration.title
-        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(d.hue.mid, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+        )
     }
 }
