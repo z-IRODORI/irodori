@@ -261,6 +261,7 @@ struct PartnerDiscoverySheet: View {
                     .padding(14)
                     .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(d.hue.wash))
                 PartnerDigView(discovery: d, state: discoveries)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
                     .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(d.hue.wash.opacity(0.7)))
             }
