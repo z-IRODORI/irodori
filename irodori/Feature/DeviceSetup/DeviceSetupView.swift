@@ -335,20 +335,37 @@ struct DeviceSetupView: View {
                 hintBand
                     .padding(12)
             }
-            Text("映像の緑の点と線は、カメラが見つけた体の部位です。枠が黄色から緑になれば撮影できる状態です。立ち位置から 1.8〜2.5m、カメラの高さは 1.0〜1.3m が目安。")
+            Text("映像の緑の点と線は、カメラが見つけた体の部位です。枠が緑になった瞬間だけ撮影できます (黄色やオレンジのうちは撮れません)。顔・肩・腰・膝が写れば OK。立ち位置から 1.8〜2.5m、カメラの高さは 1.0〜1.3m が目安。")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
     }
 
-    /// 達成度 → 枠色。0 = 無色、途中 = 黄〜黄緑、1 = 緑。服装チェックに引っかかればオレンジ
+    /// 達成度 → 枠色。0 = 無色、途中 = オレンジ〜黄 (緑には近づけない)、1 = 緑。服装チェックに引っかかればオレンジ
+    /// 緑は「いま撮影できる」ときだけ。80% が緑っぽく見えて撮れないと誤解された経緯から、途中は暖色に固定する
     private var readinessColor: Color {
         let r = viewModel.readiness
         if r > 0 && viewModel.isAttireBlocked { return Color.orange }
         if r <= 0 { return Color.black.opacity(0.07) }
         if r >= 1 { return Color.green }
-        // 黄 (hue 0.14) → 緑 (hue 0.33) へ滑らかに
-        return Color(hue: 0.14 + 0.19 * r, saturation: 0.85, brightness: 0.9)
+        // オレンジ (hue 0.08) → 黄 (hue 0.15)
+        return Color(hue: 0.08 + 0.07 * r, saturation: 0.9, brightness: 0.95)
+    }
+
+    /// 足りない部位を「あと: 膝・手」の形で
+    private var missingPartsText: String? {
+        guard let missing = viewModel.device?.status?.judgement?.missing, !missing.isEmpty else { return nil }
+        let labels: [String: String] = [
+            "nose": "顔", "l_eye": "顔", "r_eye": "顔", "l_ear": "顔全体", "r_ear": "顔全体",
+            "l_shoulder": "肩", "r_shoulder": "肩", "l_elbow": "腕", "r_elbow": "腕",
+            "l_wrist": "手", "r_wrist": "手", "l_hip": "腰", "r_hip": "腰",
+            "l_knee": "膝", "r_knee": "膝", "l_ankle": "足元", "r_ankle": "足元",
+        ]
+        var seen: [String] = []
+        for m in missing {
+            if let l = labels[m], !seen.contains(l) { seen.append(l) }
+        }
+        return seen.isEmpty ? nil : "あと: " + seen.joined(separator: "・")
     }
 
     @ViewBuilder
@@ -363,7 +380,7 @@ struct DeviceSetupView: View {
                 return "服装を判定できません（暗さ・逆光）"
             }
             if viewModel.isFullBodyOK { return "撮影できるよ！" }
-            return viewModel.hints.first ?? "全身が写るかチェック！"
+            return missingPartsText ?? viewModel.hints.first ?? "全身が写るかチェック！"
         }()
         HStack(spacing: 8) {
             if viewModel.isPersonPresent && !viewModel.isFullBodyOK && !blocked {
