@@ -10,39 +10,6 @@
 
 import SwiftUI
 
-// MARK: - パレット (IRODORI = 彩り。発見ごとに色を持たせる)
-
-enum PartnerHue: String, Codable, CaseIterable {
-    case pink, sky, lemon, mint, lilac, peach
-
-    /// カードの地色 (うすい)
-    var wash: Color {
-        switch self {
-        case .pink: return Color(red: 1.00, green: 0.91, blue: 0.94)
-        case .sky: return Color(red: 0.89, green: 0.94, blue: 1.00)
-        case .lemon: return Color(red: 1.00, green: 0.96, blue: 0.84)
-        case .mint: return Color(red: 0.88, green: 0.97, blue: 0.92)
-        case .lilac: return Color(red: 0.94, green: 0.91, blue: 1.00)
-        case .peach: return Color(red: 1.00, green: 0.92, blue: 0.86)
-        }
-    }
-
-    /// 文字・アクセント (白地・wash 地で読める濃さ)
-    var ink: Color {
-        switch self {
-        case .pink: return Color(red: 0.80, green: 0.10, blue: 0.38)
-        case .sky: return Color(red: 0.12, green: 0.40, blue: 0.78)
-        case .lemon: return Color(red: 0.62, green: 0.45, blue: 0.00)
-        case .mint: return Color(red: 0.06, green: 0.52, blue: 0.34)
-        case .lilac: return Color(red: 0.44, green: 0.28, blue: 0.80)
-        case .peach: return Color(red: 0.78, green: 0.33, blue: 0.10)
-        }
-    }
-
-    /// 中間 (グラフやテープ)
-    var mid: Color { ink.opacity(0.35) }
-}
-
 // MARK: - 発見
 
 struct PartnerDiscovery: Identifiable, Hashable {
@@ -447,35 +414,6 @@ struct PartnerDigView: View {
                 }
                 .padding(.leading, 34)
             }
-        }
-    }
-}
-
-/// 折り返して並べる (チップ用)
-struct PartnerFlowChips: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxW = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0, w: CGFloat = 0
-        for v in subviews {
-            let s = v.sizeThatFits(.unspecified)
-            if x > 0 && x + s.width > maxW { x = 0; y += rowH + spacing; rowH = 0 }
-            x += s.width + spacing
-            rowH = max(rowH, s.height)
-            w = max(w, x - spacing)
-        }
-        return CGSize(width: min(w, maxW), height: y + rowH)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, rowH: CGFloat = 0
-        for v in subviews {
-            let s = v.sizeThatFits(.unspecified)
-            if x > bounds.minX && x + s.width > bounds.maxX { x = bounds.minX; y += rowH + spacing; rowH = 0 }
-            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
-            x += s.width + spacing
-            rowH = max(rowH, s.height)
         }
     }
 }

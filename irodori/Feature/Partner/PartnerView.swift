@@ -4,7 +4,8 @@
 //
 //  Created by Claude on 2026/03/12.
 //
-//  相棒画面。ベースUIは「育つ相棒」(PartnerPattern3GrowthView)。
+//  相棒画面。案E「シンプル + 週報」(PartnerProfileView): ミッション制の理解度と相棒の発見。
+//  旧UI「育つ相棒」(PartnerPattern3GrowthView) は残してあるが、ここからは使わない。
 //
 
 import SwiftUI
@@ -15,17 +16,18 @@ struct PartnerView: View {
     /// シート表示時の閉じるコールバック (NavigationStack push 時は nil)
     var onClose: (() -> Void)? = nil
     @State private var showPartnerOnboardingSheet = false
+    @Environment(MainTabViewModel.self) private var tabViewModel: MainTabViewModel?
 
     var body: some View {
-        PartnerPattern3GrowthView(
+        PartnerProfileView(
             onConsultTap: {
                 if let onClose {
                     onClose()
                 }
                 path.append(.generalChat(conversationId: nil))
             },
-            onRetakeOnboarding: {
-                showPartnerOnboardingSheet = true
+            onMissionAction: { action in
+                handleMission(action)
             }
         )
         .navigationTitle("相棒")
@@ -66,6 +68,24 @@ struct PartnerView: View {
                     showPartnerOnboardingSheet = false
                 }
             )
+        }
+    }
+
+    /// ミッションの行き先へ移動する (相棒画面を閉じてタブを切り替える)
+    private func handleMission(_ action: String) {
+        switch action {
+        case "open_onboarding":
+            showPartnerOnboardingSheet = true
+        case "open_camera":
+            onClose?()
+            path.removeAll()
+            path.append(.camera)
+        case "open_closet", "open_calendar", "open_home":
+            onClose?()
+            path.removeAll()
+            tabViewModel?.selectedTab = action == "open_closet" ? .profile : action == "open_calendar" ? .calendar : .home
+        default:
+            break
         }
     }
 }

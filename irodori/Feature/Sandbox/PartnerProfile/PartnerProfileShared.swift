@@ -7,15 +7,6 @@
 
 import SwiftUI
 
-extension View {
-    /// 罫線なしの白カード (IRODORI の白カード + うすい影)
-    func partnerSoftCard(_ radius: CGFloat = 18) -> some View {
-        background(RenewalTokens.surface)
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .shadow(color: .black.opacity(0.05), radius: 12, y: 4)
-    }
-}
-
 // MARK: - ミッションの行 (案D)
 
 struct PartnerSoftMissionRow: View {
