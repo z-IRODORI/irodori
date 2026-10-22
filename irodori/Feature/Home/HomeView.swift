@@ -258,16 +258,25 @@ struct HomeView: View {
         #if DEBUG
         .fullScreenCover(isPresented: $showHomeSandboxSheet) {
             NavigationStack {
-                PartnerIntegratedHomeSandboxView()
-                    .environment(tabViewModel)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("閉じる") {
-                                showHomeSandboxSheet = false
-                            }
-                            .foregroundStyle(.black)
-                        }
+                List {
+                    NavigationLink("相棒画面: あなたの特徴とミッション (案 A/B/C)") {
+                        PartnerProfileSandboxView()
                     }
+                    NavigationLink("相棒統合ホーム画面 (改善案 A/B/C)") {
+                        PartnerIntegratedHomeSandboxView()
+                            .environment(tabViewModel)
+                    }
+                }
+                .navigationTitle("改善案")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("閉じる") {
+                            showHomeSandboxSheet = false
+                        }
+                        .foregroundStyle(.black)
+                    }
+                }
             }
         }
         .fullScreenCover(isPresented: $showRenewalSandbox) {
