@@ -348,16 +348,7 @@ struct PartnerOnboardingFlowView: View {
     }
 
     private var closeButton: some View {
-        Button(action: onComplete) {
-            Image(systemName: "xmark")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(width: 36, height: 36)
-                .background(Color.gray.opacity(0.1))
-                .clipShape(Circle())
-        }
-        .frame(minWidth: 44, minHeight: 44)
-        .accessibilityLabel("閉じる")
+        CloseCircleButton(action: onComplete)
     }
 
     // MARK: - Step 0: 相棒の紹介カード
@@ -367,16 +358,9 @@ struct PartnerOnboardingFlowView: View {
             if showCloseButton {
                 HStack {
                     Spacer()
-                    Button(action: onComplete) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.black)
-                            .frame(width: 36, height: 36)
-                            .background(Color.gray.opacity(0.1))
-                            .clipShape(Circle())
-                    }
+                    CloseCircleButton(action: onComplete)
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 14)
                 .padding(.top, 12)
             } else {
                 Spacer().frame(height: 24)

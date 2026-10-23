@@ -140,7 +140,6 @@ struct PartnerProfileView: View {
                 Task { await viewModel.answer(d, text) }
             }
             .presentationDetents([.fraction(0.66), .large])
-            .presentationCornerRadius(28)
         }
         .sheet(isPresented: $showAllMissions) {
             if let p = profile {
@@ -148,7 +147,6 @@ struct PartnerProfileView: View {
                     onMissionAction?(m.action)
                 }
                 .presentationDetents([.large])
-                .presentationCornerRadius(28)
             }
         }
         .fullScreenCover(isPresented: $playing) {

@@ -12,7 +12,7 @@ struct RecommendCoordinateView: View {
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
                 switch viewModel.recommendCoordinatesState {
                 case .loading, .initial:
@@ -80,20 +80,13 @@ struct RecommendCoordinateView: View {
                     )
                 }
             }
-            .navigationBarTitle("おすすめのコーデ/アイテム", displayMode: .inline)
+            .navigationTitle("おすすめのコーデ/アイテム")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark")
-                    }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("閉じる") { dismiss() }
+                        .foregroundStyle(.black)
                 }
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                DismissButton()
             }
         }
         .task {
@@ -103,17 +96,6 @@ struct RecommendCoordinateView: View {
         .sheet(isPresented: $viewModel.isShowingWebView) {
             WebViewContainer(url: URL(string: viewModel.webURLString)!)
         }
-        .interactiveDismissDisabled(true)
-    }
-
-    private func DismissButton() -> some View {
-            // Close
-            Button(action: {
-                dismiss()
-            }) {
-                Image(systemName: "xmark")
-                    .foregroundColor(.primary)
-            }
     }
 
     /// アフェリエイトの商品を横並びに表示する

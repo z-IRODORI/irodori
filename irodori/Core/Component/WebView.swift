@@ -175,14 +175,7 @@ struct WebViewContainer: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Button(action: { dismiss() }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.primary)
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("閉じる")
+            CloseCircleButton { dismiss() }
 
             // ページタイトル (商品名など)。取得できるまではホスト名を表示
             Text(pageTitle.isEmpty ? (url.host ?? "") : pageTitle)
@@ -192,7 +185,7 @@ struct WebViewContainer: View {
                 .frame(maxWidth: .infinity)
 
             // タイトルを中央に保つための xmark と同幅のバランサー
-            Color.clear.frame(width: 36, height: 36)
+            Color.clear.frame(width: 44, height: 44)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 2)

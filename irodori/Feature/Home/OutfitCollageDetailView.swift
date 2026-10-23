@@ -541,8 +541,9 @@ struct OutfitCollageItemPickerView: View {
             .navigationTitle("\(slotDisplayName)を選択")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("キャンセル") { dismiss() }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("閉じる") { dismiss() }
+                        .foregroundStyle(.black)
                 }
             }
         }

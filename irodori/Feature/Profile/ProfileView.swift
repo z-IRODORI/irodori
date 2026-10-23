@@ -25,8 +25,9 @@ struct ProfileView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 1. トップナビゲーション
+            // 1. トップナビゲーション (下に細い線。ホーム・カレンダーとそろえる)
             headerNavigationBar
+            Rectangle().fill(Color.gray.opacity(0.15)).frame(height: 0.5)
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 20) {

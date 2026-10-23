@@ -24,6 +24,7 @@ struct ItemDetailSheet: View {
     @State private var pushedCoordinate: ViewType.CoordinateDetailParams?
     /// アイテム画像タップで開く拡大ビューア
     @State private var showImageViewer = false
+    @Environment(\.dismiss) private var dismissSheet
 
     private var imageURL: String? { detail?.image_url ?? initialImageURL }
     private var typeLabel: String? { detail?.item_type ?? initialTypeLabel }
@@ -51,6 +52,14 @@ struct ItemDetailSheet: View {
                 .padding(24)
             }
             .background(.white)
+            .navigationTitle("アイテムの詳細")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("閉じる") { dismissSheet() }
+                        .foregroundStyle(.black)
+                }
+            }
             .navigationDestination(item: $pushedCoordinate) { params in
                 CoordinateDetailView(
                     viewModel: .init(

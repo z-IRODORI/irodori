@@ -110,17 +110,8 @@ struct FirstTakePhotoView: View {
 
                     if showCloseButton {
                         HStack {
-                            Button(action: {
-                                onClose?()
-                            }) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(.black)
-                                    .frame(width: 32, height: 32)
-                                    .background(Color.gray.opacity(0.1))
-                                    .clipShape(Circle())
-                            }
-                            .padding(.leading, 16)
+                            CloseCircleButton { onClose?() }
+                                .padding(.leading, 10)
 
                             Spacer()
 

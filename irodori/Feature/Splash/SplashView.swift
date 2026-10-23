@@ -33,6 +33,8 @@ struct SplashView: View {
                             TermsOfServiceView(viewModel: .init(), hasAgreeToTermsOfService: {
                                 viewModel.updateState()
                             })
+                            // 同意するか「同意しない」を選ぶまで、下にスワイプで閉じさせない
+                            .interactiveDismissDisabled()
                         }
                 case .login:
                     LoginView {

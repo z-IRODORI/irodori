@@ -224,11 +224,7 @@ private struct PickerHeader: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.black)
                 HStack {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.black)
-                    }
+                    CloseCircleButton(action: onClose)
                     Spacer()
                 }
             }

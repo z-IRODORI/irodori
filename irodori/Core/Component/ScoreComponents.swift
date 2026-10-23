@@ -76,12 +76,8 @@ struct ScoreDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                    }
+                    Button("閉じる") { dismiss() }
+                        .foregroundStyle(.black)
                 }
             }
         }

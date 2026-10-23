@@ -16,13 +16,8 @@ struct CameraView: View {
     @State private var showCapturedImage = false
     @State private var isShowOnboardingModal: Bool = false
     @State private var showFullBodyPicker = false
+    @Environment(\.dismiss) private var dismiss
     var onPhotoCaptured: ((UIImage) -> Void)? = nil
-    #if DEBUG
-    /// 開発ビルド専用: コーデ解析エンジンの切替 (A/B 検証)。
-    /// "legacy" = 既存 / "v2" = Gemini 3 Flash 検出 + アイテム画像生成。
-    /// Release ビルドはトグル非表示 & 常に legacy (AnalysisEngine.current 参照)。
-    @AppStorage(AnalysisEngine.storageKey) private var debugAnalysisEngine = AnalysisEngine.legacy.rawValue
-    #endif
 
     var body: some View {
         ZStack {
@@ -42,8 +37,8 @@ struct CameraView: View {
 
                 VStack(spacing: 32) {
                     Header()
-                        .padding(.top, 80)
-                        .padding(.horizontal, 24)
+                        .padding(.top, 72)
+                        .padding(.horizontal, 12)
                     CameraPreviewViewRepresentable(cameraViewModel: cameraViewModel)
                         .aspectRatio(3/4, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
@@ -68,8 +63,8 @@ struct CameraView: View {
                 Color.white
                 VStack(spacing: 32) {
                     Header()
-                        .padding(.top, 80)
-                        .padding(.horizontal, 24)
+                        .padding(.top, 72)
+                        .padding(.horizontal, 12)
 
                     Color.pink
                         .aspectRatio(3/4, contentMode: .fit)
@@ -94,16 +89,6 @@ struct CameraView: View {
         .navigationBarBackButtonHidden()
         .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea()
-        // 解析エンジン切替 (デバッグ検証用。Release ビルドには入らない)。
-        // Header 内ではなくルートのオーバーレイに置く: カメラ準備中 (.initial) や
-        // シミュレータのカメラ無し環境でも常に表示され、動作確認が可能になる。
-        .overlay(alignment: .topTrailing) {
-            #if DEBUG
-            debugEngineToggle
-                .padding(.top, 80)
-                .padding(.trailing, 24)
-            #endif
-        }
         .onAppear {
             AnalyticsLogger.shared.log(screen: .cameraScreenView)
             checkCameraPermission()   // カメラを初期化
@@ -199,7 +184,7 @@ struct CameraView: View {
     }
 
     private func Header() -> some View {
-        ZStack {
+        ZStack(alignment: .top) {
             VStack(spacing: 4) {
                 Text("コーデを記録")
                     .font(.system(size: 20, weight: .bold))
@@ -208,17 +193,15 @@ struct CameraView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
-            // 撮影は一時的な画面なので、戻るではなく ✕ で閉じる
+            .padding(.horizontal, 48)
+            // 撮影は一時的な画面なので、戻るではなく ✕ で閉じる。
+            // 見た目は 32pt の丸、押せる範囲は 44pt。タイトルの行と高さをそろえる
             HStack {
-                Button {
-                    if !path.isEmpty { path.removeLast() }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .frame(width: 44, height: 44)
+                // 全画面で開かれたとき (初回の撮影など) は path が空なので、画面ごと閉じる
+                CloseCircleButton {
+                    if path.isEmpty { dismiss() } else { path.removeLast() }
                 }
-                .accessibilityLabel("閉じる")
+                .offset(y: -9)
                 Spacer()
             }
 //            HStack(spacing: 24) {
@@ -260,35 +243,9 @@ struct CameraView: View {
 //            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 30)
+        .frame(height: 44, alignment: .top)
     }
 
-    #if DEBUG
-    /// 既存解析 (legacy) と v2 (Gemini 3 Flash + アイテム画像生成) を切り替える DEBUG トグル
-    private var debugEngineToggle: some View {
-        Button {
-            Haptic.impact(.soft)
-            debugAnalysisEngine = (debugAnalysisEngine == AnalysisEngine.v2.rawValue)
-                ? AnalysisEngine.legacy.rawValue
-                : AnalysisEngine.v2.rawValue
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "flask")
-                    .font(.system(size: 11, weight: .semibold))
-                Text(debugAnalysisEngine == AnalysisEngine.v2.rawValue ? "解析: v2" : "解析: 既存")
-                    .font(.system(size: 12, weight: .bold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                debugAnalysisEngine == AnalysisEngine.v2.rawValue ? Color.purple : Color.orange,
-                in: Capsule()
-            )
-        }
-        .accessibilityIdentifier("debug-engine-toggle")
-    }
-    #endif
 
     private func PartnerComment(image: ImageResource, text: String) -> some View {
         HStack(spacing: 0) {
@@ -332,13 +289,13 @@ extension CameraView {
                         .font(.system(size: 22))
                         .foregroundStyle(.white)
                 }
-                Text("全身写真を探す")
+                Text("AIで写真を探す")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.black)
                     .fixedSize()
             }
         }
-        .accessibilityLabel("写真フォルダから全身写真を探す")
+        .accessibilityLabel("AIで写真フォルダから全身写真を探す")
     }
 
     private func CaptureButton() -> some View {

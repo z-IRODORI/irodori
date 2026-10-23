@@ -175,6 +175,7 @@ struct DailyRecommendationDetailView: View {
                 source: "detail"
             )
             .presentationDetents([.height(300)])
+                .presentationDragIndicator(.visible)
         }
         // ZOZO検索は medium シート内 push だと表示領域が半分になるため全画面カバーで開く
         .fullScreenCover(item: $webLink) { link in

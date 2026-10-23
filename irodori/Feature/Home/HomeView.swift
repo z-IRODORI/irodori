@@ -39,6 +39,8 @@ struct HomeView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 12)
                 .background(.white)
+            // ヘッダーの下に細い線 (カレンダー・クローゼットとそろえる。スクロール時に境目が見える)
+            Rectangle().fill(Color.gray.opacity(0.15)).frame(height: 0.5)
 
             // 2026-10: 手持ち起点ホーム (相棒のひとこと / 次に着る日の気温 / 3案 / 相棒の問いかけ)。
             // 推薦は api/home/owned-first。UI は Sandbox で検証した Feature/Sandbox/Renewal の部品を使う。
