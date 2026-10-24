@@ -1,0 +1,3 @@
+# IRODORI（iOS）。秘密情報は ~/.appstoreconnect/irodori.env にあり、ここには書かない
+app_identifier("com.gmail.yuukirinnma.irodori")
+team_id("BR3T8YBB5L")

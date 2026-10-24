@@ -143,3 +143,12 @@ irodori/                              # iOS リポジトリのルート
 3. 暗号化: HTTPS のみ（独自の暗号なし）として `ITSAppUsesNonExemptEncryption = NO` を入れてよいか。
 4. 審査用デモアカウント: Firebase のテスト用電話番号を新しく用意するか、既にあるものを使うか。
 5. Crashlytics の dSYM アップロードを beta に入れてよいか。
+
+## 12. 導入の記録（2026-10-25）
+
+- 決まったこと: 3.6.0（ビルド 36000）、TestFlight は内部テスターのみ、`ITSAppUsesNonExemptEncryption = NO`、審査用デモアカウントは Firebase のテスト用電話番号（`irodori.env` に保存）、Crashlytics の dSYM を beta で送る、審査通過後は自動公開。
+- `fastlane status`: キー OK、TestFlight の最大 35000。`fastlane metadata_pull` でストア文言を取り込み（`review_information/` は .gitignore）。審査メモにログイン手順を追記した。
+- scheme の TestAction に `irodoriTests` を登録。古くなっていたテスト 1 件（検索ワードの優先順）を今の仕様に合わせ、**39 件すべて成功**。
+- Release アーカイブは成功。**書き出し（署名）で止まった**: Xcode の Apple ID ログインが切れていて配布証明書・プロファイルを取れない。API キーでの署名も試したが、キーが App Manager のため「Cloud signing permission error」。
+  - 対応: 利用者が Xcode の設定 > アカウントで Apple ID に入り直す（既定の署名方法）。または Admin 権限の API キーに替えて `ASC_KEY_CLOUD_SIGNING=true`。
+- xcodebuild -showBuildSettings が初回のパッケージ解決で 3 秒を超えて失敗するため、Fastfile でタイムアウトを 120 秒に延ばした。

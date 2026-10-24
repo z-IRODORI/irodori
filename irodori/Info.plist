@@ -9,15 +9,12 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<!-- Firebase Phone Auth (reCAPTCHA) 用: Encoded App ID -->
 				<string>app-1-816472842049-ios-85f57fcd9a9019d8a04bc0</string>
 			</array>
 		</dict>
 	</array>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -25,9 +22,13 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>同じ Wi‑Fi にある玄関カメラの映像を、遅延なく直接表示するために使います。</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>コーディネート画像をフォトライブラリから選択するために写真へのアクセスが必要です。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>作成したコーデコラージュ画像をカメラロールに保存するために使用します。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>コーディネート画像をフォトライブラリから選択するために写真へのアクセスが必要です。</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

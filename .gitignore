@@ -74,3 +74,6 @@ fastlane/test_output
 # Firebase SDK
 */GoogleService-Info.plist
 firebase-debug.log
+# fastlane (リリース自動化)。審査の連絡先・デモアカウントはリポジトリに入れない
+fastlane/metadata/review_information/
+fastlane/build/

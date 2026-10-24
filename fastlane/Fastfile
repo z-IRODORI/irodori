@@ -1,0 +1,235 @@
+# IRODORI iOS のリリース（設計: docs/release-automation-design.md。NoMuu の Fastfile を土台にしている）
+#
+#   fastlane beta [version:3.6.0] [dry_run:true]   テスト → 番号設定 → アーカイブ → dSYM → TestFlight
+#   fastlane submit                                  ストア文言を反映して審査に提出（確認あり。通過後は自動公開）
+#   fastlane metadata_pull                           App Store Connect の文言を metadata/ に取り込む
+#   fastlane status                                  キーの確認と、TestFlight の最新ビルド番号
+#
+# 審査提出は外部への公開にあたる。Claude は利用者の明示の指示なしに submit を実行しない。
+Encoding.default_external = Encoding::UTF_8 # 日本語のコメント・文言を含むファイルを読むため
+default_platform(:ios)
+# Firebase などのパッケージ解決で xcodebuild -showBuildSettings が初回 3 秒を超えて失敗するため延ばす
+ENV["FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT"] ||= "120"
+ENV["FASTLANE_XCODEBUILD_SETTINGS_RETRIES"] ||= "3"
+
+ROOT = File.expand_path("..", __dir__)
+PROJECT = File.join(ROOT, "irodori.xcodeproj")
+PBXPROJ = File.join(PROJECT, "project.pbxproj")
+SCHEME = "irodori"
+APP_ID = "com.gmail.yuukirinnma.irodori"
+TEST_DEVICE = "7AFD0EE9-870F-4C7A-A502-466A490F7499" # 共有の iPhone 16 Pro（~/.claude/CLAUDE.md の IRODORI の定位置）
+OUTPUT_DIR = File.join(ROOT, "build")
+ENV_FILE = File.expand_path("~/.appstoreconnect/irodori.env")
+GSP_PATH = File.join(ROOT, "GoogleService-Info.plist")
+API_HEALTH_URL = "https://irodori-api.onrender.com/health"
+MIN_FREE_GB = 20
+
+# ---------------------------------------------------------------- 共通
+def load_secrets
+  UI.user_error!("#{ENV_FILE} がありません（設計書 §4）") unless File.exist?(ENV_FILE)
+  File.readlines(ENV_FILE).each do |line|
+    next if line.strip.empty? || line.start_with?("#")
+    key, value = line.strip.split("=", 2)
+    ENV[key] ||= value.to_s.gsub("$HOME", Dir.home)
+  end
+end
+
+def api_key
+  load_secrets
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_filepath: ENV.fetch("ASC_KEY_PATH"),
+  )
+end
+
+def free_gb
+  `df -g /`.lines[1].split[3].to_i
+end
+
+# dry run は main 以外・未コミットありでも流せる（アップロード・コミットをしないため）
+def preflight(release: true)
+  if release
+    ensure_git_branch(branch: "main")
+    ensure_git_status_clean(show_uncommitted_changes: true)
+  end
+  UI.user_error!("ディスクの空きが #{free_gb}GB です。~/.claude/scripts/dev-cleanup.sh を先に流してください") if free_gb < MIN_FREE_GB
+  if system("pgrep -x xcodebuild > /dev/null")
+    UI.user_error!("ほかの xcodebuild が実行中です。終わってから実行してください（iOS のビルドは同時に 1 本まで）")
+  end
+  # iOS は本番 API の新しいエンドポイントに依存することが多い。API が落ちていたら出さない
+  code = `curl -s -o /dev/null -w "%{http_code}" -m 30 #{API_HEALTH_URL}`.strip
+  UI.user_error!("本番 API (#{API_HEALTH_URL}) が応答しません (HTTP #{code})") unless code == "200"
+end
+
+# 本体・通知拡張・テストの MARKETING_VERSION のうち最大（= アプリ本体。テストは古いことがある）
+def current_version
+  File.read(PBXPROJ).scan(/MARKETING_VERSION = ([\d.]+);/).flatten.map { |v| Gem::Version.new(v) }.max.to_s
+end
+
+# 各桁をつなげて下 2 桁の通し番号を付ける（3.5.0 -> 35000 / 3.6.0 -> 36000 / 3.10.0 -> 310000）
+# 既存の 1.1.6 -> 11600、2.2.0 -> 22003、3.5.0 -> 35000 と連続する
+def base_build_number(version)
+  major, minor, patch = version.split(".").map(&:to_i)
+  "#{major}#{minor}#{patch || 0}00".to_i
+end
+
+# 本体・通知拡張・テストの全ターゲットに同じ値を書く（不一致はアップロード時の警告になる）
+def write_versions(version, build)
+  text = File.read(PBXPROJ)
+  text = text.gsub(/MARKETING_VERSION = [^;]+;/, "MARKETING_VERSION = #{version};")
+  text = text.gsub(/CURRENT_PROJECT_VERSION = [^;]+;/, "CURRENT_PROJECT_VERSION = #{build};")
+  File.write(PBXPROJ, text)
+end
+
+# 自動署名で証明書・プロファイルを取りに行くときの認証。
+# 既定は Xcode にログイン中の Apple ID（NoMuu と同じ）。Xcode のログインが切れると
+# 「No Accounts / No signing certificate "iOS Distribution"」で書き出しに失敗する（Xcode の設定 > アカウントで入り直す）。
+# irodori.env で ASC_KEY_CLOUD_SIGNING=true にすると API キーで署名する。ただしクラウド管理の配布証明書を使うには
+# キーの役割が Admin である必要がある（App Manager だと「Cloud signing permission error」）。
+def signing_xcargs
+  load_secrets
+  return "-allowProvisioningUpdates" unless ENV["ASC_KEY_CLOUD_SIGNING"].to_s == "true"
+  ["-allowProvisioningUpdates",
+   "-authenticationKeyPath", ENV.fetch("ASC_KEY_PATH"),
+   "-authenticationKeyID", ENV.fetch("ASC_KEY_ID"),
+   "-authenticationKeyIssuerID", ENV.fetch("ASC_ISSUER_ID")].map { |a| a.include?(" ") ? "\"#{a}\"" : a }.join(" ")
+end
+
+# 書き出した .ipa の本体の entitlements。プッシュ通知が本番 (production) になっているかを確かめる
+def check_push_environment(ipa)
+  Dir.mktmpdir do |dir|
+    sh("unzip", "-q", "-o", ipa, "-d", dir, log: false)
+    app = Dir[File.join(dir, "Payload", "*.app")].first
+    ent = `codesign -d --entitlements :- "#{app}" 2>/dev/null`
+    env = ent[%r{<key>aps-environment</key>\s*<string>([^<]+)</string>}, 1]
+    UI.user_error!("プッシュ通知の環境が #{env.inspect} です（production であるべき）") unless env == "production"
+    UI.success("プッシュ通知の環境: #{env}")
+  end
+end
+
+# Crashlytics に dSYM を送る（送れなくてもリリースは止めない）
+def upload_dsym
+  dsym = lane_context[SharedValues::DSYM_OUTPUT_PATH]
+  return UI.important("dSYM が見つからないので Crashlytics への送信を飛ばします") unless dsym && File.exist?(dsym)
+  tool = Dir[File.expand_path("~/Library/Developer/Xcode/DerivedData/irodori-*/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols")].first
+  return UI.important("upload-symbols が見つからないので Crashlytics への送信を飛ばします") unless tool
+  upload_symbols_to_crashlytics(dsym_path: dsym, gsp_path: GSP_PATH, binary_path: tool)
+rescue => e
+  UI.important("Crashlytics への dSYM 送信に失敗しました（リリースは続けます）: #{e.message}")
+end
+
+# ---------------------------------------------------------------- レーン
+platform :ios do
+  desc "キーの確認と、TestFlight にある最新のビルド番号"
+  lane :status do
+    key = api_key
+    version = current_version
+    latest = latest_testflight_build_number(api_key: key, app_identifier: APP_ID, version: version, initial_build_number: 0)
+    UI.success("API キー OK。プロジェクトのバージョン #{version}、TestFlight の最大ビルド番号 #{latest}")
+    UI.message("次の beta で使うビルド番号: #{[base_build_number(version), latest.to_i + 1].max}")
+  end
+
+  desc "テスト → バージョン・ビルド番号 → アーカイブ → dSYM → TestFlight（dry_run:true ならアップロードしない）"
+  lane :beta do |options|
+    dry_run = options[:dry_run].to_s == "true"
+    preflight(release: !dry_run)
+    key = api_key
+    version = (options[:version] || current_version).to_s
+    UI.user_error!("version は 3.6.0 の形で指定してください") unless version.match?(/\A\d+\.\d+\.\d+\z/)
+
+    latest = latest_testflight_build_number(api_key: key, app_identifier: APP_ID, version: version, initial_build_number: 0)
+    build = [base_build_number(version), latest.to_i + 1].max
+    UI.header("IRODORI #{version} (#{build})#{dry_run ? '  [dry run: アップロードしない]' : ''}")
+
+    original = File.read(PBXPROJ)
+    begin
+      run_tests(
+        project: PROJECT, scheme: SCHEME, destination: "id=#{TEST_DEVICE}",
+        only_testing: ["irodoriTests"], parallel_testing: false,
+        output_directory: File.join(OUTPUT_DIR, "test"), skip_slack: true, buildlog_path: File.join(OUTPUT_DIR, "logs"),
+      )
+      write_versions(version, build)
+      build_app(
+        project: PROJECT, scheme: SCHEME, configuration: "Release", export_method: "app-store",
+        output_directory: OUTPUT_DIR, output_name: "IRODORI-#{version}-#{build}.ipa",
+        buildlog_path: File.join(OUTPUT_DIR, "logs"), include_symbols: true,
+        export_options: { manageAppVersionAndBuildNumber: false },
+        # 署名は Xcode の Apple ID ログインに頼らず API キーで行う（ログインが切れても止まらないように）
+        xcargs: signing_xcargs, # gym はアーカイブと書き出しの両方にこれを渡す
+      )
+      check_push_environment(lane_context[SharedValues::IPA_OUTPUT_PATH])
+    rescue => e
+      File.write(PBXPROJ, original) # 失敗したらバージョンの書き換えを戻す
+      raise e
+    end
+
+    if dry_run
+      File.write(PBXPROJ, original)
+      UI.success("dry run 完了: #{lane_context[SharedValues::IPA_OUTPUT_PATH]}（アップロード・dSYM 送信はしていません）")
+      next
+    end
+
+    upload_dsym
+    upload_to_testflight(
+      api_key: key, app_identifier: APP_ID, ipa: lane_context[SharedValues::IPA_OUTPUT_PATH],
+      skip_waiting_for_build_processing: false, distribute_external: false,
+      changelog: File.read(File.expand_path("metadata/ja/release_notes.txt", __dir__)).strip,
+    )
+    git_commit(path: [PBXPROJ], message: "chore(ios): #{version} (#{build}) を TestFlight へ")
+    add_git_tag(tag: "ios/v#{version}-#{build}")
+    push_to_git_remote(remote_branch: "main", tags: true)
+    sh("rm", "-f", lane_context[SharedValues::IPA_OUTPUT_PATH].to_s)
+    UI.success("TestFlight に #{version} (#{build}) を上げました")
+  end
+
+  desc "ストア文言を反映し、TestFlight の最新ビルドで審査に提出する（確認あり。通過後は自動公開）"
+  lane :submit do
+    preflight
+    key = api_key
+    version = current_version
+    build = latest_testflight_build_number(api_key: key, app_identifier: APP_ID, version: version, initial_build_number: 0)
+    UI.user_error!("TestFlight に #{version} のビルドがありません。先に beta を流してください") if build.to_i.zero?
+
+    notes = File.read(File.expand_path("metadata/ja/release_notes.txt", __dir__)).strip
+    UI.header("審査に提出します: IRODORI #{version} (#{build})")
+    UI.message("更新内容:\n#{notes}")
+    UI.message("公開方法: 審査通過後に自動で公開・段階的リリース（7 日）")
+    UI.user_error!("提出を取りやめました") unless UI.confirm("この内容で審査に提出しますか？")
+
+    review = {}
+    review[:demo_user] = ENV["REVIEW_DEMO_PHONE"] unless ENV["REVIEW_DEMO_PHONE"].to_s.empty?
+    review[:demo_password] = ENV["REVIEW_DEMO_CODE"] unless ENV["REVIEW_DEMO_CODE"].to_s.empty?
+    upload_to_app_store(
+      api_key: key, app_identifier: APP_ID, app_version: version, build_number: build.to_s,
+      metadata_path: File.expand_path("metadata", __dir__),
+      skip_binary_upload: true, skip_screenshots: true, overwrite_screenshots: false,
+      submit_for_review: true, automatic_release: true, phased_release: true,
+      force: true, # 確認は上の UI.confirm で済ませている（deliver の HTML プレビューを開かない）
+      precheck_include_in_app_purchases: false,
+      app_review_information: review.empty? ? nil : review,
+      submission_information: { add_id_info_uses_idfa: false },
+    )
+    UI.success("審査に提出しました: #{version} (#{build})。通過後に自動で公開されます")
+  end
+
+  desc "App Store Connect の現在の文言を metadata/ に取り込む（スクリーンショットは取り込まない）"
+  lane :metadata_pull do
+    key = api_key
+    sh("fastlane", "deliver", "download_metadata", "--api_key_path", write_api_key_json(key),
+       "--app_identifier", APP_ID, "--metadata_path", File.expand_path("metadata", __dir__), "--force")
+  end
+end
+
+# deliver download_metadata は API キーを JSON ファイルで受け取るので、一時ファイルに書く（終了時に消す）
+def write_api_key_json(_key)
+  require "json"
+  require "tempfile"
+  load_secrets
+  file = Tempfile.new(["asc_key", ".json"])
+  file.write({ key_id: ENV["ASC_KEY_ID"], issuer_id: ENV["ASC_ISSUER_ID"],
+               key: File.read(ENV["ASC_KEY_PATH"]), in_house: false }.to_json)
+  file.close
+  at_exit { file.unlink }
+  file.path
+end

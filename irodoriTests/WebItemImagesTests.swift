@@ -27,10 +27,17 @@ struct WebItemImagesTests {
         )
     }
 
-    @Test("説明文があれば説明文を検索ワードにする")
-    func searchWordPrefersDescription() {
-        let item = makeItem(category: "Tシャツ", color: "ホワイト", description: "白 Tシャツ")
-        #expect(item.webImageSearchWord == "白 Tシャツ")
+    // v2 の説明文は40字前後の文章で、検索クエリにすると画像がほぼヒットしないため「色 + カテゴリ」を優先する
+    @Test("色とカテゴリがあれば説明文より優先する")
+    func searchWordPrefersColorAndCategory() {
+        let item = makeItem(category: "Tシャツ", color: "ホワイト", description: "白い無地のクルーネックTシャツ。程よい厚み")
+        #expect(item.webImageSearchWord == "ホワイト Tシャツ")
+    }
+
+    @Test("色もカテゴリも無ければ説明文を検索ワードにする")
+    func searchWordFallsBackToDescription() {
+        let item = makeItem(category: nil, color: nil, description: "黒 レザー ライダースジャケット")
+        #expect(item.webImageSearchWord == "黒 レザー ライダースジャケット")
     }
 
     @Test("説明文が無ければ「色 + カテゴリ」に落とす")
