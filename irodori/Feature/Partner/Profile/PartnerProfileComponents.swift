@@ -774,10 +774,15 @@ struct PartnerColorComboCard: View {
                 .frame(height: max(30, 150 * c.ratio))
                 .overlay(alignment: .bottom) {
                     // 白どうしが隣り合っても境目が見えるように
-                    Rectangle().fill(Color.black.opacity(0.06)).frame(height: 0.5)
+                    Rectangle().fill(Color.black.opacity(0.08)).frame(height: 0.5)
                 }
             }
         }
+        // 帯をカードの端まで伸ばさず、細い枠の色見本として浮かせる
+        // (白が一番下でもカードの白地と境目が分かる)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.black.opacity(0.1), lineWidth: 1))
+        .padding([.horizontal, .top], 10)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(combo.colors.map { "\($0.name)\(Int($0.ratio * 100))%" }.joined(separator: "、"))
     }
