@@ -866,6 +866,8 @@ struct CalendarView: View {
                 }
             }
             .frame(height: cellHeight)
+            // セル全体を押せるようにする (Color.clear は当たり判定を持たず、数字と＋の上しか反応しなかった)
+            .contentShape(RoundedRectangle(cornerRadius: 6))
             // 今日の強調: 画像やコーデのある日でも今日が分かる黒リング
             .overlay {
                 if isToday {
