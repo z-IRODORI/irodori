@@ -17,7 +17,7 @@ struct LargeCoordinateCard: View {
         ZStack {
             Image(uiImage: coordinateImage)
                 .resizable()
-                .aspectRatio(3/4, contentMode: .fit)
+                .filledAspectFrame(3/4)
                 .overlay {
                     GeometryReader { geometry in
                         LinearGradient(
@@ -74,16 +74,21 @@ struct LargeCoordinateCardWithURL: View {
 
     var body: some View {
         ZStack {
-            CachedAsyncImage(url: URL(string: coordinateImageURL)!) { phase in
-                if let image = phase.image {
-                    image.resizable()
-                } else if phase.error != nil {
-                    Color.red
-                } else {
-                    Color.gray.opacity(0.5)
+            // 横長の写真 (玄関カメラ) でも潰さず、縦長の枠に合わせて左右を切り取る (全体は拡大で見られる)
+            Color.clear
+                .aspectRatio(3/4, contentMode: .fit)
+                .overlay {
+                    CachedAsyncImage(url: URL(string: coordinateImageURL)!) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else if phase.error != nil {
+                            Color.gray.opacity(0.3)
+                        } else {
+                            Color.gray.opacity(0.5)
+                        }
+                    }
                 }
-            }
-            .aspectRatio(3/4, contentMode: .fit)
+                .clipped()
             .overlay {
                 GeometryReader { geometry in
                     LinearGradient(

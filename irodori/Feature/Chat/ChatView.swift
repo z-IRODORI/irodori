@@ -195,7 +195,7 @@ struct ChatView: View {
                     GeometryReader { geo in
                         Image(uiImage: image)
                             .resizable()
-                            .aspectRatio(3/4, contentMode: .fit)
+                            .filledAspectFrame(3/4)
                             .frame(maxWidth: 180)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                             .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
@@ -269,7 +269,7 @@ struct ChatView: View {
                     Button(action: { showScrollConfirmation = true }) {
                         Image(uiImage: image)
                             .resizable()
-                            .aspectRatio(3/4, contentMode: .fit)
+                            .filledAspectFrame(3/4)
                             .frame(width: 56)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)

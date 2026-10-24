@@ -90,6 +90,9 @@ struct ItemDetailSheet: View {
                 )
             }
         }
+        // 上の取っ手とヘッダーが詰まらないよう、ヘッダーを少し下げる
+        .padding(.top, 14)
+        .background(Color.white)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .task { await load() }

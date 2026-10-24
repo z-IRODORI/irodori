@@ -73,7 +73,7 @@ struct RecentCoordinates: View {
                 KFImage(URL(string: coordinate.displayImageURL))
                     .placeholder { Color.gray.opacity(0.3) }
                     .resizable()
-                    .aspectRatio(3/4, contentMode: .fit)
+                    .filledAspectFrame(3/4)
                     .frame(width: 110)
                     .contentShape(Rectangle())
                     .onTapGesture {
