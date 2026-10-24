@@ -122,7 +122,7 @@ final class RenewalLiveHomeModel {
         reactions[recipe.recipe_id] = .sending
         Haptic.impact(.soft)
         do {
-            if case .success(let res) = try await client.feedback(uid: uid, targetDate: Self.isoDate(scope), reason: "like", recipes: [recipe]) {
+            if case .success(let res) = try await client.feedback(uid: uid, targetDate: Self.isoDate(scope), reason: "like", recipes: [recipe], colorTarget: nil) {
                 reactions[recipe.recipe_id] = .liked(res.ack_message)
                 return
             }
@@ -132,11 +132,11 @@ final class RenewalLiveHomeModel {
 
     /// 案ごとの見送り。理由を相棒に伝え、その案だけ代わりの案に入れ替える (ほかの2案はそのまま)。
     /// サーバは見送った案と、その案の服を避けて組み直す (次の日以降の提案にも理由が効く)
-    func dislike(_ recipe: OwnedFirstRecipe, reason: RenewalDislikeReason, scope: RenewalScope) async {
+    func dislike(_ recipe: OwnedFirstRecipe, reason: RenewalDislikeReason, colorTarget: RenewalColorTarget? = nil, scope: RenewalScope) async {
         reactions[recipe.recipe_id] = .sending
         Haptic.impact(.soft)
         do {
-            if case .success(let res) = try await client.feedback(uid: uid, targetDate: Self.isoDate(scope), reason: reason.rawValue, recipes: [recipe]) {
+            if case .success(let res) = try await client.feedback(uid: uid, targetDate: Self.isoDate(scope), reason: reason.rawValue, recipes: [recipe], colorTarget: colorTarget) {
                 reactions[recipe.recipe_id] = .disliked(reason, res.ack_message)
                 await replace(recipe, scope: scope, ack: res.ack_message)
                 return
@@ -247,7 +247,7 @@ final class RenewalLiveHomeModel {
     func dislike(reason: RenewalDislikeReason, scope: RenewalScope) async -> String? {
         guard let recipes = responses[scope]?.recipes else { return nil }
         do {
-            switch try await client.feedback(uid: uid, targetDate: Self.isoDate(scope), reason: reason.rawValue, recipes: recipes) {
+            switch try await client.feedback(uid: uid, targetDate: Self.isoDate(scope), reason: reason.rawValue, recipes: recipes, colorTarget: nil) {
             case .success(let res):
                 Haptic.impact(.soft)
                 await load(scope, force: true)
@@ -610,7 +610,7 @@ struct RenewalLiveHomeView: View {
                     Task { await favorites?.setFavorite(true, kind: .pool, targetId: pid, imageURL: ex.image_url) }
                 }
             },
-            onDislike: { recipe, reason in Task { await model.dislike(recipe, reason: reason, scope: scope) } }
+            onDislike: { recipe, reason, target in Task { await model.dislike(recipe, reason: reason, colorTarget: target, scope: scope) } }
         )
         Group {
             switch layout {

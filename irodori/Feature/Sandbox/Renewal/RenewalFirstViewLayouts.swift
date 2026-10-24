@@ -63,7 +63,7 @@ struct RenewalRecipeActions {
     var partnerTypeName: String = ""
     var reaction: (OwnedFirstRecipe) -> RenewalRecipeReaction? = { _ in nil }
     var onLike: ((OwnedFirstRecipe) -> Void)? = nil
-    var onDislike: ((OwnedFirstRecipe, RenewalDislikeReason) -> Void)? = nil
+    var onDislike: ((OwnedFirstRecipe, RenewalDislikeReason, RenewalColorTarget?) -> Void)? = nil
     /// 今日・明日以外の日 (カレンダーから開いたとき) の決定ボタンの文言
     var actionLabelOverride: String? = nil
 
@@ -752,7 +752,7 @@ struct RenewalListLayout: View {
                     typeName: actions.partnerTypeName,
                     reaction: actions.reaction(recipe),
                     onLike: { onLike(recipe) },
-                    onDislike: { onDislike(recipe, $0) }
+                    onDislike: { onDislike(recipe, $0, $1) }
                 )
                 .padding(.top, -2)
             }

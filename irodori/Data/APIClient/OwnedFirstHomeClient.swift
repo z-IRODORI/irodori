@@ -176,8 +176,10 @@ struct OwnedFirstFeedbackResponse: Codable {
 protocol OwnedFirstHomeClientProtocol {
     func get(uid: String, gender: String, targetDate: String, pivotItemId: String?) async throws -> Result<OwnedFirstHomeResponse, HTTPError>
     func wear(uid: String, recipe: OwnedFirstRecipe, targetDate: String, maxTemp: Int?, pieces: [OwnedFirstBoardPiece]) async throws -> Result<OwnedFirstWearResponse, HTTPError>
+    /// 提案を通さずに「この日はこれを着た」を残す (カレンダーの過去の日から)
+    func recordWorn(uid: String, targetDate: String, pieces: [OwnedFirstBoardPiece], itemIds: [String]) async throws -> Result<OwnedFirstWearResponse, HTTPError>
     /// reason: like (案ごとのいいね) | cold | color | style | mood (見送り)。recipes が1件なら案ごと
-    func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe]) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError>
+    func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe], colorTarget: RenewalColorTarget?) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError>
     func examples(uid: String, poolIds: [String]) async throws -> Result<OwnedFirstExamplesResponse, HTTPError>
 }
 
@@ -203,6 +205,27 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
         let recipe: OwnedFirstRecipe
     }
 
+    private struct ManualWearBody: Encodable {
+        let target_date: String
+        let recipe_id: String
+        let item_ids: [String]
+        let image_url: String
+        let pair_text: String
+        let pieces: [OwnedFirstBoardPiece]
+    }
+
+    func recordWorn(uid: String, targetDate: String, pieces: [OwnedFirstBoardPiece], itemIds: [String]) async throws -> Result<OwnedFirstWearResponse, HTTPError> {
+        let body = ManualWearBody(
+            target_date: targetDate,
+            recipe_id: "manual-\(targetDate)",
+            item_ids: itemIds,
+            image_url: pieces.first?.image_url ?? "",
+            pair_text: pieces.map(\.label).joined(separator: "×"),
+            pieces: pieces
+        )
+        return try await post(path: "api/home/owned-first/wear", uid: uid, body: body)
+    }
+
     private struct FeedbackBody: Encodable {
         let target_date: String
         let reason: String
@@ -211,6 +234,8 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
         /// 案ごとのフィードバックのとき、相棒が覚えておく案の名前と服
         let title: String
         let item_ids: [String]
+        /// 「色が好みじゃない」の対象 (tops | bottoms | other)。nil は全体
+        let color_target: String?
     }
 
     func get(uid: String, gender: String, targetDate: String, pivotItemId: String?) async throws -> Result<OwnedFirstHomeResponse, HTTPError> {
@@ -252,14 +277,24 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
     }
 
     /// reason: like (案ごとのいいね) | cold | color | style | mood (見送り)。recipes が1件なら案ごと
-    func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe]) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError> {
+    func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe], colorTarget: RenewalColorTarget? = nil) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError> {
+        // 対象を選んだときは、その部分の服の色系統だけを送る (無ければ案の主な色系統)
+        var families = Array(Set(recipes.map(\.main_family)))
+        if let colorTarget {
+            let picked = recipes.flatMap { r in
+                r.owned_items.filter { colorTarget.slots.contains($0.slot) }.map(\.family)
+                    + r.missing_items.filter { colorTarget.slots.contains($0.slot) }.map(\.family)
+            }
+            if !picked.isEmpty { families = Array(Set(picked)) }
+        }
         let body = FeedbackBody(
             target_date: targetDate,
             reason: reason,
             recipe_ids: recipes.map(\.recipe_id),
-            families: Array(Set(recipes.map(\.main_family))),
+            families: families,
             title: recipes.count == 1 ? recipes[0].displayTitle : "",
-            item_ids: recipes.count == 1 ? recipes[0].owned_items.map(\.item_id) : []
+            item_ids: recipes.count == 1 ? recipes[0].owned_items.map(\.item_id) : [],
+            color_target: colorTarget?.rawValue
         )
         return try await post(path: "api/home/owned-first/feedback", uid: uid, body: body)
     }

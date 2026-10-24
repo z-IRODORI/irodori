@@ -297,6 +297,34 @@ enum RenewalDislikeReason: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// 「色が好みじゃない」のとき、どこの色が違ったか
+enum RenewalColorTarget: String, Codable, CaseIterable, Identifiable {
+    case tops, bottoms, other
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .tops: return "トップスの色"
+        case .bottoms: return "ボトムスの色"
+        case .other: return "それ以外の色"
+        }
+    }
+    var hint: String {
+        switch self {
+        case .tops: return "上に着る服"
+        case .bottoms: return "パンツ・スカート"
+        case .other: return "羽織り・靴など"
+        }
+    }
+    /// 対象になるスロット (サーバの slot と同じ)
+    var slots: Set<String> {
+        switch self {
+        case .tops: return ["tops"]
+        case .bottoms: return ["bottoms"]
+        case .other: return ["outer", "shoes", "bag", "hat", "accessory", "onepiece"]
+        }
+    }
+}
+
 struct RenewalDislike: Codable, Hashable {
     let day: Int
     let reason: RenewalDislikeReason

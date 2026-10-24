@@ -33,9 +33,12 @@ struct RenewalRecipeFeedbackRow: View {
     let typeName: String
     let reaction: RenewalRecipeReaction?
     var onLike: () -> Void
-    var onDislike: (RenewalDislikeReason) -> Void
+    /// 理由と、「色が好みじゃない」のときはどこの色か
+    var onDislike: (RenewalDislikeReason, RenewalColorTarget?) -> Void
 
     @State private var asking = false
+    /// 「色が好みじゃない」を選んで、どこの色かを聞いている
+    @State private var pickingColor = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -46,11 +49,14 @@ struct RenewalRecipeFeedbackRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if asking && (reaction == nil || reaction?.isReplaced == true) {
-                reasonGrid
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                Group {
+                    if pickingColor { colorTargetGrid } else { reasonGrid }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: asking)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: pickingColor)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: reaction)
     }
 
@@ -91,11 +97,16 @@ struct RenewalRecipeFeedbackRow: View {
     /// 「この案どう？」+ いいね / ちょっと違う (選ぶと理由を聞く)
     private var askRow: some View {
         HStack(spacing: 6) {
-            Text(asking ? "どこが違った？" : "この案どう？")
+            Text(pickingColor ? "どこの色が違った？" : asking ? "どこが違った？" : "この案どう？")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(asking ? RenewalTokens.ink : RenewalTokens.muted)
             Spacer(minLength: 4)
-            if asking {
+            if pickingColor {
+                Button("戻る") { pickingColor = false }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(RenewalTokens.muted)
+                    .contentShape(Rectangle().inset(by: -12))
+            } else if asking {
                 Button("やめる") { asking = false }
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(RenewalTokens.muted)
@@ -134,8 +145,13 @@ struct RenewalRecipeFeedbackRow: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
             ForEach(RenewalDislikeReason.allCases) { reason in
                 Button {
-                    asking = false
-                    onDislike(reason)
+                    if reason == .color {
+                        Haptic.selection()
+                        pickingColor = true   // 色はどこの色かを続けて聞く
+                    } else {
+                        asking = false
+                        onDislike(reason, nil)
+                    }
                 } label: {
                     Text(reason.label)
                         .font(.system(size: 12, weight: .medium))
@@ -148,6 +164,37 @@ struct RenewalRecipeFeedbackRow: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, 30)
+    }
+
+    /// 「色が好みじゃない」の続き: トップス / ボトムス / それ以外
+    private var colorTargetGrid: some View {
+        HStack(spacing: 8) {
+            ForEach(RenewalColorTarget.allCases) { target in
+                Button {
+                    asking = false
+                    pickingColor = false
+                    onDislike(.color, target)
+                } label: {
+                    VStack(spacing: 1) {
+                        Text(target.label)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(RenewalTokens.ink)
+                        Text(target.hint)
+                            .font(.system(size: 9))
+                            .foregroundStyle(RenewalTokens.muted)
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(RenewalTokens.controlBorder, lineWidth: 1))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(target.label)が好みじゃない")
             }
         }
         .padding(.leading, 30)

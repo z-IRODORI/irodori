@@ -43,6 +43,8 @@ struct CalendarView: View {
     @State private var daySheetData: CalendarDaySheetData? = nil
     /// 空き日タップからの「その日の提案」シート
     @State private var suggestionData: CalendarDaySuggestionData? = nil
+    /// 過去の空いている日を押したとき (着た服を記録)
+    @State private var pastRecordData: CalendarDaySuggestionData? = nil
 
     /// pool の予定コーデ詳細シートに渡す組 (削除に予定日が要るため item と一緒に保持する)
     private struct PresentedPlannedPool: Identifiable {
@@ -282,6 +284,11 @@ struct CalendarView: View {
         }
         // その日のコーデ候補10件 (空き日=予定にする / 予定あり=選び直し)。
         // コーデ詳細と同じく、画像の視認性優先で半モーダルではなく全画面で見せる
+        .sheet(item: $pastRecordData) { data in
+            NavigationStack {
+                CalendarPastDayRecordView(data: data, onSaved: { await viewModel.loadPlanned() })
+            }
+        }
         .fullScreenCover(item: $suggestionData) { data in
             NavigationStack {
                 // 今日〜6日後はホームと同じ「手持ち＋買い足す」の3案。それより先は従来の候補
@@ -768,7 +775,7 @@ struct CalendarView: View {
         let totalCount = dayRecords.count + (planned == nil ? 0 : 1)
         let isToday = checkIsToday(year: month.year, month: month.monthOfTheYear, day: day)
         let dateString = String(format: "%04d-%02d-%02d", month.year, month.monthOfTheYear, day)
-        // 空いている今日以降の日は「その日の提案」を体験できる
+        // 空いている今日以降の日は「その日の提案」を体験できる (過去の空き日は「着た服を記録」)
         let canSuggest = totalCount == 0 && dateString >= HomeViewModel.jstTodayString()
 
         return Button(action: {
@@ -877,7 +884,6 @@ struct CalendarView: View {
             }
         }
         .buttonStyle(.plain)
-        .disabled(totalCount == 0 && !canSuggest)
     }
 
     private func dayNumberOverlay(_ day: Int) -> some View {
@@ -907,6 +913,10 @@ struct CalendarView: View {
         } else if let planned {
             Haptic.impact(.soft)
             Task { await openPlannedDetail(planned) }
+        } else if dateString < HomeViewModel.jstTodayString() {
+            // 過去の空いている日: その日に着た服をクローゼットから選んで残す
+            Haptic.impact(.soft)
+            pastRecordData = CalendarDaySuggestionData(date: dateString, dateLabel: dateLabel)
         } else {
             Haptic.impact(.soft)
             suggestionData = CalendarDaySuggestionData(date: dateString, dateLabel: dateLabel)
