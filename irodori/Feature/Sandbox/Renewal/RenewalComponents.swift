@@ -45,6 +45,37 @@ struct RenewalPartnerAvatar: View {
     }
 }
 
+// MARK: - 相棒アイコン (タップで相棒画面)
+
+extension EnvironmentValues {
+    /// 相棒画面を開く (ホームが設定する)。nil の画面ではアイコンは押せない
+    @Entry var renewalOpenPartner: (() -> Void)? = nil
+}
+
+/// 押すと相棒画面を開く相棒アイコン。renewalOpenPartner が無い画面では、ただのアイコン
+struct RenewalPartnerAvatarButton: View {
+    let typeName: String
+    var size: CGFloat = 44
+    @Environment(\.renewalOpenPartner) private var openPartner
+
+    var body: some View {
+        if let openPartner {
+            Button {
+                Haptic.impact(.soft)
+                openPartner()
+            } label: {
+                RenewalPartnerAvatar(typeName: typeName, size: size)
+                    // 見た目の大きさは変えず、押せる範囲だけ広げる
+                    .contentShape(Rectangle().inset(by: -(max(0, 44 - size) / 2)))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("相棒画面を開く")
+        } else {
+            RenewalPartnerAvatar(typeName: typeName, size: size)
+        }
+    }
+}
+
 /// 相棒の全身イラスト (誕生画面用)
 struct RenewalPartnerIllustration: View {
     let typeName: String

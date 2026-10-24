@@ -5,7 +5,7 @@
 //  コーデ提案のカードごとに、相棒へ感想を返す行。
 //  相棒が「この案どう？」と聞き、ユーザーは「いいね」か「ちょっと違う」で返す。
 //  「ちょっと違う」はその場で相棒が理由を聞き (シートを出さない)、選ぶと相棒が返事をして
-//  その案だけ見送り済みになる。返事はカードの中に相棒の吹き出しとして残る。
+//  その案だけ代わりの案に入れ替わる。返事は新しいカードの中に相棒の吹き出しとして残る。
 //
 
 import SwiftUI
@@ -14,7 +14,14 @@ enum RenewalRecipeReaction: Equatable {
     case sending
     case liked(String)                              // 相棒の返事
     case disliked(RenewalDislikeReason, String)     // 理由と相棒の返事
+    /// 見送った案の代わりに組み直した案 (相棒の返事を残したまま、もう一度感想を聞く)
+    case replaced(String)
     case failed
+
+    var isReplaced: Bool {
+        if case .replaced = self { return true }
+        return false
+    }
 
     var isDisliked: Bool {
         if case .disliked = self { return true }
@@ -34,11 +41,11 @@ struct RenewalRecipeFeedbackRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 8) {
-                RenewalPartnerAvatar(typeName: typeName, size: 22)
+                RenewalPartnerAvatarButton(typeName: typeName, size: 22)
                 content
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if asking && reaction == nil {
+            if asking && (reaction == nil || reaction?.isReplaced == true) {
                 reasonGrid
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -51,23 +58,11 @@ struct RenewalRecipeFeedbackRow: View {
     private var content: some View {
         switch reaction {
         case .none:
-            HStack(spacing: 6) {
-                Text(asking ? "どこが違った？" : "この案どう？")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(asking ? RenewalTokens.ink : RenewalTokens.muted)
-                Spacer(minLength: 4)
-                if asking {
-                    Button("やめる") { asking = false }
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(RenewalTokens.muted)
-                        .contentShape(Rectangle().inset(by: -12))
-                } else {
-                    chip("いいね", systemImage: "heart", action: onLike)
-                    chip("ちょっと違う", systemImage: nil) {
-                        Haptic.selection()
-                        asking = true
-                    }
-                }
+            askRow
+        case .replaced(let ack):
+            VStack(alignment: .leading, spacing: 6) {
+                reply("\(ack) 代わりに組み直したよ", mark: Image(systemName: "arrow.triangle.2.circlepath"), markColor: RenewalTokens.muted)
+                askRow
             }
         case .sending:
             HStack(spacing: 6) {
@@ -89,6 +84,28 @@ struct RenewalRecipeFeedbackRow: View {
                 Spacer(minLength: 4)
                 chip("いいね", systemImage: "heart", action: onLike)
                 chip("ちょっと違う", systemImage: nil) { asking = true }
+            }
+        }
+    }
+
+    /// 「この案どう？」+ いいね / ちょっと違う (選ぶと理由を聞く)
+    private var askRow: some View {
+        HStack(spacing: 6) {
+            Text(asking ? "どこが違った？" : "この案どう？")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(asking ? RenewalTokens.ink : RenewalTokens.muted)
+            Spacer(minLength: 4)
+            if asking {
+                Button("やめる") { asking = false }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(RenewalTokens.muted)
+                    .contentShape(Rectangle().inset(by: -12))
+            } else {
+                chip("いいね", systemImage: "heart", action: onLike)
+                chip("ちょっと違う", systemImage: nil) {
+                    Haptic.selection()
+                    asking = true
+                }
             }
         }
     }

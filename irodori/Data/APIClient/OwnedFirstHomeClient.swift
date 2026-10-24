@@ -128,7 +128,8 @@ struct OwnedFirstHomeResponse: Codable, Hashable {
     let decided_recipe: OwnedFirstDecidedRecipe?
     let text_source: String   // gemini | template
     let memory: OwnedFirstMemory?
-    let recipes: [OwnedFirstRecipe]
+    /// 「ちょっと違う」で見送った案は、その場で代わりの案に入れ替える (RenewalLiveHomeModel)
+    var recipes: [OwnedFirstRecipe]
     let closet_items: [OwnedFirstItem]
 }
 

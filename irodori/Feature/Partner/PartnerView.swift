@@ -73,6 +73,14 @@ struct PartnerView: View {
 
     /// ミッションの行き先へ移動する (相棒画面を閉じてタブを切り替える)
     private func handleMission(_ action: String) {
+        // 「この配色で組む」: その服を主役にした3案をホームで組む
+        if action.hasPrefix("pivot:") {
+            onClose?()
+            path.removeAll()
+            tabViewModel?.selectedTab = .home
+            tabViewModel?.pendingPivotItemId = String(action.dropFirst("pivot:".count))
+            return
+        }
         switch action {
         case "open_onboarding":
             showPartnerOnboardingSheet = true

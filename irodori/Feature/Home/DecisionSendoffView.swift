@@ -41,6 +41,7 @@ struct DecisionSendoffView: View {
                         .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .shadow(color: .black.opacity(0.10), radius: 10, x: 0, y: 4)
+                        .photoZoomOnTap(url: item.image_url)
 
                     // 決定はカレンダーの予定コーデにも反映される (HomeViewModel.markWorn)
                     HStack(spacing: 5) {

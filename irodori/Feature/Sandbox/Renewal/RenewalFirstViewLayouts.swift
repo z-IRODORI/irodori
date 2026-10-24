@@ -584,45 +584,42 @@ struct RenewalOwnedLegend: View {
     }
 }
 
-/// カードに添える「コーデモデル」(このコーデの参考にした着こなし写真)。列幅いっぱいのバナーで見せる
+/// カードに添える「コーデモデル」(このコーデの参考にした着こなし写真)。列幅いっぱいのバナーで見せる。
+/// タップで写真を全画面で拡大する (コーデの詳細と同じビューア)
 struct RenewalCoordeModelChip: View {
     let example: OwnedFirstExample?
     var height: CGFloat = 76
-    var onTap: () -> Void
 
     var body: some View {
         if let s = example?.image_url, let url = URL(string: s) {
-            Button(action: onTap) {
-                Color.clear
-                    .frame(maxWidth: .infinity)
-                    .frame(height: height)
-                    .overlay(alignment: .top) {
-                        // 全身写真の上寄り (上半身) が見えるようにする
-                        KFImage(url)
-                            .placeholder { RenewalTokens.raised }
-                            .resizable()
-                            .scaledToFill()
-                            .offset(y: -height * 0.25)
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: height)
+                .overlay(alignment: .top) {
+                    // 全身写真の上寄り (上半身) が見えるようにする
+                    KFImage(url)
+                        .placeholder { RenewalTokens.raised }
+                        .resizable()
+                        .scaledToFill()
+                        .offset(y: -height * 0.25)
+                }
+                .clipped()
+                .overlay(alignment: .bottom) {
+                    HStack(spacing: 3) {
+                        Text("コーデモデル")
+                            .font(.system(size: 11, weight: .semibold))
+                        Spacer(minLength: 0)
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 10, weight: .bold))
                     }
-                    .clipped()
-                    .overlay(alignment: .bottom) {
-                        HStack(spacing: 3) {
-                            Text("コーデモデル")
-                                .font(.system(size: 11, weight: .semibold))
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
-                        .background(LinearGradient(colors: [.black.opacity(0), .black.opacity(0.65)], startPoint: .top, endPoint: .bottom))
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("コーデモデルの着こなしを見る")
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(LinearGradient(colors: [.black.opacity(0), .black.opacity(0.65)], startPoint: .top, endPoint: .bottom))
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .photoZoomOnTap(url: s)
+                .accessibilityLabel("コーデモデルの写真を大きく見る")
         }
     }
 }
@@ -743,7 +740,7 @@ struct RenewalListLayout: View {
                     if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
                     if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w).lineLimit(2) }
                     Spacer(minLength: 0)
-                    RenewalCoordeModelChip(example: recipe.example, height: 76) { actions.onDetail(recipe) }
+                    RenewalCoordeModelChip(example: recipe.example, height: 76)
                     CompactDecideButton(recipe: recipe, actions: actions, fullWidth: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -853,7 +850,7 @@ struct RenewalPeekLayout: View {
             if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w) }
             Spacer(minLength: 0)
             if actions.visualMode != .photo {
-                RenewalCoordeModelChip(example: recipe.example) { actions.onDetail(recipe) }
+                RenewalCoordeModelChip(example: recipe.example)
             }
             CompactDecideButton(recipe: recipe, actions: actions, fullWidth: true)
         }

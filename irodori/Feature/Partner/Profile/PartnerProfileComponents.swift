@@ -649,3 +649,143 @@ struct PartnerProfileStoryPlayer: View {
         }
     }
 }
+
+// MARK: - あなたに似合う色の組み合わせ (カード)
+
+/// カラーチップ風のカード。上は配色の帯 (割合どおりの高さ)、下に名前・ひとこと・手持ちの服
+struct PartnerColorComboCard: View {
+    let combo: PartnerColorCombo
+    var onBuild: ((String) -> Void)? = nil
+
+    private var tagStyle: (fg: Color, bg: Color, icon: String) {
+        switch combo.kind {
+        case "liked": return (RenewalTokens.accentPink, RenewalTokens.accentPink.opacity(0.1), "heart.fill")
+        case "try": return (PartnerHue.lilac.ink, PartnerHue.lilac.wash, "sparkles")
+        default: return (RenewalTokens.ink, RenewalTokens.raised, "checkmark")
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            chip
+            VStack(alignment: .leading, spacing: 8) {
+                Label(combo.tag, systemImage: tagStyle.icon)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(tagStyle.fg)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(tagStyle.bg))
+                Text(combo.name)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Text(combo.why)
+                    .font(.system(size: 12))
+                    .foregroundStyle(RenewalTokens.muted)
+                    .lineSpacing(2)
+                    .lineLimit(2, reservesSpace: true)
+                HStack(spacing: 8) {
+                    // 手持ちの服 (重ねた丸)
+                    HStack(spacing: -10) {
+                        ForEach(combo.items) { item in
+                            Group {
+                                if let url = URL(string: item.image_url) {
+                                    KFImage(url).resizable().scaledToFit().padding(4)
+                                } else {
+                                    Image(systemName: "tshirt").foregroundStyle(RenewalTokens.muted)
+                                }
+                            }
+                            .frame(width: 34, height: 34)
+                            .background(Circle().fill(.white))
+                            .overlay(Circle().stroke(RenewalTokens.border, lineWidth: 1))
+                            .clipShape(Circle())
+                            .accessibilityLabel(item.label)
+                        }
+                    }
+                    Text(combo.hint ?? "手持ちの\(combo.items.count)点で組める")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(combo.kind == "try" ? PartnerHue.lilac.ink : RenewalTokens.muted)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(minHeight: 36)
+                if let pivot = combo.pivot_item_id, let onBuild {
+                    Button {
+                        Haptic.impact(.soft)
+                        onBuild(pivot)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("この配色で組む")
+                            Image(systemName: "arrow.right").font(.system(size: 10, weight: .bold))
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .background(Capsule().fill(RenewalTokens.primaryFill))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
+                }
+            }
+            .padding(14)
+        }
+        .frame(width: 236)
+        .partnerSoftCard(22)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// 配色の帯。持っていない色は斜線で「足すと完成」を表す
+    private var chip: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(combo.colors.enumerated()), id: \.offset) { _, c in
+                let color = Color(hex: c.hex) ?? .gray
+                ZStack(alignment: .bottomLeading) {
+                    Rectangle().fill(color)
+                    if !c.owned {
+                        Canvas { ctx, size in
+                            var x: CGFloat = -size.height
+                            while x < size.width {
+                                var p = Path()
+                                p.move(to: CGPoint(x: x, y: size.height))
+                                p.addLine(to: CGPoint(x: x + size.height, y: 0))
+                                ctx.stroke(p, with: .color(.white.opacity(0.55)), lineWidth: 1.5)
+                                x += 8
+                            }
+                        }
+                    }
+                    HStack(spacing: 4) {
+                        Text(c.name)
+                            .font(.system(size: 11, weight: .bold))
+                        if !c.owned {
+                            Text("＋足す")
+                                .font(.system(size: 9, weight: .heavy))
+                        }
+                        Spacer()
+                        Text("\(Int((c.ratio * 100).rounded()))%")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .opacity(0.8)
+                    }
+                    .foregroundStyle(Self.isLight(c.hex) ? RenewalTokens.ink : .white)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+                }
+                .frame(height: max(30, 150 * c.ratio))
+                .overlay(alignment: .bottom) {
+                    // 白どうしが隣り合っても境目が見えるように
+                    Rectangle().fill(Color.black.opacity(0.06)).frame(height: 0.5)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(combo.colors.map { "\($0.name)\(Int($0.ratio * 100))%" }.joined(separator: "、"))
+    }
+
+    static func isLight(_ hex: String) -> Bool {
+        let s = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard s.count == 6, let v = UInt32(s, radix: 16) else { return true }
+        let r = Double((v >> 16) & 0xFF), g = Double((v >> 8) & 0xFF), b = Double(v & 0xFF)
+        return (0.299 * r + 0.587 * g + 0.114 * b) > 170
+    }
+}

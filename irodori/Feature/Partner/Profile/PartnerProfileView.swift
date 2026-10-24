@@ -64,7 +64,8 @@ final class PartnerProfileViewModel {
         let before = Set(latest.missions.filter(\.done).map(\.id))
         latest.discoveries[j].dig?.reply = res.reply
         latest = PartnerProfileResponse(status: latest.status, understanding: res.understanding,
-                                        missions: res.missions, discoveries: latest.discoveries, weekly: latest.weekly)
+                                        missions: res.missions, discoveries: latest.discoveries, weekly: latest.weekly,
+                                        color_combos: latest.color_combos)
         withAnimation(.spring(duration: 0.45)) { profile = latest }
         if let newly = res.missions.first(where: { $0.done && !before.contains($0.id) }) {
             Haptic.notify(.success)
@@ -96,6 +97,7 @@ struct PartnerProfileView: View {
                     VStack(spacing: 24) {
                         header(p.understanding)
                         if let weekly = p.weekly, !found.isEmpty { weeklyStrip(weekly) }
+                        if let combos = p.color_combos, !combos.isEmpty { colorCombos(combos) }
                         missions(p) { action in
                             if action == "check_discoveries" {
                                 withAnimation { proxy.scrollTo("you", anchor: .top) }
@@ -267,6 +269,34 @@ struct PartnerProfileView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("今週のふりかえりを見る。\(weekly.count)つの発見")
+    }
+
+    // MARK: - あなたに似合う色の組み合わせ
+
+    private func colorCombos(_ combos: [PartnerColorCombo]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("あなたに似合う色の組み合わせ")
+                    .font(.system(size: 16, weight: .bold))
+                Text("手持ちの服から、相棒が選んだ配色")
+                    .font(.system(size: 12))
+                    .foregroundStyle(RenewalTokens.muted)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(combos) { combo in
+                        PartnerColorComboCard(combo: combo) { itemId in
+                            onMissionAction?("pivot:\(itemId)")
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.viewAligned)
+            .padding(.horizontal, -20)   // 画面の端までスクロールさせる
+        }
     }
 
     // MARK: - 次のミッション

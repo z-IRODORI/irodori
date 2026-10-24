@@ -258,6 +258,8 @@ struct MainTabView: View {
 final class MainTabViewModel {
     var selectedTab: Tab = .home
     var shouldShowFirstTakePhotoOnHome: Bool = false
+    /// 相棒画面の「この配色で組む」で選んだ服。ホームが受け取って主役にし、nil に戻す
+    var pendingPivotItemId: String?
 
     enum Tab {
         case home

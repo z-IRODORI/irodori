@@ -59,6 +59,7 @@ struct DailyRecommendationDetailView: View {
                         .scaledToFit()
                         .frame(maxWidth: .infinity)
                         .cornerRadius(12)
+                        .photoZoomOnTap(url: item.image_url)
                     if !item.isCloset {
                         favoriteButton
                             .padding(10)

@@ -21,6 +21,8 @@ struct PartnerGrowthCard: View {
     var onTapStandardItems: () -> Void
     var onTapTasteVote: () -> Void
     var onTapCleanImages: () -> Void = {}
+    /// 相棒のアイコンを押したとき (相棒画面へ)
+    var onTapPartner: (() -> Void)? = nil
 
     /// 提案の幅が広がる目安 (トップス・ボトムス・靴などが一通りそろう数)
     private let comfortableCount = 15
@@ -42,7 +44,15 @@ struct PartnerGrowthCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
-                RenewalPartnerAvatar(typeName: typeName, size: 44)
+                Button {
+                    Haptic.impact(.soft)
+                    onTapPartner?()
+                } label: {
+                    RenewalPartnerAvatar(typeName: typeName, size: 44)
+                }
+                .buttonStyle(.plain)
+                .disabled(onTapPartner == nil)
+                .accessibilityLabel("相棒画面を開く")
                 VStack(alignment: .leading, spacing: 4) {
                     Text("相棒があなたのことを知りたがっています")
                         .font(.system(size: 15, weight: .bold))

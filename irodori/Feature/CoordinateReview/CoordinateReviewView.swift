@@ -33,6 +33,7 @@ struct CoordinateReviewView: View {
                             aiCatchphrase: viewModel.fashionReview!.ai_catchphrase,
                             tags: viewModel.fashionReview?.tags   // タグ非表示
                         )
+                        .photoZoomOnTap(image: viewModel.coordinateImage)
 //                        if let tags = viewModel.fashionReview?.tags, !tags.isEmpty {
 //                            TagsView(tags: tags, backgroundMaterial: .thinMaterial, tagTextColor: .black, borderColor: .black)
 //                                .padding(.horizontal, 24)

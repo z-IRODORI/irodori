@@ -17,6 +17,36 @@ struct PartnerProfileResponse: Codable, Hashable {
     let missions: [PartnerProfileMission]
     var discoveries: [PartnerProfileDiscovery]
     let weekly: PartnerWeekly?
+    /// あなたに似合う色の組み合わせ (手持ちですぐできる → いいねから → ちょっと冒険)
+    var color_combos: [PartnerColorCombo]? = nil
+}
+
+struct PartnerColorCombo: Codable, Hashable, Identifiable {
+    struct ComboColor: Codable, Hashable {
+        let key: String
+        let name: String
+        let hex: String
+        let ratio: Double
+        let owned: Bool
+    }
+
+    struct ComboItem: Codable, Hashable, Identifiable {
+        let id: String
+        let label: String
+        let image_url: String
+    }
+
+    let id: String
+    let name: String
+    let why: String
+    let tag: String
+    /// ready | liked | try
+    let kind: String
+    let colors: [ComboColor]
+    let items: [ComboItem]
+    let hint: String?
+    /// 「この配色で組む」で主役にする手持ちの服
+    let pivot_item_id: String?
 }
 
 struct PartnerUnderstanding: Codable, Hashable {

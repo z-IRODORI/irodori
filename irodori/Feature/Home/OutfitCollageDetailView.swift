@@ -102,6 +102,7 @@ struct OutfitCollageDetailView: View {
                         .placeholder { Color.gray.opacity(0.12) }
                         .resizable()
                         .scaledToFit()
+                        .photoZoomOnTap(url: response.collage_url)
                 }
             }
             .frame(maxWidth: .infinity)

@@ -130,17 +130,36 @@ final class RenewalLiveHomeModel {
         reactions[recipe.recipe_id] = .failed
     }
 
-    /// 案ごとの見送り。理由を相棒に伝え、その案だけ見送り済みにする (ほかの案はそのまま)
+    /// 案ごとの見送り。理由を相棒に伝え、その案だけ代わりの案に入れ替える (ほかの2案はそのまま)。
+    /// サーバは見送った案と、その案の服を避けて組み直す (次の日以降の提案にも理由が効く)
     func dislike(_ recipe: OwnedFirstRecipe, reason: RenewalDislikeReason, scope: RenewalScope) async {
         reactions[recipe.recipe_id] = .sending
         Haptic.impact(.soft)
         do {
             if case .success(let res) = try await client.feedback(uid: uid, targetDate: Self.isoDate(scope), reason: reason.rawValue, recipes: [recipe]) {
                 reactions[recipe.recipe_id] = .disliked(reason, res.ack_message)
+                await replace(recipe, scope: scope, ack: res.ack_message)
                 return
             }
         } catch {}
         reactions[recipe.recipe_id] = .failed
+    }
+
+    /// 見送った案を、組み直した案のうち今出ていないものと入れ替える。代わりが無ければ見送り済みのまま
+    private func replace(_ old: OwnedFirstRecipe, scope: RenewalScope, ack: String) async {
+        guard let result = try? await client.get(uid: uid, gender: gender, targetDate: Self.isoDate(scope), pivotItemId: pivots[scope]),
+              case .success(let fresh) = result,
+              var current = responses[scope],
+              let index = current.recipes.firstIndex(where: { $0.recipe_id == old.recipe_id }) else { return }
+        let shown = Set(current.recipes.map(\.recipe_id))
+        guard let next = fresh.recipes.first(where: { !shown.contains($0.recipe_id) }) else { return }
+        // 相棒の返事を少し読ませてから入れ替える
+        try? await Task.sleep(for: .milliseconds(900))
+        current.recipes[index] = next
+        if let pid = next.example?.pool_id, let e = next.example?.extraction { extractions[pid] = e }
+        reactions[next.recipe_id] = .replaced(ack)
+        withAnimation(.spring(duration: 0.45)) { responses[scope] = current }
+        Task { await pollExtractions(scope) }
     }
 
     func load(_ scope: RenewalScope, force: Bool = false) async {
@@ -340,6 +359,8 @@ struct RenewalLiveHomeView: View {
             .padding(.vertical, 12)
         }
         .background(RenewalTokens.ground)
+        // カードの「この案どう？」などの相棒アイコンを押すと相棒画面へ
+        .environment(\.renewalOpenPartner, onOpenPartner)
         .overlay {
             GeometryReader { geo in
                 let g = geo.frame(in: .global)
@@ -713,7 +734,7 @@ struct RenewalLiveHomeView: View {
     /// 3案の後の相棒のひとこと。上の相棒カードと同じ白いカードにして、返事 (どれも違うかも) を右に置く
     private var partnerFollowUp: some View {
         HStack(alignment: .center, spacing: 12) {
-            RenewalPartnerAvatar(typeName: partnerTypeName, size: 32)
+            RenewalPartnerAvatarButton(typeName: partnerTypeName, size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(followUpMessage)
                     .font(.system(size: 13, weight: .medium))
@@ -1105,23 +1126,8 @@ struct RenewalModelPhotoViewer: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.ignoresSafeArea()
-            if let s = example.image_url, let url = URL(string: s) {
-                KFImage(url).resizable().scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(.white.opacity(0.18), in: Circle())
-            }
-            .padding(16)
-            .accessibilityLabel("閉じる")
-        }
-        .onTapGesture { dismiss() }
+        // ピンチで拡大できる共通ビューア
+        PhotoZoomViewer(source: .url(example.image_url ?? ""))
     }
 }
 
@@ -1192,11 +1198,15 @@ struct RenewalRemoteExampleImage: View {
         ZStack(alignment: .topLeading) {
             RenewalTokens.raised
             if let s = example?.image_url, let url = URL(string: s) {
-                KFImage(url)
-                    .placeholder { ProgressView() }
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: height)
+                // 枠の大きさは Color.clear が決め、写真は枠いっぱいに切り抜く
+                // (scaledToFill を柔軟な frame に入れると、写真の幅で枠が広がって左右にはみ出す)
+                Color.clear
+                    .overlay {
+                        KFImage(url)
+                            .placeholder { ProgressView() }
+                            .resizable()
+                            .scaledToFill()
+                    }
                     .clipped()
             } else {
                 Image(systemName: "photo")

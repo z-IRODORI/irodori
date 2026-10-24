@@ -25,6 +25,7 @@ struct CoordinateDetailView: View {
                     currentSchedule: viewModel.coordinateDetail?.current_coordinate.date ?? "",
                     aiCatchphrase: viewModel.coordinateDetail?.ai_catchphrase ?? ""
                 )
+                .photoZoomOnTap(url: viewModel.displayedImageURL)
 
                 // このコーデを一覧で「撮影画像 / 切り取り」どちらで表示するか (切り取りがある時だけ)
                 if viewModel.hasCutout {

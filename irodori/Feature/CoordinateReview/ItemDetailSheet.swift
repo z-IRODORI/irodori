@@ -224,63 +224,9 @@ struct ItemDetailSheet: View {
 /// アイテム画像の拡大ビューア (ピンチズーム + ダブルタップ切替 + タップ/×で閉じる)
 struct ItemImageZoomViewer: View {
     let imageURL: String
-    @Environment(\.dismiss) private var dismiss
-    @State private var scale: CGFloat = 1
-    @State private var lastScale: CGFloat = 1
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-                .onTapGesture { dismiss() }
-
-            if let url = URL(string: imageURL) {
-                CachedAsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image
-                            .resizable()
-                            .scaledToFit()
-                    } else if phase.error != nil {
-                        Image(systemName: "photo")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.gray)
-                    } else {
-                        ProgressView().tint(.white)
-                    }
-                }
-                .scaleEffect(scale)
-                .gesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            scale = min(max(lastScale * value, 1), 4)
-                        }
-                        .onEnded { _ in
-                            lastScale = scale
-                        }
-                )
-                .onTapGesture(count: 2) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        scale = scale > 1 ? 1 : 2.5
-                        lastScale = scale
-                    }
-                }
-                .padding(24)
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 28))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .padding(.top, 8)
-            .padding(.trailing, 12)
-            .accessibilityLabel("閉じる")
-        }
+        PhotoZoomViewer(source: .url(imageURL))
     }
 }
 

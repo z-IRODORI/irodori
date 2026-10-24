@@ -257,6 +257,12 @@ struct HomeView: View {
                 }
             }
         }
+        // 相棒画面の「この配色で組む」: その服を主役にして3案を組み直す
+        .onChange(of: tabViewModel.pendingPivotItemId) { _, id in
+            guard let id else { return }
+            tabViewModel.pendingPivotItemId = nil
+            Task { await ownedFirstModel.pivot(id, scope: RenewalScope.next()) }
+        }
         #if DEBUG
         .fullScreenCover(isPresented: $showHomeSandboxSheet) {
             NavigationStack {
@@ -307,7 +313,8 @@ struct HomeView: View {
             onTapFullBody: { showFullBodyPickerSheet = true },
             onTapStandardItems: { showStandardItemPickerSheet = true },
             onTapTasteVote: { showTasteVoteSheet = true },
-            onTapCleanImages: { showItemReplaceSheet = true }
+            onTapCleanImages: { showItemReplaceSheet = true },
+            onTapPartner: { path.append(.partner) }
         )
         .padding(.horizontal, 16)
         .padding(.bottom, 32)
