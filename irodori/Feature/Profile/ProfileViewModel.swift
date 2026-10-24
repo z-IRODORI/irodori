@@ -134,6 +134,7 @@ final class ProfileViewModel {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         closetItems.removeAll { $0.id == itemId }
                     }
+                    NotificationCenter.default.post(name: .closetDidChange, object: itemId)
                     itemToDelete = nil
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isEditMode = false

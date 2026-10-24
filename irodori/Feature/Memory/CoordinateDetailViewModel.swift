@@ -22,6 +22,9 @@ final class CoordinateDetailViewModel {
     // 大画像に表示するURL (display_type 切替で更新)
     var displayedImageURL: String
     var isUpdatingDisplayType = false
+    /// 着用アイテムを直している最中 (差し替え・外す)
+    var isEditingItem = false
+    var isDeleting = false
 
     init(
         coordinateId: String,
@@ -100,6 +103,44 @@ final class CoordinateDetailViewModel {
         )
         displayedImageURL = updatedCoordinate.displayImageURL
         Haptic.notify(.success)
+    }
+
+    private var uid: String { UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? "" }
+
+    /// 着用アイテムをクローゼットの服に差し替える (検出が違っていたとき)
+    func replaceItem(_ itemId: String, with closetItemId: String) async -> Bool {
+        await editItem { try await CoordinateItemEditClient().replace(uid: self.uid, coordinateId: self.coordinateId, itemId: itemId, closetItemId: closetItemId) }
+    }
+
+    /// 着用アイテムをコーデから外す (クローゼットの服は残す)
+    func removeItem(_ itemId: String) async -> Bool {
+        await editItem { try await CoordinateItemEditClient().remove(uid: self.uid, coordinateId: self.coordinateId, itemId: itemId) }
+    }
+
+    private func editItem(_ call: () async throws -> Result<CoordinateDetailResponse, HTTPError>) async -> Bool {
+        isEditingItem = true
+        defer { isEditingItem = false }
+        guard let result = try? await call(), case .success(let response) = result else {
+            ToastManager.shared.show("アイテムを直せませんでした")
+            return false
+        }
+        coordinateDetail = response
+        Haptic.notify(.success)
+        NotificationCenter.default.post(name: .coordinateDidChange, object: coordinateId)
+        return true
+    }
+
+    /// コーデを削除する (Firestore と Storage から)。成功したら true
+    func deleteCoordinate() async -> Bool {
+        isDeleting = true
+        defer { isDeleting = false }
+        guard let result = try? await DeleteCoordinateClient().delete(uid: uid, coordinateId: coordinateId),
+              case .success(let res) = result, res.success else {
+            ToastManager.shared.show("削除できませんでした")
+            return false
+        }
+        NotificationCenter.default.post(name: .coordinateDidChange, object: coordinateId)
+        return true
     }
 
     func tappedRecommendCoordinateButton() {

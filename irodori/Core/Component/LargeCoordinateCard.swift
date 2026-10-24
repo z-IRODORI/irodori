@@ -97,22 +97,27 @@ struct LargeCoordinateCardWithURL: View {
                 }
             }
             .overlay {
-                GeometryReader { geometry in
-                    LinearGradient(
-                        gradient: Gradient(colors: [Color.black.opacity(0.3), Color.clear]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: 50)
-                    .position(x: geometry.size.width / 2, y: 24)
+                // 日付を画像に重ねるときだけ上を暗くする (コーデ詳細は日付をヘッダーに出すので空)
+                if !currentSchedule.isEmpty {
+                    GeometryReader { geometry in
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.black.opacity(0.3), Color.clear]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: 50)
+                        .position(x: geometry.size.width / 2, y: 24)
+                    }
                 }
             }
 
-            Text("\(currentSchedule)")
-                .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(.white)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .padding(.top, 12)
+            if !currentSchedule.isEmpty {
+                Text("\(currentSchedule)")
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundStyle(.white)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 12)
+            }
             Text("\(aiCatchphrase)")
                 .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(.white)

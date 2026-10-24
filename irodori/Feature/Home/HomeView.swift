@@ -305,6 +305,19 @@ struct HomeView: View {
     /// 3案の下: 相棒を育てる導線 (直近のコーデは 2026-10 に一旦廃止)
     @ViewBuilder
     private var homeFooter: some View {
+        VStack(spacing: 24) {
+        // 最近のコーデ (撮った記録)。3案の下で「最近なにを着たか」を見返せる
+        if !viewModel.homeResponse.recent_coordinates.isEmpty {
+            RecentOutfitsStrip(
+                coordinates: viewModel.homeResponse.recent_coordinates,
+                onTap: { c in
+                    path.append(.coordinateDetail(.init(coordinateId: c.id, coordinateImageURL: c.displayImageURL, showHeader: true)))
+                },
+                onDelete: { c in viewModel.requestDelete(coordinateId: c.id) },
+                onSeeAll: { tabViewModel.selectedTab = .calendar }
+            )
+            .padding(.horizontal, -16)
+        }
         PartnerGrowthCard(
             typeName: ownedFirstModel.responses.values.first?.partner_type_name ?? viewModel.partnerHome?.type_name ?? "",
             closetCount: viewModel.closetItems.count,
@@ -316,8 +329,13 @@ struct HomeView: View {
             onTapCleanImages: { showItemReplaceSheet = true },
             onTapPartner: { path.append(.partner) }
         )
+        }
         .padding(.horizontal, 16)
         .padding(.bottom, 32)
+        // ほかの画面でコーデを消したり直したら、最近のコーデを取り直す
+        .onReceive(NotificationCenter.default.publisher(for: .coordinateDidChange)) { _ in
+            Task { await viewModel.onAppearOwnedFirst() }
+        }
     }
 
     // MARK: - Header

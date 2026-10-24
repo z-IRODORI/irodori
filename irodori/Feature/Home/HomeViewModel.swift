@@ -1038,6 +1038,7 @@ final class HomeViewModel {
                     coordinateToDelete = nil
                     // 削除後、編集モードも終了
                     isEditMode = false
+                    NotificationCenter.default.post(name: .coordinateDidChange, object: coordinateId)
                 } else {
                     ToastManager.shared.show(response.message ?? "削除に失敗しました")
                 }

@@ -43,6 +43,8 @@ struct CalendarView: View {
     @State private var daySheetData: CalendarDaySheetData? = nil
     /// 空き日タップからの「その日の提案」シート
     @State private var suggestionData: CalendarDaySuggestionData? = nil
+    /// カレンダーの長押しで削除しようとしている記録
+    @State private var recordToDelete: CoordinateListResponse?
     /// 過去の空いている日を押したとき (着た服を記録)
     @State private var pastRecordData: CalendarDaySuggestionData? = nil
 
@@ -157,6 +159,11 @@ struct CalendarView: View {
                 Task { await viewModel.loadPlanned() }
             }
         }
+        // 長押しの削除確認 + ほかの画面でコーデを消したり直したら取り直す
+        .modifier(CalendarRecordDeletion(record: $recordToDelete) {
+            viewModel.hasLoaded = false
+            await viewModel.onAppear()
+        })
         // バックグラウンド解析の完了時にもカレンダーへ反映する。
         // 従来の再読込トリガーは「path が空になった時」(撮影フローから戻った時) のみで、
         // ジョブ方式は保存前に path が空になるため、完了を検知して再読込する必要がある
@@ -209,7 +216,8 @@ struct CalendarView: View {
                         coordinateImageURL: planned.image_url,
                         coordinateDetailClient: CoordinateDetailClient()
                     ),
-                    showHeader: false
+                    showHeader: false,
+                    ownsToolbar: false
                 )
                 .navigationTitle(plannedTitle(planned))
                 .toolbar {
@@ -884,6 +892,15 @@ struct CalendarView: View {
             }
         }
         .buttonStyle(.plain)
+        // 長押しで記録 (撮った写真) を削除
+        .contextMenu {
+            if let record = dayRecords.first, let id = record.id, !id.isEmpty {
+                Button { openRecord(record) } label: { Label("詳細を見る", systemImage: "doc.text.magnifyingglass") }
+                Button(role: .destructive) {
+                    recordToDelete = record
+                } label: { Label(dayRecords.count > 1 ? "1枚目のコーデを削除" : "このコーデを削除", systemImage: "trash") }
+            }
+        }
     }
 
     private func dayNumberOverlay(_ day: Int) -> some View {
@@ -1191,5 +1208,42 @@ struct CalendarView: View {
     NavigationStack {
         CalendarView(viewModel: .init(apiClient: MockCoordinateListClient()), path: .constant([]))
             .environment(MainTabViewModel())
+    }
+}
+
+/// カレンダーの長押しで記録を削除する確認と、コーデが変わったときの取り直し
+/// (CalendarView の body が大きく型推論が重いので切り出す)
+private struct CalendarRecordDeletion: ViewModifier {
+    @Binding var record: CoordinateListResponse?
+    var reload: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog("このコーデを削除しますか？", isPresented: Binding(
+                get: { record != nil }, set: { if !$0 { record = nil } }
+            ), titleVisibility: .visible) {
+                Button("削除", role: .destructive) {
+                    guard let id = record?.id else { return }
+                    record = nil
+                    Task { await delete(id) }
+                }
+                Button("キャンセル", role: .cancel) { record = nil }
+            } message: {
+                Text("写真と着用アイテムの記録が消えます。元に戻せません")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .coordinateDidChange)) { _ in
+                Task { await reload() }
+            }
+    }
+
+    private func delete(_ id: String) async {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        if let r = try? await DeleteCoordinateClient().delete(uid: uid, coordinateId: id),
+           case .success(let res) = r, res.success {
+            Haptic.notify(.success)
+            NotificationCenter.default.post(name: .coordinateDidChange, object: id)
+        } else {
+            ToastManager.shared.show("削除できませんでした")
+        }
     }
 }

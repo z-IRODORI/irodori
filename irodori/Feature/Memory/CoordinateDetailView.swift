@@ -14,15 +14,37 @@ struct CoordinateDetailView: View {
     @State private var coordinateImage: UIImage?
     /// タップされたアイテム (詳細シート表示用)
     @State private var selectedItem: CoordinateDetailResponse.CoordinateItem?
+    /// 「アイテムを直す」で選んだ着用アイテム
+    @State private var editingItem: CoordinateDetailResponse.CoordinateItem?
+    @State private var isEditingItems = false
+    @State private var confirmDelete = false
+    @Environment(\.dismiss) private var dismiss
     let showHeader: Bool
+    /// false: 呼び出し元がタイトルとメニューを出す (カレンダーの予定コーデのシート)
+    var ownsToolbar: Bool = true
+
+    /// ヘッダーに出す日付 (「10月12日(日)」)。取得前は空
+    private var headerDate: String {
+        guard let raw = viewModel.coordinateDetail?.current_coordinate.date else { return "" }
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        guard let d = f.date(from: String(raw.prefix(10)).replacingOccurrences(of: "/", with: "-")) else { return raw }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "ja_JP")
+        out.dateFormat = "M月d日(E)"
+        return out.string(from: d)
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 32) {
                 // fetch 結果に関わらず画像はプレースホルダとして表示する
+                // 日付はヘッダーに出すので、画像には重ねない
                 LargeCoordinateCardWithURL(
                     coordinateImageURL: viewModel.displayedImageURL,
-                    currentSchedule: viewModel.coordinateDetail?.current_coordinate.date ?? "",
+                    currentSchedule: "",
                     aiCatchphrase: viewModel.coordinateDetail?.ai_catchphrase ?? ""
                 )
                 .photoZoomOnTap(url: viewModel.displayedImageURL)
@@ -110,15 +132,45 @@ struct CoordinateDetailView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(.gray.opacity(0.08))
+        .modifier(OptionalNavigationTitle(title: ownsToolbar ? headerDate : nil))
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(false)
         .toolbar {
-            if showHeader {
-                ToolbarItem(placement: .principal) {
-                    Text(viewModel.coordinateDetail?.current_coordinate.date ?? "")
-                        .font(.system(size: 16, weight: .semibold))
+            if ownsToolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(role: .destructive) {
+                        confirmDelete = true
+                    } label: {
+                        Label("このコーデを削除", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 17))
+                        .foregroundStyle(.black)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .accessibilityLabel("その他の操作")
+                .disabled(viewModel.isDeleting)
+            }
+            }
+        }
+        .confirmationDialog("このコーデを削除しますか？", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("削除", role: .destructive) {
+                Task {
+                    if await viewModel.deleteCoordinate() { dismiss() }
                 }
             }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("写真と着用アイテムの記録が消えます。元に戻せません")
+        }
+        .sheet(item: $editingItem) { item in
+            CoordinateItemReplaceSheet(
+                item: item,
+                onReplace: { closetId in await viewModel.replaceItem(item.id, with: closetId) },
+                onRemove: { await viewModel.removeItem(item.id) }
+            )
         }
         .task {
             AnalyticsLogger.shared.log(screen: .coordinateDetailScreenView, parameters: [
@@ -132,14 +184,24 @@ struct CoordinateDetailView: View {
     /// 着用アイテムの横スクロール (v2 で生成した透過アイテム画像、legacy のトップス/ボトムス画像)
     private func itemsSection(_ items: [CoordinateDetailResponse.CoordinateItem]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("着用しているアイテム")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.black)
+            HStack(alignment: .firstTextBaseline) {
+                Text("着用しているアイテム")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.black)
+                Spacer()
+                // 解析で違うアイテムが出たとき用。押すと各アイテムに「直す」が出る
+                Button(isEditingItems ? "完了" : "違うアイテムを直す") {
+                    Haptic.selection()
+                    withAnimation(.easeOut(duration: 0.2)) { isEditingItems.toggle() }
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isEditingItems ? .black : .secondary)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(items) { item in
                         Button {
-                            selectedItem = item
+                            if isEditingItems { editingItem = item } else { selectedItem = item }
                         } label: {
                             VStack(spacing: 0) {
                                 CachedAsyncImage(url: URL(string: item.item_image_path)!) { phase in
@@ -163,8 +225,26 @@ struct CoordinateDetailView: View {
                             }
                             .background(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(alignment: .topTrailing) {
+                                if isEditingItems {
+                                    Text("直す")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Capsule().fill(.black))
+                                        .padding(6)
+                                        .transition(.scale.combined(with: .opacity))
+                                }
+                            }
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button { editingItem = item } label: { Label("別のアイテムに直す", systemImage: "arrow.triangle.2.circlepath") }
+                            Button(role: .destructive) {
+                                Task { _ = await viewModel.removeItem(item.id) }
+                            } label: { Label("コーデから外す", systemImage: "minus.circle") }
+                        }
                     }
                 }
             }
@@ -206,5 +286,13 @@ struct CoordinateDetailView: View {
         } catch {
             print("Failed to load coordinate image: \(error)")
         }
+    }
+}
+
+/// 呼び出し元がタイトルを出すときは、こちらからは付けない (空のタイトルで上書きしないため)
+private struct OptionalNavigationTitle: ViewModifier {
+    let title: String?
+    func body(content: Content) -> some View {
+        if let title { content.navigationTitle(title) } else { content }
     }
 }

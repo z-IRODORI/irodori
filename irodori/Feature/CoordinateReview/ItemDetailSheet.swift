@@ -25,6 +25,7 @@ struct ItemDetailSheet: View {
     /// アイテム画像タップで開く拡大ビューア
     @State private var showImageViewer = false
     @Environment(\.dismiss) private var dismissSheet
+    @State private var confirmDeleteItem = false
 
     private var imageURL: String? { detail?.image_url ?? initialImageURL }
     private var typeLabel: String? { detail?.item_type ?? initialTypeLabel }
@@ -55,10 +56,28 @@ struct ItemDetailSheet: View {
             .navigationTitle("アイテムの詳細")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Menu {
+                        Button(role: .destructive) {
+                            confirmDeleteItem = true
+                        } label: { Label("クローゼットから削除", systemImage: "trash") }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(.black)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel("その他の操作")
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("閉じる") { dismissSheet() }
                         .foregroundStyle(.black)
                 }
+            }
+            .confirmationDialog("このアイテムをクローゼットから削除しますか？", isPresented: $confirmDeleteItem, titleVisibility: .visible) {
+                Button("削除", role: .destructive) { Task { await deleteFromCloset() } }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text("相棒の提案にも使われなくなります。コーデの記録は残ります")
             }
             .navigationDestination(item: $pushedCoordinate) { params in
                 CoordinateDetailView(
@@ -203,6 +222,19 @@ struct ItemDetailSheet: View {
             .frame(width: 110)
         }
         .buttonStyle(.plain)
+    }
+
+    private func deleteFromCloset() async {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        guard let result = try? await DeleteClosetItemClient().delete(uid: uid, itemId: itemId),
+              case .success(let res) = result, res.success else {
+            ToastManager.shared.show("このアイテムはクローゼットにありません")
+            return
+        }
+        Haptic.notify(.success)
+        ToastManager.shared.show("クローゼットから削除しました", style: .normal)
+        NotificationCenter.default.post(name: .closetDidChange, object: itemId)
+        dismissSheet()
     }
 
     private func load() async {

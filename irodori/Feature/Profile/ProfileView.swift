@@ -49,6 +49,10 @@ struct ProfileView: View {
             .refreshable {
                 await viewModel.loadItems()
             }
+            // ほかの画面 (アイテム詳細など) で服を消したら取り直す
+            .onReceive(NotificationCenter.default.publisher(for: .closetDidChange)) { _ in
+                Task { await viewModel.loadItems() }
+            }
         }
         .background(Color.white)
         .sheet(item: $itemToEdit) { item in
@@ -510,6 +514,13 @@ struct ProfileView: View {
                                     guard !viewModel.isEditMode else { return }
                                     Haptic.impact(.soft)
                                     itemToEdit = item
+                                }
+                                // 長押しでも削除できる (「編集」を押さなくても)
+                                .contextMenu {
+                                    Button { itemToEdit = item } label: { Label("詳細を見る", systemImage: "doc.text.magnifyingglass") }
+                                    Button(role: .destructive) {
+                                        viewModel.requestDelete(itemId: item.id)
+                                    } label: { Label("クローゼットから削除", systemImage: "trash") }
                                 }
                             } else {
                                 VStack(spacing: 6) {
