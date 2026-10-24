@@ -11,6 +11,8 @@ default_platform(:ios)
 # Firebase などのパッケージ解決で xcodebuild -showBuildSettings が初回 3 秒を超えて失敗するため延ばす
 ENV["FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT"] ||= "120"
 ENV["FASTLANE_XCODEBUILD_SETTINGS_RETRIES"] ||= "3"
+# ロケールが UTF-8 でないシェル（バックグラウンド実行など）だと、xcpretty が日本語のログで落ちてテストが失敗扱いになる
+ENV["LANG"] = ENV["LC_ALL"] = "en_US.UTF-8" unless ENV["LC_ALL"].to_s.include?("UTF-8")
 
 ROOT = File.expand_path("..", __dir__)
 PROJECT = File.join(ROOT, "irodori.xcodeproj")
