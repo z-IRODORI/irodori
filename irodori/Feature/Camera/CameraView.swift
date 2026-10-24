@@ -184,15 +184,10 @@ struct CameraView: View {
     }
 
     private func Header() -> some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 4) {
-                Text("コーデを記録")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.black)
-                Text("全身が入るように、1.5〜2m 離れて撮ろう")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
+        ZStack {
+            Text("コーデを記録")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.black)
             .padding(.horizontal, 48)
             // 撮影は一時的な画面なので、戻るではなく ✕ で閉じる。
             // 見た目は 32pt の丸、押せる範囲は 44pt。タイトルの行と高さをそろえる
@@ -201,7 +196,6 @@ struct CameraView: View {
                 CloseCircleButton {
                     if path.isEmpty { dismiss() } else { path.removeLast() }
                 }
-                .offset(y: -9)
                 Spacer()
             }
 //            HStack(spacing: 24) {
@@ -243,7 +237,7 @@ struct CameraView: View {
 //            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 44, alignment: .top)
+        .frame(height: 44)
     }
 
 

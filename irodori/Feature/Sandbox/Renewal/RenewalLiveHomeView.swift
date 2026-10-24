@@ -172,7 +172,11 @@ final class RenewalLiveHomeModel {
         errors[scope] = nil
         defer { loading.remove(scope) }
         do {
-            let result = try await client.get(uid: uid, gender: gender, targetDate: Self.isoDate(scope), pivotItemId: pivots[scope])
+            // 画面の task から切り離して最後まで取りに行く。タブを切り替えるたびに読み込みが取り消され、
+            // 戻るたびに 3案が空 → 入場演出つきで出直す (表示・非表示が交互に見える) のを防ぐ
+            let client = self.client, uid = self.uid, gender = self.gender
+            let date = Self.isoDate(scope), pivot = pivots[scope]
+            let result = try await Task { try await client.get(uid: uid, gender: gender, targetDate: date, pivotItemId: pivot) }.value
             switch result {
             case .success(let res):
                 responses[scope] = res
@@ -348,8 +352,10 @@ struct RenewalLiveHomeView: View {
                             if model.loading.contains(scope) { loadingSquare.padding(.top, 48) }
                         }
                     partnerFollowUp
-                } else if model.loading.contains(scope) {
+                } else if model.errors[scope] == nil {
+                    // 3案もエラーも無いときは必ず読み込み中を出し、取りに行く (空白のまま残さない)
                     loadingCard
+                        .task { await model.load(scope) }
                 }
                 // 案がそろってから出す (読み込み中に先に見えて、後から押し下げられないように)
                 if let footer, response != nil {
