@@ -148,6 +148,10 @@ struct MainTabView: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: toastManager.message)
+        // 初めてホームを使うときのツールチップ (タブバーのカメラも指すので、タブ全体の上に重ねる)
+        .overlay { CoachMarkOverlay() }
+        .onChange(of: viewModel.selectedTab, initial: true) { _, _ in updateCoachFront() }
+        .onChange(of: path.count) { _, _ in updateCoachFront() }
         // v2 解析ジョブの常駐トースター (全タブ・push 先でも見える)。
         // タブバーのすぐ上に浮かせ、完了タップでカメラ遷移時と同じ結果画面へ push する
         .overlay(alignment: .bottom) {
@@ -191,6 +195,11 @@ struct MainTabView: View {
         // .sheet で出すモーダル (DailyRecommendationDetailView 等) にも届く
         .environment(favoritesStore)
         .environment(viewModel)
+    }
+
+    /// ツールチップはホームが前面にあるときだけ出す (ほかのタブ・push 先では隠す)
+    private func updateCoachFront() {
+        CoachMarkCenter.shared.homeIsFront = viewModel.selectedTab == .home && path.isEmpty
     }
 
     private var partnerIcon: UIImage {

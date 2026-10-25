@@ -251,7 +251,12 @@ struct PartnerOnboardingFlowView: View {
         VStack(spacing: 0) {
             switch viewModel.step {
             case .intro:
-                introStepView
+                if showCloseButton {
+                    introStepView
+                } else {
+                    // 初回起動: IRODORI と相棒を3枚で伝えてから4つの質問へ
+                    OnboardingWalkthroughView(onFinish: viewModel.startQuestions)
+                }
             case .question(let index):
                 questionStepView(question: PartnerOnboardingQuestion.all[index])
             case .confirm:

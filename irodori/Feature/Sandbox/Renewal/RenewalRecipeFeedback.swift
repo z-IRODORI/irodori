@@ -55,6 +55,8 @@ struct RenewalRecipeFeedbackRow: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        // 「ちょっと違う」で理由を聞いている行をツールチップで指す
+        .coachFrame(.feedback, active: asking)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: asking)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: pickingColor)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: reaction)
@@ -116,6 +118,7 @@ struct RenewalRecipeFeedbackRow: View {
                 chip("ちょっと違う", systemImage: nil) {
                     Haptic.selection()
                     asking = true
+                    CoachMarkCenter.shared.trigger(.feedback)
                 }
             }
         }

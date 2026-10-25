@@ -677,6 +677,7 @@ struct RenewalListLayout: View {
             ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                 let start = introDelay.map { $0 + Double(index) * 0.08 }
                 row(recipe, index: index)
+                    .coachFrame(.recipes, active: index == 0)
                     .modifier(RenewalIntroRise(delay: start))
                     .environment(\.renewalIntroDelay, start.map { $0 + 0.15 })
             }

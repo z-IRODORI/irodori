@@ -27,6 +27,7 @@ struct HomeView: View {
     @State private var ownedFirstModel = RenewalLiveHomeModel(source: .render)
     #if DEBUG
     @State private var showHomeSandboxSheet = false
+    @AppStorage(CoachMarkCenter.styleKey) private var coachStyleRaw = CoachMarkCenter.Style.contextual.rawValue
     /// リニューアル後アプリの体験 Sandbox (Feature/Sandbox/Renewal)
     @State private var showRenewalSandbox = false
     #endif
@@ -267,8 +268,22 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $showHomeSandboxSheet) {
             NavigationStack {
                 List {
-                    NavigationLink("オンボーディング: ウォークスルー + ツールチップ") {
-                        GuidedOnboardingSandboxView()
+                    Section("オンボーディング (本番の画面)") {
+                        NavigationLink("ウォークスルー (初回起動の3枚)") {
+                            OnboardingWalkthroughView(onFinish: {})
+                                .toolbar(.hidden, for: .navigationBar)
+                        }
+                        Picker("ツールチップの出し方", selection: $coachStyleRaw) {
+                            ForEach(CoachMarkCenter.Style.allCases) { Text($0.label).tag($0.rawValue) }
+                        }
+                        Button("ツールチップを新規ユーザーと同じ状態にしてホームで見る") {
+                            CoachMarkCenter.shared.resetForDebug()
+                            showHomeSandboxSheet = false
+                            Task {
+                                try? await Task.sleep(for: .seconds(0.6))
+                                CoachMarkCenter.shared.homeReady()
+                            }
+                        }
                     }
                     NavigationLink("相棒誕生のあと: 服やコーデを教えるオンボーディング (案 A〜D)") {
                         DataOnboardingSandboxView()
@@ -335,6 +350,12 @@ struct HomeView: View {
             onTapCleanImages: { showItemReplaceSheet = true },
             onTapPartner: { path.append(.partner) }
         )
+        .coachFrame(.growth)
+        .id(CoachTarget.growth.scrollID)
+        // 相棒カードが見えたら「服を教えてほしいな」 (その場型のツールチップ)
+        .onScrollVisibilityChange(threshold: 0.6) { visible in
+            if visible { CoachMarkCenter.shared.trigger(.growth) }
+        }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 32)

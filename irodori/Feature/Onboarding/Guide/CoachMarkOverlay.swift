@@ -1,94 +1,68 @@
 //
-//  GuidedCoachMark.swift
-//  irodori - Sandbox
+//  CoachMarkOverlay.swift
+//  irodori
 //
-//  ツールチップ型オンボーディングの部品。
-//  画面の部品に .coachAnchor(.recipes) を付けておくと、その位置を指して吹き出しを出せる。
-//  - ツアー型: 画面を暗くして、指した部品だけをくり抜いて見せる (どこを押しても次へ)
-//  - その場型: 暗くせず、吹き出しだけを部品のそばに出す (操作のじゃまをしない)
+//  CoachMarkCenter のツールチップを画面に重ねる層 (MainTabView の一番外側に置く)。
+//  - その場型: 吹き出しだけ。吹き出しの外は素通しで、いつもどおり操作できる
+//  - ツアー型: 画面を暗くして、指す部品だけをくり抜く。暗幕のどこを押しても次へ
 //
 
 import SwiftUI
+import UIKit
 
-// MARK: - 指す先
-
-enum CoachTarget: String, CaseIterable {
-    case partner, recipes, feedback, growth, camera
-}
-
-struct CoachTip: Equatable {
-    let target: CoachTarget
-    let title: String
-    let body: String
-
-    static let partner = CoachTip(target: .partner, title: "相棒のひとこと",
-                                  body: "タップすると相棒画面へ。覚えたことや、ふたりの記録が見られるよ")
-    static let recipes = CoachTip(target: .recipes, title: "明日の3案",
-                                  body: "気温と手持ちの服から組んだよ。気に入ったら「着る」、ピンとこなければ「ちょっと違う」を押してね")
-    static let feedback = CoachTip(target: .feedback, title: "教えてくれてありがとう",
-                                   body: "理由を選ぶと、次の3案から外して組み直すよ")
-    static let growth = CoachTip(target: .growth, title: "服を教えてほしいな",
-                                 body: "写真や定番アイテムで服を教えると、あなたの服だけで組める案が増えるよ")
-    static let camera = CoachTip(target: .camera, title: "着た日はここから1枚",
-                                 body: "全身を撮ると着回しのクセがわかるよ。ふたりの記録にも残るね")
-}
-
-// MARK: - 位置を集める
-
-struct CoachAnchorKey: PreferenceKey {
-    static var defaultValue: [CoachTarget: Anchor<CGRect>] = [:]
-    static func reduce(value: inout [CoachTarget: Anchor<CGRect>], nextValue: () -> [CoachTarget: Anchor<CGRect>]) {
-        value.merge(nextValue()) { $1 }
-    }
-}
-
-extension View {
-    /// この部品をツールチップで指せるようにする
-    func coachAnchor(_ target: CoachTarget) -> some View {
-        anchorPreference(key: CoachAnchorKey.self, value: .bounds) { [target: $0] }
-    }
-}
-
-// MARK: - 重ねる層
-
-struct CoachMarkLayer: View {
-    let anchors: [CoachTarget: Anchor<CGRect>]
-    let tip: CoachTip?
-    /// true: ツアー型 (暗くしてくり抜く) / false: その場型 (吹き出しだけ)
-    let spotlight: Bool
-    /// 「1 / 4」。その場型では nil
-    var step: (index: Int, total: Int)? = nil
-    let onNext: () -> Void
-    var onSkip: (() -> Void)? = nil
+struct CoachMarkOverlay: View {
+    @State private var center = CoachMarkCenter.shared
 
     var body: some View {
         GeometryReader { proxy in
-            if let tip, let anchor = anchors[tip.target] {
-                let rect = proxy[anchor].insetBy(dx: -6, dy: -6)
+            let origin = proxy.frame(in: .global).origin
+            if center.homeIsFront, let tip = center.current, let global = targetRect(tip.target, size: proxy.size) {
+                let rect = global.offsetBy(dx: -origin.x, dy: -origin.y).insetBy(dx: -6, dy: -6)
+                let isTour = center.tourStep != nil
                 ZStack {
-                    if spotlight {
+                    if isTour {
                         CoachSpotlight(hole: rect)
                             .contentShape(Rectangle())
-                            .onTapGesture { onNext() }
+                            .onTapGesture { center.next() }
                             .transition(.opacity)
                     }
-                    bubble(tip, target: rect, in: proxy.size)
+                    bubble(tip, target: rect, size: proxy.size, isTour: isTour)
                 }
                 .animation(.spring(duration: 0.4), value: rect)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: tip)
+        .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.25), value: center.current)
     }
 
-    @ViewBuilder
-    private func bubble(_ tip: CoachTip, target: CGRect, in size: CGSize) -> some View {
+    /// 指す先の位置 (グローバル)。カメラはシステムのタブバーの中なので、4つ並びの3番目として計算する
+    private func targetRect(_ target: CoachTarget, size: CGSize) -> CGRect? {
+        if target == .camera {
+            let bottom = Self.windowSafeAreaBottom
+            let itemWidth = size.width / 4
+            return CGRect(x: itemWidth * 2 + (itemWidth - 64) / 2, y: size.height - bottom - 49 + 1, width: 64, height: 47)
+        }
+        guard let rect = center.frames[target], rect.height > 0 else { return nil }
+        // 画面から外れている間は出さない (スクロールで戻ってきたら出る)
+        guard rect.maxY > 60, rect.minY < size.height - 60 else { return nil }
+        return rect
+    }
+
+    private static var windowSafeAreaBottom: CGFloat {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .first
+        return window?.safeAreaInsets.bottom ?? 34
+    }
+
+    private func bubble(_ tip: CoachTip, target: CGRect, size: CGSize, isTour: Bool) -> some View {
         let below = target.midY < size.height * 0.5
         let width = min(size.width - 32, 340)
         let left = (size.width - width) / 2
         let arrowX = min(max(target.midX - left, 28), width - 28)
-        CoachBubble(tip: tip, step: step, arrowX: arrowX, arrowOnTop: below,
-                    showsSkip: onSkip != nil && step != nil,
-                    onNext: onNext, onSkip: { onSkip?() })
+        let step = center.tourStep.map { ($0 + 1, center.tourTotal) }
+        return CoachBubble(tip: tip, step: step, arrowX: arrowX, arrowOnTop: below,
+                           onNext: { center.next() }, onSkip: { center.skipTour() })
             .frame(width: width)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: below ? .top : .bottom)
@@ -124,13 +98,13 @@ struct CoachSpotlight: View {
     }
 }
 
-/// 吹き出し本体。相棒が話す形で、矢印は指す部品の側に出す
+/// 吹き出し。相棒が話す形で、矢印は指す部品の側に出す
 struct CoachBubble: View {
     let tip: CoachTip
+    /// ツアー型の「1 / 4」。その場型では nil
     let step: (index: Int, total: Int)?
     let arrowX: CGFloat
     let arrowOnTop: Bool
-    let showsSkip: Bool
     let onNext: () -> Void
     let onSkip: () -> Void
 
@@ -159,7 +133,7 @@ struct CoachBubble: View {
                         .foregroundStyle(RenewalTokens.muted)
                 }
                 Spacer()
-                if showsSkip && !isLast {
+                if step != nil && !isLast {
                     Button("スキップ") {
                         Haptic.impact(.soft)
                         onSkip()

@@ -326,9 +326,11 @@ struct RenewalLiveHomeView: View {
     private var visualMode: RenewalVisualMode { host.isSandbox ? (RenewalVisualMode(rawValue: visualRaw) ?? .exampleItems) : .exampleItems }
 
     var body: some View {
+        ScrollViewReader { scrollProxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 partnerHeader
+                    .coachFrame(.partner, active: !host.isSandbox)
                 if let items = response?.closet_items, !items.isEmpty {
                     RenewalPivotStrip(
                         items: items,
@@ -364,6 +366,13 @@ struct RenewalLiveHomeView: View {
             }
             .padding(.vertical, 12)
         }
+        // ツアー型のツールチップ: 画面外の部品 (相棒カード) までスクロールする
+        .onChange(of: CoachMarkCenter.shared.scrollRequest) { _, target in
+            guard let target, !host.isSandbox else { return }
+            withAnimation(.easeInOut(duration: 0.35)) { scrollProxy.scrollTo(target.scrollID, anchor: .center) }
+            CoachMarkCenter.shared.scrollRequest = nil
+        }
+        }
         .background(RenewalTokens.ground)
         // カードの「この案どう？」などの相棒アイコンを押すと相棒画面へ
         .environment(\.renewalOpenPartner, onOpenPartner)
@@ -380,6 +389,12 @@ struct RenewalLiveHomeView: View {
         .onChange(of: response?.recipes.map(\.recipe_id) ?? []) { _, ids in
             guard !ids.isEmpty else { return }
             startIntroIfNeeded()
+            notifyCoachHomeReady()
+        }
+        .onAppear { if response != nil { notifyCoachHomeReady() } }
+        // 「着る」の送り出しを閉じたら「着た日はここから1枚」 (その場型のツールチップ)
+        .onChange(of: model.sendoff == nil) { _, closed in
+            if closed, !host.isSandbox { CoachMarkCenter.shared.trigger(.camera) }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.loading.contains(scope))
         .refreshable {
@@ -410,6 +425,15 @@ struct RenewalLiveHomeView: View {
             }
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: model.sendoff)
+    }
+
+    /// 初めてのホームのツールチップ: 3案の入場が落ち着いてから出す
+    private func notifyCoachHomeReady() {
+        guard !host.isSandbox else { return }
+        Task {
+            try? await Task.sleep(for: .seconds(1.2))
+            CoachMarkCenter.shared.homeReady()
+        }
     }
 
     // MARK: ① 相棒カード

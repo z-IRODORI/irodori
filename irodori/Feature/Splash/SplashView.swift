@@ -49,6 +49,8 @@ struct SplashView: View {
                     PartnerOnboardingFlowView(
                         showCloseButton: false,
                         onComplete: {
+                            // 初めてのホームで、部品を指すツールチップを出す対象にする
+                            CoachMarkCenter.shared.markEligible()
                             viewModel.viewedOnboarding()
                             UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasFashionTypeDiagnosis.rawValue)
                             UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
