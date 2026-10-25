@@ -267,6 +267,9 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $showHomeSandboxSheet) {
             NavigationStack {
                 List {
+                    NavigationLink("オンボーディング: ウォークスルー + ツールチップ") {
+                        GuidedOnboardingSandboxView()
+                    }
                     NavigationLink("相棒誕生のあと: 服やコーデを教えるオンボーディング (案 A〜D)") {
                         DataOnboardingSandboxView()
                     }
