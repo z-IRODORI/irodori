@@ -294,6 +294,9 @@ struct HomeView: View {
                             }
                         }
                     }
+                    NavigationLink("あなたに合うブランド 10 選 (案 A〜D)") {
+                        BrandMatchSandboxView()
+                    }
                     NavigationLink("相棒誕生のあと: 服やコーデを教えるオンボーディング (案 A〜D)") {
                         DataOnboardingSandboxView()
                     }
