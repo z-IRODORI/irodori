@@ -11,6 +11,8 @@ struct SplashView: View {
     @State var path: [ViewType] = []
     @State private var isPresentedTermsOfService = false
     @State private var isStateChanging = false  // state 変更中フラグ
+    /// userId を復元できたらホームを作り直す (空の userId で読み込んだ画面を残さない)
+    @State private var homeIdentity = 0
     let viewModel: SplashViewModel = .init()
     let cameraViewModel: CameraViewModel = .init()
     private let toastManager = ToastManager.shared
@@ -60,9 +62,21 @@ struct SplashView: View {
                 case .home:
                     MainTabView()
                         .environment(AuthManager.shared)
+                        .id(homeIdentity)
+                        // サインイン済みなのに userId が無い (端末のアカウント状態だけ消えた) ときは
+                        // 紐付け表から復元して、ホームを読み込み直す
+                        .task {
+                            if await PhoneLinkSyncer.restoreUserIdIfMissing() { homeIdentity += 1 }
+                        }
                 }
             }
             // .onChange(of: path) は削除済み（FirstTakePhotoView がオンボーディングから削除されたため不要）
+            #if DEBUG
+            // 改善案 >「初回オンボーディングからやり直す」
+            .onReceive(NotificationCenter.default.publisher(for: OnboardingDebug.restartNotification)) { _ in
+                viewModel.updateState()
+            }
+            #endif
             .onChange(of: viewModel.state) { oldState, newState in
                 // state が変わったときに path をクリアして、古い NavigationStack の履歴を削除
                 print("🔍 [SplashView] State changed from \(oldState) to \(newState), clearing path")

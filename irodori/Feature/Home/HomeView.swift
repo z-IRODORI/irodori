@@ -28,6 +28,7 @@ struct HomeView: View {
     #if DEBUG
     @State private var showHomeSandboxSheet = false
     @AppStorage(CoachMarkCenter.styleKey) private var coachStyleRaw = CoachMarkCenter.Style.contextual.rawValue
+    @AppStorage(OnboardingDebug.dryRunKey) private var onboardingDryRun = true
     /// リニューアル後アプリの体験 Sandbox (Feature/Sandbox/Renewal)
     @State private var showRenewalSandbox = false
     #endif
@@ -272,6 +273,14 @@ struct HomeView: View {
                         NavigationLink("ウォークスルー (初回起動の3枚)") {
                             OnboardingWalkthroughView(onFinish: {})
                                 .toolbar(.hidden, for: .navigationBar)
+                        }
+                        Toggle("4つの質問の答えを本番に保存しない", isOn: $onboardingDryRun)
+                        Button("初回オンボーディングからやり直す") {
+                            showHomeSandboxSheet = false
+                            Task {
+                                try? await Task.sleep(for: .seconds(0.4))
+                                OnboardingDebug.restartFirstRun()
+                            }
                         }
                         Picker("ツールチップの出し方", selection: $coachStyleRaw) {
                             ForEach(CoachMarkCenter.Style.allCases) { Text($0.label).tag($0.rawValue) }

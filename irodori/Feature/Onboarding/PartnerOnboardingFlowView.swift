@@ -187,6 +187,17 @@ final class PartnerOnboardingFlowViewModel {
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? "guest-user"
         let response: PartnerOnboardingResponse
 
+        #if DEBUG
+        // 動作確認用: 答えを本番に保存せず、端末内で相棒を誕生させる (改善案 > オンボーディング で切替)
+        if OnboardingDebug.dryRun {
+            try? await Task.sleep(for: .seconds(1.2))
+            let mock = PartnerOnboardingResponse.mock(impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+            persistPartnerResult(mock)
+            Haptic.notify(.success)
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) { step = .birth(mock) }
+            return
+        }
+        #endif
         do {
             let result = try await partnerClient.saveOnboarding(
                 userId: uid,
