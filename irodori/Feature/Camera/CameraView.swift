@@ -51,7 +51,9 @@ struct CameraView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.leading, 24)
                         CaptureButton()
+                            .coachFrame(.cameraShutter)
                         AIFullBodyButton()
+                            .coachFrame(.cameraPicker)
                             .frame(maxWidth: .infinity, alignment: .trailing)
                             .padding(.trailing, 24)
                     }
@@ -78,7 +80,9 @@ struct CameraView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.leading, 24)
                         CaptureButton()
+                            .coachFrame(.cameraShutter)
                         AIFullBodyButton()
+                            .coachFrame(.cameraPicker)
                             .frame(maxWidth: .infinity, alignment: .trailing)
                             .padding(.trailing, 24)
                     }
@@ -92,6 +96,17 @@ struct CameraView: View {
         .onAppear {
             AnalyticsLogger.shared.log(screen: .cameraScreenView)
             checkCameraPermission()   // カメラを初期化
+        }
+        // 初めて開いたとき: 撮り方と、写真から選べることを案内する (カメラの準備を待ってから)
+        .task {
+            try? await Task.sleep(for: .seconds(0.9))
+            CoachMarkCenter.shared.cameraOpened()
+        }
+        // ツールチップの「写真から選ぶ」→ AIで写真を探す
+        .onChange(of: CoachMarkCenter.shared.pendingAction) { _, action in
+            guard action == .pickPhotosInCamera else { return }
+            CoachMarkCenter.shared.pendingAction = nil
+            showFullBodyPicker = true
         }
         .fullScreenCover(isPresented: $showCapturedImage) {
             if let image = cameraViewModel.capturedImage {

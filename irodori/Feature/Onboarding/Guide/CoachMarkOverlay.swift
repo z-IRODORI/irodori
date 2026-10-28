@@ -16,7 +16,8 @@ struct CoachMarkOverlay: View {
     var body: some View {
         GeometryReader { proxy in
             let origin = proxy.frame(in: .global).origin
-            if center.homeIsFront, let tip = center.current, let global = targetRect(tip.target, size: proxy.size) {
+            if let tip = center.current, tip.target.screen == center.front,
+               let global = targetRect(tip.target, size: proxy.size) {
                 let rect = global.offsetBy(dx: -origin.x, dy: -origin.y).insetBy(dx: -6, dy: -6)
                 let isTour = center.tourStep != nil
                 ZStack {
@@ -61,8 +62,12 @@ struct CoachMarkOverlay: View {
         let left = (size.width - width) / 2
         let arrowX = min(max(target.midX - left, 28), width - 28)
         let step = center.tourStep.map { ($0 + 1, center.tourTotal) }
-        return CoachBubble(tip: tip, step: step, arrowX: arrowX, arrowOnTop: below,
-                           onNext: { center.next() }, onSkip: { center.skipTour() })
+        // 行動ボタンを出すのは、その場型か、ツアーの最後だけ (途中は「つぎへ」で進める)
+        let action = (center.tourStep == nil || center.isLastTourStep) ? tip.action : nil
+        return CoachBubble(tip: tip, step: step, action: action, arrowX: arrowX, arrowOnTop: below,
+                           onNext: { center.next() },
+                           onAction: { center.perform($0) },
+                           onLater: { center.tourStep != nil ? center.skipTour() : center.next() })
             .frame(width: width)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: below ? .top : .bottom)
@@ -98,34 +103,37 @@ struct CoachSpotlight: View {
     }
 }
 
-/// 吹き出し。相棒が話す形で、矢印は指す部品の側に出す
+/// 吹き出し。相棒が話す形で、矢印は指す部品の側に出す。
+/// 行動 (撮る・写真から教える) があるときは、それを黒い主ボタンにして次の行動にする
 struct CoachBubble: View {
     let tip: CoachTip
-    /// ツアー型の「1 / 4」。その場型では nil
+    /// ツアーの「1 / 4」。その場型では nil
     let step: (index: Int, total: Int)?
+    let action: CoachAction?
     let arrowX: CGFloat
     let arrowOnTop: Bool
     let onNext: () -> Void
-    let onSkip: () -> Void
+    let onAction: (CoachAction) -> Void
+    let onLater: () -> Void
 
     private var isLast: Bool { step.map { $0.index == $0.total } ?? true }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                PartnerIconImage(size: 30)
-                VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 10) {
+                PartnerIconImage(size: 34)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(tip.title)
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(RenewalTokens.ink)
                     Text(tip.body)
                         .font(.system(size: 13))
-                        .foregroundStyle(RenewalTokens.ink.opacity(0.8))
-                        .lineSpacing(3)
+                        .foregroundStyle(RenewalTokens.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                Spacer(minLength: 0)
             }
-            HStack {
+            HStack(spacing: 8) {
                 if let step {
                     Text("\(step.index) / \(step.total)")
                         .font(.system(size: 11, weight: .medium))
@@ -133,27 +141,13 @@ struct CoachBubble: View {
                         .foregroundStyle(RenewalTokens.muted)
                 }
                 Spacer()
-                if step != nil && !isLast {
-                    Button("スキップ") {
-                        Haptic.impact(.soft)
-                        onSkip()
-                    }
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(RenewalTokens.muted)
-                    .frame(minWidth: 44, minHeight: 36)
+                if let action {
+                    secondary(tip.laterLabel, action: onLater)
+                    primary(tip.actionLabel) { onAction(action) }
+                } else {
+                    if step != nil && !isLast { secondary("スキップ", action: onLater) }
+                    primary(step == nil ? "OK" : (isLast ? "はじめる" : "つぎへ"), action: onNext)
                 }
-                Button {
-                    Haptic.impact(.soft)
-                    onNext()
-                } label: {
-                    Text(step == nil ? "OK" : (isLast ? "はじめる" : "つぎへ"))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 36)
-                        .background(RenewalTokens.primaryFill, in: Capsule())
-                }
-                .buttonStyle(.plain)
             }
         }
         .padding(14)
@@ -167,6 +161,36 @@ struct CoachBubble: View {
         }
         .shadow(color: .black.opacity(0.15), radius: 14, y: 6)
         .accessibilityElement(children: .contain)
+    }
+
+    private func primary(_ label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            action()
+        } label: {
+            Text(label)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .frame(minHeight: 40)
+                .background(RenewalTokens.primaryFill, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func secondary(_ label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            action()
+        } label: {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(RenewalTokens.muted)
+                .padding(.horizontal, 8)
+                .frame(minWidth: 44, minHeight: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

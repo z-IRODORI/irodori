@@ -6,45 +6,73 @@
 //  - 出すのは初回オンボーディングを終えたユーザーだけ (markEligible)。既存ユーザーには出さない
 //  - 同じツールチップは二度と出さない (UserDefaults に記録)
 //  - 部品は .coachFrame(.recipes) で画面上の位置を知らせ、MainTabView の CoachMarkOverlay が吹き出しを描く
+//  - 最後は「やってみる」ボタンにして、データ入力 (撮る・写真から教える) を次の行動にする
 //
-//  出し方は2つ (既定は「その場型」):
+//  ホームの出し方は2つ (既定は「その場型」):
 //  - その場型: 必要になった瞬間に1つずつ。暗くしない
-//      ホームに3案が出た → 相棒のひとこと / 相棒カードが見えた → 服を教えて /
-//      「ちょっと違う」を押した → 理由で組み直す / 「着る」の送り出しを閉じた → 着た日は撮ろう
-//  - ツアー型: 3案が出た直後に4つを順に。画面を暗くして1つずつくり抜く
+//      3案が出た → 相棒のひとこと / 相棒カードが見えた → 服を教えて (写真から教える) /
+//      「ちょっと違う」→ 理由を教えて / 「着る」の送り出しを閉じた → 着た日は1枚 (撮ってみる)
+//  - ツアー型: 3案が出た直後に4つを順に。暗くして1つずつくり抜き、最後は「撮ってみる」
+//  カメラ画面: 初めて開いたときに2つ (シャッター → 写真から選ぶ)。どちらの型でも出す
 //
 
 import SwiftUI
 
 enum CoachTarget: String, CaseIterable {
     case partner, recipes, feedback, growth, camera
+    case cameraShutter, cameraPicker
 
     /// ScrollViewReader で送るときの id
     var scrollID: String { "coach.\(rawValue)" }
+
+    /// どの画面の部品か
+    var screen: CoachMarkCenter.Screen {
+        switch self {
+        case .cameraShutter, .cameraPicker: return .camera
+        default: return .home
+        }
+    }
+}
+
+/// ツールチップのボタンから始めるデータ入力
+enum CoachAction: Equatable {
+    /// カメラ画面を開く
+    case openCamera
+    /// ホームから「AIで写真を探す」を開く
+    case pickPhotosFromHome
+    /// カメラ画面で「AIで写真を探す」を開く
+    case pickPhotosInCamera
 }
 
 struct CoachTip: Equatable {
     let target: CoachTarget
     let title: String
     let body: String
+    /// 主ボタンで始める行動 (nil なら「つぎへ」「OK」)
+    var action: CoachAction? = nil
+    var actionLabel: String = ""
+    /// 行動ボタンの横の控えめなボタン
+    var laterLabel: String = "あとで"
 
     static func of(_ target: CoachTarget) -> CoachTip {
         switch target {
         case .partner:
-            return .init(target: target, title: "相棒のひとこと",
-                         body: "タップすると相棒画面へ。覚えたことや、ふたりの記録が見られるよ")
+            return .init(target: target, title: "相棒のひとこと", body: "タップで相棒画面へ")
         case .recipes:
-            return .init(target: target, title: "次に着る日の3案",
-                         body: "気温と手持ちの服から組んだよ。気に入ったら「着る」、ピンとこなければ「ちょっと違う」を押してね")
+            return .init(target: target, title: "相棒からの3案", body: "「着る」で決定。違えば「ちょっと違う」")
         case .feedback:
-            return .init(target: target, title: "教えてくれてありがとう",
-                         body: "理由を選ぶと、その案を入れ替えて、次の3案にも活かすよ")
+            return .init(target: target, title: "理由を教えてね", body: "次の3案に活かすよ")
         case .growth:
-            return .init(target: target, title: "服を教えてほしいな",
-                         body: "写真や定番アイテムで服を教えると、あなたの服だけで組める案が増えるよ")
+            return .init(target: target, title: "服を教えて", body: "あなたの服で組める案が増えるよ",
+                         action: .pickPhotosFromHome, actionLabel: "写真から教える")
         case .camera:
-            return .init(target: target, title: "着た日はここから1枚",
-                         body: "全身を撮ると着回しのクセがわかるよ。ふたりの記録にも残るね")
+            return .init(target: target, title: "着た日は1枚撮ろう", body: "着回しのクセを覚えるよ",
+                         action: .openCamera, actionLabel: "撮ってみる")
+        case .cameraShutter:
+            return .init(target: target, title: "全身を1枚", body: "鏡越しでもOK")
+        case .cameraPicker:
+            return .init(target: target, title: "撮った写真でもOK", body: "AIが全身写真を探すよ",
+                         action: .pickPhotosInCamera, actionLabel: "写真から選ぶ", laterLabel: "カメラで撮る")
         }
     }
 }
@@ -60,21 +88,29 @@ final class CoachMarkCenter {
         var label: String { self == .contextual ? "その場型" : "ツアー型" }
     }
 
+    /// いま前面にある画面 (ツールチップはその画面の部品だけ指す)
+    enum Screen { case home, camera, other }
+
     static let styleKey = "coachMark.style"
     private static let eligibleKey = "coachMark.eligible"
     private static let seenKey = "coachMark.seen"
-    private static let tourTips: [CoachTip] = [.of(.partner), .of(.recipes), .of(.growth), .of(.camera)]
+    private static let homeTour: [CoachTip] = [.of(.partner), .of(.recipes), .of(.growth), .of(.camera)]
+    private static let cameraTour: [CoachTip] = [.of(.cameraShutter), .of(.cameraPicker)]
 
-    /// 部品の位置 (グローバル座標)。カメラはタブバーの中なので CoachMarkOverlay が計算する
+    /// 部品の位置 (グローバル座標)。タブバーのカメラは CoachMarkOverlay が計算する
     var frames: [CoachTarget: CGRect] = [:]
     /// いま出しているツールチップ
     private(set) var current: CoachTip?
-    /// ツアー型の何番目か (0 始まり)。その場型では nil
+    /// ツアーの何番目か (0 始まり)。その場型では nil
     private(set) var tourStep: Int?
-    /// ホームが前面にあるとき true (ほかのタブ・push 先では隠す)
-    var homeIsFront = true
+    private var tour: [CoachTip] = []
+    private var tourKey = ""
+    /// 前面の画面 (MainTabView が知らせる)
+    var front: Screen = .home
     /// ツアー型で、画面外の部品までスクロールしてほしいとき
     var scrollRequest: CoachTarget?
+    /// ツールチップのボタンで始めた行動 (受け取った画面が実行して nil に戻す)
+    var pendingAction: CoachAction?
 
     private var queue: [CoachTip] = []
     private var seen: Set<String>
@@ -87,7 +123,8 @@ final class CoachMarkCenter {
         Style(rawValue: UserDefaults.standard.string(forKey: Self.styleKey) ?? "") ?? .contextual
     }
 
-    var tourTotal: Int { Self.tourTips.count }
+    var tourTotal: Int { tour.count }
+    var isLastTourStep: Bool { tourStep.map { $0 == tour.count - 1 } ?? false }
 
     private var isEligible: Bool { UserDefaults.standard.bool(forKey: Self.eligibleKey) }
 
@@ -100,15 +137,15 @@ final class CoachMarkCenter {
     func homeReady() {
         guard isEligible else { return }
         switch style {
-        case .tour:
-            guard tourStep == nil, !seen.contains("tour") else { return }
-            withAnimation(.easeInOut(duration: 0.25)) {
-                tourStep = 0
-                current = Self.tourTips[0]
-            }
-        case .contextual:
-            trigger(.partner)
+        case .tour: startTour(Self.homeTour, key: "tour")
+        case .contextual: trigger(.partner)
         }
+    }
+
+    /// カメラ画面を開いた (初めてのときだけ、撮り方と写真からの選び方を案内する)
+    func cameraOpened() {
+        guard isEligible else { return }
+        startTour(Self.cameraTour, key: "cameraTour")
     }
 
     /// その場型: その部品が必要になった瞬間に1回だけ出す
@@ -119,12 +156,12 @@ final class CoachMarkCenter {
         if current == nil { showNextQueued() }
     }
 
-    /// 吹き出しの「つぎへ」「OK」、ツアー型の暗幕タップ
+    /// 「つぎへ」「OK」、ツアーの暗幕タップ
     func next() {
         if let step = tourStep {
             let n = step + 1
-            guard n < Self.tourTips.count else { finishTour(); return }
-            let tip = Self.tourTips[n]
+            guard n < tour.count else { finishTour(); return }
+            let tip = tour[n]
             if tip.target == .growth { scrollRequest = .growth }
             withAnimation(.easeInOut(duration: 0.25)) {
                 tourStep = n
@@ -135,7 +172,25 @@ final class CoachMarkCenter {
         }
     }
 
+    /// 行動ボタン: ツールチップを閉じて、その画面に行動を渡す
+    func perform(_ action: CoachAction) {
+        Haptic.impact(.medium)
+        if tourStep != nil { finishTour() } else { showNextQueued() }
+        pendingAction = action
+    }
+
+    /// ツアーをやめる (スキップ・「あとで」)
     func skipTour() { finishTour() }
+
+    private func startTour(_ tips: [CoachTip], key: String) {
+        guard tourStep == nil, !seen.contains(key), let first = tips.first else { return }
+        tour = tips
+        tourKey = key
+        withAnimation(.easeInOut(duration: 0.25)) {
+            tourStep = 0
+            current = first
+        }
+    }
 
     private func showNextQueued() {
         withAnimation(.easeInOut(duration: 0.25)) {
@@ -144,11 +199,12 @@ final class CoachMarkCenter {
     }
 
     private func finishTour() {
-        markSeen("tour")
+        markSeen(tourKey)
         withAnimation(.easeInOut(duration: 0.25)) {
             tourStep = nil
             current = nil
         }
+        tour = []
     }
 
     private func markSeen(_ key: String) {
@@ -165,6 +221,8 @@ final class CoachMarkCenter {
         queue = []
         current = nil
         tourStep = nil
+        tour = []
+        pendingAction = nil
     }
     #endif
 }

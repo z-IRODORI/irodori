@@ -152,6 +152,12 @@ struct MainTabView: View {
         .overlay { CoachMarkOverlay() }
         .onChange(of: viewModel.selectedTab, initial: true) { _, _ in updateCoachFront() }
         .onChange(of: path.count) { _, _ in updateCoachFront() }
+        // ツールチップの「撮ってみる」→ カメラ画面へ
+        .onChange(of: CoachMarkCenter.shared.pendingAction) { _, action in
+            guard action == .openCamera else { return }
+            CoachMarkCenter.shared.pendingAction = nil
+            path.append(.camera)
+        }
         // v2 解析ジョブの常駐トースター (全タブ・push 先でも見える)。
         // タブバーのすぐ上に浮かせ、完了タップでカメラ遷移時と同じ結果画面へ push する
         .overlay(alignment: .bottom) {
@@ -199,7 +205,12 @@ struct MainTabView: View {
 
     /// ツールチップはホームが前面にあるときだけ出す (ほかのタブ・push 先では隠す)
     private func updateCoachFront() {
-        CoachMarkCenter.shared.homeIsFront = viewModel.selectedTab == .home && path.isEmpty
+        let center = CoachMarkCenter.shared
+        if path.last == .camera {
+            center.front = .camera
+        } else {
+            center.front = viewModel.selectedTab == .home && path.isEmpty ? .home : .other
+        }
     }
 
     private var partnerIcon: UIImage {

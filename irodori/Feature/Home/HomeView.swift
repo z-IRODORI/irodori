@@ -360,6 +360,12 @@ struct HomeView: View {
             onTapPartner: { path.append(.partner) }
         )
         .coachFrame(.growth)
+        // ツールチップの「写真から教える」→ AIで写真を探す
+        .onChange(of: CoachMarkCenter.shared.pendingAction) { _, action in
+            guard action == .pickPhotosFromHome else { return }
+            CoachMarkCenter.shared.pendingAction = nil
+            showFullBodyPickerSheet = true
+        }
         .id(CoachTarget.growth.scrollID)
         // 相棒カードが見えたら「服を教えてほしいな」 (その場型のツールチップ)
         .onScrollVisibilityChange(threshold: 0.6) { visible in
