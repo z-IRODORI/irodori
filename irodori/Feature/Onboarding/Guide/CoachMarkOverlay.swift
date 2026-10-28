@@ -119,16 +119,17 @@ struct CoachBubble: View {
     private var isLast: Bool { step.map { $0.index == $0.total } ?? true }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 10) {
-                PartnerIconImage(size: 34)
-                VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                PartnerIconImage(size: 36)
+                VStack(alignment: .leading, spacing: 6) {
                     Text(tip.title)
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(RenewalTokens.ink)
                     Text(tip.body)
                         .font(.system(size: 13))
                         .foregroundStyle(RenewalTokens.muted)
+                        .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -150,8 +151,10 @@ struct CoachBubble: View {
                 }
             }
         }
-        .padding(14)
-        .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 18)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+        .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(alignment: arrowOnTop ? .topLeading : .bottomLeading) {
             CoachArrow()
                 .fill(RenewalTokens.surface)

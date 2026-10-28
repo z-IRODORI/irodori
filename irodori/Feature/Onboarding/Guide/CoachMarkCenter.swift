@@ -57,21 +57,21 @@ struct CoachTip: Equatable {
     static func of(_ target: CoachTarget) -> CoachTip {
         switch target {
         case .partner:
-            return .init(target: target, title: "相棒のひとこと", body: "タップで相棒画面へ")
+            return .init(target: target, title: "相棒のひとこと", body: "タップで相棒画面へ。覚えたことや、ふたりの記録が見られるよ")
         case .recipes:
-            return .init(target: target, title: "相棒からの3案", body: "「着る」で決定。違えば「ちょっと違う」")
+            return .init(target: target, title: "相棒からの3案", body: "気温と手持ちの服から組んだよ。気に入ったら「着る」、違えば「ちょっと違う」")
         case .feedback:
-            return .init(target: target, title: "理由を教えてね", body: "次の3案に活かすよ")
+            return .init(target: target, title: "理由を教えてね", body: "選んだ理由はちゃんと覚えて、次の3案に活かすよ")
         case .growth:
-            return .init(target: target, title: "服を教えて", body: "あなたの服で組める案が増えるよ",
+            return .init(target: target, title: "服を教えて", body: "写真や定番アイテムで教えてくれると、あなたの服だけで組める案が増えるよ",
                          action: .pickPhotosFromHome, actionLabel: "写真から教える")
         case .camera:
-            return .init(target: target, title: "着た日は1枚撮ろう", body: "着回しのクセを覚えるよ",
+            return .init(target: target, title: "着た日は1枚撮ろう", body: "全身を撮ると、着回しのクセや好きな色を覚えるよ。ふたりの記録にも残るね",
                          action: .openCamera, actionLabel: "撮ってみる")
         case .cameraShutter:
-            return .init(target: target, title: "全身を1枚", body: "鏡越しでもOK")
+            return .init(target: target, title: "全身を1枚", body: "鏡越しでもOK。足もとまで入ると、服をよく覚えられるよ")
         case .cameraPicker:
-            return .init(target: target, title: "撮った写真でもOK", body: "AIが全身写真を探すよ",
+            return .init(target: target, title: "撮った写真でもOK", body: "写真フォルダから、AIがあなたの全身写真を探して選んでくれるよ",
                          action: .pickPhotosInCamera, actionLabel: "写真から選ぶ", laterLabel: "カメラで撮る")
         }
     }
