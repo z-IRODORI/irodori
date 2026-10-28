@@ -32,19 +32,28 @@ extension EnvironmentValues {
 
 // MARK: - 1. 入場
 
-/// カード: 少し下から浮かび上がる
+/// カード: 少し下から浮かび上がる。
+/// token (入場の回 + 案) ごとに1回だけ。途中でカードが作り直されても、同じ回の入場はもう流さない
+/// (作り直しのたびに透明から浮かび直して、案がちらついて見えるのを防ぐ)
 struct RenewalIntroRise: ViewModifier {
     let delay: Double?
+    var token: String = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
+    /// このカードで入場を始めた (始めたカードだけが最後まで動く)
+    @State private var startedHere = false
+
+    @MainActor private static var played: Set<String> = []
 
     func body(content: Content) -> some View {
-        let animate = delay != nil && !reduceMotion
+        let animate = delay != nil && !reduceMotion && (startedHere || !Self.played.contains(token))
         content
             .opacity(!animate || shown ? 1 : 0)
             .offset(y: !animate || shown ? 0 : 18)
             .onAppear {
-                guard animate, let delay else { return }
+                guard animate, let delay, !Self.played.contains(token) else { return }
+                Self.played.insert(token)
+                startedHere = true
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.86).delay(delay)) { shown = true }
             }
     }

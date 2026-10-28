@@ -146,7 +146,7 @@ struct CoachBubble: View {
                     secondary(tip.laterLabel, action: onLater)
                     primary(tip.actionLabel) { onAction(action) }
                 } else {
-                    if step != nil && !isLast { secondary("スキップ", action: onLater) }
+                    // スキップは置かない (つぎへ / OK で1つずつ進める)
                     primary(step == nil ? "OK" : (isLast ? "はじめる" : "つぎへ"), action: onNext)
                 }
             }

@@ -667,6 +667,8 @@ struct RenewalListLayout: View {
     let actions: RenewalRecipeActions
     /// 入場演出の開始秒 (nil = 演出なし)
     var introDelay: Double? = nil
+    /// 入場演出の回。同じ回の入場は各カード1回だけ流す
+    var introToken: Int = 0
 
     private var isItemMode: Bool { actions.visualMode != .photo }
     /// アイテムを並べる見せ方では、カードを画面幅いっぱいに近づけてボードを大きくする
@@ -678,7 +680,7 @@ struct RenewalListLayout: View {
                 let start = introDelay.map { $0 + Double(index) * 0.08 }
                 row(recipe, index: index)
                     .coachFrame(.recipes, active: index == 0)
-                    .modifier(RenewalIntroRise(delay: start))
+                    .modifier(RenewalIntroRise(delay: start, token: "\(introToken)-\(recipe.recipe_id)"))
                     .environment(\.renewalIntroDelay, start.map { $0 + 0.15 })
             }
         }

@@ -307,6 +307,8 @@ struct RenewalLiveHomeView: View {
     @AppStorage("renewalHome.spokenDay") private var spokenDay = ""
     @State private var introDelay: Double? = nil
     @State private var introKey = 0
+    /// 最後に入場演出を流した時刻 (続けて何度も流さない)
+    @State private var introStartedAt: Date = .distantPast
     @State private var pulseItemId: String?
     @State private var pendingPivotIntro: String?
     @State private var flying: (url: String, from: CGRect)?
@@ -526,6 +528,9 @@ struct RenewalLiveHomeView: View {
             return
         }
         guard !reduceMotion else { return }
+        // 入場は数秒に1回まで (案の取り直しが重なっても、浮かび直しを繰り返さない)
+        guard Date().timeIntervalSince(introStartedAt) > 3 else { return }
+        introStartedAt = Date()
         introDelay = 0.05
         introKey += 1
         // 演出が終わったら通常表示に戻す (再描画で再生しないように)
@@ -645,7 +650,7 @@ struct RenewalLiveHomeView: View {
         Group {
             switch layout {
             case .list:
-                RenewalListLayout(recipes: response.recipes, actions: actions, introDelay: introDelay)
+                RenewalListLayout(recipes: response.recipes, actions: actions, introDelay: introDelay, introToken: introKey)
                     .environment(\.renewalPulseItemId, pulseItemId)
                     .id(introKey)
             case .peek: RenewalPeekLayout(recipes: response.recipes, actions: actions)
