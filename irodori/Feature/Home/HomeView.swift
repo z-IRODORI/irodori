@@ -53,13 +53,14 @@ struct HomeView: View {
                     showToast: { ToastManager.shared.show($0) }
                 ),
                 model: ownedFirstModel,
+                // 相棒はタブになったので、重ねて開かずに相棒タブへ切り替える
                 onOpenPartner: {
                     Haptic.impact(.soft)
-                    path.append(.partner)
+                    tabViewModel.selectedTab = .partner
                 },
                 onOpenToneSheet: {
                     Haptic.impact(.soft)
-                    path.append(.partner)
+                    tabViewModel.selectedTab = .partner
                 },
                 onOpenPhotoPicker: { showFullBodyPickerSheet = true },
                 onOpenCalendar: { tabViewModel.selectedTab = .calendar },
@@ -360,7 +361,7 @@ struct HomeView: View {
             onTapStandardItems: { showStandardItemPickerSheet = true },
             onTapTasteVote: { showTasteVoteSheet = true },
             onTapCleanImages: { showItemReplaceSheet = true },
-            onTapPartner: { path.append(.partner) }
+            onTapPartner: { tabViewModel.selectedTab = .partner }
         )
         .coachFrame(.growth)
         // ツールチップの「写真から教える」→ AIで写真を探す

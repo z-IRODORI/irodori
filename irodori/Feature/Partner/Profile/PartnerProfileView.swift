@@ -100,7 +100,6 @@ struct PartnerProfileView: View {
                         header(p.understanding)
                         if let weekly = p.weekly, !found.isEmpty { weeklyStrip(weekly) }
                         if let combos = p.color_combos, !combos.isEmpty { colorCombos(combos) }
-                        if let onBrandMatchTap { BrandMatchEntryCard(action: onBrandMatchTap) }
                         missions(p) { action in
                             if action == "check_discoveries" {
                                 withAnimation { proxy.scrollTo("you", anchor: .top) }
@@ -209,24 +208,51 @@ struct PartnerProfileView: View {
             }
             .accessibilityElement(children: .combine)
 
-            if let onConsultTap {
-                Button {
-                    Haptic.impact(.soft)
-                    onConsultTap()
-                } label: {
-                    Label("相棒に相談する", systemImage: "bubble.left.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(RenewalTokens.ink)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(RenewalTokens.surface))
-                        .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
+            // 相棒にできること: 相談する / 合うブランドを見る (同じ形のボタンを横に並べる)
+            if onConsultTap != nil || onBrandMatchTap != nil {
+                HStack(spacing: 10) {
+                    if let onConsultTap {
+                        headerAction("相棒に相談する", icon: "bubble.left.fill", action: onConsultTap)
+                    }
+                    if let onBrandMatchTap {
+                        headerAction("合うブランド", icon: "tag.fill", badge: "10", action: onBrandMatchTap)
+                    }
                 }
-                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity)
         .animation(.easeOut(duration: 0.4), value: u.pct)
+    }
+
+    /// 理解度の下に並べる白いカプセルのボタン (アイコン + 文字 + 任意の小さな数)
+    private func headerAction(_ title: String, icon: String, badge: String? = nil,
+                              action: @escaping () -> Void) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            action()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                if let badge {
+                    Text(badge)
+                        .font(.system(size: 11, weight: .bold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(RenewalTokens.accentPink))
+                }
+            }
+            .foregroundStyle(RenewalTokens.ink)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 40)
+            .background(Capsule().fill(RenewalTokens.surface))
+            .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 今週のふりかえり

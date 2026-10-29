@@ -18,7 +18,59 @@ struct PartnerView: View {
     @State private var showPartnerOnboardingSheet = false
     @Environment(MainTabViewModel.self) private var tabViewModel: MainTabViewModel?
 
+    /// タブとして表示するとき true。ホームと同じく、見出しと「4つの質問」を画面の上部に自前で描く
+    /// (タブを包む NavigationStack の外側にあるため、タブの中の toolbar はナビゲーションバーに出ない)
+    var isTab = false
+
     var body: some View {
+        Group {
+            if isTab {
+                VStack(spacing: 0) {
+                    ZStack {
+                        Text("相棒")
+                            .font(.system(size: 18, weight: .semibold))
+                        HStack {
+                            Spacer()
+                            questionsButton
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(.white)
+                    // ヘッダーの下に細い線 (ホーム・カレンダー・クローゼットとそろえる)
+                    Rectangle().fill(Color.gray.opacity(0.15)).frame(height: 0.5)
+                    profile
+                }
+            } else {
+                profile
+                    .navigationTitle("相棒")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        if let onClose {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("閉じる") {
+                                    onClose()
+                                }
+                                .foregroundStyle(.black)
+                            }
+                        }
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            questionsButton
+                        }
+                    }
+            }
+        }
+        .fullScreenCover(isPresented: $showPartnerOnboardingSheet) {
+            PartnerOnboardingFlowView(
+                showCloseButton: true,
+                onComplete: {
+                    showPartnerOnboardingSheet = false
+                }
+            )
+        }
+    }
+
+    private var profile: some View {
         PartnerProfileView(
             onConsultTap: {
                 if let onClose {
@@ -36,45 +88,27 @@ struct PartnerView: View {
                 path.append(.brandMatch)
             }
         )
-        .navigationTitle("相棒")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if let onClose {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("閉じる") {
-                        onClose()
-                    }
-                    .foregroundStyle(.black)
-                }
+    }
+
+    /// 4つの質問に答え直す (相棒のタイプを決め直す)
+    private var questionsButton: some View {
+        Button {
+            Haptic.impact(.soft)
+            showPartnerOnboardingSheet = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("4つの質問")
+                    .font(.system(size: 12, weight: .semibold))
             }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    Haptic.impact(.soft)
-                    showPartnerOnboardingSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("4つの質問")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.gray.opacity(0.1))
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
+            .foregroundStyle(.black)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Color.gray.opacity(0.1))
+            .clipShape(Capsule())
         }
-        .fullScreenCover(isPresented: $showPartnerOnboardingSheet) {
-            PartnerOnboardingFlowView(
-                showCloseButton: true,
-                onComplete: {
-                    showPartnerOnboardingSheet = false
-                }
-            )
-        }
+        .buttonStyle(.plain)
     }
 
     /// ミッションの行き先へ移動する (相棒画面を閉じてタブを切り替える)

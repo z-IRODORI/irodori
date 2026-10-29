@@ -23,7 +23,18 @@ struct MainTabView: View {
                     CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
                 }
 
-                // コーデ追加 (中央のカメラ。タブとして留まらず、タップでカメラ画面へ直行)
+                // 相棒 (真ん中。相棒の絵をそのまま使い、ほかのタブより目立たせる)
+                Tab(value: MainTabViewModel.Tab.partner) {
+                    PartnerView(path: $path, isTab: true)
+                } label: {
+                    Label {
+                        Text("相棒")
+                    } icon: {
+                        Image(uiImage: PartnerTabIcon.image(selected: vm.selectedTab == .partner))
+                    }
+                }
+
+                // コーデ追加 (タブとして留まらず、タップでカメラ画面へ直行)
                 // circle.fill 版は黒い円盤になり他タブから浮くため、通常シンボル+ラベルで揃える
                 Tab("カメラ", systemImage: "camera", value: MainTabViewModel.Tab.plus) {
                     EmptyView()
@@ -46,12 +57,6 @@ struct MainTabView: View {
                     // + はタブとして留まらず、カメラ画面を直接開く
                     viewModel.selectedTab = previousTab
                     path.append(.camera)
-                } else if newTab == .partner {
-                    // 相棒タブ指定時はホーム画面から相棒画面へ遷移
-                    viewModel.selectedTab = .home
-                    if path.last != .partner {
-                        path.append(.partner)
-                    }
                 } else {
                     previousTab = newTab
                 }
