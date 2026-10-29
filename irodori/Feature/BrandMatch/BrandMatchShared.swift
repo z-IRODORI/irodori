@@ -6,7 +6,7 @@
 //  TasteTokens と同じ値) に沿う:
 //  - 影なし。Ground (#F9FAFB) の上に白い面 + 1px の枠 (#E8E8E8) だけで階層を作る
 //  - 複数の項目は 1 つの入れ物を 1px の罫線 (#EFEFEF) で区切る ("Group, don't box")
-//  - 色はデータにだけ: あなたの位置・ど真ん中の印に 1 色 (#1D5FBF)。好きの印だけお気に入りのピンク
+//  - 色は使わず白・黒・グレーで組む。好きの印だけお気に入りのピンク
 //  - 一覧の行は固定のロゴ枠 + 2 行 (名前 / 価格と合うところ)。理由の文や特徴は詳細シートへ
 //
 
@@ -56,8 +56,8 @@ struct BMRule: View {
 
 // MARK: - ロゴ枠
 
-/// 一覧で使う固定の画像枠。ロゴ・運営会社のロゴ・デザイナー・店舗の画像のどれか (札は付けない。
-/// 何の画像かは詳細シートの「画像: …」で伝える)。どれも無いときだけ頭文字 (最終手段)
+/// 一覧で使う固定の画像枠。ロゴ・運営会社のロゴ・デザイナー・店舗の画像のどれか (札は付けない)。
+/// どれも無いときだけ頭文字 (最終手段)
 struct BMLogoTile: View {
     let brand: BMBrand
     var width: CGFloat = 64
@@ -156,7 +156,7 @@ struct BMBrandRow: View {
                 HStack(spacing: 6) {
                     HStack(spacing: 3) {
                         Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(BMTokens.data)
+                            .foregroundStyle(BMTokens.ink)
                         Text(pick.reasonList)
                             .foregroundStyle(BMTokens.muted)
                             .lineLimit(1)
@@ -239,19 +239,21 @@ struct BMBrandTile: View {
     }
 }
 
-/// 価格の段階: ¥ を 5 つ並べ、当てはまる数だけ濃く (言葉は省く。読み上げは「価格帯 5 段階中 3」)
+/// 価格の段階: 詳細と同じ 5 段階のメーター (当てはまる段階まで黒で埋める)。
+/// ¥ の数より度合いが一目でわかる。読み上げは「価格帯 5 段階中 3、ミドル」
 struct BMPriceScale: View {
     let tier: Int
     var size: CGFloat = 12
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 2) {
             ForEach(1...5, id: \.self) { i in
-                Text("¥").foregroundStyle(i <= tier ? BMTokens.ink : BMTokens.control)
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
+                    .fill(i <= tier ? BMTokens.ink : BMTokens.border)
+                    .frame(width: size * 0.6, height: size * 0.6)
             }
         }
-        .font(.system(size: size, weight: .semibold).monospacedDigit())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("価格帯 5 段階中 \(tier)"))
+        .accessibilityLabel(Text("価格帯 5 段階中 \(tier)、\(BMBrand.tierLabels[max(0, min(5, tier))])"))
     }
 }
 
@@ -435,8 +437,9 @@ struct BMReactionBar: View {
 
 // MARK: - 詳細シート
 
-/// 並び: 合う理由 → どんな人向け → あなたとの距離 → ブランドのこと (歴史は畳む)。
-/// 「興味なし / 好き / 公式サイト」は下に固定し、スクロールしなくても押せる
+/// 並び: ブランド名 → 価格帯 (手に入るかを最初に) → 好みの一致度とチャート (相棒のひとこと) →
+/// 相棒より: 合う理由 (#好み #価格 #テイスト) → こんな人に合う → ブランド情報 (歴史は畳む) → 注意事項。
+/// 色は使わず白・黒・グレーで組む (好きのピンクだけ例外)。「興味なし / 好き / 公式サイト」は下に固定
 struct BMDetailSheet: View {
     @Bindable var store: BrandMatchStore
     let pick: BMPick
@@ -446,28 +449,20 @@ struct BMDetailSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 header
+                    .padding(.bottom, 4)
 
-                // いちばん見てほしいところ: あなたとの相性 (一致度・相棒のひとこと・チャート・観点ごとの判定)
-                group("あなたとの相性（IRODORI の見立て）") {
-                    BMCompatibilityView(persona: store.persona, brand: brand)
-                }
+                BMPriceCard(brand: brand, budget: 6 - store.persona.economy)
 
-                group("相棒より: このブランドがあなたに合う理由", icon: true) {
-                    ForEach(Array(pick.reasons.enumerated()), id: \.offset) { i, r in
-                        if i > 0 { BMRule(leading: 16) }
-                        Text(r)
-                            .font(.system(size: 14))
-                            .foregroundStyle(BMTokens.ink)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                    }
-                }
+                BMCompatibilityView(persona: store.persona, brand: brand)
+                    .bmCard()
+
+                reasons
+                    .padding(.top, 4)
 
                 if let t = brand.targetPersona {
-                    group("こんな人に合う（IRODORI の見立て）") {
+                    group("こんな人に合う") {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(t).font(.system(size: 14)).foregroundStyle(BMTokens.ink).lineSpacing(4)
                             Text((brand.styleTags + brand.subTags).joined(separator: " · "))
@@ -479,8 +474,6 @@ struct BMDetailSheet: View {
                 }
 
                 group("ブランド情報") {
-                    fact("価格帯", priceText)
-                    BMRule(leading: 16)
                     fact("買える場所", brand.channels.isEmpty ? nil : brand.channels.joined(separator: "・"))
                     BMRule(leading: 16)
                     fact("創業", founded)
@@ -511,39 +504,7 @@ struct BMDetailSheet: View {
                     }
                 }
 
-                // 「持ってる」「知ってた」は控えめに (主な反応は下の固定ボタン)
-                HStack(spacing: 8) {
-                    Text("ほかに").font(.system(size: 12)).foregroundStyle(BMTokens.muted)
-                    ForEach([BMReaction.owned, .known]) { r in
-                        let on = store.reaction(brand.id) == r
-                        Button { store.toggle(r, for: brand.id) } label: {
-                            Text(r.title)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(on ? BMTokens.surface : BMTokens.ink)
-                                .padding(.horizontal, 14)
-                                .frame(minHeight: 44)
-                                .background(on ? BMTokens.primary : BMTokens.surface,
-                                            in: RoundedRectangle(cornerRadius: BMTokens.controlRadius, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: BMTokens.controlRadius, style: .continuous)
-                                    .stroke(on ? .clear : BMTokens.control, lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(on ? .isSelected : [])
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    if let img = brand.image {
-                        if let page = img.sourcePage, let url = URL(string: page) {
-                            Link(destination: url) { Text(imageCredit(img)).underline() }
-                        } else {
-                            Text(imageCredit(img))
-                        }
-                    }
-                    Text("創業・運営・価格帯は 2026 年 10 月の調査値。IRODORI とブランドの提携はありません。")
-                }
-                .font(.system(size: 12))
-                .foregroundStyle(BMTokens.faint)
+                notes
             }
             .padding(20)
         }
@@ -554,23 +515,89 @@ struct BMDetailSheet: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            BMSlotLabel(slot: pick.slot)
-            HStack(spacing: 14) {
-                BMLogoTile(brand: brand, width: 88, height: 88)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(brand.nameEn)
-                        .font(.system(size: 20, weight: .bold))
+        HStack(spacing: 14) {
+            BMLogoTile(brand: brand, width: 72, height: 72)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(brand.nameEn)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(BMTokens.ink)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                Text(brand.nameJa).font(.system(size: 13)).foregroundStyle(BMTokens.muted)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: 相棒より: 合う理由 (表にせず、相棒の吹き出しにハッシュタグで)
+
+    private var reasons: some View {
+        let tags = pick.reasonTags
+        return HStack(alignment: .top, spacing: 10) {
+            BMPartnerIcon(persona: store.persona, size: 36)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("相棒より")
+                    .font(.system(size: 12))
+                    .foregroundStyle(BMTokens.muted)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("このブランドをすすめる理由は、この \(tags.count) つだよ")
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(BMTokens.ink)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                    Text(brand.nameJa).font(.system(size: 12)).foregroundStyle(BMTokens.muted)
-                    if let img = brand.image, img.kind != .brandLogo {
-                        Text("画像: " + img.label).font(.system(size: 11)).foregroundStyle(BMTokens.faint).lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(tags) { t in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("#" + t.tag)
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(BMTokens.ink)
+                            Text(t.text)
+                                .font(.system(size: 13))
+                                .foregroundStyle(BMTokens.muted)
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
                     }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(BMTokens.surface, in: bubbleShape)
+                .overlay(bubbleShape.stroke(BMTokens.border, lineWidth: 1))
+            }
+        }
+    }
+
+    private var bubbleShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 16, bottomTrailingRadius: 16,
+                               topTrailingRadius: 16, style: .continuous)
+    }
+
+    // MARK: 注意事項 (ページの下)
+
+    private var notes: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            note("あなたとの相性 (好みの一致度・チャート・こんな人に合う) は、ファッションタイプとブランドの特徴から IRODORI が見立てたものです。")
+            note("価格帯は、トップスの通常の定価をもとにした 5 段階です。創業・運営・価格は 2026 年 10 月の調査値です。")
+            note("IRODORI とブランドの提携はありません。")
+            if let img = brand.image, let src = img.source {
+                let credit = "画像の出典: " + src + ((img.license ?? "").isEmpty ? "" : "（\(img.license ?? "")）")
+                if let page = img.sourcePage, let url = URL(string: page) {
+                    Link(destination: url) { note(credit, underline: true) }
+                } else {
+                    note(credit)
                 }
             }
         }
+        .padding(.top, 8)
+    }
+
+    private func note(_ text: String, underline: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text("※")
+            Text(text).underline(underline).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(BMTokens.faint)
     }
 
     /// 下に固定: 興味なし / 好き (お気に入りのピンク) / 公式サイト
@@ -621,16 +648,6 @@ struct BMDetailSheet: View {
         .background(BMTokens.surface)
     }
 
-    /// 例: 画像: 運営会社のロゴ（オンワード樫山）・出典: 公式サイト / 画像: ロゴ・出典: Wikimedia Commons（Public domain）
-    private func imageCredit(_ img: BMImage) -> String {
-        var s = "画像: " + img.label
-        if let src = img.source {
-            s += "・出典: " + src
-            if let l = img.license, !l.isEmpty { s += "（" + l + "）" }
-        }
-        return s
-    }
-
     private var founded: String? {
         // 括弧の補足は省く (語の途中で折れて読みにくいため。全文は歴史に)
         let f = brand.founder.map { String($0.split(separator: "（").first ?? Substring($0)).trimmingCharacters(in: .whitespaces) }
@@ -639,20 +656,12 @@ struct BMDetailSheet: View {
         return "\(y) 年"
     }
 
-    private var priceText: String {
-        var s = brand.yen + " " + brand.tierLabel
-        if let r = brand.priceRange { s += "\n" + r.replacingOccurrences(of: " / ", with: "\n") }
-        return s
-    }
-
-    private func group<C: View>(_ title: String, icon: Bool = false, @ViewBuilder content: () -> C) -> some View {
+    private func group<C: View>(_ title: String, @ViewBuilder content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                if icon { BMPartnerIcon(persona: store.persona, size: 24) }
-                Text(title).font(.system(size: 12)).foregroundStyle(BMTokens.muted)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundStyle(BMTokens.muted)
+                .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 0) { content() }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .bmCard()
@@ -675,5 +684,105 @@ struct BMDetailSheet: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - 価格帯 (詳細の上部)
+
+/// 手に入るかを最初に判断できるように: 段階の名前 + トップスの目安の金額 + 5 段階のメーター +
+/// あなたの予算感との比べ + 公式の価格の例 (調査値があるときだけ)
+struct BMPriceCard: View {
+    let brand: BMBrand
+    /// あなたのちょうどいい段階 (6 − 経済の点、1〜5)
+    let budget: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("価格帯")
+                        .font(.system(size: 12))
+                        .foregroundStyle(BMTokens.muted)
+                    Spacer(minLength: 8)
+                    Text(fitText)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(BMTokens.ink)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(BMTokens.raised, in: RoundedRectangle(cornerRadius: BMTokens.chipRadius, style: .continuous))
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(brand.tierLabel)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(BMTokens.ink)
+                    Text("トップス \(brand.tierGuide) が目安")
+                        .font(.system(size: 13).monospacedDigit())
+                        .foregroundStyle(BMTokens.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                meter
+            }
+            .padding(16)
+
+            let examples = brand.priceExamples
+            if !examples.isEmpty {
+                BMRule(leading: 16)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("公式の価格の例")
+                        .font(.system(size: 12))
+                        .foregroundStyle(BMTokens.muted)
+                    ForEach(Array(examples.enumerated()), id: \.offset) { _, e in
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            if !e.item.isEmpty {
+                                Text(e.item)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(BMTokens.muted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(width: 116, alignment: .leading)
+                            }
+                            Text(e.price)
+                                .font(.system(size: 13, weight: .medium).monospacedDigit())
+                                .foregroundStyle(BMTokens.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                .padding(16)
+            }
+        }
+        .bmCard()
+    }
+
+    /// 5 段階のメーター: 当てはまる段階まで黒で埋める (端に「プチプラ」「ラグジュアリー」)
+    private var meter: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 3) {
+                ForEach(1...5, id: \.self) { i in
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(i <= brand.tier ? BMTokens.ink : BMTokens.border)
+                        .frame(height: 8)
+                }
+            }
+            HStack {
+                Text(BMBrand.tierLabels[1])
+                Spacer()
+                Text(BMBrand.tierLabels[5])
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(BMTokens.faint)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("価格帯 5 段階中 \(brand.tier)、\(brand.tierLabel)。トップス \(brand.tierGuide) が目安。\(fitText)"))
+    }
+
+    /// あなたの予算感 (ファッションタイプの経済の点) との比べ
+    private var fitText: String {
+        let gap = Double(brand.tier) - budget
+        if abs(gap) <= 0.5 { return "あなたの予算感にぴったり" }
+        if gap < 0 { return "あなたの予算感より手頃" }
+        return gap <= 1.5 ? "あなたの予算感より少し上" : "あなたの予算感より上"
     }
 }

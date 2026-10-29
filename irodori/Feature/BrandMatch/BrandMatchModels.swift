@@ -41,7 +41,28 @@ struct BMBrand: Identifiable {
     var yen: String { String(repeating: "¥", count: tier) }
     /// 読み上げ用 (「¥¥¥」は「円円円」と読まれるため)
     var priceSpoken: String { "価格帯 5 段階中 \(tier)、\(tierLabel)" }
-    var tierLabel: String { ["", "プチプラ", "手頃", "ミドル", "ハイ", "ラグジュアリー"][max(0, min(5, tier))] }
+    var tierLabel: String { BMBrand.tierLabels[max(0, min(5, tier))] }
+    /// 段階の目安 (調査で段階を決めたときの基準。トップスの通常の定価)
+    var tierGuide: String { BMBrand.tierGuides[max(0, min(5, tier))] }
+
+    static let tierLabels = ["", "プチプラ", "手頃", "ミドル", "ハイ", "ラグジュアリー"]
+    /// proposals/brand-match/SCHEMA.md の price.tier の表 (シャツ・ブラウス・カットソー・ニット)
+    static let tierGuides = ["", "〜3千円", "3千〜1万円", "1万〜2.5万円", "2.5万〜6万円", "6万円〜"]
+
+    /// 公式の価格の例 (調査値) を「アイテム / 価格」に分ける。
+    /// 例: 「シャツ 2千〜3千円台 / ジーンズ 3千〜4千円台」→ [(シャツ, 2千〜3千円台), (ジーンズ, 3千〜4千円台)]
+    var priceExamples: [(item: String, price: String)] {
+        guard let r = priceRange else { return [] }
+        return r.components(separatedBy: " / ").compactMap { part in
+            let t = part.trimmingCharacters(in: .whitespaces)
+            guard !t.isEmpty else { return nil }
+            // 数字で始まる語の手前で分ける (「GORE-TEX のレインジャケット 2万円台前半」も正しく分かれる)
+            if let r = t.range(of: " (?=[0-9０-９])", options: .regularExpression) {
+                return (String(t[..<r.lowerBound]), String(t[r.upperBound...]))
+            }
+            return ("", t)
+        }
+    }
 }
 
 // MARK: - ブランドの画像
@@ -90,17 +111,26 @@ struct BMImage {
     }
 }
 
-// MARK: - 10 選の 3 つの枠
+// MARK: - 10 選の 2 つの枠
 
+/// API は 3 つの枠 (core / stretch / discover) で選ぶ。画面では「おすすめ」と「新しい出会い」の 2 つに分け、
+/// 「少し背伸び」(stretch: 1 段上の価格や少し先の流行) は「新しい出会い」にまとめる (選ぶブランドの数は変えない)
 enum BMSlot: String, CaseIterable, Identifiable {
-    case core, stretch, discover
+    case core, discover
     var id: String { rawValue }
+
+    init?(apiValue: String) {
+        switch apiValue {
+        case "core": self = .core
+        case "stretch", "discover": self = .discover
+        default: return nil
+        }
+    }
 
     /// 見出し (何の一覧かが一目でわかる言葉に)
     var title: String {
         switch self {
-        case .core: return "いちばん合う"
-        case .stretch: return "少し背伸び"
+        case .core: return "おすすめ"
         case .discover: return "新しい出会い"
         }
     }
@@ -108,9 +138,8 @@ enum BMSlot: String, CaseIterable, Identifiable {
     /// 見出しの下の 1 行 (どう選んだか)
     var subtitle: String {
         switch self {
-        case .core: return "好みも予算も、あなたにぴったりのブランド"
-        case .stretch: return "いつもより少し上の価格や、少し先のトレンドに挑戦"
-        case .discover: return "クローゼットにまだ少ないテイストのブランド"
+        case .core: return "好みも予算も、あなたに合うブランド"
+        case .discover: return "少し上の価格や、クローゼットにまだ少ないテイストのブランド"
         }
     }
 }
@@ -146,6 +175,42 @@ struct BMPick: Identifiable {
 
     /// テイスト (例: きれいめ・フェミニン)
     var tasteLine: String { brand.styleTags.prefix(2).joined(separator: "・") }
+
+    /// 詳細で相棒が伝える「合う理由」。好み・価格・テイストの 3 つをハッシュタグにする。
+    /// 言葉は API の points (短い言葉) と reasons (決まった言い回し) から組み、無い要素は飛ばす
+    var reasonTags: [BMReasonTag] {
+        let priceWords = ["予算にぴったり", "手頃な価格", "1 段上の価格"]
+        let axisWords: Set<String> = ["流行に敏感", "定番好き", "自分らしさ", "控えめ", "きちんと感", "自由な装い",
+                                      "着心地重視", "シルエット重視", "価値観が近い"]
+        var out: [BMReasonTag] = []
+        // 1. 好み (価値観がいちばん近い観点)
+        if let a = points.first(where: { axisWords.contains($0) }) {
+            let text = reasons.first { $0.contains("価値観が近い") } ?? "好みのバランスが、あなたと近い"
+            out.append(BMReasonTag(tag: a, text: text))
+        }
+        // 2. 価格 (あなたの予算感との比べ)
+        if let p = points.first(where: { priceWords.contains($0) }) {
+            switch p {
+            case "手頃な価格": out.append(BMReasonTag(tag: "手頃な価格", text: "手頃な価格で取り入れやすい"))
+            case "1 段上の価格": out.append(BMReasonTag(tag: "ワンランク上", text: "少し背伸びして長く着る一着に"))
+            default: out.append(BMReasonTag(tag: "予算にぴったり", text: "あなたの予算感にちょうどいい価格"))
+            }
+        }
+        // 3. テイスト (クローゼットやタイプに合う雰囲気。無ければブランドのテイスト)
+        if let t = points.first(where: { !axisWords.contains($0) && !priceWords.contains($0) }) {
+            out.append(BMReasonTag(tag: t, text: reasons.first { $0.contains("「\(t)」") } ?? "「\(t)」のテイストのブランド"))
+        } else if let t = brand.styleTags.first {
+            out.append(BMReasonTag(tag: t, text: "「\(t)」のテイストのブランド"))
+        }
+        return out
+    }
+}
+
+/// 合う理由の 1 つ (#流行に敏感 + 1 行の説明)
+struct BMReasonTag: Identifiable {
+    let tag: String
+    let text: String
+    var id: String { tag }
 }
 
 // MARK: - サンプルユーザー

@@ -86,9 +86,7 @@ struct BrandMatchDesignC: View {
         }
         let p = picks[shown]
         if shown > 0, picks[shown - 1].slot != p.slot {
-            await say(p.slot == .stretch
-                      ? "次は、ちょっと背伸びの 3 つ。1 段上の価格か、少し先の流行だよ。"
-                      : "最後は、はじめましての 2 つ。あなたのクローゼットにまだ少ない雰囲気だよ。",
+            await say("次は、新しい出会いの \(picks.filter { $0.slot == p.slot }.count) つ。少し上の価格や、クローゼットにまだ少ない雰囲気だよ。",
                       after: 0.8)
         }
         typing = true

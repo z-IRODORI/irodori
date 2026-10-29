@@ -171,7 +171,7 @@ extension BrandMatchResponse {
     func persona(userId: String) -> BMPersona? {
         guard status == "success", let s = scores, let typeName = type_name else { return nil }
         let picks: [BMPick] = picks.compactMap { p in
-            guard let slot = BMSlot(rawValue: p.slot) else { return nil }
+            guard let slot = BMSlot(apiValue: p.slot) else { return nil }
             return BMPick(brand: p.brand.model, slot: slot, reasons: p.reasons, points: p.points, score: p.score)
         }
         return BMPersona(

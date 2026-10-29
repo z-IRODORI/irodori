@@ -30,7 +30,7 @@ struct BrandMatchDesignD: View {
                     ForEach(BMSlot.allCases) { s in
                         HStack(spacing: 5) {
                             mark(s, rank: nil, size: 12)
-                            Text(s == .stretch ? "背伸び" : s.title).font(.system(size: 12)).foregroundStyle(BMTokens.muted)
+                            Text(s.title).font(.system(size: 12)).foregroundStyle(BMTokens.muted)
                                 .fixedSize()
                         }
                     }
@@ -143,7 +143,7 @@ struct BrandMatchDesignD: View {
         }
     }
 
-    /// 枠の印 (データの色 1 色を塗り方で分ける): ど真ん中 = 塗り / 背伸び = 淡い塗り / はじめまして = 輪。
+    /// 枠の印 (データの色 1 色を塗り方で分ける): おすすめ = 塗り / 新しい出会い = 輪。
     /// 黒は「選んでいる点」の輪にだけ使う
     @ViewBuilder
     private func mark(_ slot: BMSlot, rank: Int?, size: CGFloat) -> some View {
@@ -152,10 +152,6 @@ struct BrandMatchDesignD: View {
         case .core:
             Circle().fill(BMTokens.data).frame(width: size, height: size)
                 .overlay { label?.foregroundStyle(BMTokens.surface) }
-        case .stretch:
-            Circle().fill(Color(red: 0.80, green: 0.86, blue: 0.95)).frame(width: size, height: size)
-                .overlay(Circle().stroke(BMTokens.data, lineWidth: 1))
-                .overlay { label?.foregroundStyle(BMTokens.data) }
         case .discover:
             Circle().fill(BMTokens.surface).frame(width: size, height: size)
                 .overlay(Circle().stroke(BMTokens.data, lineWidth: 1.5))
