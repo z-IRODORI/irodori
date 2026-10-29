@@ -12,6 +12,16 @@ import UserNotifications
 final class NotificationService: UNNotificationServiceExtension {
     private var contentHandler: ((UNNotificationContent) -> Void)?
     private var bestAttempt: UNMutableNotificationContent?
+    /// 完了 (contentHandler) は必ず1回だけ呼ぶ。ダウンロードの完了と時間切れが重なっても二重に呼ばない
+    private let lock = NSLock()
+
+    private func deliver(_ content: UNNotificationContent) {
+        lock.lock()
+        let handler = contentHandler
+        contentHandler = nil
+        lock.unlock()
+        handler?(content)
+    }
 
     override func didReceive(
         _ request: UNNotificationRequest,
@@ -22,13 +32,13 @@ final class NotificationService: UNNotificationServiceExtension {
         bestAttempt = content
 
         guard let url = Self.imageURL(in: request.content.userInfo) else {
-            contentHandler(content)
+            deliver(content)
             return
         }
 
-        let task = URLSession.shared.downloadTask(with: url) { [weak self] location, response, _ in
-            guard let self, let content = self.bestAttempt else { return }
-            defer { contentHandler(content) }
+        // self を強く持つ (弱参照だと self が先に消えたとき、通知が出ないまま終わる)
+        let task = URLSession.shared.downloadTask(with: url) { location, response, _ in
+            defer { self.deliver(content) }
             guard let location else { return }
             let ext = Self.fileExtension(url: url, response: response)
             let dest = FileManager.default.temporaryDirectory
@@ -46,9 +56,7 @@ final class NotificationService: UNNotificationServiceExtension {
     }
 
     override func serviceExtensionTimeWillExpire() {
-        if let contentHandler, let bestAttempt {
-            contentHandler(bestAttempt)
-        }
+        if let bestAttempt { deliver(bestAttempt) }
     }
 
     // MARK: - 画像 URL の取り出し

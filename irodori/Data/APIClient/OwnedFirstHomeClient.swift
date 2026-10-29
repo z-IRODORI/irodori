@@ -127,6 +127,8 @@ struct OwnedFirstHomeResponse: Codable, Hashable {
     /// その日に「着る」と決めた案 (決めたときのまま)。案が入れ替わっても上に出し続ける
     let decided_recipe: OwnedFirstDecidedRecipe?
     let text_source: String   // gemini | template
+    /// true: 文言はまだテンプレート (サーバが裏で相棒の文言を作っている)。少し後に1回取り直すと入っている
+    var text_pending: Bool? = nil
     let memory: OwnedFirstMemory?
     /// 「ちょっと違う」で見送った案は、その場で代わりの案に入れ替える (RenewalLiveHomeModel)
     var recipes: [OwnedFirstRecipe]
@@ -174,13 +176,20 @@ struct OwnedFirstFeedbackResponse: Codable {
 // MARK: - Client
 
 protocol OwnedFirstHomeClientProtocol {
-    func get(uid: String, gender: String, targetDate: String, pivotItemId: String?) async throws -> Result<OwnedFirstHomeResponse, HTTPError>
+    /// refresh: true ならサーバの当日キャッシュを使わず組み直す (引っ張って更新)
+    func get(uid: String, gender: String, targetDate: String, pivotItemId: String?, refresh: Bool) async throws -> Result<OwnedFirstHomeResponse, HTTPError>
     func wear(uid: String, recipe: OwnedFirstRecipe, targetDate: String, maxTemp: Int?, pieces: [OwnedFirstBoardPiece]) async throws -> Result<OwnedFirstWearResponse, HTTPError>
     /// 提案を通さずに「この日はこれを着た」を残す (カレンダーの過去の日から)
     func recordWorn(uid: String, targetDate: String, pieces: [OwnedFirstBoardPiece], itemIds: [String]) async throws -> Result<OwnedFirstWearResponse, HTTPError>
     /// reason: like (案ごとのいいね) | cold | color | style | mood (見送り)。recipes が1件なら案ごと
     func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe], colorTarget: RenewalColorTarget?) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError>
     func examples(uid: String, poolIds: [String]) async throws -> Result<OwnedFirstExamplesResponse, HTTPError>
+}
+
+extension OwnedFirstHomeClientProtocol {
+    func get(uid: String, gender: String, targetDate: String, pivotItemId: String?) async throws -> Result<OwnedFirstHomeResponse, HTTPError> {
+        try await get(uid: uid, gender: gender, targetDate: targetDate, pivotItemId: pivotItemId, refresh: false)
+    }
 }
 
 final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
@@ -238,7 +247,7 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
         let color_target: String?
     }
 
-    func get(uid: String, gender: String, targetDate: String, pivotItemId: String?) async throws -> Result<OwnedFirstHomeResponse, HTTPError> {
+    func get(uid: String, gender: String, targetDate: String, pivotItemId: String?, refresh: Bool) async throws -> Result<OwnedFirstHomeResponse, HTTPError> {
         var components = URLComponents(string: "\(baseURL)/api/home/owned-first")!
         var query = [
             URLQueryItem(name: "user_id", value: uid),
@@ -250,6 +259,9 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
         }
         if let pivotItemId {
             query.append(URLQueryItem(name: "pivot_item_id", value: pivotItemId))
+        }
+        if refresh {
+            query.append(URLQueryItem(name: "refresh", value: "true"))
         }
         components.queryItems = query
         guard let url = components.url else { return .failure(.responseError) }

@@ -122,15 +122,21 @@ extension PushNotificationManager: UNUserNotificationCenterDelegate {
         return []
     }
 
-    /// 通知タップ → コーデ詳細へ
+    /// 通知タップ → コーデ詳細へ。
+    /// async 版を nonisolated で受けると、終わりがバックグラウンドのスレッドになり、
+    /// iOS への完了通知もそこから呼ばれてアプリが落ちる (UIKit はメインスレッドを要求する)。
+    /// 完了ハンドラ版にして、行き先の反映と完了の報告をどちらもメインスレッドで行う
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        let userInfo = response.notification.request.content.userInfo
-        guard let destination = Self.destination(from: userInfo) else { return }
-        await MainActor.run {
-            self.pendingDestination = destination
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let destination = Self.destination(from: response.notification.request.content.userInfo)
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                if let destination { self.pendingDestination = destination }
+            }
+            completionHandler()
         }
     }
 }

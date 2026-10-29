@@ -146,10 +146,24 @@ struct CalendarOwnedFirstSuggestionView: View {
         do {
             if case .success(let res) = try await client.get(uid: uid, gender: gender, targetDate: data.date, pivotItemId: nil) {
                 response = res
+                if res.text_pending == true { await followUpTexts(after: res) }
                 return
             }
         } catch {}
         failed = true
+    }
+
+    /// 文言が後から入るとき: 少し待って1回だけ取り直し、同じ3案なら差し替える (サーバは保存済みを返すだけ)
+    private func followUpTexts(after first: OwnedFirstHomeResponse) async {
+        for wait in [4.0, 6.0] {
+            try? await Task.sleep(for: .seconds(wait))
+            guard let result = try? await client.get(uid: uid, gender: gender, targetDate: data.date, pivotItemId: nil),
+                  case .success(let fresh) = result,
+                  fresh.recipes.map(\.recipe_id) == first.recipes.map(\.recipe_id) else { return }
+            if fresh.text_pending == true { continue }
+            withAnimation(.easeInOut(duration: 0.3)) { response = fresh }
+            return
+        }
     }
 
     private func decide(_ recipe: OwnedFirstRecipe, response: OwnedFirstHomeResponse) async {

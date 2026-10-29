@@ -72,6 +72,52 @@ final class RenewalLiveHomeModel {
     init(source: RenewalHomeDataSource) {
         self.source = source
         self.client = OwnedFirstHomeClient(baseURL: source.baseURL ?? OwnedFirstHomeClient.productionBaseURL)
+        if source == .render { restoreSaved() }
+    }
+
+    // MARK: 端末の控え (起動直後に前回の3案をすぐ出す)
+
+    private static let savedKey = "renewalHome.savedResponse"
+    /// 控えが新しければ、起動時に取りに行かない (サーバへのアクセスを減らす)
+    private static let freshSeconds: TimeInterval = 10 * 60
+
+    private struct Saved: Codable {
+        let uid: String
+        let scope: String
+        let savedAt: Date
+        let response: OwnedFirstHomeResponse
+    }
+
+    /// 同じ人・同じ日の控えがあれば、読み込みを待たずに表示する
+    private func restoreSaved() {
+        guard let data = UserDefaults.standard.data(forKey: Self.savedKey),
+              let saved = try? JSONDecoder().decode(Saved.self, from: data),
+              saved.uid == uid, let scope = RenewalScope(rawValue: saved.scope),
+              saved.response.target_date == Self.isoDate(scope) else { return }
+        responses[scope] = saved.response
+        savedAt[scope] = saved.savedAt
+        for r in saved.response.recipes {
+            if let pid = r.example?.pool_id, let e = r.example?.extraction { extractions[pid] = e }
+        }
+    }
+
+    private func save(_ response: OwnedFirstHomeResponse, scope: RenewalScope) {
+        guard source == .render, pivots[scope] == nil else { return }
+        let now = Date()
+        savedAt[scope] = now
+        if let data = try? JSONEncoder().encode(Saved(uid: uid, scope: scope.rawValue, savedAt: now, response: response)) {
+            UserDefaults.standard.set(data, forKey: Self.savedKey)
+        }
+    }
+
+    private var savedAt: [RenewalScope: Date] = [:]
+
+    /// 控えを表示しているときに、裏で新しい3案に取り替える (読み込み中の表示は出さない)。
+    /// 控えが10分以内のものなら取りに行かない
+    func revalidateIfNeeded(_ scope: RenewalScope) async {
+        guard let at = savedAt[scope], Date().timeIntervalSince(at) > Self.freshSeconds,
+              !loading.contains(scope), !uid.isEmpty else { return }
+        await fetch(scope, refresh: false, silent: true)
     }
 
     var uid: String { UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? "" }
@@ -162,24 +208,33 @@ final class RenewalLiveHomeModel {
         Task { await pollExtractions(scope) }
     }
 
-    func load(_ scope: RenewalScope, force: Bool = false) async {
+    func load(_ scope: RenewalScope, force: Bool = false, refresh: Bool = false) async {
         guard force || responses[scope] == nil, !loading.contains(scope) else { return }
         guard !uid.isEmpty else {
             errors[scope] = "ログインしていないため、実データを取得できません (userId が空)"
             return
         }
-        loading.insert(scope)
-        errors[scope] = nil
-        defer { loading.remove(scope) }
+        await fetch(scope, refresh: refresh, silent: false)
+    }
+
+    /// silent: 読み込み中の表示を出さず、取れたら差し替える (控えの更新・文言の後追い)
+    private func fetch(_ scope: RenewalScope, refresh: Bool, silent: Bool) async {
+        if !silent {
+            loading.insert(scope)
+            errors[scope] = nil
+        }
+        defer { if !silent { loading.remove(scope) } }
         do {
             // 画面の task から切り離して最後まで取りに行く。タブを切り替えるたびに読み込みが取り消され、
             // 戻るたびに 3案が空 → 入場演出つきで出直す (表示・非表示が交互に見える) のを防ぐ
             let client = self.client, uid = self.uid, gender = self.gender
             let date = Self.isoDate(scope), pivot = pivots[scope]
-            let result = try await Task { try await client.get(uid: uid, gender: gender, targetDate: date, pivotItemId: pivot) }.value
+            let result = try await Task { try await client.get(uid: uid, gender: gender, targetDate: date, pivotItemId: pivot, refresh: refresh) }.value
             switch result {
             case .success(let res):
                 responses[scope] = res
+                save(res, scope: scope)
+                if res.text_pending == true { scheduleTextFollowUp(scope, pivot: pivot) }
                 // 相棒画面の吹き出しを、ホームのひとことと同じ話題にそろえる
                 if source == .render {
                     UserDefaults.standard.set(res.greeting, forKey: RenewalLiveHomeModel.lastGreetingKey)
@@ -189,10 +244,33 @@ final class RenewalLiveHomeModel {
                     if let pid = r.example?.pool_id, let e = r.example?.extraction { extractions[pid] = e }
                 }
             case .failure(let error):
-                errors[scope] = message(for: error)
+                if !silent { errors[scope] = message(for: error) }
             }
         } catch {
             // キャンセルは表示しない
+        }
+    }
+
+    /// 文言が後から入るとき: 少し待って1回だけ取り直し、同じ3案なら文言だけ差し替える。
+    /// (サーバは保存済みの3案を返すだけなので軽い。案が変わっていたら取り替えない)
+    private func scheduleTextFollowUp(_ scope: RenewalScope, pivot: String?) {
+        let client = self.client, uid = self.uid, gender = self.gender, date = Self.isoDate(scope)
+        Task { @MainActor [weak self] in
+            for wait in [4.0, 6.0] {
+                try? await Task.sleep(for: .seconds(wait))
+                guard let self, self.pivots[scope] == pivot, let current = self.responses[scope] else { return }
+                guard let result = try? await client.get(uid: uid, gender: gender, targetDate: date, pivotItemId: pivot, refresh: false),
+                      case .success(var fresh) = result else { return }
+                guard fresh.recipes.map(\.recipe_id) == current.recipes.map(\.recipe_id) else { return }
+                if fresh.text_pending == true { continue }
+                // 見送りで入れ替えた案などの手元の状態は保ったまま、文言だけ新しくする
+                fresh.recipes = current.recipes.map { old in
+                    fresh.recipes.first(where: { $0.recipe_id == old.recipe_id }) ?? old
+                }
+                withAnimation(.easeInOut(duration: 0.3)) { self.responses[scope] = fresh }
+                self.save(fresh, scope: scope)
+                return
+            }
         }
     }
 
@@ -400,12 +478,13 @@ struct RenewalLiveHomeView: View {
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.loading.contains(scope))
         .refreshable {
-            await model.load(scope, force: true)
+            await model.load(scope, force: true, refresh: true)
             await onRefresh?()
         }
         .modifier(SandboxNavigation(enabled: host.isSandbox, layoutRaw: $layoutRaw, visualRaw: $visualRaw))
         .task(id: scope) {
             await model.load(scope)
+            await model.revalidateIfNeeded(scope)
             await model.pollExtractions(scope)
         }
         .sheet(item: $detailRecipe) { recipe in
@@ -446,7 +525,7 @@ struct RenewalLiveHomeView: View {
         Button(action: onOpenPartner) {
             HStack(alignment: .center, spacing: 12) {
                 RenewalPartnerAvatar(typeName: partnerTypeName, size: 40)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {  // 天気・ひとこと・覚えてるよ の間を少しあける
                     nextWearMeta
                     if let response {
                         RenewalSpokenText(
@@ -460,7 +539,7 @@ struct RenewalLiveHomeView: View {
                         )
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(RenewalTokens.ink)
-                        .lineSpacing(2)
+                        .lineSpacing(3)
                         .lineLimit(3)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)

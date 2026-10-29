@@ -96,19 +96,17 @@ struct PartnerView: View {
             Haptic.impact(.soft)
             showPartnerOnboardingSheet = true
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 11, weight: .semibold))
-                Text("4つの質問")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .foregroundStyle(.black)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color.gray.opacity(0.1))
-            .clipShape(Capsule())
+            // 文字は出さずアイコンだけ (見た目 32pt の丸、押せる範囲は 44pt)
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.black)
+                .frame(width: 32, height: 32)
+                .background(Color.gray.opacity(0.1), in: Circle())
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("4つの質問に答え直す")
     }
 
     /// ミッションの行き先へ移動する (相棒画面を閉じてタブを切り替える)
