@@ -91,7 +91,7 @@ struct BrandMatchSandboxView: View {
 
     private var summary: String {
         switch tab {
-        case .a: return "3 つの枠で 10 個をロゴつきの一覧に。見比べやすい"
+        case .a: return "ZOZOTOWN のようなロゴ一覧。リストとタイルを切り替えられる"
         case .b: return "1 枚ずつめくり、右で好き・左で興味なし。反応が集まる"
         case .c: return "相棒がチャットで 1 つずつ紹介。関係の延長で受け取れる"
         case .d: return "好みの地図で、あなたとの近さを位置で見せる"

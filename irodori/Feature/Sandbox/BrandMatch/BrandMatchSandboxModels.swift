@@ -49,11 +49,12 @@ struct BMBrand: Identifiable {
 enum BMImageKind {
     case brandLogo, companyLogo, designerPhoto, brandPhoto, companyPhoto, brandVisual, brandIcon
 
-    /// 写真は枠いっぱいに、ロゴは余白をとって収める
+    /// 写真は枠いっぱいに、ロゴは余白をとって収める。
+    /// 運営会社の画像はロゴの絵であることが多い (例: BAYCREW'S) ので、切らずに収める
     var isPhoto: Bool {
         switch self {
-        case .designerPhoto, .brandPhoto, .companyPhoto, .brandVisual: return true
-        case .brandLogo, .companyLogo, .brandIcon: return false
+        case .designerPhoto, .brandPhoto, .brandVisual: return true
+        case .brandLogo, .companyLogo, .companyPhoto, .brandIcon: return false
         }
     }
 }
@@ -92,19 +93,21 @@ enum BMSlot: String, CaseIterable, Identifiable {
     case core, stretch, discover
     var id: String { rawValue }
 
+    /// 見出し (何の一覧かが一目でわかる言葉に)
     var title: String {
         switch self {
-        case .core: return "ど真ん中"
-        case .stretch: return "ちょっと背伸び"
-        case .discover: return "はじめまして"
+        case .core: return "いちばん合う"
+        case .stretch: return "少し背伸び"
+        case .discover: return "新しい出会い"
         }
     }
 
+    /// 見出しの下の 1 行 (どう選んだか)
     var subtitle: String {
         switch self {
-        case .core: return "価値観も予算も、いちばん近い"
-        case .stretch: return "1 段上の価格か、少し先の流行"
-        case .discover: return "クローゼットにまだ少ない雰囲気"
+        case .core: return "好みも予算も、あなたにぴったりのブランド"
+        case .stretch: return "いつもより少し上の価格や、少し先のトレンドに挑戦"
+        case .discover: return "クローゼットにまだ少ないテイストのブランド"
         }
     }
 }
@@ -119,6 +122,22 @@ struct BMPick: Identifiable {
     let score: Double
     var id: String { brandID }
     var brand: BMBrand { BMBrand.all[brandID]! }
+
+    /// 一覧で見せる「合う理由」の短い一文 (例: トレンド感が近い・予算にぴったり)
+    var reasonShort: String {
+        let near: [String: String] = [
+            "流行に敏感": "トレンド感が近い", "定番好き": "定番好きが近い", "自分らしさ": "自分らしさ重視が近い",
+            "控えめ": "控えめな好みが近い", "きちんと感": "きちんと感が近い", "自由な装い": "自由な着こなしが近い",
+            "着心地重視": "着心地重視が近い", "シルエット重視": "シルエット重視が近い", "価値観が近い": "好みが近い",
+        ]
+        let fit = points.lazy.compactMap { near[$0] }.first ?? "好みが近い"
+        let price = points.contains("予算にぴったり") ? "予算にぴったり"
+            : points.contains("手頃な価格") ? "手頃な価格" : points.contains("1 段上の価格") ? "少し上の価格" : nil
+        return [fit, price].compactMap { $0 }.joined(separator: "・")
+    }
+
+    /// テイスト (例: きれいめ・フェミニン)
+    var tasteLine: String { brand.styleTags.prefix(2).joined(separator: "・") }
 }
 
 // MARK: - サンプルユーザー

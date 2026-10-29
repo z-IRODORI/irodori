@@ -120,53 +120,126 @@ struct BMLogoTile: View {
     }
 }
 
-// MARK: - 一覧の 1 行 (ロゴ枠 + 2 行)
+// MARK: - 一覧の 1 行 (ZOZOTOWN のようなロゴ一覧: 順位 + 正方形のロゴ + 名前 + テイスト・価格 + 合う理由 + ♡)
 
 struct BMBrandRow: View {
     let pick: BMPick
+    var rank: Int?
     var reaction: BMReaction?
     var showsChevron = true
+    /// ♡ を押したとき (nil なら ♡ を出さない)
+    var onLike: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 12) {
-            BMLogoTile(brand: pick.brand)
+        HStack(alignment: .top, spacing: 12) {
+            if let rank {
+                Text("\(rank)")
+                    .font(.system(size: 15, weight: .bold).monospacedDigit())
+                    .foregroundStyle(BMTokens.ink)
+                    .frame(width: 16, alignment: .center)
+                    .padding(.top, 26)
+                    .accessibilityLabel(Text("\(rank) 位"))
+            }
+            BMLogoTile(brand: pick.brand, width: 72, height: 72)
             VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(pick.brand.nameEn)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(BMTokens.ink)
-                        .lineLimit(1)
-                    Spacer(minLength: 6)
-                    BMPriceScale(tier: pick.brand.tier)
-                }
-                // そのブランドだけの 1 文 (特徴の最初の文)。行ごとに違うので見比べられる
-                Text(pick.brand.summary ?? pick.brand.nameJa)
-                    .font(.system(size: 12))
+                Text(pick.brand.nameEn)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(BMTokens.ink)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                Text(pick.brand.nameJa)
+                    .font(.system(size: 11))
                     .foregroundStyle(BMTokens.muted)
                     .lineLimit(1)
+                HStack(spacing: 6) {
+                    BMPriceScale(tier: pick.brand.tier)
+                    Text(pick.tasteLine)
+                        .font(.system(size: 12))
+                        .foregroundStyle(BMTokens.muted)
+                        .lineLimit(1)
+                }
+                .padding(.top, 1)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
+                    Text(pick.reasonShort)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(BMTokens.data)
+                .padding(.top, 1)
             }
-            if let reaction { mark(reaction) }
-            if showsChevron {
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let onLike {
+                let liked = reaction == .like
+                Button(action: onLike) {
+                    Image(systemName: liked ? "heart.fill" : "heart")
+                        .font(.system(size: 18))
+                        .foregroundStyle(liked ? BMTokens.favorite : BMTokens.faint)
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(liked ? "好きを取り消す" : "好き"))
+                .accessibilityAddTraits(liked ? .isSelected : [])
+            } else if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(BMTokens.faint)
+                    .padding(.top, 28)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)          // 44 + 24 = 68pt のピッチ
+        .padding(.leading, 12)
+        .padding(.trailing, 6)
+        .padding(.vertical, 12)
         .opacity(reaction == .notInterested ? 0.45 : 1)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
     }
+}
 
-    @ViewBuilder
-    private func mark(_ r: BMReaction) -> some View {
-        if r == .like {
-            Image(systemName: "heart.fill").font(.system(size: 12)).foregroundStyle(BMTokens.favorite)
-                .accessibilityLabel(Text("好き"))
-        } else {
-            Text(r.title).font(.system(size: 11, weight: .medium)).foregroundStyle(BMTokens.faint)
+/// タイル表示の 1 マス (正方形のロゴ + 順位 + ♡ + 名前 + 価格)
+struct BMBrandTile: View {
+    let pick: BMPick
+    let rank: Int
+    var reaction: BMReaction?
+    var onLike: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            GeometryReader { g in
+                BMLogoTile(brand: pick.brand, width: g.size.width, height: g.size.width)
+            }
+            .aspectRatio(1, contentMode: .fit)
+            .overlay(alignment: .topLeading) {
+                Text("\(rank)")
+                    .font(.system(size: 12, weight: .bold).monospacedDigit())
+                    .foregroundStyle(BMTokens.surface)
+                    .frame(minWidth: 20, minHeight: 20)
+                    .background(BMTokens.primary, in: RoundedRectangle(cornerRadius: BMTokens.chipRadius))
+                    .padding(5)
+            }
+            .overlay(alignment: .topTrailing) {
+                let liked = reaction == .like
+                Button(action: onLike) {
+                    Image(systemName: liked ? "heart.fill" : "heart")
+                        .font(.system(size: 15))
+                        .foregroundStyle(liked ? BMTokens.favorite : BMTokens.faint)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(liked ? "好きを取り消す" : "好き"))
+            }
+            Text(pick.brand.nameEn)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(BMTokens.ink)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, minHeight: 30, alignment: .topLeading)
+            HStack(spacing: 4) {
+                BMPriceScale(tier: pick.brand.tier)
+                Text(pick.brand.styleTags.first ?? "").font(.system(size: 11)).foregroundStyle(BMTokens.muted).lineLimit(1)
+            }
         }
+        .opacity(reaction == .notInterested ? 0.45 : 1)
     }
 }
 
@@ -379,7 +452,7 @@ struct BMDetailSheet: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
-                group("相棒から: あなたに合う理由", icon: true) {
+                group("相棒より: このブランドがあなたに合う理由", icon: true) {
                     ForEach(Array(pick.reasons.enumerated()), id: \.offset) { i, r in
                         if i > 0 { BMRule(leading: 16) }
                         Text(r)
@@ -392,7 +465,7 @@ struct BMDetailSheet: View {
                 }
 
                 if let t = brand.targetPersona {
-                    group("どんな人向け（IRODORI の見立て）") {
+                    group("こんな人に合う（IRODORI の見立て）") {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(t).font(.system(size: 14)).foregroundStyle(BMTokens.ink).lineSpacing(4)
                             Text((brand.styleTags + brand.subTags).joined(separator: " · "))
@@ -403,12 +476,12 @@ struct BMDetailSheet: View {
                     }
                 }
 
-                group("あなたとの距離") {
+                group("好みの近さ（点が近いほど、あなたと似ている）") {
                     BMAxisCompare(user: store.persona.scores, brand: brand.axes)
                         .padding(16)
                 }
 
-                group("ブランドのこと") {
+                group("ブランド情報") {
                     fact("価格帯", priceText)
                     BMRule(leading: 16)
                     fact("買える場所", brand.channels.isEmpty ? nil : brand.channels.joined(separator: "・"))
@@ -487,10 +560,10 @@ struct BMDetailSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             BMSlotLabel(slot: pick.slot)
             HStack(spacing: 14) {
-                BMLogoTile(brand: brand, width: 96, height: 64)
+                BMLogoTile(brand: brand, width: 88, height: 88)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(brand.nameEn)
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(BMTokens.ink)
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)

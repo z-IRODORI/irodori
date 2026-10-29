@@ -77,7 +77,7 @@ struct BrandMatchDesignB: View {
             BMSlotLabel(slot: p.slot)
                 .padding(16)
             VStack(alignment: .leading, spacing: 6) {
-                BMLogoTile(brand: b, width: 120, height: 80)
+                BMLogoTile(brand: b, width: 128, height: 128)
                 // ブランドのロゴでないときは、何の画像かを書く (運営会社のロゴ・デザイナー など)
                 if let img = b.image, img.kind != .brandLogo {
                     Text("画像: " + img.label)
@@ -109,9 +109,11 @@ struct BrandMatchDesignB: View {
                     .padding(.bottom, 16)
             }
             BMRule()
-            row("価格", b.tierLabel)
+            row("合う理由", p.reasonShort)
             BMRule(leading: 16)
-            row("合うところ", p.points.joined(separator: " · "))
+            row("テイスト", p.tasteLine)
+            BMRule(leading: 16)
+            row("価格", b.tierLabel)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .bmCard()

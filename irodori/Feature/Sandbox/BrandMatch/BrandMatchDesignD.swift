@@ -177,7 +177,7 @@ struct BrandMatchDesignD: View {
         let p = picks[min(selected, picks.count - 1)]
         return VStack(alignment: .leading, spacing: 0) {
             Button { opened = p } label: {
-                BMBrandRow(pick: p, reaction: store.reaction(p.brandID)).contentShape(Rectangle())
+                BMBrandRow(pick: p, rank: selected + 1, reaction: store.reaction(p.brandID)).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             BMRule()
