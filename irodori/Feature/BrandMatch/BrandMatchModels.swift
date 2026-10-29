@@ -258,6 +258,53 @@ enum BMReaction: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - 価格帯への返事
+
+/// 「この価格帯、あなたにはどう？」への返事。並びはメーターと同じ (左が安い)
+enum BMPriceVerdict: String, CaseIterable, Identifiable {
+    case low, just, high
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .low: return "安い"
+        case .just: return "ちょうどいい"
+        case .high: return "高い"
+        }
+    }
+
+    /// 相棒の返事の書き出し
+    var ack: String {
+        switch self {
+        case .low: return "もっと上でも大丈夫なんだね、覚えたよ。"
+        case .just: return "ちょうどいいんだね、覚えたよ。"
+        case .high: return "高めなんだね、覚えたよ。"
+        }
+    }
+}
+
+/// 返事を送ったあとに相棒が覚えたこと (本番だけ。改善案では nil)
+struct BMPriceLearning {
+    /// 予算感 (1〜5) の前と後
+    let budgetBefore: Double
+    let budgetAfter: Double
+    /// 10 選のうち入れ替わったブランドの数
+    let changed: Int
+    /// 相棒の理解度が増えた分 (ミッション「ブランドの価格帯を教える」)
+    let gainedPct: Int
+    /// 価格帯を教えた回数と、次に理解度が上がる回数
+    let answers: Int
+    let nextTarget: Int?
+
+    /// 相棒の返事の続き (予算感の動き + 10 選がどうなったか)
+    var detail: String {
+        let move = budgetAfter < budgetBefore - 0.01 ? "予算感を少し下げて、"
+            : budgetAfter > budgetBefore + 0.01 ? "予算感を少し上げて、" : ""
+        let list = changed > 0 ? "10 選のうち \(changed) ブランドを選び直したよ" : "いまの 10 選はこのままがよさそう"
+        return move + list
+    }
+}
+
 // MARK: - 状態
 
 @Observable
@@ -267,6 +314,12 @@ final class BrandMatchStore {
     var onReaction: ((String, BMReaction?) -> Void)?
     /// "personaID/brandID" → 反応
     private(set) var reactions: [String: BMReaction] = [:]
+    /// "personaID/brandID" → 価格帯への返事
+    private(set) var priceVerdicts: [String: BMPriceVerdict] = [:]
+    /// 価格帯への返事を送り、選び直した 10 選に入れ替える (本番)。nil = 送らない (改善案)
+    var onPriceFeedback: (@MainActor (String, BMPriceVerdict?) async -> BMPriceLearning?)?
+    /// 一覧の見出しの下に出す相棒のひとこと (選び直したときなど)。nil なら決まった文
+    var note: String?
 
     init(persona: BMPersona) {
         self.persona = persona
@@ -290,6 +343,28 @@ final class BrandMatchStore {
     /// サーバーに残っている反応を、送り返さずに読み込む
     func preload(_ r: BMReaction, for brandID: String) {
         reactions["\(persona.id)/\(brandID)"] = r
+    }
+
+    func priceVerdict(_ brandID: String) -> BMPriceVerdict? { priceVerdicts["\(persona.id)/\(brandID)"] }
+
+    /// サーバーに残っている価格帯への返事を、送り返さずに読み込む
+    func preloadPrice(_ v: BMPriceVerdict, for brandID: String) {
+        priceVerdicts["\(persona.id)/\(brandID)"] = v
+    }
+
+    /// 価格帯に返事する (同じ返事をもう一度押すと取り消し)。相棒が覚えたことを返す
+    @MainActor
+    func answerPrice(_ v: BMPriceVerdict, for brandID: String) async -> (verdict: BMPriceVerdict?, learning: BMPriceLearning?) {
+        let key = "\(persona.id)/\(brandID)"
+        let previous = priceVerdicts[key]
+        let next: BMPriceVerdict? = previous == v ? nil : v
+        priceVerdicts[key] = next
+        Haptic.selection()
+        guard let send = onPriceFeedback else { return (next, nil) }
+        let learning = await send(brandID, next)
+        // 届かなかったときは元に戻す (覚えていないのに選んだ見た目にしない)
+        if learning == nil { priceVerdicts[key] = previous }
+        return (next, learning)
     }
 
     func count(_ r: BMReaction) -> Int {

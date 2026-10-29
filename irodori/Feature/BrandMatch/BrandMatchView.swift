@@ -5,6 +5,7 @@
 //  あなたに合うブランド 10 選 (本番)。相棒画面・診断結果の画面から開く。
 //  irodori-api の /api/brand-match から、本人のファッションタイプ・クローゼットの服・性別・年齢で選んだ 10 選を読み、
 //  一覧 (BrandMatchListView) と詳細シートで見せる。反応 (好き など) は API に送り、次の 10 選に効かせる。
+//  価格帯への返事 (高い / ちょうどいい / 安い) は予算感を直すので、送ったらすぐ 10 選を読み直して入れ替える。
 //
 
 import SwiftUI
@@ -49,18 +50,42 @@ struct BrandMatchView: View {
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
         guard !uid.isEmpty else { phase = .failed; return }
         let gender = Gender.fromWithDefault(UserDefaults.standard.string(forKey: UserDefaultsKey.gender.rawValue)).apiValue
-        switch await client.fetch(userId: uid, gender: gender, age: Self.userAge()) {
+        let age = Self.userAge()
+        switch await client.fetch(userId: uid, gender: gender, age: age) {
         case .success(let res):
             if res.status == "needs_fashion_type" {
                 phase = .needsDiagnosis
             } else if let persona = res.persona(userId: uid), !persona.picks.isEmpty {
                 let store = BrandMatchStore(persona: persona)
-                for p in res.picks {
-                    if let r = BMReaction(apiValue: p.reaction) { store.preload(r, for: p.brand.id) }
-                }
+                Self.preload(res, into: store)
                 let client = self.client
                 store.onReaction = { brandID, reaction in
                     Task { await client.sendFeedback(userId: uid, brandId: brandID, reaction: reaction) }
+                }
+                // 価格帯への返事: 送る → 直した予算感で 10 選を読み直す → 入れ替える
+                store.onPriceFeedback = { [weak store] brandID, verdict in
+                    guard let store,
+                          let res = await client.sendPriceFeedback(userId: uid, brandId: brandID, verdict: verdict)
+                    else { return nil }
+                    let before = store.persona
+                    var changed = 0
+                    if case .success(let fresh) = await client.fetch(userId: uid, gender: gender, age: age),
+                       let next = fresh.persona(userId: uid), !next.picks.isEmpty {
+                        let shown = Set(before.picks.map(\.brandID))
+                        changed = next.picks.filter { !shown.contains($0.brandID) }.count
+                        Self.preload(fresh, into: store)
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            store.persona = next
+                            if changed > 0 { store.note = "教えてくれた予算感で、\(changed) ブランドを選び直したよ" }
+                        }
+                    }
+                    return BMPriceLearning(
+                        budgetBefore: 6 - before.economy,
+                        budgetAfter: res.budget?.tier ?? 6 - store.persona.economy,
+                        changed: changed,
+                        gainedPct: res.growth.gained_pct,
+                        answers: res.growth.answers,
+                        nextTarget: res.growth.next_target)
                 }
                 phase = .ready(store)
             } else {
@@ -68,6 +93,14 @@ struct BrandMatchView: View {
             }
         case .failure:
             phase = .failed
+        }
+    }
+
+    /// サーバーに残っている反応と価格帯への返事を、送り返さずに読み込む
+    private static func preload(_ res: BrandMatchResponse, into store: BrandMatchStore) {
+        for p in res.picks {
+            if let r = BMReaction(apiValue: p.reaction) { store.preload(r, for: p.brand.id) }
+            if let v = p.price_feedback.flatMap(BMPriceVerdict.init(rawValue:)) { store.preloadPrice(v, for: p.brand.id) }
         }
     }
 

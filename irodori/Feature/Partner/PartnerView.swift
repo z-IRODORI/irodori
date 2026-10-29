@@ -126,6 +126,10 @@ struct PartnerView: View {
             onClose?()
             path.removeAll()
             path.append(.camera)
+        case "open_brands":
+            // 「ブランドの価格帯を教える」: あなたに合うブランドの一覧へ
+            onClose?()
+            path.append(.brandMatch)
         case "open_closet", "open_calendar", "open_home":
             onClose?()
             path.removeAll()

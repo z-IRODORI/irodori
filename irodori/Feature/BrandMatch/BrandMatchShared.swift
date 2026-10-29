@@ -246,6 +246,11 @@ struct BMPriceScale: View {
     var size: CGFloat = 12
     var body: some View {
         HStack(spacing: 2) {
+            // 何の目盛りかが分かるように、前に ¥ を置く
+            Text("¥")
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(BMTokens.muted)
+                .padding(.trailing, 2)
             ForEach(1...5, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 1, style: .continuous)
                     .fill(i <= tier ? BMTokens.ink : BMTokens.border)
@@ -453,25 +458,12 @@ struct BMDetailSheet: View {
                 header
                     .padding(.bottom, 4)
 
-                BMPriceCard(brand: brand, budget: 6 - store.persona.economy)
+                BMPriceCard(store: store, brand: brand)
 
                 BMCompatibilityView(persona: store.persona, brand: brand)
                     .bmCard()
 
-                reasons
-                    .padding(.top, 4)
-
-                if let t = brand.targetPersona {
-                    group("こんな人に合う") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(t).font(.system(size: 14)).foregroundStyle(BMTokens.ink).lineSpacing(4)
-                            Text((brand.styleTags + brand.subTags).joined(separator: " · "))
-                                .font(.system(size: 12))
-                                .foregroundStyle(BMTokens.muted)
-                        }
-                        .padding(16)
-                    }
-                }
+                partnerCard
 
                 group("ブランド情報") {
                     fact("買える場所", brand.channels.isEmpty ? nil : brand.channels.joined(separator: "・"))
@@ -530,46 +522,114 @@ struct BMDetailSheet: View {
         .accessibilityAddTraits(.isHeader)
     }
 
-    // MARK: 相棒より: 合う理由 (表にせず、相棒の吹き出しにハッシュタグで)
+    // MARK: 相棒より (合う理由 + こんな人に合う)
 
-    private var reasons: some View {
+    /// 相棒からの手紙のように 1 枚で: 見出し (相棒の顔 + 相棒より) / すすめる理由 (#好み #価格 #テイスト) /
+    /// こんな人に合う / 締めのひとこと。区切り線で話題を分ける。カードは画面の幅いっぱいに置く
+    private var partnerCard: some View {
         let tags = pick.reasonTags
-        return HStack(alignment: .top, spacing: 10) {
-            BMPartnerIcon(persona: store.persona, size: 36)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("相棒より")
-                    .font(.system(size: 12))
-                    .foregroundStyle(BMTokens.muted)
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("このブランドをすすめる理由は、この \(tags.count) つだよ")
-                        .font(.system(size: 14, weight: .semibold))
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                BMPartnerIcon(persona: store.persona, size: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("相棒より")
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(BMTokens.ink)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(brand.nameEn) のこと、話させて")
+                        .font(.system(size: 12))
+                        .foregroundStyle(BMTokens.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(BMTokens.raised)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+
+            if !tags.isEmpty {
+                BMRule()
+                VStack(alignment: .leading, spacing: 16) {
+                    partnerSay("すすめる理由は、この \(tags.count) つだよ")
                     ForEach(tags) { t in
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text("#" + t.tag)
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(BMTokens.ink)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(BMTokens.raised, in: Capsule())
                             Text(t.text)
-                                .font(.system(size: 13))
-                                .foregroundStyle(BMTokens.muted)
+                                .font(.system(size: 14))
+                                .foregroundStyle(BMTokens.ink)
                                 .lineSpacing(3)
                                 .fixedSize(horizontal: false, vertical: true)
+                                .padding(.leading, 2)
                         }
                         .accessibilityElement(children: .combine)
                     }
                 }
                 .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(BMTokens.surface, in: bubbleShape)
-                .overlay(bubbleShape.stroke(BMTokens.border, lineWidth: 1))
             }
+
+            if let t = brand.targetPersona {
+                BMRule()
+                VStack(alignment: .leading, spacing: 10) {
+                    partnerSay("こんな人に合うと思うよ")
+                    Text(t)
+                        .font(.system(size: 14))
+                        .foregroundStyle(BMTokens.ink)
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                    let styles = brand.styleTags + brand.subTags
+                    if !styles.isEmpty {
+                        BMFlowLayout(spacing: 6) {
+                            ForEach(styles, id: \.self) { tag in
+                                Text(tag)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(BMTokens.muted)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4)
+                                    .overlay(Capsule().stroke(BMTokens.border, lineWidth: 1))
+                            }
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Text("テイスト: " + styles.joined(separator: "、")))
+                    }
+                }
+                .padding(16)
+            }
+
+            BMRule()
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "bubble.left")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("ピンとこなかったら「興味なし」を押してね。次からは選ばないよ")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(BMTokens.muted)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
+        .bmCard()
     }
 
-    private var bubbleShape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 16, bottomTrailingRadius: 16,
-                               topTrailingRadius: 16, style: .continuous)
+    /// 相棒が話しかける見出し (相棒の口調。小さな吹き出しの印つき)
+    private func partnerSay(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "quote.opening")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(BMTokens.faint)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(BMTokens.ink)
+        }
+        .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: 注意事項 (ページの下)
@@ -690,11 +750,22 @@ struct BMDetailSheet: View {
 // MARK: - 価格帯 (詳細の上部)
 
 /// 手に入るかを最初に判断できるように: 段階の名前 + トップスの目安の金額 + 5 段階のメーター +
-/// あなたの予算感との比べ + 公式の価格の例 (調査値があるときだけ)
+/// あなたの予算感との比べ + 公式の価格の例 (調査値があるときだけ)。
+/// 下で「この価格帯、あなたにはどう？」に 安い / ちょうどいい / 高い で答えられる。答えると相棒が予算感を覚え
+/// (相棒のミッションにも数える)、10 選を選び直す
 struct BMPriceCard: View {
+    @Bindable var store: BrandMatchStore
     let brand: BMBrand
-    /// あなたのちょうどいい段階 (6 − 経済の点、1〜5)
-    let budget: Double
+
+    private enum Reply {
+        case thinking(BMPriceVerdict)
+        case done(BMPriceVerdict, BMPriceLearning?)
+        case failed
+    }
+    @State private var reply: Reply?
+
+    /// あなたのちょうどいい段階 (6 − 経済の点、1〜5)。返事で直ると、ここも変わる
+    private var budget: Double { 6 - store.persona.economy }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -710,6 +781,7 @@ struct BMPriceCard: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(BMTokens.raised, in: RoundedRectangle(cornerRadius: BMTokens.chipRadius, style: .continuous))
+                        .contentTransition(.opacity)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(brand.tierLabel)
@@ -752,8 +824,140 @@ struct BMPriceCard: View {
                 }
                 .padding(16)
             }
+
+            BMRule()
+            feedback
+                .padding(16)
         }
         .bmCard()
+    }
+
+    // MARK: 価格帯への返事
+
+    private var feedback: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("この価格帯、あなたにはどう？")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(BMTokens.ink)
+                Spacer(minLength: 4)
+                Text("相棒が覚えるよ")
+                    .font(.system(size: 11))
+                    .foregroundStyle(BMTokens.faint)
+            }
+            HStack(spacing: 8) {
+                ForEach(BMPriceVerdict.allCases) { v in
+                    let on = store.priceVerdict(brand.id) == v
+                    Button { answer(v) } label: {
+                        Text(v.title)
+                            .font(.system(size: 14, weight: on ? .semibold : .medium))
+                            .foregroundStyle(on ? BMTokens.surface : BMTokens.ink)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(on ? BMTokens.primary : BMTokens.surface,
+                                        in: RoundedRectangle(cornerRadius: BMTokens.controlRadius, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: BMTokens.controlRadius, style: .continuous)
+                                .stroke(on ? .clear : BMTokens.control, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isThinking)
+                    .accessibilityLabel(Text("この価格帯は\(v.title)"))
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                }
+            }
+            if let reply {
+                partnerReply(reply)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: replyKey)
+    }
+
+    private var isThinking: Bool { if case .thinking = reply { return true } else { return false } }
+
+    private var replyKey: String {
+        switch reply {
+        case .none: return ""
+        case .thinking(let v): return "t-\(v.rawValue)"
+        case .done(let v, let l): return "d-\(v.rawValue)-\(l?.changed ?? -1)"
+        case .failed: return "f"
+        }
+    }
+
+    private func answer(_ v: BMPriceVerdict) {
+        Task { @MainActor in
+            let willClear = store.priceVerdict(brand.id) == v
+            reply = willClear ? nil : .thinking(v)
+            let result = await store.answerPrice(v, for: brand.id)
+            guard let verdict = result.verdict else { reply = nil; return }
+            // 本番で送れなかったときは、そう伝える (改善案は送らないので learning が無くても覚えたことにする)
+            if store.onPriceFeedback != nil && result.learning == nil {
+                reply = .failed
+            } else {
+                reply = .done(verdict, result.learning)
+                if let gained = result.learning?.gainedPct, gained > 0 { Haptic.notify(.success) }
+            }
+        }
+    }
+
+    /// 相棒の返事 (覚えたこと → 10 選をどうしたか → 相棒の成長)
+    @ViewBuilder
+    private func partnerReply(_ r: Reply) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            BMPartnerIcon(persona: store.persona, size: 30)
+            VStack(alignment: .leading, spacing: 8) {
+                switch r {
+                case .thinking:
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("相棒が予算感を覚えて、10 選を見直しているよ…")
+                            .font(.system(size: 13))
+                            .foregroundStyle(BMTokens.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                case .failed:
+                    Text("ごめんね、うまく届かなかったみたい。もう一度押してみてね")
+                        .font(.system(size: 13))
+                        .foregroundStyle(BMTokens.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                case .done(let v, let learning):
+                    Text(v.ack + (learning?.detail ?? ""))
+                        .font(.system(size: 13))
+                        .foregroundStyle(BMTokens.ink)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let learning { growth(learning) }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(BMTokens.raised, in: UnevenRoundedRectangle(
+                topLeadingRadius: 4, bottomLeadingRadius: 14, bottomTrailingRadius: 14, topTrailingRadius: 14,
+                style: .continuous))
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// 相棒の成長: 理解度が上がったとき / あと何回で上がるか
+    @ViewBuilder
+    private func growth(_ l: BMPriceLearning) -> some View {
+        if l.gainedPct > 0 {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("相棒が成長したよ　理解度 +\(l.gainedPct)%")
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+            }
+            .foregroundStyle(BMTokens.surface)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(BMTokens.primary, in: Capsule())
+        } else if let next = l.nextTarget, next > l.answers {
+            Text("あと \(next - l.answers) ブランド教えてくれると、相棒の理解度が上がるよ")
+                .font(.system(size: 12).monospacedDigit())
+                .foregroundStyle(BMTokens.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// 5 段階のメーター: 当てはまる段階まで黒で埋める (端に「プチプラ」「ラグジュアリー」)
@@ -778,11 +982,56 @@ struct BMPriceCard: View {
         .accessibilityLabel(Text("価格帯 5 段階中 \(brand.tier)、\(brand.tierLabel)。トップス \(brand.tierGuide) が目安。\(fitText)"))
     }
 
-    /// あなたの予算感 (ファッションタイプの経済の点) との比べ
+    /// あなたの予算感 (ファッションタイプの経済の点。価格帯への返事で直る) との比べ
     private var fitText: String {
         let gap = Double(brand.tier) - budget
         if abs(gap) <= 0.5 { return "あなたの予算感にぴったり" }
         if gap < 0 { return "あなたの予算感より手頃" }
         return gap <= 1.5 ? "あなたの予算感より少し上" : "あなたの予算感より上"
+    }
+}
+
+// MARK: - 折り返して並べる (テイストの札)
+
+struct BMFlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let height = rows.last.map { $0.y + $0.height } ?? 0
+        let width = rows.map(\.width).max() ?? 0
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let rows = arrange(width: bounds.width, subviews: subviews)
+        for row in rows {
+            var x = bounds.minX
+            for i in row.indices {
+                let size = subviews[i].sizeThatFits(.unspecified)
+                subviews[i].place(at: CGPoint(x: x, y: bounds.minY + row.y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+        }
+    }
+
+    private struct Row { var indices: [Int] = []; var y: CGFloat = 0; var width: CGFloat = 0; var height: CGFloat = 0 }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var row = Row()
+        for (i, v) in subviews.enumerated() {
+            let size = v.sizeThatFits(.unspecified)
+            let needed = row.indices.isEmpty ? size.width : row.width + spacing + size.width
+            if needed > width, !row.indices.isEmpty {
+                rows.append(row)
+                row = Row(y: row.y + row.height + spacing)
+            }
+            row.width = row.indices.isEmpty ? size.width : row.width + spacing + size.width
+            row.height = max(row.height, size.height)
+            row.indices.append(i)
+        }
+        if !row.indices.isEmpty { rows.append(row) }
+        return rows
     }
 }

@@ -5,6 +5,7 @@
 //  あなたに合うブランド 10 選 (irodori-api の /api/brand-match)。
 //  GET  /api/brand-match?user_id=&gender=&age=   → 10 選 (ブランドの事実は調査マスタの値)
 //  POST /api/brand-match/feedback                 → 好き / 持ってる / 知ってた / 興味なし
+//  POST /api/brand-match/price-feedback           → 価格帯が 高い / ちょうどいい / 安い (予算感を直し、相棒のミッションに数える)
 //
 
 import Foundation
@@ -12,6 +13,7 @@ import Foundation
 protocol BrandMatchClientProtocol {
     func fetch(userId: String, gender: String, age: Int?) async -> Result<BrandMatchResponse, HTTPError>
     func sendFeedback(userId: String, brandId: String, reaction: BMReaction?) async
+    func sendPriceFeedback(userId: String, brandId: String, verdict: BMPriceVerdict?) async -> BrandPriceFeedbackResponse?
 }
 
 final class BrandMatchClient: BrandMatchClientProtocol {
@@ -50,6 +52,54 @@ final class BrandMatchClient: BrandMatchClientProtocol {
         request.httpBody = try? JSONEncoder().encode(body)
         _ = try? await URLSession.shared.data(for: request)
     }
+
+    func sendPriceFeedback(userId: String, brandId: String, verdict: BMPriceVerdict?) async -> BrandPriceFeedbackResponse? {
+        guard let url = URL(string: "\(Self.baseURL)/api/brand-match/price-feedback") else { return nil }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 60
+        let body = BrandPriceFeedbackRequest(user_id: userId, brand_id: brandId, verdict: verdict?.rawValue)
+        request.httpBody = try? JSONEncoder().encode(body)
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode >= 400 { return nil }
+            return try JSONDecoder().decode(BrandPriceFeedbackResponse.self, from: data)
+        } catch {
+            print("[BrandMatch] price feedback error: \(error.localizedDescription)")
+            return nil
+        }
+    }
+}
+
+private struct BrandPriceFeedbackRequest: Encodable {
+    let user_id: String
+    let brand_id: String
+    let verdict: String?
+
+    // verdict が nil のときも null を送る (返事を取り消す)
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(user_id, forKey: .user_id)
+        try c.encode(brand_id, forKey: .brand_id)
+        try c.encode(verdict, forKey: .verdict)
+    }
+
+    enum CodingKeys: String, CodingKey { case user_id, brand_id, verdict }
+}
+
+/// 価格帯への返事の結果: 直した予算感と、相棒の成長 (ミッションで増えた理解度)
+struct BrandPriceFeedbackResponse: Decodable {
+    let status: String
+    let verdict: String?
+    let budget: BrandMatchResponse.Budget?
+    let growth: Growth
+
+    struct Growth: Decodable {
+        let gained_pct: Int
+        let answers: Int
+        let next_target: Int?
+    }
 }
 
 private struct BrandMatchFeedbackRequest: Encodable {
@@ -77,7 +127,15 @@ struct BrandMatchResponse: Decodable {
     let scores: Scores?
     let closet: [String]?
     let partner_line: String?
+    /// 予算感 (価格帯への返事で直した値。古いサーバでは nil)
+    let budget: Budget?
     let picks: [Pick]
+
+    struct Budget: Decodable {
+        let tier: Double
+        let base: Double
+        let answers: Int
+    }
 
     struct Scores: Decodable {
         let trend: Double
@@ -98,6 +156,8 @@ struct BrandMatchResponse: Decodable {
         let reasons: [String]
         let points: [String]
         let reaction: String?
+        /// 価格帯への返事 (high / just / low)
+        let price_feedback: String?
         let brand: Brand
     }
 

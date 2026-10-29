@@ -54,7 +54,8 @@ struct BrandMatchListView: View {
                 Text("あなたに合う 10 ブランド")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(BMTokens.ink)
-                Text("好みとクローゼットの服から選んだよ")
+                // 価格帯を教えて選び直したときは、そのことを伝える
+                Text(store.note ?? "好みとクローゼットの服から選んだよ")
                     .font(.system(size: 12))
                     .foregroundStyle(BMTokens.muted)
                     .lineLimit(2)
