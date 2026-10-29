@@ -23,15 +23,13 @@ struct MainTabView: View {
                     CalendarView(viewModel: .init(apiClient: CoordinateListClient()), path: $path)
                 }
 
-                // 相棒 (真ん中。相棒の絵をそのまま使い、ほかのタブより目立たせる)
+                // 相棒 (真ん中。文字なしで相棒の絵だけを大きく置き、ほかのタブより目立たせる)
                 Tab(value: MainTabViewModel.Tab.partner) {
                     PartnerView(path: $path, isTab: true)
                 } label: {
-                    Label {
-                        Text("相棒")
-                    } icon: {
-                        Image(uiImage: PartnerTabIcon.image(selected: vm.selectedTab == .partner))
-                    }
+                    // 文字は付けず、相棒の絵だけ (読み上げでは「相棒」)
+                    Image(uiImage: PartnerTabIcon.image(selected: vm.selectedTab == .partner))
+                        .accessibilityLabel(Text("相棒"))
                 }
 
                 // コーデ追加 (タブとして留まらず、タップでカメラ画面へ直行)

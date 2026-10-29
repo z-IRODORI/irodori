@@ -2,9 +2,9 @@
 //  PartnerTabIcon.swift
 //  irodori
 //
-//  タブの真ん中「相棒」のアイコン。相棒の絵 (PartnerIconImage と同じ画像) を丸く切り抜き、
-//  ピンクの輪で囲む。タブのほかのアイコンは単色だが、相棒だけは色つきのまま見せて目立たせる
-//  (.alwaysOriginal)。選んでいるときは輪を太くする。
+//  タブの真ん中「相棒」のアイコン。相棒の絵 (PartnerIconImage と同じ画像) をそのまま使う。
+//  タブのほかのアイコンは単色だが、相棒だけは色つきのまま、一回り大きく見せて目立たせる
+//  (.alwaysOriginal)。タブには文字を付けない。
 //
 
 import UIKit
@@ -31,28 +31,45 @@ enum PartnerTabIcon {
     }
 
     private static func render(name: String, selected: Bool) -> UIImage {
-        let side: CGFloat = 30
-        let ring: CGFloat = selected ? 2.5 : 1.5
-        // ホームの「イチオシ」と同じピンク (RenewalTokens.accentPink #D81B60)
-        let pink = UIColor(red: 0xD8 / 255, green: 0x1B / 255, blue: 0x60 / 255, alpha: 1)
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: side, height: side))
+        // ほかのタブのアイコン (約 25pt) より大きく。絵の背景は透明なので、枠も下地も付けずにそのまま置く。
+        // 絵の周りの透明な余白を切り詰めてから、高さ 44pt に合わせる (相棒の絵は縦長)
+        let height: CGFloat = 44   // 文字なしのタブなので、文字の分まで使って大きく
+        guard let art = UIImage(named: name) else { return UIImage() }
+        let box = opaqueBounds(of: art)
+        let scale = height / box.height
+        let size = CGSize(width: min(box.width * scale, 44), height: height)
+        let renderer = UIGraphicsImageRenderer(size: size)
         let image = renderer.image { _ in
-            let outer = CGRect(x: 0, y: 0, width: side, height: side)
-            let inner = outer.insetBy(dx: ring + 1, dy: ring + 1)
-            // 白い下地 + 絵 (丸く切り抜く)
-            UIColor.white.setFill()
-            UIBezierPath(ovalIn: outer).fill()
-            if let art = UIImage(named: name) {
-                UIBezierPath(ovalIn: inner).addClip()
-                art.draw(in: inner)
-                UIGraphicsGetCurrentContext()?.resetClip()
-            }
-            // ピンクの輪
-            let ringPath = UIBezierPath(ovalIn: outer.insetBy(dx: ring / 2, dy: ring / 2))
-            ringPath.lineWidth = ring
-            pink.setStroke()
-            ringPath.stroke()
+            let drawRect = CGRect(x: (size.width - art.size.width * scale) / 2 - (box.midX - art.size.width / 2) * scale,
+                                  y: -box.minY * scale,
+                                  width: art.size.width * scale, height: art.size.height * scale)
+            art.draw(in: drawRect)
         }
         return image.withRenderingMode(.alwaysOriginal)
+    }
+
+    /// 絵の中で透明でない部分の枠 (ポイント単位)。小さく描いてアルファを調べる
+    private static func opaqueBounds(of image: UIImage) -> CGRect {
+        let full = CGRect(origin: .zero, size: image.size)
+        let w = 96, h = Int((CGFloat(w) * image.size.height / max(image.size.width, 1)).rounded())
+        guard h > 0, let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                         space: CGColorSpaceCreateDeviceRGB(),
+                                         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let cg = image.cgImage else { return full }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let data = ctx.data else { return full }
+        let px = data.bindMemory(to: UInt8.self, capacity: w * h * 4)
+        var minX = w, minY = h, maxX = -1, maxY = -1
+        for y in 0..<h {
+            for x in 0..<w where px[(y * w + x) * 4 + 3] > 8 {
+                minX = min(minX, x); maxX = max(maxX, x)
+                minY = min(minY, y); maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, maxY >= minY else { return full }
+        // CGContext は下が原点なので、上下を入れ替えて UIKit の座標に
+        let sx = image.size.width / CGFloat(w), sy = image.size.height / CGFloat(h)
+        return CGRect(x: CGFloat(minX) * sx, y: CGFloat(h - 1 - maxY) * sy,
+                      width: CGFloat(maxX - minX + 1) * sx, height: CGFloat(maxY - minY + 1) * sy)
     }
 }
