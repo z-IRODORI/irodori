@@ -9,6 +9,43 @@ import SwiftUI
 import AVFoundation
 import Photos
 
+/// カメラの準備中: 相棒がゆっくり呼吸するように動き、準備していることを伝える (Reduce Motion では静止)
+private struct CameraPartnerLoadingView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var breathe = false
+
+    var body: some View {
+        ZStack {
+            Color.white.ignoresSafeArea()
+            VStack(spacing: 20) {
+                PartnerIconImage(size: 96)
+                    .padding(12)
+                    .background(RenewalTokens.raised, in: Circle())
+                    .overlay(Circle().stroke(RenewalTokens.border, lineWidth: 1))
+                    .scaleEffect(breathe ? 1.04 : 0.97)
+                    .offset(y: breathe ? -3 : 2)
+                VStack(spacing: 6) {
+                    Text("相棒がカメラを準備しているよ")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(RenewalTokens.ink)
+                    Text("今日のコーデ、いっしょに残そう")
+                        .font(.system(size: 13))
+                        .foregroundStyle(RenewalTokens.muted)
+                }
+                ProgressView()
+                    .tint(RenewalTokens.muted)
+            }
+            .padding(.horizontal, 24)
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { breathe = true }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("相棒がカメラを準備しています"))
+    }
+}
+
 // メインカメラView
 struct CameraView: View {
     @State var cameraViewModel: CameraViewModel
@@ -23,14 +60,7 @@ struct CameraView: View {
         ZStack {
             switch cameraViewModel.cameraState {
             case .initial:
-                VStack(spacing: 24) {
-                    Text("カメラ準備中...")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.pink)
-                    Image(.splash03)
-                        .resizable()
-                        .frame(width: 200, height: 300)
-                }
+                CameraPartnerLoadingView()
 
             case .connectedDevice:
                 Color.white
