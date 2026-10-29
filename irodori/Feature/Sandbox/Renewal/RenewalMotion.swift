@@ -15,6 +15,7 @@ import Kingfisher
 // MARK: - 環境値
 
 private struct IntroDelayKey: EnvironmentKey { static let defaultValue: Double? = nil }
+private struct IntroTokenKey: EnvironmentKey { static let defaultValue: String? = nil }
 private struct PulseItemKey: EnvironmentKey { static let defaultValue: String? = nil }
 
 extension EnvironmentValues {
@@ -22,6 +23,11 @@ extension EnvironmentValues {
     var renewalIntroDelay: Double? {
         get { self[IntroDelayKey.self] }
         set { self[IntroDelayKey.self] = newValue }
+    }
+    /// 入場演出の回 + 案 (カードの RenewalIntroRise と同じ token)。ボードの服もこの回ごとに1回だけ置く
+    var renewalIntroToken: String? {
+        get { self[IntroTokenKey.self] }
+        set { self[IntroTokenKey.self] = newValue }
     }
     /// 組み直した直後に弾ませる主役の服 (OwnedFirstItem.item_id)
     var renewalPulseItemId: String? {
@@ -59,24 +65,37 @@ struct RenewalIntroRise: ViewModifier {
     }
 }
 
-/// ボードの服: 上からそっと置かれる。主役の服は置かれた後に1回だけ弾む
+/// ボードの服: 上からそっと置かれる。主役の服は置かれた後に1回だけ弾む。
+/// カードと同じく、入場の回 × 服ごとに1回だけ。途中でボードが作り直されても、同じ服を置き直さない
+/// (作り直しのたびに透明から置き直して、服が消えては出るように見えるのを防ぐ)
 struct RenewalIntroPlace: ViewModifier {
     let order: Int
     let itemId: String?
+    /// ボードの中の服の ID (RenewalFlatPiece.id)
+    var pieceId: String = ""
     @Environment(\.renewalIntroDelay) private var introDelay
+    @Environment(\.renewalIntroToken) private var introToken
     @Environment(\.renewalPulseItemId) private var pulseId
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var placed = false
     @State private var pulse = false
+    /// この服で入場を始めた (始めた服だけが最後まで動く)
+    @State private var startedHere = false
+
+    @MainActor private static var played: Set<String> = []
+
+    private var key: String { "\(introToken ?? "")#\(pieceId)" }
 
     func body(content: Content) -> some View {
-        let animate = introDelay != nil && !reduceMotion
+        let animate = introDelay != nil && !reduceMotion && (startedHere || !Self.played.contains(key))
         content
             .opacity(!animate || placed ? 1 : 0)
             .offset(y: !animate || placed ? 0 : -14)
             .scaleEffect((!animate || placed ? 1 : 0.92) * (pulse ? 1.08 : 1))
             .onAppear {
-                guard animate, let introDelay else { return }
+                guard animate, let introDelay, !Self.played.contains(key) else { return }
+                Self.played.insert(key)
+                startedHere = true
                 let at = introDelay + Double(order) * 0.09
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.72).delay(at)) { placed = true }
                 if let pulseId, pulseId == itemId {

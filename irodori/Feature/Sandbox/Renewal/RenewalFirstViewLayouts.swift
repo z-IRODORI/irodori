@@ -470,7 +470,7 @@ struct RenewalFlatLayBoard: View {
         let order = ["outer": 0, "tops": 1, "bottoms": 2, "shoes": 3][p.slot] ?? 4
         let itemId = p.id.hasPrefix("o_") ? String(p.id.dropFirst(2)) : nil
         return pieceBody(p)
-            .modifier(RenewalIntroPlace(order: order, itemId: itemId))
+            .modifier(RenewalIntroPlace(order: order, itemId: itemId, pieceId: p.id))
             .zIndex(isOwned(p) ? 1 : 0)
     }
 
@@ -682,6 +682,7 @@ struct RenewalListLayout: View {
                     .coachFrame(.recipes, active: index == 0)
                     .modifier(RenewalIntroRise(delay: start, token: "\(introToken)-\(recipe.recipe_id)"))
                     .environment(\.renewalIntroDelay, start.map { $0 + 0.15 })
+                    .environment(\.renewalIntroToken, "\(introToken)-\(recipe.recipe_id)")
             }
         }
         .padding(.horizontal, edge)

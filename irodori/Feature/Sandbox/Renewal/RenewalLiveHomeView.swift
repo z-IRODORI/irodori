@@ -86,6 +86,9 @@ final class RenewalLiveHomeModel {
         let scope: String
         let savedAt: Date
         let response: OwnedFirstHomeResponse
+        /// 控えたあとにわかった抽出の状況 (pool_id → 状況)。response の中は取りに行った時点のままなので、
+        /// これが無いと次の起動で「用意中」に戻る (古い控えには無い)
+        var extractions: [String: OwnedFirstExtraction]?
     }
 
     /// 同じ人・同じ日の控えがあれば、読み込みを待たずに表示する
@@ -96,18 +99,46 @@ final class RenewalLiveHomeModel {
               saved.response.target_date == Self.isoDate(scope) else { return }
         responses[scope] = saved.response
         savedAt[scope] = saved.savedAt
-        for r in saved.response.recipes {
-            if let pid = r.example?.pool_id, let e = r.example?.extraction { extractions[pid] = e }
-        }
+        mergeExtractions(from: saved.response.recipes)
+        for (pid, e) in saved.extractions ?? [:] { mergeExtraction(e, for: pid) }
     }
 
     private func save(_ response: OwnedFirstHomeResponse, scope: RenewalScope) {
         guard source == .render, pivots[scope] == nil else { return }
-        let now = Date()
-        savedAt[scope] = now
-        if let data = try? JSONEncoder().encode(Saved(uid: uid, scope: scope.rawValue, savedAt: now, response: response)) {
+        savedAt[scope] = Date()
+        persist(scope)
+    }
+
+    /// 端末の控えを書き直す (取りに行った時刻は変えない)。抽出の最新の状況も一緒に残す
+    private func persist(_ scope: RenewalScope) {
+        guard source == .render, pivots[scope] == nil,
+              let response = responses[scope], let at = savedAt[scope] else { return }
+        let pids = Set(response.recipes.compactMap { $0.example?.pool_id })
+        let saved = Saved(uid: uid, scope: scope.rawValue, savedAt: at, response: response,
+                          extractions: extractions.filter { pids.contains($0.key) })
+        if let data = try? JSONEncoder().encode(saved) {
             UserDefaults.standard.set(data, forKey: Self.savedKey)
         }
+    }
+
+    // MARK: 抽出の状況 (進んだ状況を古い値で巻き戻さない)
+
+    /// 3案の中に入っている抽出の状況を取り込む。
+    /// サーバの当日の控えや端末の控えは、取りに行った時点の「用意中」のままのことがある。
+    /// そのまま上書きすると、出ていたアイテムが「用意中」に戻って消え、ポーリングで出直す
+    /// (表示・非表示を繰り返して見える) ので、今より進んでいるときだけ入れ替える
+    private func mergeExtractions(from recipes: [OwnedFirstRecipe]) {
+        for r in recipes {
+            if let pid = r.example?.pool_id, let e = r.example?.extraction { mergeExtraction(e, for: pid) }
+        }
+    }
+
+    /// 戻り値: 入れ替えた
+    @discardableResult
+    private func mergeExtraction(_ e: OwnedFirstExtraction, for pid: String) -> Bool {
+        guard e.supersedes(extractions[pid]) else { return false }
+        extractions[pid] = e
+        return true
     }
 
     private var savedAt: [RenewalScope: Date] = [:]
@@ -202,7 +233,7 @@ final class RenewalLiveHomeModel {
         // 相棒の返事を少し読ませてから入れ替える
         try? await Task.sleep(for: .milliseconds(900))
         current.recipes[index] = next
-        if let pid = next.example?.pool_id, let e = next.example?.extraction { extractions[pid] = e }
+        mergeExtractions(from: [next])
         reactions[next.recipe_id] = .replaced(ack)
         withAnimation(.spring(duration: 0.45)) { responses[scope] = current }
         Task { await pollExtractions(scope) }
@@ -233,15 +264,13 @@ final class RenewalLiveHomeModel {
             switch result {
             case .success(let res):
                 responses[scope] = res
+                mergeExtractions(from: res.recipes)
                 save(res, scope: scope)
                 if res.text_pending == true { scheduleTextFollowUp(scope, pivot: pivot) }
                 // 相棒画面の吹き出しを、ホームのひとことと同じ話題にそろえる
                 if source == .render {
                     UserDefaults.standard.set(res.greeting, forKey: RenewalLiveHomeModel.lastGreetingKey)
                     UserDefaults.standard.set(res.target_date, forKey: RenewalLiveHomeModel.lastGreetingDateKey)
-                }
-                for r in res.recipes {
-                    if let pid = r.example?.pool_id, let e = r.example?.extraction { extractions[pid] = e }
                 }
             case .failure(let error):
                 if !silent { errors[scope] = message(for: error) }
@@ -268,6 +297,7 @@ final class RenewalLiveHomeModel {
                     fresh.recipes.first(where: { $0.recipe_id == old.recipe_id }) ?? old
                 }
                 withAnimation(.easeInOut(duration: 0.3)) { self.responses[scope] = fresh }
+                self.mergeExtractions(from: fresh.recipes)
                 self.save(fresh, scope: scope)
                 return
             }
@@ -290,7 +320,12 @@ final class RenewalLiveHomeModel {
             do {
                 try await Task.sleep(for: .seconds(6))
                 if case .success(let res) = try await client.examples(uid: uid, poolIds: pending) {
-                    for (pid, e) in res.examples { extractions[pid] = e }
+                    var changed = false
+                    for (pid, e) in res.examples {
+                        if mergeExtraction(e, for: pid) { changed = true }
+                    }
+                    // 端末の控えにも残す (次の起動で「用意中」から出直さないように)
+                    if changed { persist(scope) }
                 }
             } catch {
                 return  // キャンセル (画面離脱・スコープ切替)

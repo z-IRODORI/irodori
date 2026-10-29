@@ -49,6 +49,19 @@ struct OwnedFirstExtraction: Codable, Hashable {
     let items: [OwnedFirstExtractedItem]
 
     var isInProgress: Bool { status == "pending" || status == "cropped" }
+
+    /// 進み具合 (大きいほど進んでいる)。none < 用意中 < 完成 (失敗を含む)。同じ段階なら画像のそろった数で比べる
+    var progress: Int {
+        let stage = status == "none" ? 0 : (isInProgress ? 1 : 2)
+        return stage * 1000 + items.filter { !$0.image_url.isEmpty }.count
+    }
+
+    /// 今の状況 (current) をこれで置き換えてよいか。
+    /// 取りに行った時点のまま残っている古い控え (用意中) で、進んだ状況を巻き戻さない
+    func supersedes(_ current: OwnedFirstExtraction?) -> Bool {
+        guard let current else { return true }
+        return self != current && progress >= current.progress
+    }
 }
 
 struct OwnedFirstExtractedItem: Codable, Hashable, Identifiable {
