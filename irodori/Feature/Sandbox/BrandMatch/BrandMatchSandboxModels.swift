@@ -136,6 +136,11 @@ struct BMPick: Identifiable {
         return [fit, price].compactMap { $0 }.joined(separator: "・")
     }
 
+    /// 一覧の行で見せる短い理由 (例: トレンド感が近い)。価格は ¥ の段階で別に見せる
+    var reasonList: String {
+        reasonShort.components(separatedBy: "・").first ?? reasonShort
+    }
+
     /// テイスト (例: きれいめ・フェミニン)
     var tasteLine: String { brand.styleTags.prefix(2).joined(separator: "・") }
 }

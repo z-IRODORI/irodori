@@ -79,12 +79,12 @@ struct BMLogoTile: View {
                                 .padding(.horizontal, 6).padding(.top, 4)
                         }
                     }
-                    .frame(width: width, height: height - 15)   // 画像の部分の高さを固定し、札を押し出さない
+                    .frame(width: width, height: height - strip)   // 画像の部分の高さを固定し、札を押し出さない
                     .clipped()
                     Text(tag)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: height >= 60 ? 11 : 9, weight: .semibold))
                         .foregroundStyle(BMTokens.muted)
-                        .frame(width: width, height: 15)
+                        .frame(width: width, height: strip)
                         .background(BMTokens.raised)
                 }
             } else if let img = brand.image, let ui = img.uiImage {
@@ -115,12 +115,18 @@ struct BMLogoTile: View {
         .accessibilityHidden(true)
     }
 
+    /// 札の帯の高さ (小さい枠では細く)
+    private var strip: CGFloat { height >= 60 ? 15 : 12 }
+
     private var initial: String {
         brand.nameEn.first(where: { $0.isLetter || $0.isNumber }).map { String($0).uppercased() } ?? "・"
     }
 }
 
-// MARK: - 一覧の 1 行 (ZOZOTOWN のようなロゴ一覧: 順位 + 正方形のロゴ + 名前 + テイスト・価格 + 合う理由 + ♡)
+// MARK: - 一覧の 1 行 (IRODORI の細身の行: 正方形のロゴ 52pt + 2 行。ピッチ 72pt)
+//  1 行目: ブランド名 (+ 1 位は「イチオシ」)        ♡
+//  2 行目: ✓ 合う理由 ・ ¥ の段階
+//  カナ・テイスト・歴史は詳細シートへ
 
 struct BMBrandRow: View {
     let pick: BMPick
@@ -131,50 +137,42 @@ struct BMBrandRow: View {
     var onLike: (() -> Void)?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(spacing: 12) {
             if let rank {
                 Text("\(rank)")
-                    .font(.system(size: 15, weight: .bold).monospacedDigit())
-                    .foregroundStyle(BMTokens.ink)
-                    .frame(width: 16, alignment: .center)
-                    .padding(.top, 26)
+                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(rank == 1 ? BMTokens.ink : BMTokens.faint)
+                    .frame(width: 16)
                     .accessibilityLabel(Text("\(rank) 位"))
             }
-            BMLogoTile(brand: pick.brand, width: 72, height: 72)
-            VStack(alignment: .leading, spacing: 3) {
+            BMLogoTile(brand: pick.brand, width: 52, height: 52)
+            VStack(alignment: .leading, spacing: 4) {
+                // 1 位だけ、名前の上にホームと同じ「イチオシ」(名前を押し出さない)
+                if rank == 1 { DailyIchioshiBadge().fixedSize() }
                 Text(pick.brand.nameEn)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(BMTokens.ink)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-                Text(pick.brand.nameJa)
-                    .font(.system(size: 11))
-                    .foregroundStyle(BMTokens.muted)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 HStack(spacing: 6) {
-                    BMPriceScale(tier: pick.brand.tier)
-                    Text(pick.tasteLine)
-                        .font(.system(size: 12))
-                        .foregroundStyle(BMTokens.muted)
-                        .lineLimit(1)
+                    HStack(spacing: 3) {
+                        Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(BMTokens.data)
+                        Text(pick.reasonList)
+                            .foregroundStyle(BMTokens.muted)
+                            .lineLimit(1)
+                    }
+                    .font(.system(size: 12))
+                    Text("·").font(.system(size: 12)).foregroundStyle(BMTokens.control)
+                    BMPriceScale(tier: pick.brand.tier, size: 11)
                 }
-                .padding(.top, 1)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
-                    Text(pick.reasonShort)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(BMTokens.data)
-                .padding(.top, 1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let onLike {
                 let liked = reaction == .like
                 Button(action: onLike) {
                     Image(systemName: liked ? "heart.fill" : "heart")
-                        .font(.system(size: 18))
+                        .font(.system(size: 17))
                         .foregroundStyle(liked ? BMTokens.favorite : BMTokens.faint)
                         .frame(width: 36, height: 44)
                         .contentShape(Rectangle())
@@ -186,12 +184,11 @@ struct BMBrandRow: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(BMTokens.faint)
-                    .padding(.top, 28)
             }
         }
-        .padding(.leading, 12)
-        .padding(.trailing, 6)
-        .padding(.vertical, 12)
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .padding(.vertical, 10)          // 52 + 20 = 72pt のピッチ
         .opacity(reaction == .notInterested ? 0.45 : 1)
     }
 }
@@ -246,13 +243,14 @@ struct BMBrandTile: View {
 /// 価格の段階: ¥ を 5 つ並べ、当てはまる数だけ濃く (言葉は省く。読み上げは「価格帯 5 段階中 3」)
 struct BMPriceScale: View {
     let tier: Int
+    var size: CGFloat = 12
     var body: some View {
         HStack(spacing: 0) {
             ForEach(1...5, id: \.self) { i in
                 Text("¥").foregroundStyle(i <= tier ? BMTokens.ink : BMTokens.control)
             }
         }
-        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+        .font(.system(size: size, weight: .semibold).monospacedDigit())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("価格帯 5 段階中 \(tier)"))
     }
@@ -279,7 +277,7 @@ struct BMSectionHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(title).font(.system(size: 16, weight: .semibold)).foregroundStyle(BMTokens.ink)
+                Text(title).font(.system(size: 15, weight: .semibold)).foregroundStyle(BMTokens.ink)
                 if let count {
                     Text("\(count)").font(.system(size: 14).monospacedDigit()).foregroundStyle(BMTokens.muted)
                 }

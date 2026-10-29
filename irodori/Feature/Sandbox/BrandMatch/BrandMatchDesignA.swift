@@ -22,7 +22,7 @@ struct BrandMatchDesignA: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
                 header
                 toolbar
                 if let filter {
@@ -46,21 +46,25 @@ struct BrandMatchDesignA: View {
 
     // MARK: 見出し (何の一覧か + どう選んだか)
 
+    /// ホームの相棒カードと同じ組み方 (白い面 + 相棒 40pt + 15pt の見出し + 12pt の補足)
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            BMPartnerIcon(persona: persona, size: 48)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(persona.typeName)のあなたに合う\n10 ブランド")
-                    .font(.system(size: 20, weight: .bold))
+        HStack(spacing: 12) {
+            BMPartnerIcon(persona: persona, size: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("あなたに合う 10 ブランド")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(BMTokens.ink)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("診断の結果と、クローゼットの服から選びました")
+                Text("好みとクローゼットの服から選んだよ")
                     .font(.system(size: 12))
                     .foregroundStyle(BMTokens.muted)
+                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .bmCard()
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
@@ -68,7 +72,7 @@ struct BrandMatchDesignA: View {
     // MARK: タブ (絞り込み) と 表示の切り替え
 
     private var toolbar: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     tab(nil, title: "すべて", count: persona.picks.count)
@@ -96,14 +100,14 @@ struct BrandMatchDesignA: View {
             withAnimation(.easeOut(duration: 0.2)) { filter = slot }
             Haptic.selection()
         } label: {
-            HStack(spacing: 4) {
-                Text(title).font(.system(size: 13, weight: on ? .bold : .medium))
-                Text("\(count)").font(.system(size: 12).monospacedDigit())
+            HStack(spacing: 3) {
+                Text(title).font(.system(size: 12, weight: on ? .semibold : .regular))
+                Text("\(count)").font(.system(size: 11).monospacedDigit())
                     .foregroundStyle(on ? BMTokens.surface.opacity(0.8) : BMTokens.muted)
             }
             .foregroundStyle(on ? BMTokens.surface : BMTokens.ink)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 36)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 30)
             .background(on ? BMTokens.primary : BMTokens.surface, in: Capsule())
             .overlay(Capsule().stroke(on ? .clear : BMTokens.control, lineWidth: 1))
         }
@@ -116,9 +120,9 @@ struct BrandMatchDesignA: View {
             withAnimation(.easeOut(duration: 0.2)) { action() }
         } label: {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(on ? BMTokens.ink : BMTokens.faint)
-                .frame(width: 40, height: 36)
+                .frame(width: 36, height: 30)
                 .background(on ? BMTokens.raised : BMTokens.surface)
         }
         .buttonStyle(.plain)
@@ -129,7 +133,7 @@ struct BrandMatchDesignA: View {
     // MARK: 一覧
 
     private func section(_ slot: BMSlot, rows: [(rank: Int, pick: BMPick)]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             BMSectionHeader(title: slot.title, count: rows.count, note: slot.subtitle)
             if grid {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10, alignment: .top), count: 3),
@@ -145,7 +149,7 @@ struct BrandMatchDesignA: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.element.pick.id) { i, r in
-                        if i > 0 { BMRule(leading: 124) }
+                        if i > 0 { BMRule(leading: 106) }
                         BMBrandRow(pick: r.pick, rank: r.rank, reaction: store.reaction(r.pick.brandID),
                                    onLike: { store.toggle(.like, for: r.pick.brandID) })
                             .contentShape(Rectangle())
