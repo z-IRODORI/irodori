@@ -25,6 +25,10 @@ final class ProfileViewModel {
     var showDeleteConfirmation: Bool = false
     var itemToDelete: String? = nil
     var isDeletingItem: Bool = false
+    /// 編集モードで選んだ服 (まとめて削除する)
+    var selectedIds: Set<String> = []
+    var showBulkDeleteConfirmation: Bool = false
+    private let bulkDeleteClient: BulkDeleteClientProtocol = BulkDeleteClient()
 
     private let closetClient: ClosetClientProtocol
     private let deleteClosetItemClient: DeleteClosetItemClientProtocol
@@ -111,6 +115,46 @@ final class ProfileViewModel {
         if !isEditMode {
             itemToDelete = nil
             showDeleteConfirmation = false
+            selectedIds = []
+        }
+    }
+
+    func toggleSelection(_ itemId: String) {
+        Haptic.selection()
+        if selectedIds.contains(itemId) { selectedIds.remove(itemId) } else { selectedIds.insert(itemId) }
+    }
+
+    /// 表示中 (カテゴリで絞った一覧) の服をすべて選ぶ / すべて外す
+    func toggleSelectAll() {
+        Haptic.selection()
+        let visible = Set(filteredItems.map(\.id))
+        if visible.isSubset(of: selectedIds) {
+            selectedIds.subtract(visible)
+        } else {
+            selectedIds.formUnion(visible)
+        }
+    }
+
+    /// 選んだ服をまとめて削除する (確認は1回)
+    func deleteSelected() async {
+        let ids = Array(selectedIds)
+        guard !ids.isEmpty, let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) else { return }
+        isDeletingItem = true
+        defer { isDeletingItem = false }
+        let result = await bulkDeleteClient.deleteItems(uid: uid, ids: ids)
+        let deleted = Set(result.deleted)
+        withAnimation(.easeInOut(duration: 0.3)) {
+            closetItems.removeAll { deleted.contains($0.id) }
+        }
+        selectedIds.subtract(deleted)
+        if !deleted.isEmpty {
+            NotificationCenter.default.post(name: .closetDidChange, object: nil)
+        }
+        if result.failed.isEmpty {
+            ToastManager.shared.show("\(deleted.count)点を削除しました")
+            withAnimation(.easeInOut(duration: 0.2)) { isEditMode = false }
+        } else {
+            ToastManager.shared.show("\(result.failed.count)点を削除できませんでした。もう一度お試しください")
         }
     }
 

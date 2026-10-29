@@ -49,6 +49,9 @@ final class HomeViewModel {
     var isEditMode: Bool = false
     var showDeleteConfirmation: Bool = false
     var coordinateToDelete: String? = nil
+    /// まとめて削除するコーデ
+    var coordinatesToDelete: [String] = []
+    var showBulkDeleteConfirmation: Bool = false
     var isDeletingCoordinate: Bool = false
 
     // 明日のコーデ推薦
@@ -1014,6 +1017,33 @@ final class HomeViewModel {
     func requestDelete(coordinateId: String) {
         coordinateToDelete = coordinateId
         showDeleteConfirmation = true
+    }
+
+    func requestBulkDelete(coordinateIds: [String]) {
+        guard !coordinateIds.isEmpty else { return }
+        coordinatesToDelete = coordinateIds
+        showBulkDeleteConfirmation = true
+    }
+
+    /// 選んだコーデをまとめて削除する (クローゼットの服は残る)
+    func deleteSelectedCoordinates() async {
+        let ids = coordinatesToDelete
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        guard !ids.isEmpty, !uid.isEmpty else { return }
+        isDeletingCoordinate = true
+        defer { isDeletingCoordinate = false }
+        let result = await BulkDeleteClient().deleteCoordinates(uid: uid, ids: ids)
+        let deleted = Set(result.deleted)
+        withAnimation(.easeInOut(duration: 0.3)) {
+            homeResponse.recent_coordinates.removeAll { deleted.contains($0.id) }
+        }
+        coordinatesToDelete = []
+        if !deleted.isEmpty {
+            NotificationCenter.default.post(name: .coordinateDidChange, object: nil)
+        }
+        ToastManager.shared.show(result.failed.isEmpty
+            ? "\(deleted.count)件のコーデを削除しました"
+            : "\(result.failed.count)件を削除できませんでした。もう一度お試しください")
     }
 
     func deleteCoordinate() async {

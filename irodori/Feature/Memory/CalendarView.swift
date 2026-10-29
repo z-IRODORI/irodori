@@ -892,13 +892,21 @@ struct CalendarView: View {
             }
         }
         .buttonStyle(.plain)
-        // 長押しで記録 (撮った写真) を削除
+        // 長押しで記録 (撮った写真) を削除。複数ある日は一覧を開いて選んで消す
         .contextMenu {
             if let record = dayRecords.first, let id = record.id, !id.isEmpty {
-                Button { openRecord(record) } label: { Label("詳細を見る", systemImage: "doc.text.magnifyingglass") }
-                Button(role: .destructive) {
-                    recordToDelete = record
-                } label: { Label(dayRecords.count > 1 ? "1枚目のコーデを削除" : "このコーデを削除", systemImage: "trash") }
+                if dayRecords.count > 1 {
+                    Button(role: .destructive) {
+                        daySheetData = CalendarDaySheetData(
+                            date: dateString, dateLabel: "\(month.monthOfTheYear)月\(day)日",
+                            records: dayRecords, outfit: planned, startEditing: true)
+                    } label: { Label("コーデを選んで削除", systemImage: "trash") }
+                } else {
+                    Button { openRecord(record) } label: { Label("詳細を見る", systemImage: "doc.text.magnifyingglass") }
+                    Button(role: .destructive) {
+                        recordToDelete = record
+                    } label: { Label("このコーデを削除", systemImage: "trash") }
+                }
             }
         }
     }
@@ -1229,7 +1237,7 @@ private struct CalendarRecordDeletion: ViewModifier {
                 }
                 Button("キャンセル", role: .cancel) { record = nil }
             } message: {
-                Text("写真と着用アイテムの記録が消えます。元に戻せません")
+                Text("写真の記録が消えます。クローゼットの服は残ります。元に戻せません")
             }
             .onReceive(NotificationCenter.default.publisher(for: .coordinateDidChange)) { _ in
                 Task { await reload() }

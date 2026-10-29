@@ -232,6 +232,14 @@ struct HomeView: View {
                 }
             }
         }
+        .alert("\(viewModel.coordinatesToDelete.count)件のコーデを削除", isPresented: $viewModel.showBulkDeleteConfirmation) {
+            Button("キャンセル", role: .cancel) {}
+            Button("削除", role: .destructive) {
+                Task { await viewModel.deleteSelectedCoordinates() }
+            }
+        } message: {
+            Text("選んだコーデを削除しますか？\nクローゼットの服は残ります。")
+        }
         .alert("コーディネートを削除", isPresented: $viewModel.showDeleteConfirmation) {
             Button("キャンセル", role: .cancel) {
                 viewModel.coordinateToDelete = nil
@@ -348,6 +356,7 @@ struct HomeView: View {
                     path.append(.coordinateDetail(.init(coordinateId: c.id, coordinateImageURL: c.displayImageURL, showHeader: true)))
                 },
                 onDelete: { c in viewModel.requestDelete(coordinateId: c.id) },
+                onDeleteMany: { cs in viewModel.requestBulkDelete(coordinateIds: cs.map(\.id)) },
                 onSeeAll: { tabViewModel.selectedTab = .calendar }
             )
             .padding(.horizontal, -16)

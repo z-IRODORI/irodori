@@ -36,18 +36,23 @@ struct CoachMarkOverlay: View {
         .animation(.easeInOut(duration: 0.25), value: center.current)
     }
 
-    /// 指す先の位置 (グローバル)。カメラはシステムのタブバーの中なので、4つ並びの3番目として計算する
+    /// 指す先の位置 (グローバル)。カメラはシステムのタブバーの中なので、並び順から計算する
     private func targetRect(_ target: CoachTarget, size: CGSize) -> CGRect? {
         if target == .camera {
             let bottom = Self.windowSafeAreaBottom
-            let itemWidth = size.width / 4
-            return CGRect(x: itemWidth * 2 + (itemWidth - 64) / 2, y: size.height - bottom - 49 + 1, width: 64, height: 47)
+            // タブの並び (MainTabView): ホーム / カレンダー / 相棒 / カメラ / クローゼット → カメラは5つ中4番目
+            let itemWidth = size.width / CGFloat(Self.tabCount)
+            return CGRect(x: itemWidth * CGFloat(Self.cameraTabIndex) + (itemWidth - 64) / 2,
+                          y: size.height - bottom - 49 + 1, width: 64, height: 47)
         }
         guard let rect = center.frames[target], rect.height > 0 else { return nil }
         // 画面から外れている間は出さない (スクロールで戻ってきたら出る)
         guard rect.maxY > 60, rect.minY < size.height - 60 else { return nil }
         return rect
     }
+
+    private static let tabCount = 5
+    private static let cameraTabIndex = 3
 
     private static var windowSafeAreaBottom: CGFloat {
         let window = UIApplication.shared.connectedScenes

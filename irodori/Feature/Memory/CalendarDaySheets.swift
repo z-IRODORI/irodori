@@ -21,6 +21,8 @@ struct CalendarDaySheetData: Identifiable {
     let dateLabel: String                    // 例: "8月12日"
     let records: [CoordinateListResponse]    // 着用記録 (0件以上)
     let outfit: CalendarOutfit?              // 予定 or 採用 (高々1件)
+    /// true: 開いたらすぐ選択 (まとめて削除) の状態にする (日付の長押しから)
+    var startEditing: Bool = false
     var id: String { date }
 }
 
@@ -32,9 +34,14 @@ struct CalendarDayOutfitsSheet: View {
     var onShowCandidates: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @State private var editing = false
+    @State private var selected: Set<String> = []
+    @State private var confirmDelete = false
+    @State private var deleting = false
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
     private var totalCount: Int { data.records.count + (data.outfit == nil ? 0 : 1) }
+    private var deletableIds: [String] { data.records.compactMap { ($0.id ?? "").isEmpty ? nil : $0.id } }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -46,11 +53,31 @@ struct CalendarDayOutfitsSheet: View {
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                     Spacer()
+                    // 撮った記録を選んでまとめて削除 (予定・採用は対象外)
+                    if !deletableIds.isEmpty {
+                        Button(editing ? "完了" : "編集") {
+                            Haptic.selection()
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                editing.toggle()
+                                if !editing { selected = [] }
+                            }
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.black)
+                        .frame(minHeight: 44)
+                    }
                 }
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(Array(data.records.enumerated()), id: \.offset) { index, record in
                         if let imageURL = record.displayImageURL {
-                            tile(imageURL: imageURL, label: data.records.count > 1 ? "記録\(index + 1)" : "記録") {
+                            let id = record.id ?? ""
+                            tile(imageURL: imageURL, label: data.records.count > 1 ? "記録\(index + 1)" : "記録",
+                                 selected: editing && !id.isEmpty ? selected.contains(id) : nil) {
+                                if editing {
+                                    guard !id.isEmpty else { return }
+                                    if selected.contains(id) { selected.remove(id) } else { selected.insert(id) }
+                                    return
+                                }
                                 dismiss()
                                 onSelectRecord(record)
                             }
@@ -63,10 +90,27 @@ struct CalendarDayOutfitsSheet: View {
                             dashed: !outfit.isAdopted,
                             check: outfit.isAdopted
                         ) {
+                            guard !editing else { return }
                             dismiss()
                             onSelectOutfit(outfit)
                         }
+                        .opacity(editing ? 0.4 : 1)
                     }
+                }
+                if editing {
+                    Button {
+                        Haptic.impact(.medium)
+                        confirmDelete = true
+                    } label: {
+                        Text(selected.isEmpty ? "削除するコーデを選んでください" : "\(selected.count)件を削除")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(selected.isEmpty ? Color.gray.opacity(0.4) : Color.red, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selected.isEmpty || deleting)
+                    .padding(.top, 4)
                 }
                 // 予定ありの日は、この日の候補一覧 (10件) から選び直せる
                 if data.outfit != nil, let onShowCandidates {
@@ -94,6 +138,37 @@ struct CalendarDayOutfitsSheet: View {
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+        .onAppear {
+            if data.startEditing && !deletableIds.isEmpty { editing = true }
+        }
+        .confirmationDialog("\(selected.count)件のコーデを削除しますか？", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("削除", role: .destructive) { Task { await deleteSelected() } }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("写真の記録が消えます。クローゼットの服は残ります。元に戻せません")
+        }
+        .overlay {
+            if deleting { ProgressView().controlSize(.large) }
+        }
+    }
+
+    private func deleteSelected() async {
+        let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
+        guard !selected.isEmpty, !uid.isEmpty else { return }
+        deleting = true
+        defer { deleting = false }
+        let result = await BulkDeleteClient().deleteCoordinates(uid: uid, ids: Array(selected))
+        if !result.deleted.isEmpty {
+            Haptic.notify(.success)
+            NotificationCenter.default.post(name: .coordinateDidChange, object: nil)
+        }
+        if result.failed.isEmpty {
+            ToastManager.shared.show("\(result.deleted.count)件のコーデを削除しました")
+            dismiss()
+        } else {
+            selected = Set(result.failed)
+            ToastManager.shared.show("\(result.failed.count)件を削除できませんでした。もう一度お試しください")
+        }
     }
 
     private func tile(
@@ -101,6 +176,7 @@ struct CalendarDayOutfitsSheet: View {
         label: String,
         dashed: Bool = false,
         check: Bool = false,
+        selected: Bool? = nil,
         onTap: @escaping () -> Void
     ) -> some View {
         Button {
@@ -128,6 +204,21 @@ struct CalendarDayOutfitsSheet: View {
                         if check {
                             AdoptedCheckBadge()
                                 .padding(5)
+                        }
+                    }
+                    // 編集中: 選択の印
+                    .overlay(alignment: .topTrailing) {
+                        if let selected {
+                            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 20))
+                                .foregroundStyle(selected ? Color.black : Color.white)
+                                .background(Circle().fill(selected ? Color.white : Color.black.opacity(0.25)).padding(1))
+                                .padding(5)
+                        }
+                    }
+                    .overlay {
+                        if selected == true {
+                            RoundedRectangle(cornerRadius: 10).strokeBorder(Color.black, lineWidth: 2)
                         }
                     }
                 Text(label)

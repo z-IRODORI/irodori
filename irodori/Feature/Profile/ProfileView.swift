@@ -55,6 +55,22 @@ struct ProfileView: View {
             }
         }
         .background(Color.white)
+        // 編集モード: 選んだ服をまとめて削除するバー (タブバーの上)
+        .safeAreaInset(edge: .bottom) {
+            if viewModel.isEditMode {
+                bulkDeleteBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isEditMode)
+        .alert("\(viewModel.selectedIds.count)点を削除", isPresented: $viewModel.showBulkDeleteConfirmation) {
+            Button("キャンセル", role: .cancel) {}
+            Button("削除", role: .destructive) {
+                Task { await viewModel.deleteSelected() }
+            }
+        } message: {
+            Text("選んだ服をクローゼットから削除しますか？\nこの操作は取り消せません。")
+        }
         .sheet(item: $itemToEdit) { item in
             ItemImageEditView(
                 viewModel: .init(item: item),
@@ -430,6 +446,37 @@ struct ProfileView: View {
         }
     }
 
+    /// 編集モードの下のバー: すべて選択 / n点を削除
+    private var bulkDeleteBar: some View {
+        let count = viewModel.selectedIds.count
+        let allVisible = !viewModel.filteredItems.isEmpty
+            && Set(viewModel.filteredItems.map(\.id)).isSubset(of: viewModel.selectedIds)
+        return HStack(spacing: 12) {
+            Button(allVisible ? "選択を外す" : "すべて選択") { viewModel.toggleSelectAll() }
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.black)
+                .frame(minHeight: 44)
+            Spacer()
+            Button {
+                Haptic.impact(.medium)
+                viewModel.showBulkDeleteConfirmation = true
+            } label: {
+                Text(count == 0 ? "服を選んでください" : "\(count)点を削除")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 44)
+                    .background(count == 0 ? Color.gray.opacity(0.4) : Color.red, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(count == 0)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(.white)
+        .overlay(alignment: .top) { Rectangle().fill(Color.gray.opacity(0.15)).frame(height: 0.5) }
+    }
+
     // アイテムグリッド
     private var itemsGrid: some View {
         Group {
@@ -510,8 +557,11 @@ struct ProfileView: View {
                                 )
                                 .contentShape(Rectangle())
                                 .onTapGesture {
-                                    // 編集モード中は削除操作を優先 (タップで編集画面を開かない)
-                                    guard !viewModel.isEditMode else { return }
+                                    // 編集モード中はタップで選ぶ (まとめて削除)
+                                    if viewModel.isEditMode {
+                                        viewModel.toggleSelection(item.id)
+                                        return
+                                    }
                                     Haptic.impact(.soft)
                                     itemToEdit = item
                                 }
@@ -560,21 +610,24 @@ struct ProfileView: View {
                                 )
                             }
 
-                            // 編集モード時の削除ボタン
+                            // 編集モード: 選択の印 (選んだ服は黒い ✓、枠も黒く)
                             if viewModel.isEditMode {
-                                Button {
-                                    viewModel.requestDelete(itemId: item.id)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 22))
-                                        .foregroundStyle(.white)
-                                        .background(Circle().fill(.red).padding(2))
-                                }
-                                .offset(x: -4, y: 4)
-                                .transition(.scale.combined(with: .opacity))
+                                let on = viewModel.selectedIds.contains(item.id)
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(on ? Color.black : Color.clear, lineWidth: 2)
+                                    .allowsHitTesting(false)
+                                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 22))
+                                    .foregroundStyle(on ? Color.black : Color.gray.opacity(0.6))
+                                    .background(Circle().fill(.white).padding(2))
+                                    .offset(x: -6, y: 6)
+                                    .allowsHitTesting(false)
+                                    .transition(.scale.combined(with: .opacity))
+                                    .accessibilityHidden(true)
                             }
                         }
                         .animation(.easeInOut(duration: 0.2), value: viewModel.isEditMode)
+                        .accessibilityAddTraits(viewModel.isEditMode && viewModel.selectedIds.contains(item.id) ? .isSelected : [])
                     }
                 }
             }
