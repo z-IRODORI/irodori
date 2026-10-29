@@ -450,6 +450,11 @@ struct BMDetailSheet: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
+                // いちばん見てほしいところ: あなたとの相性 (一致度・相棒のひとこと・チャート・観点ごとの判定)
+                group("あなたとの相性（IRODORI の見立て）") {
+                    BMCompatibilityView(persona: store.persona, brand: brand)
+                }
+
                 group("相棒より: このブランドがあなたに合う理由", icon: true) {
                     ForEach(Array(pick.reasons.enumerated()), id: \.offset) { i, r in
                         if i > 0 { BMRule(leading: 16) }
@@ -472,11 +477,6 @@ struct BMDetailSheet: View {
                         }
                         .padding(16)
                     }
-                }
-
-                group("好みの近さ（点が近いほど、あなたと似ている）") {
-                    BMAxisCompare(user: store.persona.scores, brand: brand.axes)
-                        .padding(16)
                 }
 
                 group("ブランド情報") {
