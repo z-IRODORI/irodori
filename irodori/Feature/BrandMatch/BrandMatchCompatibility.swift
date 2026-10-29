@@ -1,6 +1,6 @@
 //
 //  BrandMatchCompatibility.swift
-//  irodori - Sandbox
+//  irodori
 //
 //  詳細シートの「あなたとの相性」。
 //  ① 好みの一致度 (大きな数字) と「5 つの観点のうち いくつがぴったりか」

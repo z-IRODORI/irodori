@@ -146,6 +146,12 @@ struct FashionTypeResultView: View {
                         fashionTypeDetailSection(description: description)
                     }
 
+                    // あなたに合う 10 ブランド (オンボーディングの途中では出さない)
+                    if onComplete == nil {
+                        BrandMatchEntryCard { path.append(.brandMatch) }
+                            .padding(.horizontal, 24)
+                    }
+
                     // 完了ボタン
                     Button(action: {
                         if let onComplete = onComplete {

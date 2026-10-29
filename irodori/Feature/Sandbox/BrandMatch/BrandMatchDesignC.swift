@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct BrandMatchDesignC: View {
-    @Bindable var store: BMSandboxStore
+    @Bindable var store: BrandMatchStore
 
     private enum Entry: Identifiable {
         case partner(Int, String)

@@ -27,6 +27,7 @@ enum ViewType: Hashable {
     case outfitSuggestion
     case addItemBySearch
     case deviceSetup   // 玄関カメラ (Raspberry Pi) の連携・設置ガイド
+    case brandMatch    // あなたに合うブランド 10 選
 
     struct CoordinateReviewParams: Hashable {
         let image: UIImage?

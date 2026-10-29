@@ -11,7 +11,7 @@
 import SwiftUI
 
 struct BrandMatchDesignD: View {
-    @Bindable var store: BMSandboxStore
+    @Bindable var store: BrandMatchStore
     @State private var selected = 0
     @State private var opened: BMPick?
     @State private var showsOthers = true

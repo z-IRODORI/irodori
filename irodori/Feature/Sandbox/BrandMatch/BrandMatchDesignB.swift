@@ -10,7 +10,7 @@
 import SwiftUI
 
 struct BrandMatchDesignB: View {
-    @Bindable var store: BMSandboxStore
+    @Bindable var store: BrandMatchStore
     @State private var index = 0
     @State private var drag: CGSize = .zero
     @State private var opened: BMPick?

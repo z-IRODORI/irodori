@@ -79,6 +79,8 @@ struct PartnerProfileView: View {
     var onConsultTap: (() -> Void)? = nil
     /// ミッションの行き先 (open_home など)。check_discoveries はこの画面の中で処理する
     var onMissionAction: ((String) -> Void)? = nil
+    /// 「あなたに合う 10 ブランド」(一覧への遷移は呼び出し元)。nil なら出さない
+    var onBrandMatchTap: (() -> Void)? = nil
 
     @State private var viewModel = PartnerProfileViewModel()
     @State private var showAllMissions = false
@@ -98,6 +100,7 @@ struct PartnerProfileView: View {
                         header(p.understanding)
                         if let weekly = p.weekly, !found.isEmpty { weeklyStrip(weekly) }
                         if let combos = p.color_combos, !combos.isEmpty { colorCombos(combos) }
+                        if let onBrandMatchTap { BrandMatchEntryCard(action: onBrandMatchTap) }
                         missions(p) { action in
                             if action == "check_discoveries" {
                                 withAnimation { proxy.scrollTo("you", anchor: .top) }

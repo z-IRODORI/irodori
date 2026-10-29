@@ -1,6 +1,6 @@
 //
 //  BrandMatchShared.swift
-//  irodori - Sandbox
+//  irodori
 //
 //  ブランド 10 選の改善案で共用する部品。IRODORI のデザインシステム (taste-skill app-screens /
 //  TasteTokens と同じ値) に沿う:
@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 // MARK: - トークン (RenewalTokens = TasteTokens と同値。足りないものだけ足す)
 
@@ -62,25 +63,17 @@ struct BMLogoTile: View {
     var width: CGFloat = 64
     var height: CGFloat = 44
 
+    @State private var failed = false
+
     var body: some View {
         ZStack {
+            BMTokens.surface
             if let img = brand.image, let ui = img.uiImage {
-                BMTokens.surface
-                if img.kind.isPhoto {
-                    // 写真は白黒に (一覧で写真だけが目立たないように)
-                    Image(uiImage: ui).resizable().scaledToFill().grayscale(1)
-                } else if img.dark {
-                    // 白抜きのロゴは、黒で白い枠に置く (黒い枠は「選択中」に見えるため)
-                    Image(uiImage: ui).renderingMode(.template).resizable().scaledToFit()
-                        .foregroundStyle(BMTokens.ink).padding(height * 0.1)
-                } else {
-                    Image(uiImage: ui).resizable().scaledToFit()
-                        .grayscale(img.kind == .brandLogo ? 0 : 1)   // 運営会社のロゴは白黒 (ブランドの色と混ざらないように)
-                        .padding(height * 0.1)
-                }
+                styled(Image(uiImage: ui), img)            // 改善案: アプリに入れた画像
+            } else if let img = brand.image, let url = img.url, !failed {
+                remote(url, img)                           // 本番: API が配る画像
             } else {
                 // どの画像も無いときだけ頭文字 (最終手段)
-                BMTokens.surface
                 Text(initial)
                     .font(.system(size: height * 0.4, weight: .semibold))
                     .foregroundStyle(BMTokens.faint)
@@ -90,6 +83,38 @@ struct BMLogoTile: View {
         .clipShape(RoundedRectangle(cornerRadius: BMTokens.controlRadius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: BMTokens.controlRadius, style: .continuous).stroke(BMTokens.border, lineWidth: 1))
         .accessibilityHidden(true)
+    }
+
+    /// 写真は白黒で枠いっぱい / 白抜きのロゴは黒で / 運営会社のロゴは白黒 (ブランドの色と混ざらないように)
+    @ViewBuilder
+    private func styled(_ image: Image, _ img: BMImage) -> some View {
+        if img.kind.isPhoto {
+            image.resizable().scaledToFill().grayscale(1)
+        } else if img.dark {
+            image.renderingMode(.template).resizable().scaledToFit()
+                .foregroundStyle(BMTokens.ink).padding(height * 0.1)
+        } else {
+            image.resizable().scaledToFit()
+                .grayscale(img.kind == .brandLogo ? 0 : 1)
+                .padding(height * 0.1)
+        }
+    }
+
+    @ViewBuilder
+    private func remote(_ url: URL, _ img: BMImage) -> some View {
+        if img.kind.isPhoto {
+            KFImage(url).onFailure { _ in failed = true }
+                .resizable().scaledToFill().grayscale(1)
+        } else if img.dark {
+            KFImage(url).onFailure { _ in failed = true }
+                .renderingMode(.template).resizable().scaledToFit()
+                .foregroundStyle(BMTokens.ink).padding(height * 0.1)
+        } else {
+            KFImage(url).onFailure { _ in failed = true }
+                .resizable().scaledToFit()
+                .grayscale(img.kind == .brandLogo ? 0 : 1)
+                .padding(height * 0.1)
+        }
     }
 
     private var initial: String {
@@ -383,7 +408,7 @@ struct BMAxisCompare: View {
 // MARK: - 反応ボタン (4 つ並び。選んだものだけ黒で塗る)
 
 struct BMReactionBar: View {
-    @Bindable var store: BMSandboxStore
+    @Bindable var store: BrandMatchStore
     let brandID: String
 
     var body: some View {
@@ -413,7 +438,7 @@ struct BMReactionBar: View {
 /// 並び: 合う理由 → どんな人向け → あなたとの距離 → ブランドのこと (歴史は畳む)。
 /// 「興味なし / 好き / 公式サイト」は下に固定し、スクロールしなくても押せる
 struct BMDetailSheet: View {
-    @Bindable var store: BMSandboxStore
+    @Bindable var store: BrandMatchStore
     let pick: BMPick
     @State private var showsHistory = false
 

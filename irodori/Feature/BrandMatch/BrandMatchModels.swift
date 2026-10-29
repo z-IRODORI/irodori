@@ -1,9 +1,9 @@
 //
-//  BrandMatchSandboxModels.swift
-//  irodori - Sandbox
+//  BrandMatchModels.swift
+//  irodori
 //
-//  「あなたに合うブランド 10 選」の改善案 (A〜D) で共用するモデルと状態。
-//  ブランドの事実は BrandMatchSandboxData.swift (出典つきの調査マスタから書き出したもの) の値だけを使う。
+//  「あなたに合うブランド 10 選」のモデルと状態。本番 (API の値) と改善案 (サンプルの値) で共用する。
+//  ブランドの事実は出典つきの調査マスタ (irodori-api/data/brand_master.json) の値だけを使う。
 //
 
 import SwiftUI
@@ -60,7 +60,7 @@ enum BMImageKind {
 }
 
 struct BMImage {
-    /// 開発用アセット (Preview Content/BrandMatchImages) の PNG。配布用のビルドには入らない
+    /// 改善案: 開発用アセット (Preview Content/BrandMatchImages) の PNG 名。本番は空
     let file: String
     let kind: BMImageKind
     /// 何の画像か (例: ロゴ / 運営会社のロゴ（オンワード樫山） / デザイナー（三宅一生）)
@@ -70,9 +70,12 @@ struct BMImage {
     let source: String?
     let sourcePage: String?
     let license: String?
+    /// 本番: API が配る画像 (irodori-api の /static/brands/<id>.png)
+    var url: URL? = nil
 
     var uiImage: UIImage? {
-        Bundle.main.path(forResource: file, ofType: "png").flatMap { UIImage(contentsOfFile: $0) }
+        guard !file.isEmpty else { return nil }
+        return Bundle.main.path(forResource: file, ofType: "png").flatMap { UIImage(contentsOfFile: $0) }
     }
 
     /// 枠の下端に付ける札 (ブランドのロゴでないことを示す)。ブランドのロゴなら nil
@@ -113,15 +116,15 @@ enum BMSlot: String, CaseIterable, Identifiable {
 }
 
 struct BMPick: Identifiable {
-    let brandID: String
+    let brand: BMBrand
     let slot: BMSlot
     /// 決まった言い回しの組み合わせ (brand_match.py の reasons)
     let reasons: [String]
     /// 一覧で並べる短い「合うところ」(流行に敏感・予算にぴったり・きれいめ など)
     let points: [String]
     let score: Double
-    var id: String { brandID }
-    var brand: BMBrand { BMBrand.all[brandID]! }
+    var id: String { brand.id }
+    var brandID: String { brand.id }
 
     /// 一覧で見せる「合う理由」の短い一文 (例: トレンド感が近い・予算にぴったり)
     var reasonShort: String {
@@ -159,6 +162,7 @@ struct BMPersona: Identifiable {
     let partnerLine: String
     let picks: [BMPick]
 
+    /// 相棒の絵 (16 タイプの名前の画像)
     var iconName: String { "\(typeName)_icon" }
     var codeLabel: String { typeCode.map(String.init).joined(separator: "-") }
     func picks(in slot: BMSlot) -> [BMPick] { picks.filter { $0.slot == slot } }
@@ -192,22 +196,34 @@ enum BMReaction: String, CaseIterable, Identifiable {
 // MARK: - 状態
 
 @Observable
-final class BMSandboxStore {
-    var personaIndex = 0
+final class BrandMatchStore {
+    var persona: BMPersona
+    /// 反応が変わったとき (本番: API に送る)。nil = 送らない (改善案)
+    var onReaction: ((String, BMReaction?) -> Void)?
     /// "personaID/brandID" → 反応
     private(set) var reactions: [String: BMReaction] = [:]
 
-    var persona: BMPersona { BMPersona.samples[personaIndex] }
+    init(persona: BMPersona) {
+        self.persona = persona
+    }
 
     func reaction(_ brandID: String) -> BMReaction? { reactions["\(persona.id)/\(brandID)"] }
 
     func toggle(_ r: BMReaction, for brandID: String) {
         let key = "\(persona.id)/\(brandID)"
-        reactions[key] = reactions[key] == r ? nil : r
+        let next: BMReaction? = reactions[key] == r ? nil : r
+        reactions[key] = next
         Haptic.selection()
+        onReaction?(brandID, next)
     }
 
     func set(_ r: BMReaction?, for brandID: String) {
+        reactions["\(persona.id)/\(brandID)"] = r
+        onReaction?(brandID, r)
+    }
+
+    /// サーバーに残っている反応を、送り返さずに読み込む
+    func preload(_ r: BMReaction, for brandID: String) {
         reactions["\(persona.id)/\(brandID)"] = r
     }
 

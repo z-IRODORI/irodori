@@ -1,8 +1,8 @@
 //
-//  BrandMatchDesignA.swift
-//  irodori - Sandbox
+//  BrandMatchListView.swift
+//  irodori
 //
-//  案 A「ロゴ一覧」: ZOZOTOWN のブランド一覧のように、正方形のロゴを主役に並べる。
+//  あなたに合うブランド 10 選の一覧 (本番と改善案の案 A で共用)。ZOZOTOWN のブランド一覧のように、正方形のロゴを主役に並べる。
 //  - 見出し: 「モテ・プランナーのあなたに合う 10 ブランド」と、どう選んだかの 1 行 (相棒の顔つき)
 //  - タブ: すべて / いちばん合う / 少し背伸び / 新しい出会い で絞り込む
 //  - 表示: リスト (順位・ロゴ・名前・テイストと価格・合う理由・♡) と タイル (3 列) を切り替え
@@ -11,8 +11,8 @@
 
 import SwiftUI
 
-struct BrandMatchDesignA: View {
-    @Bindable var store: BMSandboxStore
+struct BrandMatchListView: View {
+    @Bindable var store: BrandMatchStore
     @State private var opened: BMPick?
     @State private var filter: BMSlot?          // nil = すべて
     @State private var grid = false
@@ -33,7 +33,7 @@ struct BrandMatchDesignA: View {
                         if !rows.isEmpty { section(slot, rows: rows) }
                     }
                 }
-                Text("ブランドのロゴ以外の画像には「運営」「デザイナー」などを添えています。IRODORI とブランドの提携はありません。")
+                Text("画像はブランドのロゴのほか、運営会社のロゴなどのことがあります (くわしくは各ブランドの画面に)。IRODORI とブランドの提携はありません。")
                     .font(.system(size: 11))
                     .foregroundStyle(BMTokens.faint)
                     .fixedSize(horizontal: false, vertical: true)

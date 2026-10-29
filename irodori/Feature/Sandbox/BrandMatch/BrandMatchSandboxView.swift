@@ -21,7 +21,7 @@ struct BrandMatchSandboxView: View {
     }
 
     @State private var tab: Tab = .a
-    @State private var store = BMSandboxStore()
+    @State private var store = BrandMatchStore(persona: BMPersona.samples[0])
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,14 +29,14 @@ struct BrandMatchSandboxView: View {
             BMRule()
             Group {
                 switch tab {
-                case .a: BrandMatchDesignA(store: store)
+                case .a: BrandMatchListView(store: store)
                 case .b: BrandMatchDesignB(store: store)
                 case .c: BrandMatchDesignC(store: store)
                 case .d: BrandMatchDesignD(store: store)
                 }
             }
             // ユーザーや案を変えたら、案の画面を作り直す (めくった位置や会話を最初から)
-            .id("\(tab.rawValue)-\(store.personaIndex)")
+            .id("\(tab.rawValue)-\(store.persona.id)")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("ブランド 10 選の案")
@@ -58,8 +58,8 @@ struct BrandMatchSandboxView: View {
             .pickerStyle(.segmented)
 
             Menu {
-                ForEach(Array(BMPersona.samples.enumerated()), id: \.element.id) { i, p in
-                    Button("\(p.typeName)（\(p.sub)）") { store.personaIndex = i }
+                ForEach(BMPersona.samples) { p in
+                    Button("\(p.typeName)（\(p.sub)）") { store.persona = p }
                 }
             } label: {
                 HStack(spacing: 8) {
@@ -96,5 +96,13 @@ struct BrandMatchSandboxView: View {
         case .c: return "相棒がチャットで 1 つずつ紹介。関係の延長で受け取れる"
         case .d: return "好みの地図で、あなたとの近さを位置で見せる"
         }
+    }
+}
+
+// MARK: - サンプルデータ用 (BrandMatchSandboxData.swift はブランド ID で書き出す)
+
+extension BMPick {
+    init(brandID: String, slot: BMSlot, reasons: [String], points: [String], score: Double) {
+        self.init(brand: BMBrand.all[brandID]!, slot: slot, reasons: reasons, points: points, score: score)
     }
 }

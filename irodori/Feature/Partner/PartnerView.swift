@@ -28,6 +28,12 @@ struct PartnerView: View {
             },
             onMissionAction: { action in
                 handleMission(action)
+            },
+            onBrandMatchTap: {
+                if let onClose {
+                    onClose()
+                }
+                path.append(.brandMatch)
             }
         )
         .navigationTitle("相棒")
