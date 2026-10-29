@@ -55,8 +55,8 @@ struct BMRule: View {
 
 // MARK: - ロゴ枠
 
-/// 一覧で使う固定の画像枠。ロゴ・運営会社のロゴ・デザイナー・店舗の画像のどれか。
-/// どれも無いときだけ頭文字 (ロゴに見せかけない最終手段)
+/// 一覧で使う固定の画像枠。ロゴ・運営会社のロゴ・デザイナー・店舗の画像のどれか (札は付けない。
+/// 何の画像かは詳細シートの「画像: …」で伝える)。どれも無いときだけ頭文字 (最終手段)
 struct BMLogoTile: View {
     let brand: BMBrand
     var width: CGFloat = 64
@@ -64,30 +64,7 @@ struct BMLogoTile: View {
 
     var body: some View {
         ZStack {
-            if let img = brand.image, let ui = img.uiImage, let tag = img.tag {
-                // ブランドのロゴでない画像: 上に画像、下端に札 (重ねない)
-                BMTokens.surface
-                VStack(spacing: 0) {
-                    Group {
-                        if img.kind.isPhoto {
-                            Image(uiImage: ui).resizable().scaledToFill().grayscale(1)
-                        } else if img.dark {
-                            Image(uiImage: ui).renderingMode(.template).resizable().scaledToFit()
-                                .foregroundStyle(BMTokens.ink).padding(.horizontal, 6).padding(.top, 4)
-                        } else {
-                            Image(uiImage: ui).resizable().scaledToFit().grayscale(1)
-                                .padding(.horizontal, 6).padding(.top, 4)
-                        }
-                    }
-                    .frame(width: width, height: height - strip)   // 画像の部分の高さを固定し、札を押し出さない
-                    .clipped()
-                    Text(tag)
-                        .font(.system(size: height >= 60 ? 11 : 9, weight: .semibold))
-                        .foregroundStyle(BMTokens.muted)
-                        .frame(width: width, height: strip)
-                        .background(BMTokens.raised)
-                }
-            } else if let img = brand.image, let ui = img.uiImage {
+            if let img = brand.image, let ui = img.uiImage {
                 BMTokens.surface
                 if img.kind.isPhoto {
                     // 写真は白黒に (一覧で写真だけが目立たないように)
@@ -114,9 +91,6 @@ struct BMLogoTile: View {
         .overlay(RoundedRectangle(cornerRadius: BMTokens.controlRadius, style: .continuous).stroke(BMTokens.border, lineWidth: 1))
         .accessibilityHidden(true)
     }
-
-    /// 札の帯の高さ (小さい枠では細く)
-    private var strip: CGFloat { height >= 60 ? 15 : 12 }
 
     private var initial: String {
         brand.nameEn.first(where: { $0.isLetter || $0.isNumber }).map { String($0).uppercased() } ?? "・"
