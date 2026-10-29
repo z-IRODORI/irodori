@@ -308,13 +308,11 @@ struct TomorrowPickSection: View {
     private var currentIndex: Int { cards.firstIndex { $0.id == currentCardID } ?? 0 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            scopeSegments
-            sectionHeader
+        VStack(alignment: .leading, spacing: 12) {
+            scopeAndWeatherRuleBar
             #if DEBUG
             debugBar
             #endif
-            // 翌日レスポンス: 昨日の👍👎への「反映したよ」バッジ
             if let ack = daily?.feedback_ack {
                 FeedbackAckBadge(ack: ack)
                     .padding(.horizontal, 24)
@@ -322,18 +320,15 @@ struct TomorrowPickSection: View {
             if decidedPoolIdForCurrentTab != nil {
                 decidedBanner
             } else if let planned = plannedForCurrentTab {
-                // カレンダー側で予定したコーデをホームでも認知させる (ホーム⇄カレンダーの往復)
                 plannedBanner(planned)
             }
             contentArea
-            // クローゼットが少ないと手持ちベースのパーソナライズが効かないため、登録導線を出す
             if shouldShowItemNudge {
                 itemRegistrationNudge
             }
         }
         .onAppear {
             playMorningRitualIfNeeded()
-            // カレンダー側での予定追加/削除をタブ復帰時に反映する
             Task { await viewModel.refreshPlannedOutfits() }
         }
         .onChange(of: cards.count) { _, _ in
@@ -351,7 +346,6 @@ struct TomorrowPickSection: View {
                 scopeName: viewModel.selectedPickScope.displayName
             )
         }
-        // コーデ詳細は半モーダルではなく全画面で見せる (画像・構成リストの視認性優先)
         .fullScreenCover(item: $reasonItem) { item in
             NavigationStack {
                 TomorrowCompositionView(
@@ -384,49 +378,51 @@ struct TomorrowPickSection: View {
         }
     }
 
-    // MARK: - セット全体のメタ行 (根拠キャプション + 「合っていない」)
+    // MARK: - カルーセル下部フッター (件数 + 一覧 + 候補入れ替え)
 
-    /// 左: 「あなたの◯回の記録から」等の根拠キャプション (サーバ生成)。
-    /// カルーセル下の11ptグレーでは気付かれないため、カルーセル直上に黒字で置き
-    /// 「この3案が何から選ばれたか」を先に伝える (バッジ化はしない)。
-    /// 右: セットごと dislike して次の候補に切り替える逃げ道。
-    private var setMetaRow: some View {
-        HStack(alignment: .center, spacing: 10) {
+    private var carouselFooterRow: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Text("\(currentIndex + 1) / \(cards.count)")
+                .font(.system(size: 12, weight: .regular).monospacedDigit())
+                .foregroundStyle(TasteTokens.muted)
+
             if let caption = daily?.signal_caption, !caption.isEmpty {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(caption)
-                        .font(.system(size: 12))
-                        .lineSpacing(2)
-                        .lineLimit(2)
-                }
-                .foregroundStyle(.black.opacity(0.75))
+                Text("· \(caption)")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(TasteTokens.muted)
+                    .lineLimit(1)
             }
+
             Spacer(minLength: 8)
+
             Button {
                 Haptic.selection()
                 showSetMismatchDialog = true
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "hand.thumbsdown")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text(isSendingSetMismatch ? "切り替え中..." : "全体的に合っていない")
-                        .font(.system(size: 11, weight: .semibold))
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .overlay(Capsule().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                .contentShape(Capsule())
+                Text(isSendingSetMismatch ? "切替中..." : "候補を入れ替える")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(TasteTokens.muted)
             }
             .buttonStyle(.plain)
             .disabled(isSendingSetMismatch)
+
+            Button {
+                Haptic.selection()
+                showPlanListSheet = true
+            } label: {
+                HStack(spacing: 2) {
+                    Text("すべて見る")
+                        .font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(TasteTokens.ink)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 24)
     }
 
-    /// 表示中のカード全部に dislike (理由: 全体的に合っていない) を送り、次の候補に切り替える
     private func sendSetMismatch() {
         guard !isSendingSetMismatch, !cards.isEmpty else { return }
         isSendingSetMismatch = true
@@ -437,7 +433,7 @@ struct TomorrowPickSection: View {
             if ok {
                 Haptic.notify(.success)
                 withAnimation { currentCardID = nil }
-                ToastManager.shared.show("教えてくれてありがとう。別の提案に切り替えるね", style: .normal)
+                ToastManager.shared.show("別の提案に切り替えました", style: .normal)
             } else {
                 Haptic.notify(.error)
                 ToastManager.shared.show("送信に失敗しました。時間をおいて再度お試しください")
@@ -445,69 +441,71 @@ struct TomorrowPickSection: View {
         }
     }
 
-    // MARK: - 今日/明日/週末 セグメント + 見出し (日付 + 地域 + 天気)
+    // MARK: - taste-skill §4.4: Underline tabs on a full-width 1px rule (左: 今日/明日/週末, 右: 日付・地域・気温)
 
     private var currentTab: PickTab? {
         viewModel.pickTabs.first { $0.scope == viewModel.selectedPickScope }
     }
 
-    /// 今日/明日/週末の切替を、カプセルではなく題字サイズのテキストタブで見せる。
-    /// 「いま見ている提案がどの日のものか」がセクション見出しとして流し見でも伝わり、
-    /// 具体的な日付・地域・天気は直下の sectionHeader が担う。
-    private var scopeSegments: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 22) {
-            ForEach(viewModel.pickTabs) { tab in
-                let isSelected = tab.scope == viewModel.selectedPickScope
-                Button {
-                    Haptic.selection()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        viewModel.selectPickScope(tab.scope)
-                    }
-                } label: {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(tab.scope.displayName)
-                            .font(.system(size: 22, weight: .bold))
-                            .tracking(0.5)
-                            .foregroundStyle(isSelected ? Color.black : Color.black.opacity(0.3))
-                        Group {
-                            if isSelected {
-                                Capsule()
-                                    .fill(Color.black)
-                                    .matchedGeometryEffect(id: "scope_underline", in: scopeUnderlineNamespace)
-                            } else {
-                                Color.clear
+    private var scopeAndWeatherRuleBar: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .bottom, spacing: 20) {
+                HStack(alignment: .bottom, spacing: 20) {
+                    ForEach(viewModel.pickTabs) { tab in
+                        let isSelected = tab.scope == viewModel.selectedPickScope
+                        Button {
+                            Haptic.selection()
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                viewModel.selectPickScope(tab.scope)
                             }
+                        } label: {
+                            VStack(spacing: 8) {
+                                Text(tab.scope.displayName)
+                                    .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
+                                    .foregroundStyle(isSelected ? TasteTokens.ink : TasteTokens.muted)
+                                Rectangle()
+                                    .fill(isSelected ? TasteTokens.ink : Color.clear)
+                                    .frame(height: 2)
+                            }
+                            .fixedSize(horizontal: true, vertical: false)
+                            .contentShape(Rectangle())
                         }
-                        .frame(width: 22, height: 3)
+                        .buttonStyle(.plain)
                     }
-                    .contentShape(Rectangle())
+                }
+
+                Spacer(minLength: 8)
+
+                Button(action: onLocationTap) {
+                    HStack(spacing: 6) {
+                        if let tab = currentTab {
+                            Text(tab.shortDate)
+                                .font(.system(size: 12, weight: .regular).monospacedDigit())
+                                .foregroundStyle(TasteTokens.muted)
+                                .fixedSize()
+                        }
+                        Text(viewModel.currentPrefectureName)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(TasteTokens.muted)
+                            .lineLimit(1)
+                        if let weather = daily?.weather {
+                            Text("\(weather.max_temp)°/\(weather.min_temp)°")
+                                .font(.system(size: 12, weight: .medium).monospacedDigit())
+                                .foregroundStyle(TasteTokens.ink)
+                                .fixedSize()
+                        }
+                    }
+                    .padding(.bottom, 8)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(tab.label)のコーデ提案")
-                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             }
-            Spacer()
-        }
-        .padding(.horizontal, 24)
-    }
+            .padding(.horizontal, 24)
 
-    private var sectionHeader: some View {
-        HStack(spacing: 8) {
-            if let tab = currentTab {
-                Text(tab.shortDate)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-            }
-            // 行幅が足りない端末では、気温・日付 (fixedSize) ではなく県名側を省略させる
-            DailyLocationBadge(prefectureName: viewModel.currentPrefectureName, action: onLocationTap)
-                .layoutPriority(-1)
-            if let weather = daily?.weather {
-                DailyMiniWeatherBadge(weather: weather)
-            }
-            Spacer()
+            Rectangle()
+                .fill(TasteTokens.border)
+                .frame(height: 1)
+                .padding(.horizontal, 24)
         }
-        .padding(.horizontal, 24)
     }
 
     #if DEBUG
@@ -713,13 +711,11 @@ struct TomorrowPickSection: View {
     @ViewBuilder
     private var contentArea: some View {
         if !cards.isEmpty {
-            setMetaRow
-            // ページング (x/N) と「一覧で見る」はカードの上に置き、
-            // スクロールせずに件数と一覧導線が見えるようにする
-            paginationRow
             cardCarousel
                 .opacity(ritualRevealed ? 1 : 0)
                 .offset(y: ritualRevealed ? 0 : 16)
+            // 件数・根拠キャプション・候補入れ替え・すべて見る はカルーセル下のフッターにまとめる
+            carouselFooterRow
         } else if viewModel.isLoadingDailyRecommendation {
             loadingCarousel
         } else if viewModel.hasDailyRecommendationError {
