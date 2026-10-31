@@ -16,6 +16,7 @@ struct InputUserInfoView: View {
     @State private(set) var viewModel: InputUserInfoViewModel
     let finishedInputUserInfo: () -> Void
     @FocusState private var focusedBirthdayField: BirthdayField?
+    @FocusState private var usernameFocused: Bool
     @State private var showingPrefecturePicker = false
 
     var cancellables = Set<AnyCancellable>()
@@ -43,6 +44,9 @@ struct InputUserInfoView: View {
                         .foregroundColor(.black)
                     
                     TextField("ユーザー名を入力してください", text: Bindable(viewModel).username)
+                        .focused($usernameFocused)
+                        .submitLabel(.done)
+                        .onSubmit { usernameFocused = false }
                         .font(.system(size: 16))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
@@ -236,6 +240,17 @@ struct InputUserInfoView: View {
             .padding(.bottom, 40)
         }
         .background(Color.white)
+        // 入力欄の外をタップしたらキーボードを下ろす (ボタンのタップはそのまま効く)
+        .contentShape(Rectangle())
+        .onTapGesture { dismissKeyboard() }
+        // 数字キーボードには「完了」が無いので、キーボードの上に出す
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("完了") { dismissKeyboard() }
+                    .fontWeight(.semibold)
+            }
+        }
         .ignoresSafeArea()
         .onAppear {
             AnalyticsLogger.shared.log(screen: .userInfoScreenView)
@@ -262,4 +277,11 @@ struct InputUserInfoView: View {
 
 #Preview {
     InputUserInfoView(viewModel: InputUserInfoViewModel(), finishedInputUserInfo: {})
+}
+
+extension InputUserInfoView {
+    fileprivate func dismissKeyboard() {
+        usernameFocused = false
+        focusedBirthdayField = nil
+    }
 }

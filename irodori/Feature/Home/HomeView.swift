@@ -278,6 +278,9 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $showHomeSandboxSheet) {
             NavigationStack {
                 List {
+                    NavigationLink("初回起動の画面: 相棒を使った案 A〜D") {
+                        EntryScreenDesignsSandboxView()
+                    }
                     Section("オンボーディング (本番の画面)") {
                         NavigationLink("ウォークスルー (初回起動の3枚)") {
                             OnboardingWalkthroughView(onFinish: {})
