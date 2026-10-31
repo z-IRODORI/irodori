@@ -14,12 +14,29 @@ enum AccountLocalState {
         .notificationPromptShown,     // 通知プリプロンプトの表示済み記録
     ]
 
-    /// 新規会員登録・退会用の初期化。userId を含む全アカウント状態を消すため、
-    /// 既存データを引き継ぐ場合 (ログイン) では絶対に呼ばないこと。
+    /// UserDefaultsKey の外で、人ごとに違う内容を保存しているキー (前の人の表示が残らないように一緒に消す)
+    private static let accountScopedPrefixes = [
+        "renewalHome.",          // 前回の3案の控え・相棒のひとこと・最近選んだ主役の服
+        "homeSectionCache_",     // ホーム下部の前回レスポンス
+        "analysisJob.",          // 解析中のジョブ (前の人の解析トースターが出る)
+    ]
+    private static let accountScopedKeys = ["coachMark.seen", "coachMark.eligible"]
+
+    /// 新規会員登録・退会・別の人のアカウントに切り替わったときの初期化。userId を含む全アカウント状態を消すため、
+    /// 同じ人のデータを引き継ぐ場合 (ログイン) では呼ばないこと。
+    @MainActor
     static func resetForNewRegistration() {
+        let defaults = UserDefaults.standard
         for key in UserDefaultsKey.allCases where !keepKeys.contains(key) {
-            UserDefaults.standard.removeObject(forKey: key.rawValue)
+            defaults.removeObject(forKey: key.rawValue)
         }
+        for key in defaults.dictionaryRepresentation().keys
+        where accountScopedPrefixes.contains(where: { key.hasPrefix($0) }) || accountScopedKeys.contains(key) {
+            defaults.removeObject(forKey: key)
+        }
+        // メモリに残っている前の人の状態も消す
+        AnalysisJobStore.shared.cancel()
+        CoachMarkCenter.shared.resetForNewAccount()
         deleteProfileImageFiles()
         // 試着用の顔写真と生成結果キャッシュ。残すと次のアカウントに前の顔が写り込む
         FaceImageStore.shared.deleteAll()

@@ -212,6 +212,16 @@ final class CoachMarkCenter {
         UserDefaults.standard.set(Array(seen), forKey: Self.seenKey)
     }
 
+    /// 別の人のアカウントに切り替わったとき: 表示済みの記録を消す (前の人の「見た」を引き継がない)
+    func resetForNewAccount() {
+        seen = []
+        queue = []
+        current = nil
+        tourStep = nil
+        tour = []
+        pendingAction = nil
+    }
+
     #if DEBUG
     /// 動作確認用: 新規ユーザーと同じ状態に戻す
     func resetForDebug() {

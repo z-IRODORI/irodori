@@ -15,6 +15,8 @@ struct SplashView: View {
     @State private var homeIdentity = 0
     /// サインイン済みなのに端末の情報が足りない (再インストール・別の端末) とき、サーバに確かめている間
     @State private var resolvingAccount: Bool
+    /// この起動ですでにサーバに確かめたか (入力画面に進んだあと何度も確かめない)
+    @State private var checkedAccountThisLaunch = false
     let viewModel: SplashViewModel = .init()
     let cameraViewModel: CameraViewModel = .init()
     private let toastManager = ToastManager.shared
@@ -97,9 +99,23 @@ struct SplashView: View {
             // 入力画面・オンボーディングに進む前に、サーバのプロフィールと相棒を戻す
             .task {
                 guard resolvingAccount else { return }
+                checkedAccountThisLaunch = true
                 await AccountResolver.resolve()
                 resolvingAccount = false
                 viewModel.updateState()
+            }
+            // 再インストール直後は利用規約が先に出るので、同意したあと入力画面・オンボーディングに
+            // 進む時点でも確かめる (Firebase のログインはキーチェーンに残り、アプリを消しても消えない)
+            .onChange(of: viewModel.state) { _, newState in
+                guard !resolvingAccount, !checkedAccountThisLaunch, AuthManager.shared.isSignedIn else { return }
+                guard newState == .userInfo || newState == .onboarding else { return }
+                checkedAccountThisLaunch = true
+                resolvingAccount = true
+                Task { @MainActor in
+                    await AccountResolver.resolve()
+                    resolvingAccount = false
+                    viewModel.updateState()
+                }
             }
             .onChange(of: viewModel.state) { oldState, newState in
                 // state が変わったときに path をクリアして、古い NavigationStack の履歴を削除
