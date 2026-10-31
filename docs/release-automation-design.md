@@ -49,7 +49,7 @@ fastlane submit
   ├─ preflight       TestFlight に該当バージョンのビルドがあること
   ├─ deliver         説明文・更新内容・審査メモを反映し、ビルドを選ぶ
   ├─ confirm         提出内容を表示して y/n（自動実行でも必ず止まる）
-  └─ submit          審査に提出（承認後は自動公開・段階的リリース）
+  └─ submit          審査に提出（承認後は自動で全員へ公開）
 ```
 
 ## 4. ファイル構成
@@ -96,7 +96,7 @@ irodori/                              # iOS リポジトリのルート
 
 ## 7. 審査への提出（submit）
 
-- 公開方法: 審査通過後に**自動で公開**する（`automatic_release: true`）。段階的リリース（7 日かけて自動アップデートの対象を広げる）は有効のまま（`phased_release: true`）。不具合が見つかったら App Store Connect で段階的リリースを一時停止できる（2026-10-25 決定。NoMuu は手動公開）。
+- 公開方法: 審査通過後に**自動で全員へ公開**する（`automatic_release: true`、段階的リリースなし `phased_release: false`）。2026-11-01 に利用者の指示で、段階的リリース（7 日かけて広げる）をやめた。NoMuu は手動公開。
 - ログインは電話番号認証（Firebase）。審査用に **Firebase のテスト用電話番号と確認コード**を用意し、`irodori.env` から審査メモに差し込む（リポジトリに書かない）。
 - 審査メモ（`review_information/notes.txt`）: ログイン手順、ホームの 3 案・カメラ・相棒画面の見方。玄関カメラ（ラズパイ）は実機が無いと試せないので「任意の機能」と書く。
 - スクリーンショット: 変更があるときだけ `metadata/` に置いて渡す（通常は `skip_screenshots`）。
@@ -117,7 +117,7 @@ irodori/                              # iOS リポジトリのルート
 | テスト | `nomuuTests`、iPhone 17 | `irodoriTests`、iPhone 16 Pro（7AFD0EE9-870F-4C7A-A502-466A490F7499） |
 | env | `nomiers.env` | `irodori.env`（キーは共用） |
 | ビルド番号 | MAJOR + MINOR(2 桁) + PATCH(2 桁) | MAJOR + MINOR + PATCH + 通し番号 2 桁（§5） |
-| 公開方法 | 審査通過後に手動公開 | 審査通過後に自動公開（段階的リリースあり） |
+| 公開方法 | 審査通過後に手動公開 | 審査通過後に自動で全員へ公開（段階的リリースなし） |
 | 追加の処理 | — | Crashlytics の dSYM、本番 API の確認、entitlements の確認 |
 | タグ | `ios/v1.12.0-11200` | `ios/v3.6.0-36000` |
 
