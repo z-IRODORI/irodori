@@ -17,6 +17,8 @@ struct SplashView: View {
     @State private var resolvingAccount: Bool
     /// この起動ですでにサーバに確かめたか (入力画面に進んだあと何度も確かめない)
     @State private var checkedAccountThisLaunch = false
+    @State private var forceUpdate = ForceUpdateChecker.shared
+    @Environment(\.scenePhase) private var scenePhase
     let viewModel: SplashViewModel = .init()
     let cameraViewModel: CameraViewModel = .init()
     private let toastManager = ToastManager.shared
@@ -40,6 +42,23 @@ struct SplashView: View {
     }
 
     var body: some View {
+        // 強制アップデート: 古いアプリなら、どの画面よりも先にアップデート画面だけを出す
+        if forceUpdate.required {
+            ForceUpdateView(message: forceUpdate.message, storeURL: forceUpdate.storeURL)
+                .task { await forceUpdate.check() }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { Task { await forceUpdate.check() } }
+                }
+        } else {
+            mainFlow
+                .task { await forceUpdate.check() }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { Task { await forceUpdate.check() } }
+                }
+        }
+    }
+
+    private var mainFlow: some View {
         Group {
                 switch viewModel.state {
                 case .termsOfService:
