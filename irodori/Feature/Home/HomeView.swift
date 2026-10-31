@@ -28,7 +28,7 @@ struct HomeView: View {
     #if DEBUG
     @State private var showHomeSandboxSheet = false
     @AppStorage(CoachMarkCenter.styleKey) private var coachStyleRaw = CoachMarkCenter.Style.contextual.rawValue
-    @AppStorage(OnboardingDebug.dryRunKey) private var onboardingDryRun = true
+    @AppStorage(OnboardingDebug.dryRunKey) private var onboardingDryRun = false
     /// リニューアル後アプリの体験 Sandbox (Feature/Sandbox/Renewal)
     @State private var showRenewalSandbox = false
     #endif
@@ -82,15 +82,19 @@ struct HomeView: View {
                 tabViewModel.shouldShowFirstTakePhotoOnHome = false
             }
         }
-        .fullScreenCover(isPresented: $showPartnerOnboardingSheet, onDismiss: {
+        // 相棒が変わった (ホーム・相棒画面のどちらから答え直しても): 今の表示は残したまま、サーバから取り直す
+        .onReceive(NotificationCenter.default.publisher(for: PartnerLocalMirror.didChange)) { _ in
             Task {
                 let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
                 await viewModel.loadPartnerHomeSection(uid: uid)
+                await ownedFirstModel.refetchShownScopes()
                 await viewModel.reloadDailyRecommendation()
             }
-        }) {
+        }
+        .fullScreenCover(isPresented: $showPartnerOnboardingSheet) {
             PartnerOnboardingFlowView(
                 showCloseButton: true,
+                mode: .update,
                 onComplete: {
                     showPartnerOnboardingSheet = false
                 }

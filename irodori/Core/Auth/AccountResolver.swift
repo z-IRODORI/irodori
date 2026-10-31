@@ -93,14 +93,8 @@ enum AccountResolver {
 
         // 相棒: 誕生済みならオンボーディングを出さない
         if account.onboarding_completed {
-            defaults.set(true, forKey: UserDefaultsKey.hasOnboarding.rawValue)
-            defaults.set(true, forKey: UserDefaultsKey.hasPartnerOnboardingCompleted.rawValue)
-            defaults.set(true, forKey: UserDefaultsKey.hasFashionTypeDiagnosis.rawValue)
-            defaults.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
-            if let type = account.partner_type_name, !type.isEmpty {
-                defaults.set(type, forKey: UserDefaultsKey.partnerImage.rawValue)
-                defaults.set("\(type)_icon", forKey: UserDefaultsKey.partnerIconImage.rawValue)
-            }
+            PartnerLocalMirror.markOnboardingCompleted()
+            PartnerLocalMirror.apply(typeName: account.partner_type_name)
         }
         return plan.notice
     }

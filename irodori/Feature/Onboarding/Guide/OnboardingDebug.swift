@@ -13,9 +13,9 @@ enum OnboardingDebug {
     static let dryRunKey = "debug.onboardingDryRun"
     static let restartNotification = Notification.Name("debug.restartOnboarding")
 
-    /// true のあいだ、4つの質問の答えを本番に保存しない (既定は true)
+    /// true のあいだ、4つの質問の答えを本番に保存しない (既定は false。オンにすると質問の画面に「確認用」と出る)
     static var dryRun: Bool {
-        UserDefaults.standard.object(forKey: dryRunKey) as? Bool ?? true
+        UserDefaults.standard.object(forKey: dryRunKey) as? Bool ?? false
     }
 
     /// 新規ユーザーと同じく、ウォークスルーから始め直す (ツールチップも未表示に戻す)

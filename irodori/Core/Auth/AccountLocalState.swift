@@ -42,6 +42,22 @@ enum AccountLocalState {
         FaceImageStore.shared.deleteAll()
     }
 
+    /// サーバの値の控え (画像以外) だけを消す。プロフィール・userId・誕生済みの印は残す。
+    /// - 会員登録で相棒が生まれたとき: 前に使っていた別アカウントのキャラ・3案・ホームの控えが出ないように
+    /// - ログアウトしたとき: 次にログインする人に前の控えが出ないように
+    /// 相棒画面からの更新では呼ばない (更新はデータを消さず、相棒を育てるフィードバックとして扱う)
+    @MainActor
+    static func clearServerMirrors() {
+        let defaults = UserDefaults.standard
+        for key: UserDefaultsKey in [.partnerImage, .partnerIconImage, .partnerOnboardingResponse] {
+            defaults.removeObject(forKey: key.rawValue)
+        }
+        for key in defaults.dictionaryRepresentation().keys
+        where accountScopedPrefixes.contains(where: { key.hasPrefix($0) }) && !key.hasPrefix("analysisJob.") {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     /// Documents に保存されるプロフィール画像 (profile_*) を削除する。
     /// 残すと次のアカウントに前のアバターが写り込む。
     private static func deleteProfileImageFiles() {

@@ -51,6 +51,8 @@ struct ProfileEditView: View {
             Button("ログアウト", role: .destructive) {
                 do {
                     try AuthManager.shared.signOut()
+                    // サーバの値の控え (相棒・3案・ホーム) を消す。プロフィールなど登録したデータは残す
+                    AccountLocalState.clearServerMirrors()
                     AnalyticsLogger.shared.log(action: .logout)
                 } catch {
                     ToastManager.shared.show("ログアウトに失敗しました。もう一度お試しください。")

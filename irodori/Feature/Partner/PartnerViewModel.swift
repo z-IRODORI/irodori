@@ -33,14 +33,8 @@ final class PartnerViewModel {
                 if response.status == "success" {
                     self.userInsight = response
 
-                    // FashionTypeの画像情報をUserDefaultsに保存
-                    if let fashionType = response.fashion_type {
-                        let partnerImage = fashionType.type_name
-                        let partnerIconImage = "\(fashionType.type_name)_icon"
-
-                        UserDefaults.standard.set(partnerImage, forKey: UserDefaultsKey.partnerImage.rawValue)
-                        UserDefaults.standard.set(partnerIconImage, forKey: UserDefaultsKey.partnerIconImage.rawValue)
-                    }
+                    // サーバの相棒のタイプ (partner_state が正) を端末に写す
+                    PartnerLocalMirror.apply(typeName: response.fashion_type?.type_name)
                 } else {
                     ToastManager.shared.show(response.insight ?? "相棒情報がありません")
                 }

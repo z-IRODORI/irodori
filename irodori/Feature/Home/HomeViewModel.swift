@@ -237,14 +237,10 @@ final class HomeViewModel {
         if let result = try? await partnerClient.getHome(userId: targetUid),
            case .success(let response) = result {
             partnerHome = response
-            if let typeName = response.type_name, !typeName.isEmpty {
-                let iconName = "\(typeName)_icon"
-                if UIImage(named: iconName) != nil {
-                    UserDefaults.standard.set(iconName, forKey: UserDefaultsKey.partnerIconImage.rawValue)
-                }
-                if UIImage(named: typeName) != nil {
-                    UserDefaults.standard.set(typeName, forKey: UserDefaultsKey.partnerImage.rawValue)
-                }
+            // 通信に失敗したときの仮のデータ (user_id が違う) は端末に写さない
+            if response.user_id == targetUid {
+                PartnerLocalMirror.apply(typeName: response.type_name)
+                if response.has_completed_onboarding == true { PartnerLocalMirror.markOnboardingCompleted() }
             }
         }
     }

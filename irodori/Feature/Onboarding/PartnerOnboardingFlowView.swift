@@ -97,9 +97,13 @@ final class PartnerOnboardingFlowViewModel {
     var tone: String = "gentle"
     var selectedValueInCurrentStep: String? = nil
 
+    /// 保存できなかったとき (確認画面に戻して知らせる)
+    var saveErrorMessage: String? = nil
+
     private let partnerClient: PartnerClientProtocol
 
-    init(partnerClient: PartnerClientProtocol = FallbackPartnerClient()) {
+    // 失敗したときに仮の相棒で進めない (仮のタイプが端末に残り、サーバと食い違うため)。本物のクライアントだけを使う
+    init(partnerClient: PartnerClientProtocol = PartnerClient()) {
         self.partnerClient = partnerClient
     }
 
@@ -179,67 +183,54 @@ final class PartnerOnboardingFlowViewModel {
         }
     }
 
-    func submitOnboarding() async {
+    /// mode: 会員登録の流れ (.registration) か、登録後に相棒画面から答え直す (.update) か。
+    /// サーバでは別々の API (登録: 前のキャラの残りを消して始める / 更新: 消さずに相棒を育てる)
+    func submitOnboarding(mode: PartnerAnswerMode) async {
         withAnimation(.easeInOut(duration: 0.2)) {
             step = .loading
         }
 
         let uid = UserDefaults.standard.string(forKey: UserDefaultsKey.userId.rawValue) ?? "guest-user"
-        let response: PartnerOnboardingResponse
 
         #if DEBUG
-        // 動作確認用: 答えを本番に保存せず、端末内で相棒を誕生させる (改善案 > オンボーディング で切替)
+        // 動作確認用: 答えを本番に保存せず、相棒の誕生だけを見る (改善案 > オンボーディング で切替)。
+        // 端末にも保存しない (保存すると、サーバの相棒と食い違って古いキャラに戻るため)
         if OnboardingDebug.dryRun {
             try? await Task.sleep(for: .seconds(1.2))
             let mock = PartnerOnboardingResponse.mock(impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
-            persistPartnerResult(mock)
+            if mode == .registration { PartnerLocalMirror.markOnboardingCompleted() }
             Haptic.notify(.success)
             withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) { step = .birth(mock) }
             return
         }
         #endif
-        do {
-            let result = try await partnerClient.saveOnboarding(
-                userId: uid,
-                impression: impression,
-                priority: priority,
-                rangeVal: rangeVal,
-                tone: tone
-            )
-            switch result {
-            case .success(let res):
-                response = res
-            case .failure:
-                response = .mock(impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
-            }
-        } catch {
-            response = .mock(impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+
+        let result: Result<PartnerOnboardingResponse, HTTPError>?
+        switch mode {
+        case .registration:
+            result = try? await partnerClient.saveOnboarding(userId: uid, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+        case .update:
+            result = try? await partnerClient.updatePartner(userId: uid, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+        }
+        guard case .success(let response)? = result else {
+            Haptic.notify(.error)
+            saveErrorMessage = "相棒を保存できませんでした。通信を確かめて、もう一度お試しください。"
+            withAnimation(.easeInOut(duration: 0.2)) { step = .confirm }
+            return
         }
 
-        // 相棒アイコンとオンボーディング結果をローカルにも保存し、タブバー・ホーム・相棒画面に即時反映
-        persistPartnerResult(response)
+        if mode == .registration {
+            // 前に使っていた別アカウントのキャラ・3案・ホームの控えを消してから、新しい相棒を写す
+            AccountLocalState.clearServerMirrors()
+        }
+        PartnerLocalMirror.apply(typeName: response.type_name)
+        PartnerLocalMirror.markOnboardingCompleted()
+        NotificationCenter.default.post(name: PartnerLocalMirror.didChange, object: nil)
         Haptic.notify(.success)
 
         withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
             step = .birth(response)
         }
-    }
-
-    private func persistPartnerResult(_ response: PartnerOnboardingResponse) {
-        let iconName = "\(response.type_name)_icon"
-        if UIImage(named: iconName) != nil {
-            UserDefaults.standard.set(iconName, forKey: UserDefaultsKey.partnerIconImage.rawValue)
-        }
-        if UIImage(named: response.type_name) != nil {
-            UserDefaults.standard.set(response.type_name, forKey: UserDefaultsKey.partnerImage.rawValue)
-        }
-        if let data = try? JSONEncoder().encode(response) {
-            UserDefaults.standard.set(data, forKey: UserDefaultsKey.partnerOnboardingResponse.rawValue)
-        }
-        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasPartnerOnboardingCompleted.rawValue)
-        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasOnboarding.rawValue)
-        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasFashionTypeDiagnosis.rawValue)
-        UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasSelectedStandardItems.rawValue)
     }
 
     static func loadPersistedResponse() -> PartnerOnboardingResponse? {
@@ -250,10 +241,20 @@ final class PartnerOnboardingFlowViewModel {
     }
 }
 
+/// 4つの質問の答えをどこに保存するか
+enum PartnerAnswerMode {
+    /// 会員登録の流れで初めて相棒が生まれる
+    case registration
+    /// 登録後に相棒画面から答え直す (データを消さず、相棒を育てるフィードバックとして扱う)
+    case update
+}
+
 // MARK: - Main Flow View
 
 struct PartnerOnboardingFlowView: View {
     var showCloseButton: Bool = false
+    /// 会員登録の流れか、相棒画面からの更新か (保存先の API が違う)
+    var mode: PartnerAnswerMode = .registration
     let onComplete: () -> Void
 
     @State private var viewModel = PartnerOnboardingFlowViewModel()
@@ -279,6 +280,28 @@ struct PartnerOnboardingFlowView: View {
             }
         }
         .background(Color.white.ignoresSafeArea())
+        #if DEBUG
+        .overlay(alignment: .bottom) {
+            if OnboardingDebug.dryRun {
+                Text("確認用：答えを保存していません")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.red.opacity(0.8), in: Capsule())
+                    .padding(.bottom, 8)
+                    .allowsHitTesting(false)
+            }
+        }
+        #endif
+        .alert("保存できませんでした", isPresented: Binding(
+            get: { viewModel.saveErrorMessage != nil },
+            set: { if !$0 { viewModel.saveErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.saveErrorMessage ?? "")
+        }
     }
 
     /// すでに相棒がいる (オンボーディング済みで、アプリ内から開いた) ときの相棒アイコン
@@ -350,7 +373,7 @@ struct PartnerOnboardingFlowView: View {
             }
 
             Button {
-                Task { await viewModel.submitOnboarding() }
+                Task { await viewModel.submitOnboarding(mode: mode) }
             } label: {
                 Text("この内容で相棒を育てる")
                     .font(.system(size: 16, weight: .bold))

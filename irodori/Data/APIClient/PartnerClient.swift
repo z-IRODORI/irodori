@@ -27,6 +27,8 @@ protocol PartnerClientProtocol {
     func getSpeakingStyle(userId: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError>
     func setSpeakingStyle(userId: String, style: String) async throws -> Result<PartnerSpeakingStyleResponse, HTTPError>
     func saveOnboarding(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError>
+    /// 登録後に相棒画面から答え直す (POST api/partner/update)。データを消さず相棒を育てる
+    func updatePartner(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError>
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError>
 }
 
@@ -205,6 +207,19 @@ final class PartnerClient: PartnerClientProtocol {
         )
     }
 
+    func updatePartner(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try await post(
+            endpoint: "api/partner/update",
+            body: PartnerOnboardingBody(
+                user_id: userId,
+                impression: impression,
+                priority: priority,
+                range: rangeVal,
+                tone: tone
+            )
+        )
+    }
+
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {
         try await post(
             endpoint: "api/partner/outfit-suggestion",
@@ -369,6 +384,10 @@ final class MockPartnerClient: PartnerClientProtocol {
         return .success(.mock(impression: impression, priority: priority, rangeVal: rangeVal, tone: tone))
     }
 
+    func updatePartner(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try await saveOnboarding(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+    }
+
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {
         try? await Task.sleep(nanoseconds: 800_000_000)
         return .success(.mock())
@@ -492,6 +511,11 @@ final class FallbackPartnerClient: PartnerClientProtocol {
             { try await real.saveOnboarding(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone) },
             { try await mock.saveOnboarding(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone) }
         )
+    }
+
+    // 保存は仮の結果で成功に見せない (端末とサーバの相棒が食い違うため)。本物の結果をそのまま返す
+    func updatePartner(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try await real.updatePartner(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
     }
 
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {

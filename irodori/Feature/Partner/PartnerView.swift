@@ -63,6 +63,7 @@ struct PartnerView: View {
         .fullScreenCover(isPresented: $showPartnerOnboardingSheet) {
             PartnerOnboardingFlowView(
                 showCloseButton: true,
+                mode: .update,
                 onComplete: {
                     showPartnerOnboardingSheet = false
                 }

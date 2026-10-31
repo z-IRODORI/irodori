@@ -239,6 +239,15 @@ final class RenewalLiveHomeModel {
         Task { await pollExtractions(scope) }
     }
 
+    /// 相棒が変わったとき (相棒画面から答え直した): 今の3案は出したまま、裏で取り直して差し替える。
+    /// 控えは消さない (サーバの当日のキャッシュは相棒の設定が変わると作り直される)
+    func refetchShownScopes() async {
+        guard !uid.isEmpty else { return }
+        for scope in Array(responses.keys) where pivots[scope] == nil && !loading.contains(scope) {
+            await fetch(scope, refresh: false, silent: true)
+        }
+    }
+
     func load(_ scope: RenewalScope, force: Bool = false, refresh: Bool = false) async {
         guard force || responses[scope] == nil, !loading.contains(scope) else { return }
         guard !uid.isEmpty else {
