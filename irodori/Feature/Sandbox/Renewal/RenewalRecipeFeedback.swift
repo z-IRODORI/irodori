@@ -118,7 +118,6 @@ struct RenewalRecipeFeedbackRow: View {
                 chip("ちょっと違う", systemImage: nil) {
                     Haptic.selection()
                     asking = true
-                    CoachMarkCenter.shared.trigger(.feedback)
                 }
             }
         }

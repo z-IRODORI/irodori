@@ -515,11 +515,8 @@ struct RenewalLiveHomeView: View {
             startIntroIfNeeded()
             notifyCoachHomeReady()
         }
-        .onAppear { if response != nil { notifyCoachHomeReady() } }
-        // 「着る」の送り出しを閉じたら「着た日はここから1枚」 (その場型のツールチップ)
-        .onChange(of: model.sendoff == nil) { _, closed in
-            if closed, !host.isSandbox { CoachMarkCenter.shared.trigger(.camera) }
-        }
+        // ホームが開いたらツアーを始める (3案の読み込みを待つのは数秒まで。間に合わなければ3案を飛ばして始める)
+        .onAppear { notifyCoachHomeReady(waitForRecipes: response == nil) }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.loading.contains(scope))
         .refreshable {
             await model.load(scope, force: true, refresh: true)
@@ -552,10 +549,14 @@ struct RenewalLiveHomeView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: model.sendoff)
     }
 
-    /// 初めてのホームのツールチップ: 3案の入場が落ち着いてから出す
-    private func notifyCoachHomeReady() {
+    /// 初めてのホームのツアー: 3案の入場が落ち着いてから始める。
+    /// waitForRecipes: まだ3案が無いとき、最大6秒だけ待つ (届けば onChange からも呼ばれる。二重には始まらない)
+    private func notifyCoachHomeReady(waitForRecipes: Bool = false) {
         guard !host.isSandbox else { return }
         Task {
+            if waitForRecipes {
+                try? await Task.sleep(for: .seconds(6))
+            }
             try? await Task.sleep(for: .seconds(1.2))
             CoachMarkCenter.shared.homeReady()
         }

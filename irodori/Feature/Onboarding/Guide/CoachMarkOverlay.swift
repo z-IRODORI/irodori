@@ -3,8 +3,7 @@
 //  irodori
 //
 //  CoachMarkCenter のツールチップを画面に重ねる層 (MainTabView の一番外側に置く)。
-//  - その場型: 吹き出しだけ。吹き出しの外は素通しで、いつもどおり操作できる
-//  - ツアー型: 画面を暗くして、指す部品だけをくり抜く。暗幕のどこを押しても次へ
+//  ツアー形式: 画面を暗くして、指す部品だけをくり抜く。暗幕のどこを押しても次へ
 //
 
 import SwiftUI
@@ -67,7 +66,7 @@ struct CoachMarkOverlay: View {
         let left = (size.width - width) / 2
         let arrowX = min(max(target.midX - left, 28), width - 28)
         let step = center.tourStep.map { ($0 + 1, center.tourTotal) }
-        // 行動ボタンを出すのは、その場型か、ツアーの最後だけ (途中は「つぎへ」で進める)
+        // 行動ボタンを出すのは、ツアーの最後だけ (途中は「つぎへ」で進める)
         let action = (center.tourStep == nil || center.isLastTourStep) ? tip.action : nil
         return CoachBubble(tip: tip, step: step, action: action, arrowX: arrowX, arrowOnTop: below,
                            onNext: { center.next() },
@@ -112,7 +111,7 @@ struct CoachSpotlight: View {
 /// 行動 (撮る・写真から教える) があるときは、それを黒い主ボタンにして次の行動にする
 struct CoachBubble: View {
     let tip: CoachTip
-    /// ツアーの「1 / 4」。その場型では nil
+    /// ツアーの「1 / 4」。ツアーをしていないときは nil
     let step: (index: Int, total: Int)?
     let action: CoachAction?
     let arrowX: CGFloat

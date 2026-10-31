@@ -27,7 +27,6 @@ struct HomeView: View {
     @State private var ownedFirstModel = RenewalLiveHomeModel(source: .render)
     #if DEBUG
     @State private var showHomeSandboxSheet = false
-    @AppStorage(CoachMarkCenter.styleKey) private var coachStyleRaw = CoachMarkCenter.Style.contextual.rawValue
     @AppStorage(OnboardingDebug.dryRunKey) private var onboardingDryRun = false
     /// リニューアル後アプリの体験 Sandbox (Feature/Sandbox/Renewal)
     @State private var showRenewalSandbox = false
@@ -298,9 +297,6 @@ struct HomeView: View {
                                 OnboardingDebug.restartFirstRun()
                             }
                         }
-                        Picker("ツールチップの出し方", selection: $coachStyleRaw) {
-                            ForEach(CoachMarkCenter.Style.allCases) { Text($0.label).tag($0.rawValue) }
-                        }
                         Button("ツールチップを新規ユーザーと同じ状態にしてホームで見る") {
                             CoachMarkCenter.shared.resetForDebug()
                             showHomeSandboxSheet = false
@@ -387,10 +383,6 @@ struct HomeView: View {
             showFullBodyPickerSheet = true
         }
         .id(CoachTarget.growth.scrollID)
-        // 相棒カードが見えたら「服を教えてほしいな」 (その場型のツールチップ)
-        .onScrollVisibilityChange(threshold: 0.6) { visible in
-            if visible { CoachMarkCenter.shared.trigger(.growth) }
-        }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 32)
