@@ -66,6 +66,8 @@ final class InputUserInfoViewModel {
             userDefaults.set(selectedGender.apiValue, forKey: UserDefaultsKey.gender.rawValue)
             userDefaults.set(true, forKey: UserDefaultsKey.hasCompletedUserInfo.rawValue)
         }
+        // サーバにも残す (別の端末・再インストールでログインしたとき入力し直さずに済む)
+        await AccountResolver.saveProfile(user)
 
         // 生年月日をUserDefaultsに保存（入力済みの場合）
         if isBirthdayComplete {

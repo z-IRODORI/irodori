@@ -13,6 +13,8 @@ struct SplashView: View {
     @State private var isStateChanging = false  // state 変更中フラグ
     /// userId を復元できたらホームを作り直す (空の userId で読み込んだ画面を残さない)
     @State private var homeIdentity = 0
+    /// サインイン済みなのに端末の情報が足りない (再インストール・別の端末) とき、サーバに確かめている間
+    @State private var resolvingAccount: Bool
     let viewModel: SplashViewModel = .init()
     let cameraViewModel: CameraViewModel = .init()
     private let toastManager = ToastManager.shared
@@ -24,6 +26,13 @@ struct SplashView: View {
 
     init() {
         viewModel.updateState()
+        // 起動した瞬間に入力画面を一瞬見せないよう、確かめる必要があれば最初から「確認中」にしておく
+        let needsCheck: Bool
+        switch viewModel.state {
+        case .userInfo, .onboarding: needsCheck = AuthManager.shared.isSignedIn
+        default: needsCheck = false
+        }
+        _resolvingAccount = State(initialValue: needsCheck)
     }
 
     var body: some View {
@@ -42,6 +51,13 @@ struct SplashView: View {
                     LoginView {
                         viewModel.updateState()
                     }
+                case .userInfo where resolvingAccount,
+                     .onboarding where resolvingAccount:
+                    // 入力画面やオンボーディングを一瞬見せないよう、確かめ終わるまで背景だけ出す
+                    EntryBackground()
+                        .overlay(alignment: .bottom) {
+                            ProgressView().tint(.white).controlSize(.large).padding(.bottom, 80)
+                        }
                 case .userInfo:
                     InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {
                         viewModel.setupSignUpDate()   // アプリインストールしてから一度しか呼ばれない想定
@@ -77,6 +93,14 @@ struct SplashView: View {
                 viewModel.updateState()
             }
             #endif
+            // 再インストールや別の端末で、Firebase のログインは残っているのに端末の情報が無いとき:
+            // 入力画面・オンボーディングに進む前に、サーバのプロフィールと相棒を戻す
+            .task {
+                guard resolvingAccount else { return }
+                await AccountResolver.resolve()
+                resolvingAccount = false
+                viewModel.updateState()
+            }
             .onChange(of: viewModel.state) { oldState, newState in
                 // state が変わったときに path をクリアして、古い NavigationStack の履歴を削除
                 print("🔍 [SplashView] State changed from \(oldState) to \(newState), clearing path")
@@ -121,18 +145,7 @@ struct SplashView: View {
 
     private func SplashView() -> some View {
         ZStack {
-            Image(.splash01)
-                .resizable()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            VStack(spacing: 12) {
-                Image(.logoWhite)
-                    .resizable()
-                    .frame(width: 250, height: 50)
-                Text("今日のコーデに納得を、人生にIRODORIを")
-                    .foregroundStyle(.white)
-                    .font(.system(size: 18, weight: .semibold))
-            }
+            EntryBackground()
 
             VStack(spacing: 12) {
                 Text("サービスを開始することで以下の利用規約に同意したものとします")
@@ -169,7 +182,6 @@ struct SplashView: View {
             .frame(maxHeight: .infinity, alignment: .bottom)
             .padding(.bottom, 40)
         }
-        .ignoresSafeArea()
     }
 }
 
