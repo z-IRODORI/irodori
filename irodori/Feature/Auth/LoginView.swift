@@ -24,9 +24,9 @@ struct LoginView: View {
             VStack(spacing: 16) {
                 Spacer()
                 if resolving {
-                    ProgressView().tint(.white).controlSize(.large)
+                    ProgressView().controlSize(.large)
                     Text("アカウントを確認しています")
-                        .foregroundStyle(.white)
+                        .foregroundStyle(RenewalTokens.ink)
                         .font(.system(size: 13, weight: .semibold))
                 } else {
                     Button {
@@ -38,16 +38,16 @@ struct LoginView: View {
                             Text("電話番号ではじめる・ログイン")
                                 .font(.system(size: 16, weight: .semibold))
                         }
-                        .foregroundColor(.black)
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
-                        .background(Color.white)
+                        .background(RenewalTokens.primaryFill)
                         .clipShape(RoundedRectangle(cornerRadius: 25))
                     }
                     .padding(.horizontal, 24)
 
                     Text("はじめての方も、別の端末で使っていた方も同じボタンです。\n同じ電話番号なら、これまでのデータにそのまま戻れます")
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(RenewalTokens.muted)
                         .font(.system(size: 12, weight: .regular))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)

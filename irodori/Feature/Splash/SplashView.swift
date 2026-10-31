@@ -58,7 +58,7 @@ struct SplashView: View {
                     // 入力画面やオンボーディングを一瞬見せないよう、確かめ終わるまで背景だけ出す
                     EntryBackground()
                         .overlay(alignment: .bottom) {
-                            ProgressView().tint(.white).controlSize(.large).padding(.bottom, 80)
+                            ProgressView().controlSize(.large).padding(.bottom, 80)
                         }
                 case .userInfo:
                     InputUserInfoView(viewModel: .init(), finishedInputUserInfo: {
@@ -165,7 +165,7 @@ struct SplashView: View {
 
             VStack(spacing: 12) {
                 Text("サービスを開始することで以下の利用規約に同意したものとします")
-                    .foregroundStyle(.white)
+                    .foregroundStyle(RenewalTokens.muted)
                     .font(.system(size: 12, weight: .regular))
                 Button(action: {
                     AnalyticsLogger.shared.log(action: .termsAccepted, parameters: [
@@ -174,7 +174,7 @@ struct SplashView: View {
                     isPresentedTermsOfService = true
                 }) {
                     Text("利用規約")
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(RenewalTokens.ink)
                         .font(.system(size: 12, weight: .semibold))
                 }
                 .padding(.bottom, 24)
@@ -187,10 +187,10 @@ struct SplashView: View {
                 }) {
                     Text("次へ")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.black)
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
-                        .background(Color.white)
+                        .background(RenewalTokens.primaryFill)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
                         .padding(.horizontal, 24)
                 }
