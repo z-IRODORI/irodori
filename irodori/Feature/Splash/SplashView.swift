@@ -19,7 +19,9 @@ struct SplashView: View {
     @State private var checkedAccountThisLaunch = false
     @State private var forceUpdate = ForceUpdateChecker.shared
     @Environment(\.scenePhase) private var scenePhase
-    let viewModel: SplashViewModel = .init()
+    // アプリの根 (irodoriApp) は scenePhase が変わるたびに SplashView を作り直すので、
+    // 状態はアプリ全体で1つにする (作り直しで画面の状態がリセットされないように)
+    let viewModel: SplashViewModel = .shared
     let cameraViewModel: CameraViewModel = .init()
     private let toastManager = ToastManager.shared
     private let authManager = AuthManager.shared
@@ -29,8 +31,8 @@ struct SplashView: View {
     }
 
     init() {
-        viewModel.signOutLeftoverSessionIfFreshInstall()
-        viewModel.startOverIfRegistrationAbandoned()
+        // 起動時の確認は、アプリの起動ごとに1回だけ (作り直しのたびに走ると、「次へ」を押した直後に戻されてしまう)
+        viewModel.runLaunchChecksOnce()
         viewModel.updateState()
         // 起動した瞬間に入力画面を一瞬見せないよう、確かめる必要があれば最初から「確認中」にしておく
         let needsCheck: Bool

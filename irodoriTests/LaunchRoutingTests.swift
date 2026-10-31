@@ -105,38 +105,53 @@ struct LaunchRoutingTests {
     }
 
     // MARK: 途中でやめた登録・ログイン (最初からやり直す)
+    // 「途中」の印に頼らず、起動時の状態だけで決める (古いバージョンで途中でやめた人も対象)
 
-    @Test("登録・ログインを始めていない: やり直さない (いつもの再開)")
-    func notStartedNoRestart() {
-        #expect(LaunchRouting.restart(registrationInProgress: false, screen: .userInfo, hadLocalAccountBefore: false) == .none)
+    private func restart(_ screen: LaunchScreen, signedIn: Bool = true, terms: Bool = true, legacy: Bool = false) -> LaunchRouting.Restart {
+        LaunchRouting.restart(screen: screen, signedIn: signedIn, agreedToTerms: terms, localUserIdIsLegacy: legacy)
     }
 
-    @Test("スプラッシュで「次へ」を押して終了: 最初からやり直す")
+    @Test("初めての起動 (スプラッシュのまま): 何もしない")
+    func freshNoRestart() {
+        #expect(restart(.termsOfService, signedIn: false, terms: false) == .none)
+    }
+
+    @Test("スプラッシュで「次へ」を押して終了 (未ログイン): スプラッシュから")
     func abandonedAfterTerms() {
-        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .login, hadLocalAccountBefore: false)
-                == .startOver(clearLocalAccount: true))
+        #expect(restart(.login, signedIn: false) == .startOver(clearLocalAccount: true))
     }
 
-    @Test("SMS 認証のあと、プロフィール入力で終了: 最初からやり直し、途中で作った端末の状態も消す")
+    @Test("SMS 認証のあと、プロフィール入力で終了: 最初から・端末の状態も消す")
     func abandonedAtProfile() {
-        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .userInfo, hadLocalAccountBefore: false)
-                == .startOver(clearLocalAccount: true))
+        #expect(restart(.userInfo) == .startOver(clearLocalAccount: true))
     }
 
-    @Test("4つの質問の途中で終了: 最初からやり直す")
+    @Test("4つの質問の途中で終了: 最初から")
     func abandonedAtOnboarding() {
-        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .onboarding, hadLocalAccountBefore: false)
-                == .startOver(clearLocalAccount: true))
+        #expect(restart(.onboarding) == .startOver(clearLocalAccount: true))
     }
 
-    @Test("ホームまで来ていた: やり直さない")
+    @Test("古いバージョンで途中でやめていた人 (印なし・ログイン済み・相棒なし): 最初から")
+    func oldVersionAbandoned() {
+        #expect(restart(.onboarding) == .startOver(clearLocalAccount: true))
+        #expect(restart(.userInfo) == .startOver(clearLocalAccount: true))
+    }
+
+    @Test("ホームまで来ている: やり直さない")
     func reachedHomeNoRestart() {
-        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .home, hadLocalAccountBefore: false) == .none)
+        #expect(restart(.home) == .none)
     }
 
-    @Test("電話番号認証の前から使っている人がログインを途中でやめた: やり直すが、端末のデータは消さない")
+    @Test("電話番号認証の前から使っている人 (旧世代 UUID): 最初からだが端末のデータは消さない")
     func legacyUserKeepsLocalData() {
-        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .login, hadLocalAccountBefore: true)
-                == .startOver(clearLocalAccount: false))
+        #expect(restart(.login, signedIn: false, legacy: true) == .startOver(clearLocalAccount: false))
+    }
+
+    @Test("旧世代 UUID の見分け")
+    func legacyIdDetection() {
+        #expect(LaunchRouting.isLegacyUserId("12345678-1234-1234-1234-1234567890AB"))
+        #expect(!LaunchRouting.isLegacyUserId("VAQ2vmYPhtVsiDdHQrpUSOCVVBJ2"))   // Firebase uid
+        #expect(!LaunchRouting.isLegacyUserId(nil))
+        #expect(!LaunchRouting.isLegacyUserId(""))
     }
 }

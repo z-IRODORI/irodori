@@ -22,6 +22,17 @@ final class SplashViewModel {
     }
     var state: State = .termsOfService
 
+    static let shared = SplashViewModel()
+    private var didRunLaunchChecks = false
+
+    /// 起動時に1回だけ: 入れ直し直後のログインを外す → 途中でやめた登録を最初からにする
+    func runLaunchChecksOnce() {
+        guard !didRunLaunchChecks else { return }
+        didRunLaunchChecks = true
+        signOutLeftoverSessionIfFreshInstall()
+        startOverIfRegistrationAbandoned()
+    }
+
     private static let launchedBeforeKey = "app.launchedBefore"
 
     /// 起動時に1回: アプリを入れ直した直後なら、キーチェーンに残った Firebase のログインを外す
@@ -35,20 +46,22 @@ final class SplashViewModel {
         d.set(true, forKey: Self.launchedBeforeKey)
     }
 
-    /// 起動時に1回: 登録・ログインを途中でやめていたら、ログインを外してスプラッシュ (利用規約) からやり直す
+    /// 起動時に1回: ホームまで行けない (登録・ログインが最後まで終わっていない) なら、
+    /// ログインを外してスプラッシュ (利用規約) からやり直す
     func startOverIfRegistrationAbandoned() {
+        let d = UserDefaults.standard
         let decision = LaunchRouting.restart(
-            registrationInProgress: RegistrationProgress.isInProgress,
             screen: currentScreen(),
-            hadLocalAccountBefore: RegistrationProgress.hadLocalAccountBefore
+            signedIn: AuthManager.shared.isSignedIn,
+            agreedToTerms: d.bool(forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue),
+            localUserIdIsLegacy: LaunchRouting.isLegacyUserId(d.string(forKey: UserDefaultsKey.userId.rawValue))
         )
         guard case .startOver(let clearLocal) = decision else { return }
         try? Auth.auth().signOut()
         if clearLocal {
             AccountLocalState.resetForNewRegistration()
         }
-        UserDefaults.standard.removeObject(forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue)
-        RegistrationProgress.finish()
+        d.removeObject(forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue)
     }
 
     /// 画面の切り替え (決まりは LaunchRouting)
@@ -58,9 +71,7 @@ final class SplashViewModel {
         case .login: state = .login
         case .userInfo: state = .userInfo
         case .onboarding: state = .onboarding
-        case .home:
-            state = .home
-            RegistrationProgress.finish()
+        case .home: state = .home
         }
     }
 
@@ -87,7 +98,6 @@ final class SplashViewModel {
     }
 
     func nextButtonTapped() {
-        RegistrationProgress.begin()
         UserDefaults.standard.set(true, forKey: UserDefaultsKey.hasAgreedToTermsOfService.rawValue)
         // 直接 .login にセットしない: 再インストールでキーチェーンに Firebase セッションが
         // 残っている場合はログインをスキップして次のステップへ進めるため、ルーティングに任せる

@@ -77,41 +77,23 @@ enum LaunchRouting {
 
     enum Restart: Equatable {
         case none
-        /// 最初 (スプラッシュ) からやり直す。clearLocalAccount: 今回の登録で端末に作った状態も消す
+        /// 最初 (スプラッシュ) からやり直す。clearLocalAccount: 端末のアカウント状態も消す
         case startOver(clearLocalAccount: Bool)
     }
 
-    /// 起動時に1回: 「新規会員登録 / ログイン」を始めたのにホームまで行かずにアプリを終えていたら、最初からやり直す。
-    /// 登録を始める前から端末にアカウントがあった人 (電話番号認証の前から使っている人) は、端末のデータを消さない。
-    static func restart(registrationInProgress: Bool, screen: LaunchScreen, hadLocalAccountBefore: Bool) -> Restart {
-        guard registrationInProgress, screen != .home else { return .none }
-        return .startOver(clearLocalAccount: !hadLocalAccountBefore)
-    }
-}
-
-/// 「新規会員登録 / ログイン」の途中かどうかの記録 (端末にだけ持つ)
-@MainActor
-enum RegistrationProgress {
-    private static let inProgressKey = "registration.inProgress"
-    private static let hadLocalAccountKey = "registration.hadLocalAccount"
-
-    static var isInProgress: Bool { UserDefaults.standard.bool(forKey: inProgressKey) }
-    static var hadLocalAccountBefore: Bool { UserDefaults.standard.bool(forKey: hadLocalAccountKey) }
-
-    /// スプラッシュの「次へ」、「新規会員登録」「ログイン」を押したとき
-    static func begin() {
-        let d = UserDefaults.standard
-        if !d.bool(forKey: inProgressKey) {
-            let hadAccount = !(d.string(forKey: UserDefaultsKey.userId.rawValue) ?? "").isEmpty
-                || d.object(forKey: UserDefaultsKey.userInfo.rawValue) != nil
-            d.set(hadAccount, forKey: hadLocalAccountKey)
-        }
-        d.set(true, forKey: inProgressKey)
+    /// 起動時に1回: ホームまで行けない状態 (= 登録・ログインが最後まで終わっていない) なら、最初からやり直す。
+    /// 「途中」の印には頼らず、端末に残っている状態だけで決める (古いバージョンで途中でやめた人も戻せるように)。
+    /// - すでにスプラッシュ (利用規約に未同意かつ未ログイン) なら何もしない
+    /// - 電話番号認証の前から使っている人 (端末の user_id が旧世代の UUID) は、端末のデータを消さない
+    static func restart(screen: LaunchScreen, signedIn: Bool, agreedToTerms: Bool, localUserIdIsLegacy: Bool) -> Restart {
+        if screen == .home { return .none }
+        if !agreedToTerms && !signedIn { return .none }
+        return .startOver(clearLocalAccount: !localUserIdIsLegacy)
     }
 
-    /// ホームまで来た (登録・ログインが最後まで終わった)
-    static func finish() {
-        UserDefaults.standard.removeObject(forKey: inProgressKey)
-        UserDefaults.standard.removeObject(forKey: hadLocalAccountKey)
+    /// 端末生成の UUID (電話番号認証の前の世代の user_id) か
+    static func isLegacyUserId(_ id: String?) -> Bool {
+        guard let id, !id.isEmpty else { return false }
+        return UUID(uuidString: id) != nil
     }
 }
