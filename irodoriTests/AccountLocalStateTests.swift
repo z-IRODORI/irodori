@@ -9,6 +9,7 @@ import Foundation
 import Testing
 @testable import irodori
 
+@MainActor
 struct AccountLocalStateTests {
 
     @Test("アカウント紐付きキーは消え、端末スコープキーは残る")

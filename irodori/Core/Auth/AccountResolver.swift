@@ -28,16 +28,19 @@ struct AccountResponse: Decodable {
     let prefecture_code: String?
     let onboarding_completed: Bool
     let partner_type_name: String?
+    /// 初めての電話番号か (古いサーバでは nil)
+    let is_new_account: Bool?
 }
 
 @MainActor
 enum AccountResolver {
     private static var baseURL: String { PartnerProfileClient.defaultBaseURL }
 
-    /// 結果: サーバから取れたか (false でも端末は使える状態にしてある)
+    /// intent: ログイン画面で選んだ入口 (起動時の確認では nil)。
+    /// 戻り値: 選んだ入口と実際のアカウントが食い違ったときに知らせること
     @discardableResult
-    static func resolve() async -> Bool {
-        guard let user = Auth.auth().currentUser else { return false }
+    static func resolve(intent: LaunchRouting.Intent? = nil) async -> LaunchRouting.Notice? {
+        guard let user = Auth.auth().currentUser else { return nil }
         let defaults = UserDefaults.standard
         guard let token = try? await user.getIDToken(),
               let account = await fetch(token: token) else {
@@ -45,12 +48,17 @@ enum AccountResolver {
             if (defaults.string(forKey: UserDefaultsKey.userId.rawValue) ?? "").isEmpty {
                 defaults.set(user.uid, forKey: UserDefaultsKey.userId.rawValue)
             }
-            return false
+            return nil
         }
 
+        let plan = LaunchRouting.plan(
+            localUserId: defaults.string(forKey: UserDefaultsKey.userId.rawValue),
+            resolvedUserId: account.user_id,
+            isNewAccount: account.is_new_account ?? false,
+            intent: intent
+        )
         // 端末に別の人のアカウントが残っていたら消す (同じ端末を複数人で使ったとき)
-        let local = defaults.string(forKey: UserDefaultsKey.userId.rawValue) ?? ""
-        if !local.isEmpty && local != account.user_id {
+        if plan.resetLocal {
             AccountLocalState.resetForNewRegistration()
         }
         defaults.set(account.user_id, forKey: UserDefaultsKey.userId.rawValue)
@@ -90,7 +98,7 @@ enum AccountResolver {
                 defaults.set("\(type)_icon", forKey: UserDefaultsKey.partnerIconImage.rawValue)
             }
         }
-        return true
+        return plan.notice
     }
 
     /// プロフィール入力のあとに呼ぶ (別の端末でログインしたとき入力し直さずに済むように)
