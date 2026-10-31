@@ -88,6 +88,7 @@ struct LoginView: View {
 
     private func start(_ intent: LaunchRouting.Intent) {
         Haptic.impact(.soft)
+        RegistrationProgress.begin()
         self.intent = intent
         isPresentedPhoneAuth = true
     }

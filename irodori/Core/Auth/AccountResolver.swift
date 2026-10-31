@@ -42,8 +42,12 @@ enum AccountResolver {
     static func resolve(intent: LaunchRouting.Intent? = nil) async -> LaunchRouting.Notice? {
         guard let user = Auth.auth().currentUser else { return nil }
         let defaults = UserDefaults.standard
+        // 「ログイン」を選んだときだけ、端末に残っていた user_id を引き継ぎ候補として渡す
+        // (電話番号認証の前から使っている人のデータを、初めてのログインで失わないように)
+        let local = defaults.string(forKey: UserDefaultsKey.userId.rawValue)
+        let carryOver = intent == .login ? local : nil
         guard let token = try? await user.getIDToken(),
-              let account = await fetch(token: token) else {
+              let account = await fetch(token: token, carryOver: carryOver) else {
             // 通信できない: 端末に user_id が無ければ Firebase uid で始める (新世代と同じ)
             if (defaults.string(forKey: UserDefaultsKey.userId.rawValue) ?? "").isEmpty {
                 defaults.set(user.uid, forKey: UserDefaultsKey.userId.rawValue)
@@ -122,8 +126,12 @@ enum AccountResolver {
         _ = try? await URLSession.shared.data(for: request)
     }
 
-    private static func fetch(token: String) async -> AccountResponse? {
-        guard let url = URL(string: "\(baseURL)/api/user/account") else { return nil }
+    private static func fetch(token: String, carryOver: String?) async -> AccountResponse? {
+        var components = URLComponents(string: "\(baseURL)/api/user/account")
+        if let carryOver, !carryOver.isEmpty {
+            components?.queryItems = [URLQueryItem(name: "carry_over_user_id", value: carryOver)]
+        }
+        guard let url = components?.url else { return nil }
         var request = URLRequest(url: url)
         request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 30   // Render のコールドスタートを考慮

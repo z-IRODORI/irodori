@@ -28,6 +28,7 @@ struct SplashView: View {
 
     init() {
         viewModel.signOutLeftoverSessionIfFreshInstall()
+        viewModel.startOverIfRegistrationAbandoned()
         viewModel.updateState()
         // 起動した瞬間に入力画面を一瞬見せないよう、確かめる必要があれば最初から「確認中」にしておく
         let needsCheck: Bool

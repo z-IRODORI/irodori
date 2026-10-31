@@ -103,4 +103,40 @@ struct LaunchRoutingTests {
         let p = LaunchRouting.plan(localUserId: "u1", resolvedUserId: "u1", isNewAccount: false, intent: nil)
         #expect(p.notice == nil)
     }
+
+    // MARK: 途中でやめた登録・ログイン (最初からやり直す)
+
+    @Test("登録・ログインを始めていない: やり直さない (いつもの再開)")
+    func notStartedNoRestart() {
+        #expect(LaunchRouting.restart(registrationInProgress: false, screen: .userInfo, hadLocalAccountBefore: false) == .none)
+    }
+
+    @Test("スプラッシュで「次へ」を押して終了: 最初からやり直す")
+    func abandonedAfterTerms() {
+        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .login, hadLocalAccountBefore: false)
+                == .startOver(clearLocalAccount: true))
+    }
+
+    @Test("SMS 認証のあと、プロフィール入力で終了: 最初からやり直し、途中で作った端末の状態も消す")
+    func abandonedAtProfile() {
+        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .userInfo, hadLocalAccountBefore: false)
+                == .startOver(clearLocalAccount: true))
+    }
+
+    @Test("4つの質問の途中で終了: 最初からやり直す")
+    func abandonedAtOnboarding() {
+        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .onboarding, hadLocalAccountBefore: false)
+                == .startOver(clearLocalAccount: true))
+    }
+
+    @Test("ホームまで来ていた: やり直さない")
+    func reachedHomeNoRestart() {
+        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .home, hadLocalAccountBefore: false) == .none)
+    }
+
+    @Test("電話番号認証の前から使っている人がログインを途中でやめた: やり直すが、端末のデータは消さない")
+    func legacyUserKeepsLocalData() {
+        #expect(LaunchRouting.restart(registrationInProgress: true, screen: .login, hadLocalAccountBefore: true)
+                == .startOver(clearLocalAccount: false))
+    }
 }
