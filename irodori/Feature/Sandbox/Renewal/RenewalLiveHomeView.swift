@@ -434,7 +434,6 @@ struct RenewalLiveHomeView: View {
     @State private var pulseItemId: String?
     @State private var pendingPivotIntro: String?
     @State private var flying: (url: String, from: CGRect)?
-    @State private var memoryShown = false
     @State private var showDislike = false
     /// 最近主役に選んだ服 (新しい順・カンマ区切り)
     @AppStorage("renewalHome.recentPivots") private var recentPivotsRaw = ""
@@ -564,60 +563,50 @@ struct RenewalLiveHomeView: View {
 
     // MARK: ① 相棒カード
 
-    /// 案C (1画面凝縮) の相棒カード: 白いカード1枚に アバター + 日付・気温 + ひとこと (2〜3行) + ›。
-    /// カード全体で相棒画面を開く (長押しで話し方)。覚えていることはひとことの下に1行だけ
+    /// 相棒カード: 上に 最高気温 (赤) / 最低気温 (青) と日付、下に相棒の吹き出し (ちょうどいい服) だけを置く。
+    /// カード全体で相棒画面を開く (長押しで話し方)
     private var partnerHeader: some View {
         Button(action: onOpenPartner) {
-            HStack(alignment: .center, spacing: 12) {
-                RenewalPartnerAvatar(typeName: partnerTypeName, size: 40)
-                VStack(alignment: .leading, spacing: 8) {  // 天気・ひとこと・覚えてるよ の間を少しあける
-                    nextWearMeta
-                    if let response {
-                        RenewalSpokenText(
-                            text: response.greeting,
-                            animate: !reduceMotion && spokenDay != Self.todayKey,
-                            tapToFinish: false,
-                            onFinished: {
-                                spokenDay = Self.todayKey
-                                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.4).delay(0.25)) { memoryShown = true }
-                            }
-                        )
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(RenewalTokens.ink)
-                        .lineSpacing(3)
-                        .lineLimit(3)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        if let memory = response.memory {
-                            memoryNote(memory)
-                                .opacity(memoryShown ? 1 : 0)
-                                .offset(y: memoryShown ? 0 : 3)
+            VStack(alignment: .leading, spacing: 10) {
+                weatherRow
+                HStack(alignment: .top, spacing: 8) {
+                    RenewalPartnerAvatar(typeName: partnerTypeName, size: 34)
+                    Group {
+                        if let response {
+                            RenewalSpokenText(
+                                text: response.greeting,
+                                animate: !reduceMotion && spokenDay != Self.todayKey,
+                                tapToFinish: false,
+                                onFinished: { spokenDay = Self.todayKey }
+                            )
+                            .foregroundStyle(RenewalTokens.ink)
+                        } else {
+                            Text("相棒が今日の服を考えています…")
+                                .foregroundStyle(RenewalTokens.muted)
+                                .redacted(reason: .placeholder)
                         }
-                        if host.showCharCount {
-                            HStack(spacing: 6) {
-                                RenewalCharCountBadge(text: response.greeting)
-                                Text("\(response.daily_angle_label) ・ \(response.text_source == "gemini" ? "Gemini" : "テンプレート")")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(RenewalTokens.muted)
-                            }
-                        }
-                    } else {
-                        Text("相棒があなたの手持ち服から3案を組んでいます…")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(RenewalTokens.muted)
-                            .redacted(reason: .placeholder)
                     }
+                    .font(.system(size: 13, weight: .medium))
+                    .lineSpacing(3)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 18)
+                    .padding(.trailing, 12)
+                    .padding(.vertical, 9)
+                    .background(RenewalSpeechBubble(radius: 14, tailWidth: 8, tailTop: 9, tailHeight: 12).fill(RenewalTokens.raised))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(RenewalTokens.muted)
+                if host.showCharCount, let response {
+                    RenewalCharCountBadge(text: response.greeting)
+                }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 14)
+            .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 16))
             .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
-            .contentShape(RoundedRectangle(cornerRadius: 14))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
@@ -628,6 +617,39 @@ struct RenewalLiveHomeView: View {
         .padding(.horizontal, 16)   // 3案のカードと端をそろえる
         .padding(.top, 4)
     }
+
+    /// 「21° / 13°」(最高は赤・最低は青) と、右に「明日 11/2(月)」
+    private var weatherRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            if let w = response?.weather {
+                Text("\(w.max_temp)°")
+                    .font(.system(size: 38, weight: .bold))
+                    .foregroundStyle(Self.maxTempColor)
+                Text(" / ")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(RenewalTokens.muted)
+                Text("\(w.min_temp)°")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Self.minTempColor)
+            } else {
+                Text("--°")
+                    .font(.system(size: 38, weight: .bold))
+                    .foregroundStyle(RenewalTokens.muted)
+            }
+            Spacer(minLength: 8)
+            Text("\(scope == .today ? "今日" : "明日") \(RenewalLiveHomeModel.dateLabel(scope))")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(RenewalTokens.muted)
+                .lineLimit(1)
+        }
+        .monospacedDigit()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(metaAccessibility)
+    }
+
+    /// 白地で文字が読める濃さ (コントラスト 4.5 以上) の赤と青
+    private static let maxTempColor = Color(red: 0.82, green: 0.20, blue: 0.16)
+    private static let minTempColor = Color(red: 0.12, green: 0.42, blue: 0.80)
 
     // MARK: 動き
 
@@ -693,57 +715,15 @@ struct RenewalLiveHomeView: View {
         }
     }
 
-    /// ひとことの根拠になった「相棒が覚えていること」(さりげなく1行)
-    private func memoryNote(_ m: OwnedFirstMemory) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 10, weight: .semibold))
-            Text("覚えてるよ ・ \(m.label)")
-                .font(.system(size: 11))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-        }
-        .foregroundStyle(RenewalTokens.muted)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("相棒が覚えていること: \(m.label)")
-    }
-
-    /// 「明日 10/21(水) ・ 29° / 20°」(季節ラベルはテキストだけで添える)
-    private var nextWearMeta: some View {
-        HStack(spacing: 5) {
-            Text("\(scope == .today ? "今日" : "明日") \(RenewalLiveHomeModel.dateLabel(scope))")
-            if let w = response?.weather {
-                Text("・")
-                Image(systemName: weatherSymbol(w.condition)).font(.system(size: 11))
-                Text("\(w.max_temp)° / \(w.min_temp)°").monospacedDigit()
-            }
-            if let climate = response?.climate {
-                Text("・\(climate.label)")
-            }
-        }
-        .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(RenewalTokens.muted)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(metaAccessibility)
-    }
-
     private var metaAccessibility: String {
         var s = "\(scope == .today ? "今日" : "明日")着るなら、\(RenewalLiveHomeModel.dateLabel(scope))"
         if let w = response?.weather { s += "、最高\(w.max_temp)度、最低\(w.min_temp)度" }
-        if let c = response?.climate { s += "、\(c.label)。\(c.guidance)" }
         return s
     }
 
     private var partnerTypeName: String {
         if let name = response?.partner_type_name, !name.isEmpty { return name }
         return host.fallbackTypeName
-    }
-
-    private func weatherSymbol(_ condition: String) -> String {
-        if condition.contains("雨") { return "cloud.rain" }
-        if condition.contains("雪") { return "cloud.snow" }
-        if condition.contains("くもり") || condition.contains("曇") { return "cloud" }
-        return "sun.max"
     }
 
     // MARK: ③ 3案 (リスト / のぞき見 × 見せ方)
