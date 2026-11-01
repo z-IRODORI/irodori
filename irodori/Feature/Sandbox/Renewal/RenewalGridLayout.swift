@@ -43,6 +43,8 @@ private struct RenewalGridCard: View {
     @State private var askingReason = false
     /// DEBUG: 2・3枚目の写真を隠して、写真なしのカードの見た目を確かめる
     @AppStorage("debug.gridHidePhotoPreview") private var hidePhotoPreview = false
+    /// 着こなし例の写真の置き方 (くらべて決めるまで DEBUG で切り替える)
+    @AppStorage(RenewalGridPhotoPlacement.storageKey) private var placementRaw = RenewalGridPhotoPlacement.tile.rawValue
     @State private var askingColor = false
 
     private var reaction: RenewalRecipeReaction? { actions.reaction(recipe) }
@@ -51,7 +53,8 @@ private struct RenewalGridCard: View {
         VStack(alignment: .leading, spacing: 8) {
             Button { actions.onDetail(recipe) } label: {
                 RenewalGridVisual(recipe: recipe, actions: actions, height: RenewalGridLayout.imageHeight,
-                                  hidePhoto: hidePhotoPreview && (index == 1 || index == 2))
+                                  hidePhoto: hidePhotoPreview && (index == 1 || index == 2),
+                                  placement: RenewalGridPhotoPlacement(rawValue: placementRaw) ?? .tile)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("案\(index + 1) \(recipe.displayTitle)。タップで詳細")

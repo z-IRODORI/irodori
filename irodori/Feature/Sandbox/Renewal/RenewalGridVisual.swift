@@ -2,14 +2,22 @@
 //  RenewalGridVisual.swift
 //  irodori
 //
-//  ホームの2列のカードの「コーデの画像」。写真の有無で中身だけを変え、枠・大きさ・部品の位置はそろえる。
-//    写真あり: コーデモデルの写真を全面に。下の帯は暗くして、見出しを白で重ねる
-//    写真なし: 服を 2×2 のタイルに並べる (足りないマスは色の組み合わせの見本)。下の帯は淡い色で、見出しは濃い文字
-//  下の帯 (見出しと服の数) の位置と高さは、どちらも同じ。
+//  ホームの2列のカードの「コーデの画像」。主役は手持ちのアイテムで組んだコーデ (服を 2×2 のタイルに並べる)。
+//  コーデモデルの写真 (着こなし例) は添える扱いで、置き方をくらべて決める (DEBUG で切り替え):
+//    tile  : タイルの 4 マス目を写真にする (写真が無ければ色の組み合わせの見本)
+//    pager : 1 枚目は服のタイル、横にめくると写真
+//    badge : 見出しの帯の右端に小さく丸い写真 (押すと拡大)
+//  写真の有無で変わるのは写真の部分だけ。カードの大きさ・帯・文字の色はそろえる。
 //
 
 import SwiftUI
 import Kingfisher
+
+enum RenewalGridPhotoPlacement: String, CaseIterable, Identifiable {
+    case tile, pager, badge
+    var id: String { rawValue }
+    static let storageKey = "debug.gridPhotoPlacement"
+}
 
 struct RenewalGridVisual: View {
     let recipe: OwnedFirstRecipe
@@ -17,6 +25,9 @@ struct RenewalGridVisual: View {
     var height: CGFloat
     /// 写真があっても使わない (DEBUG の見た目の確認用)
     var hidePhoto = false
+    var placement: RenewalGridPhotoPlacement = .tile
+
+    @State private var page = 0
 
     /// 下の帯 (使う服・服の数・見出し) の高さ
     static let bandHeight: CGFloat = 64
@@ -33,14 +44,36 @@ struct RenewalGridVisual: View {
     }
 
     var body: some View {
-        let hasPhoto = photoURL != nil
         ZStack(alignment: .bottomLeading) {
-            if let photoURL { photo(photoURL) } else { tiles }
-            band(onPhoto: hasPhoto)
+            switch (placement, photoURL) {
+            case (.pager, let url?):
+                TabView(selection: $page) {
+                    tiles(photoCell: nil).tag(0)
+                    photo(url).tag(1)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .overlay(alignment: .bottomTrailing) { pageDots.padding(.trailing, 10).padding(.bottom, Self.bandHeight - 18) }
+            case (.tile, let url?):
+                tiles(photoCell: url)
+            default:
+                tiles(photoCell: nil)
+            }
+            band(onPhoto: placement == .pager && page == 1 && photoURL != nil)
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var pageDots: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<2, id: \.self) { i in
+                Circle().fill(page == i ? RenewalTokens.ink : RenewalTokens.controlBorder).frame(width: 5, height: 5)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(.white.opacity(0.9), in: Capsule())
     }
 
     // MARK: 写真あり
@@ -62,8 +95,9 @@ struct RenewalGridVisual: View {
 
     // MARK: 写真なし (2×2 のタイル)
 
-    private var tiles: some View {
-        let ps = Array(pieces.prefix(4))
+    /// photoCell があれば、4 マス目を写真 (着こなし例) にする
+    private func tiles(photoCell: URL?) -> some View {
+        let ps = Array(pieces.prefix(photoCell == nil ? 4 : 3))
         let gap: CGFloat = 4
         return GeometryReader { geo in
             let cellW = (geo.size.width - gap * 3) / 2
@@ -75,7 +109,13 @@ struct RenewalGridVisual: View {
                 }
                 HStack(spacing: gap) {
                     cell(ps.indices.contains(2) ? ps[2] : nil, w: cellW, h: cellH)
-                    if ps.count >= 4 { cell(ps[3], w: cellW, h: cellH) } else { paletteCell(w: cellW, h: cellH) }
+                    if let photoCell {
+                        photoTile(photoCell, w: cellW, h: cellH)
+                    } else if ps.count >= 4 {
+                        cell(ps[3], w: cellW, h: cellH)
+                    } else {
+                        paletteCell(w: cellW, h: cellH)
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -93,6 +133,29 @@ struct RenewalGridVisual: View {
         }
         .frame(width: w, height: h)
         .clipShape(RoundedRectangle(cornerRadius: 9))
+    }
+
+    /// 着こなし例の写真のマス (押すと拡大)
+    private func photoTile(_ url: URL, w: CGFloat, h: CGFloat) -> some View {
+        KFImage(url)
+            .placeholder { RenewalTokens.raised }
+            .resizable()
+            .scaledToFill()
+            .frame(width: w, height: h, alignment: .top)
+            .clipped()
+            .overlay(alignment: .bottomLeading) { exampleTag.padding(4) }
+            .clipShape(RoundedRectangle(cornerRadius: 9))
+            .photoZoomOnTap(url: url.absoluteString)
+            .accessibilityLabel("着こなし例の写真を大きく見る")
+    }
+
+    private var exampleTag: some View {
+        Text("着こなし例")
+            .font(.system(size: 8.5, weight: .bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(.black.opacity(0.55), in: Capsule())
     }
 
     /// 足りないマスは、そのコーデの色の組み合わせの見本
@@ -123,20 +186,8 @@ struct RenewalGridVisual: View {
     // MARK: 下の帯 (どちらも同じ位置・高さ)
 
     private func band(onPhoto: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 5) {
-                if onPhoto {
-                    // 写真の服が何かは、写真だけでは分からないので小さく添える
-                    HStack(spacing: -6) {
-                        ForEach(pieces.prefix(3)) { p in
-                            cutout(p)
-                                .padding(3)
-                                .frame(width: 24, height: 24)
-                                .background(.white, in: Circle())
-                                .overlay(Circle().stroke(.white, lineWidth: 1.2))
-                        }
-                    }
-                }
+        HStack(alignment: .bottom, spacing: 6) {
+            VStack(alignment: .leading, spacing: 5) {
                 if let status = statusText {
                     Text(status)
                         .font(.system(size: 9.5, weight: .bold))
@@ -145,15 +196,27 @@ struct RenewalGridVisual: View {
                         .padding(.vertical, 2)
                         .background(onPhoto ? Color.white.opacity(0.92) : RenewalTokens.primaryFill, in: Capsule())
                 }
+                Text(recipe.displayTitle)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(onPhoto ? .white : RenewalTokens.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .shadow(color: onPhoto ? .black.opacity(0.3) : .clear, radius: 2, y: 1)
+                    .accessibilityAddTraits(.isHeader)
             }
-            .frame(height: 24, alignment: .leading)
-            Text(recipe.displayTitle)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(onPhoto ? .white : RenewalTokens.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .shadow(color: onPhoto ? .black.opacity(0.3) : .clear, radius: 2, y: 1)
-                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 0)
+            if placement == .badge, let url = photoURL {
+                KFImage(url)
+                    .placeholder { RenewalTokens.raised }
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 40, height: 40, alignment: .top)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(.white, lineWidth: 2))
+                    .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                    .photoZoomOnTap(url: url.absoluteString)
+                    .accessibilityLabel("着こなし例の写真を大きく見る")
+            }
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
