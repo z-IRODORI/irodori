@@ -618,9 +618,15 @@ struct RenewalLiveHomeView: View {
         .padding(.top, 4)
     }
 
-    /// 「21° / 13°」(最高は赤・最低は青) と、右に「明日 11/2(月)」
+    /// 左に「明日 11/2(月)」、続けて「21° / 13°」(最高は赤・最低は青)
     private var weatherRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
+            Text("\(scope == .today ? "今日" : "明日") \(RenewalLiveHomeModel.dateLabel(scope))")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(RenewalTokens.muted)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.trailing, 12)
             if let w = response?.weather {
                 // 最高と最低は同じ大きさにし、色だけで分ける
                 Text("\(w.max_temp)°")
@@ -637,11 +643,7 @@ struct RenewalLiveHomeView: View {
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(RenewalTokens.muted)
             }
-            Spacer(minLength: 8)
-            Text("\(scope == .today ? "今日" : "明日") \(RenewalLiveHomeModel.dateLabel(scope))")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(RenewalTokens.muted)
-                .lineLimit(1)
+            Spacer(minLength: 0)
         }
         .monospacedDigit()
         .accessibilityElement(children: .ignore)
