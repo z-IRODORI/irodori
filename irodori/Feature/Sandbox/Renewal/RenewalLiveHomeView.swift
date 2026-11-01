@@ -622,18 +622,19 @@ struct RenewalLiveHomeView: View {
     private var weatherRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             if let w = response?.weather {
+                // 最高と最低は同じ大きさにし、色だけで分ける
                 Text("\(w.max_temp)°")
-                    .font(.system(size: 38, weight: .bold))
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(Self.maxTempColor)
                 Text(" / ")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 24, weight: .regular))
                     .foregroundStyle(RenewalTokens.muted)
                 Text("\(w.min_temp)°")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(Self.minTempColor)
             } else {
                 Text("--°")
-                    .font(.system(size: 38, weight: .bold))
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(RenewalTokens.muted)
             }
             Spacer(minLength: 8)
