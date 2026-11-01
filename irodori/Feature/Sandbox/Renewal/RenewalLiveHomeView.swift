@@ -652,7 +652,7 @@ struct RenewalLiveHomeView: View {
                         .foregroundStyle(RenewalTokens.ink)
                 }
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("\(scope == .today ? "今日" : "明日") \(RenewalLiveHomeModel.dateLabel(scope))\(shortCondition.isEmpty ? "" : " ・ \(shortCondition)")")
+                    Text("\(scope == .today ? "今日" : "明日") \(RenewalLiveHomeModel.dateLabel(scope))\(response?.weather.condition.isEmpty == false ? " ・ \(response?.weather.condition ?? "")" : "")")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(RenewalTokens.muted)
                         .lineLimit(1)
@@ -724,12 +724,6 @@ struct RenewalLiveHomeView: View {
         .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
         .padding(.horizontal, 16)
         .padding(.top, 4)
-    }
-
-    /// 「くもり 昼過ぎ から 夕方 雨」→「くもり」(気象庁の文の最初の語だけ)
-    private var shortCondition: String {
-        let c = response?.weather.condition ?? ""
-        return c.split(whereSeparator: { $0 == " " || $0 == "　" }).first.map(String.init) ?? c
     }
 
     /// 相棒のひとこと (短いもの)。古いサーバでは長いひとことの最初の1文
