@@ -17,14 +17,18 @@ import SwiftUI
 import Kingfisher
 
 enum RenewalFirstViewLayout: String, CaseIterable, Identifiable {
-    case grid, list, peek
+    case grid, gridGuide, compactList, list, peek
 
     var id: String { rawValue }
     static let storageKey = "renewalSandbox.firstViewLayout.v2"
+    /// 本番ホームでモックを見比べるためのキー (DEBUG ビルドだけ読む)
+    static let debugHomeKey = "debug.homeMockLayout"
 
     var label: String {
         switch self {
         case .grid: return "2列 (本番)"
+        case .gridGuide: return "2列＋コーデモデル (モック1)"
+        case .compactList: return "1列・低い行 (モック2)"
         case .list: return "リスト"
         case .peek: return "のぞき見"
         }

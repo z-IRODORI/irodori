@@ -18,6 +18,8 @@ struct RenewalGridLayout: View {
     /// 入場演出の開始秒 (nil = 演出なし)
     var introDelay: Double? = nil
     var introToken: Int = 0
+    /// 画像の下に「コーデモデル (無ければ相棒)」の札を置く見せ方 (モック)。false は従来どおり画像の左下に小さな写真
+    var guide = false
 
     /// コーデの画像の高さ。2 段が最初の画面に収まる高さにする
     static let imageHeight: CGFloat = 152
@@ -26,7 +28,7 @@ struct RenewalGridLayout: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                 let start = introDelay.map { $0 + Double(index) * 0.06 }
-                RenewalGridCard(recipe: recipe, index: index, actions: actions)
+                RenewalGridCard(recipe: recipe, index: index, actions: actions, guide: guide)
                     .coachFrame(.recipes, active: index == 0)
                     .modifier(RenewalIntroRise(delay: start, token: "\(introToken)-\(recipe.recipe_id)"))
             }
@@ -39,9 +41,9 @@ private struct RenewalGridCard: View {
     let recipe: OwnedFirstRecipe
     let index: Int
     let actions: RenewalRecipeActions
+    var guide = false
 
     @State private var askingReason = false
-    @State private var askingColor = false
 
     private var reaction: RenewalRecipeReaction? { actions.reaction(recipe) }
 
@@ -57,18 +59,27 @@ private struct RenewalGridCard: View {
             .accessibilityLabel("案\(index + 1) \(recipe.displayTitle)。タップで詳細")
             .overlay(alignment: .topLeading) { if index == 0 { pickBadge.padding(6) } }
             .overlay(alignment: .topTrailing) { likeButton.padding(4) }
-            .overlay(alignment: .bottomLeading) { modelThumb.padding(6) }
+            // guide では服の上に何も重ねない (写真と状態は画像の下の行へ)
+            .overlay(alignment: .bottomLeading) { if !guide { modelThumb.padding(6) } }
             // 相棒の返事が出ている間は、手持ちの状態を隠す (重ならないように)
-            .overlay(alignment: .bottomTrailing) { if ackText == nil { statusBadge.padding(6) } }
+            .overlay(alignment: .bottomTrailing) { if ackText == nil && !guide { statusBadge.padding(6) } }
             .overlay(alignment: .bottom) { ackBubble }
 
-            Text(recipe.displayTitle)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(RenewalTokens.ink)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, minHeight: 34, alignment: .topLeading)
-                .accessibilityAddTraits(.isHeader)
+            if guide {
+                HStack(alignment: .top, spacing: 8) {
+                    RenewalRecipeGuideTile(recipe: recipe, typeName: actions.partnerTypeName)
+                    VStack(alignment: .leading, spacing: 3) {
+                        title
+                        Text(statusText)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(RenewalTokens.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                }
+            } else {
+                title.frame(minHeight: 34, alignment: .topLeading)
+            }
 
             HStack(spacing: 6) {
                 decideButton
@@ -81,28 +92,17 @@ private struct RenewalGridCard: View {
         .shadow(color: .black.opacity(0.06), radius: 10, y: 3)
         // 見送った案は薄くして、相棒の返事だけをはっきり見せる (すぐ代わりの案に入れ替わる)
         .opacity(reaction?.isDisliked == true ? 0.45 : 1)
-        .confirmationDialog("どこが違った？", isPresented: $askingReason, titleVisibility: .visible) {
-            ForEach(RenewalDislikeReason.allCases) { reason in
-                Button(reason.label) {
-                    if reason == .color {
-                        // 色はどこの色かを続けて聞く (ダイアログを閉じてから開き直す)
-                        Task { @MainActor in
-                            try? await Task.sleep(for: .seconds(0.35))
-                            askingColor = true
-                        }
-                    } else {
-                        actions.onDislike?(recipe, reason, nil)
-                    }
-                }
-            }
-            Button("やめる", role: .cancel) {}
-        }
-        .confirmationDialog("どこの色が違った？", isPresented: $askingColor, titleVisibility: .visible) {
-            ForEach(RenewalColorTarget.allCases) { target in
-                Button("\(target.label)（\(target.hint)）") { actions.onDislike?(recipe, .color, target) }
-            }
-            Button("やめる", role: .cancel) {}
-        }
+        .modifier(RenewalDislikeDialogs(isPresented: $askingReason) { actions.onDislike?(recipe, $0, $1) })
+    }
+
+    private var title: some View {
+        Text(recipe.displayTitle)
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(RenewalTokens.ink)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: 画像の上
@@ -171,29 +171,9 @@ private struct RenewalGridCard: View {
             .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
     }
 
-    /// 「手持ちで完成」「あと1点」(手持ちにない服の数)
-    private var statusText: String {
-        let missing: Int
-        if actions.visualMode == .exampleItems {
-            let pieces = RenewalFlatLayBuilder.exampleItems(recipe, extraction: actions.extraction(recipe))
-            missing = pieces.isEmpty ? recipe.missing_items.count : pieces.filter { !$0.ownedMatch }.count
-        } else {
-            missing = recipe.missing_items.count
-        }
-        if recipe.owned_items.isEmpty { return "定番で組んだ案" }
-        return missing == 0 ? "手持ちで完成" : "あと\(missing)点"
-    }
+    private var statusText: String { RenewalRecipeStatus.text(recipe, actions) }
 
-    /// 相棒の返事 (いいね・違う・組み直した)
-    private var ackText: String? {
-        switch reaction {
-        case .liked(let ack): return ack
-        case .disliked(_, let ack): return ack
-        case .replaced(let ack): return "\(ack) 代わりに組み直したよ"
-        case .failed: return "うまく届かなかったみたい"
-        default: return nil
-        }
-    }
+    private var ackText: String? { RenewalRecipeStatus.ack(reaction) }
 
     @ViewBuilder
     private var ackBubble: some View {
@@ -259,6 +239,115 @@ private struct RenewalGridCard: View {
             .buttonStyle(.plain)
             .disabled(reaction == .sending || reaction?.isDisliked == true)
             .accessibilityLabel("ちょっと違う")
+        }
+    }
+}
+
+// MARK: - 2列・1列で共通の部品
+
+enum RenewalRecipeStatus {
+    /// 「手持ちで完成」「あと1点」(手持ちにない服の数)
+    static func text(_ recipe: OwnedFirstRecipe, _ actions: RenewalRecipeActions) -> String {
+        let missing: Int
+        if actions.visualMode == .exampleItems {
+            let pieces = RenewalFlatLayBuilder.exampleItems(recipe, extraction: actions.extraction(recipe))
+            missing = pieces.isEmpty ? recipe.missing_items.count : pieces.filter { !$0.ownedMatch }.count
+        } else {
+            missing = recipe.missing_items.count
+        }
+        if recipe.owned_items.isEmpty { return "定番で組んだ案" }
+        return missing == 0 ? "手持ちで完成" : "あと\(missing)点"
+    }
+
+    /// 相棒の返事 (いいね・違う・組み直した)
+    static func ack(_ reaction: RenewalRecipeReaction?) -> String? {
+        switch reaction {
+        case .liked(let ack): return ack
+        case .disliked(_, let ack): return ack
+        case .replaced(let ack): return "\(ack) 代わりに組み直したよ"
+        case .failed: return "うまく届かなかったみたい"
+        default: return nil
+        }
+    }
+}
+
+/// 「違う」を押したあとに理由を聞く (色のときはどこの色かも続けて聞く)
+struct RenewalDislikeDialogs: ViewModifier {
+    @Binding var isPresented: Bool
+    let onDislike: (RenewalDislikeReason, RenewalColorTarget?) -> Void
+    @State private var askingColor = false
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog("どこが違った？", isPresented: $isPresented, titleVisibility: .visible) {
+                ForEach(RenewalDislikeReason.allCases) { reason in
+                    Button(reason.label) {
+                        if reason == .color {
+                            // ダイアログを閉じてから開き直す
+                            Task { @MainActor in
+                                try? await Task.sleep(for: .seconds(0.35))
+                                askingColor = true
+                            }
+                        } else {
+                            onDislike(reason, nil)
+                        }
+                    }
+                }
+                Button("やめる", role: .cancel) {}
+            }
+            .confirmationDialog("どこの色が違った？", isPresented: $askingColor, titleVisibility: .visible) {
+                ForEach(RenewalColorTarget.allCases) { target in
+                    Button("\(target.label)（\(target.hint)）") { onDislike(.color, target) }
+                }
+                Button("やめる", role: .cancel) {}
+            }
+    }
+}
+
+/// 案の「コーデイメージ」の札。服のボードの外 (見出しの横) に置き、服を隠さない。
+///  コーデモデルあり = 縦長の写真 (頭からひざまで)。押すと大きく見られる
+///  コーデモデルなし = 同じ大きさの枠に相棒の顔 (押すと相棒画面)
+/// どちらも同じ大きさ・同じ角丸にして、カードの形をそろえる
+struct RenewalRecipeGuideTile: View {
+    let recipe: OwnedFirstRecipe
+    let typeName: String
+    var width: CGFloat = 44
+    var height: CGFloat = 58
+
+    private var photoURL: String? {
+        guard let s = recipe.example?.image_url, !s.isEmpty, URL(string: s) != nil else { return nil }
+        return s
+    }
+
+    var body: some View {
+        if let s = photoURL, let url = URL(string: s) {
+            Color.clear
+                .frame(width: width, height: height)
+                .overlay(alignment: .top) {
+                    KFImage(url)
+                        .placeholder { RenewalTokens.raised }
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: width)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(RenewalTokens.accentPink.opacity(0.55), lineWidth: 1.5))
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 15, height: 15)
+                        .background(.black.opacity(0.55), in: Circle())
+                        .padding(3)
+                }
+                .photoZoomOnTap(url: s)
+                .accessibilityLabel("コーデモデルの写真を大きく見る")
+        } else {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(RenewalTokens.raised)
+                .frame(width: width, height: height)
+                .overlay { RenewalPartnerAvatarButton(typeName: typeName, size: width - 10) }
+                .accessibilityLabel("相棒")
         }
     }
 }

@@ -446,7 +446,17 @@ struct RenewalLiveHomeView: View {
 
     private var response: OwnedFirstHomeResponse? { model.responses[scope] }
     // 本番はリスト × コーデモデルのアイテムで固定 (切替は Sandbox のみ)
-    private var layout: RenewalFirstViewLayout { host.isSandbox ? (RenewalFirstViewLayout(rawValue: layoutRaw) ?? .grid) : .grid }
+    private var layout: RenewalFirstViewLayout {
+        if host.isSandbox { return RenewalFirstViewLayout(rawValue: layoutRaw) ?? .grid }
+        #if DEBUG
+        // モックの見比べ用 (DEBUG ビルドのみ)
+        if let raw = UserDefaults.standard.string(forKey: RenewalFirstViewLayout.debugHomeKey),
+           let mock = RenewalFirstViewLayout(rawValue: raw) { return mock }
+        #endif
+        return .grid
+    }
+    /// 2列・1列の新しい並べ方 (気温を大きく見せるヘッダーと、主役の服の列を畳む)
+    private var isCompactFamily: Bool { [.grid, .gridGuide, .compactList].contains(layout) }
     /// 「主役の服を選んで組む」の列を開いているか (2列では、ふだんは上の行のボタンだけにする)
     @State private var showPivotStrip = false
     private var visualMode: RenewalVisualMode { host.isSandbox ? (RenewalVisualMode(rawValue: visualRaw) ?? .exampleItems) : .exampleItems }
@@ -456,11 +466,11 @@ struct RenewalLiveHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Group {
-                    if layout == .grid { gridHeader } else { partnerHeader }
+                    if isCompactFamily { gridHeader } else { partnerHeader }
                 }
                 .coachFrame(.partner, active: !host.isSandbox)
                 if let items = response?.closet_items, !items.isEmpty,
-                   layout != .grid || showPivotStrip || model.pivotItemId(scope) != nil {
+                   !isCompactFamily || showPivotStrip || model.pivotItemId(scope) != nil {
                     RenewalPivotStrip(
                         items: items,
                         pinnedId: model.pivotItemId(scope),
@@ -886,8 +896,12 @@ struct RenewalLiveHomeView: View {
         )
         Group {
             switch layout {
-            case .grid:
-                RenewalGridLayout(recipes: response.recipes, actions: actions, introDelay: introDelay, introToken: introKey)
+            case .grid, .gridGuide:
+                RenewalGridLayout(recipes: response.recipes, actions: actions, introDelay: introDelay, introToken: introKey,
+                                  guide: layout == .gridGuide)
+                    .id(introKey)
+            case .compactList:
+                RenewalCompactListLayout(recipes: response.recipes, actions: actions, introDelay: introDelay, introToken: introKey)
                     .id(introKey)
             case .list:
                 RenewalListLayout(recipes: response.recipes, actions: actions, introDelay: introDelay, introToken: introKey)
