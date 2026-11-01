@@ -16,11 +16,9 @@ struct PartnerGrowthCard: View {
     /// 相棒の理解度 (%)。相棒画面・見比べと同じ値 (api/partner)。読み込み前は nil
     var understandingPct: Int? = nil
     /// 撮影から切り抜いた (粗い) 服の数。あれば「きれいな画像に」と相棒からお願いする
-    var roughImageCount: Int = 0
     var onTapFullBody: () -> Void
     var onTapStandardItems: () -> Void
     var onTapTasteVote: () -> Void
-    var onTapCleanImages: () -> Void = {}
     /// 相棒のアイコンを押したとき (相棒画面へ)
     var onTapPartner: (() -> Void)? = nil
 
@@ -101,11 +99,6 @@ struct PartnerGrowthCard: View {
                 Divider().overlay(RenewalTokens.rule).padding(.leading, 52)
                 ask(icon: "hand.thumbsup", title: "好きなコーデを教えて",
                     detail: "2つを見比べて選ぶだけ", action: onTapTasteVote)
-                if roughImageCount > 0 {
-                    Divider().overlay(RenewalTokens.rule).padding(.leading, 52)
-                    ask(icon: "sparkles", title: "服の写真をきれいにしよう",
-                        detail: "撮影から切り抜いた\(roughImageCount)点を、商品画像に差し替えられるよ", action: onTapCleanImages)
-                }
             }
             .background(RenewalTokens.ground)
             .clipShape(RoundedRectangle(cornerRadius: RenewalTokens.cardRadius))

@@ -63,21 +63,7 @@ struct CoordinateReviewView: View {
                             onTapItem: { item in selectedItem = item }
                         )
                             .padding(.horizontal, 24)
-                            .padding(.bottom, detectedItems.isEmpty ? 50 + 12 + 12 : 0)   // ButtonHeight + ButtonBottomPadding + BottomPadding
-                        // 検出したアイテムごとに、ネットで見つけた「きれいな画像」を横並びで提示する
-                        // (ユーザーに見せる検索ワードは検出結果のまま。検索時のみ「ユニクロ」が付く)
-                        if !detectedItems.isEmpty {
-                            VStack(alignment: .leading, spacing: 24) {
-                                ForEach(detectedItems, id: \.id) { item in
-                                    WebItemImagesRow(
-                                        searchWord: item.webImageSearchWord,
-                                        typeLabel: item.item_type
-                                    )
-                                }
-                            }
-                            .padding(.horizontal, 24)
                             .padding(.bottom, 50 + 12 + 12)   // ButtonHeight + ButtonBottomPadding + BottomPadding
-                        }
                     }
                 }
                 .navigationBarBackButtonHidden(true)

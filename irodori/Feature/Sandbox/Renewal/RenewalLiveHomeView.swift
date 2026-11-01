@@ -1131,7 +1131,6 @@ struct RenewalLiveRecipeDetailView: View {
 
     /// アイテムを並べる見せ方では Pinterest の写真を出さず、並べたアイテムを大きく見せる
     private var isItemMode: Bool { visualMode != .photo }
-    @State private var searchQuery: SimilarSearch?
     @State private var zoomModel = false
 
     private var pieces: [RenewalFlatPiece] {
@@ -1199,9 +1198,6 @@ struct RenewalLiveRecipeDetailView: View {
                     Button("閉じる") { dismiss() }.foregroundStyle(RenewalTokens.ink)
                 }
             }
-            .navigationDestination(item: $searchQuery) { q in
-                KeywordItemSearchView(initialQuery: q.query)
-            }
         }
     }
 
@@ -1251,32 +1247,12 @@ struct RenewalLiveRecipeDetailView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(RenewalTokens.owned)
                     .accessibilityLabel("手持ち")
-            } else {
-                Button {
-                    searchQuery = SimilarSearch(query: p.label)
-                } label: {
-                    Text("似たアイテム")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(RenewalTokens.ink)
-                        .padding(.horizontal, 10)
-                        .frame(height: 28)
-                        .overlay(Capsule().stroke(RenewalTokens.controlBorder, lineWidth: 1))
-                        .contentShape(Rectangle().inset(by: -8))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(p.label)に似たアイテムを探す")
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
 
-}
-
-/// 似たアイテムを探すときの検索語
-struct SimilarSearch: Identifiable, Hashable {
-    let query: String
-    var id: String { query }
 }
 
 /// コーデモデルの写真を全画面で見る

@@ -9,13 +9,9 @@
 import SwiftUI
 
 struct KeywordItemSearchView: View {
-    /// 開いたらすぐ検索する語 (コーデの「似たアイテム」から開いたとき)
-    var initialQuery: String? = nil
-
     @State private var viewModel = KeywordItemSearchViewModel()
     @State private var picked: SearchImageResult?
     @FocusState private var searchFocused: Bool
-    @State private var didRunInitial = false
 
     /// 何を打てばよいか迷わないように、よく登録される定番を候補として並べる
     private let suggestions = ["白 Tシャツ", "黒 Tシャツ", "白 シャツ", "ネイビー ニット", "グレー スウェット",
@@ -35,12 +31,6 @@ struct KeywordItemSearchView: View {
         }
         .navigationTitle("検索して追加")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            guard !didRunInitial, let q = initialQuery, !q.isEmpty else { return }
-            didRunInitial = true
-            viewModel.keyword = q
-            await viewModel.search()
-        }
         .background(Color.gray.opacity(0.05))
         .sheet(item: $picked) { result in
             SearchedItemRegisterView(

@@ -10,7 +10,6 @@ struct ProfileView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var itemToEdit: ClosetItem?
     @State private var showStandardItemSheet = false
-    @State private var showItemReplaceSheet = false
     @State private var showSettingsSheet = false
 
     let itemSpacing: CGFloat = 4
@@ -34,10 +33,6 @@ struct ProfileView: View {
                     // クローゼットの主役は服の一覧。プロフィール・顔写真・玄関カメラは右上の設定へ
                     VStack(spacing: 16) {
                         addItemButtons
-                        // 撮影切り抜きのアイテムがある時だけ、商品画像への差し替え導線を出す
-                        if !viewModel.photoCropItems.isEmpty {
-                            itemReplaceEntryCard
-                        }
                         categorySelector
                         itemsGrid
                             .padding(.horizontal, 24)
@@ -104,14 +99,6 @@ struct ProfileView: View {
                     }
                 }
             }
-        }
-        .sheet(isPresented: $showItemReplaceSheet) {
-            ItemImageReplaceListView(
-                items: viewModel.photoCropItems,
-                onReplaced: { oldId, newItem in
-                    viewModel.replaceItem(oldId: oldId, with: newItem)
-                }
-            )
         }
         .sheet(isPresented: $showStandardItemSheet, onDismiss: {
             // 追加登録後にクローゼットを再読込して反映する
@@ -341,51 +328,6 @@ struct ProfileView: View {
             .foregroundStyle(.black)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-    }
-
-    // MARK: - 撮影切り抜きアイテムを商品画像に差し替える導線
-
-    private var itemReplaceEntryCard: some View {
-        Button {
-            Haptic.impact(.soft)
-            showItemReplaceSheet = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("アイテム画像をきれいにする")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.black)
-                    Text("撮影の切り抜き\(viewModel.photoCropItems.count)点を商品画像に差し替えられます")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.gray.opacity(0.5))
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Color.gray.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.black.opacity(0.07), lineWidth: 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 20)
     }
 
     // MARK: - 4. tabSegmentView

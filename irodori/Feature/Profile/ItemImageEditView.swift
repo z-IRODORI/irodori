@@ -6,11 +6,6 @@
 //  「ノイズ除去」(Vision 被写体マスク) と消しゴム (なぞって透明にする) で画像を整え、
 //  確認ステップ「この画像で良いですか？」で OK されたら透過 PNG として保存する。
 //
-//  自分で直しきれない撮影切り抜きのために、「ネットで見つけた画像」10件の行
-//  (WebItemImagesRow) を差し替えモードで置く。タップ → 拡大プレビュー → 差し替え、
-//  10件に気に入るものが無ければ行末の「検索して探す」で ItemImageReplaceView へ。
-//  差し替え後はそのまま新しいアイテムで編集画面を開き直す。
-//
 //  UI は OutfitSuggestionView と同じミニマル言語:
 //  白背景・黒の主CTA・白 + hairline の副CTA・ピル型ツールボタン。
 //
@@ -33,9 +28,6 @@ struct ItemImageEditView: View {
     @State private var currentStroke: [CGPoint] = []
     @State private var brushSize: CGFloat = 24
 
-    // 商品画像への差し替え
-    @State private var showReplacePicker = false
-    @State private var showReplaceConfirmation = false
     /// 服の特徴 (key → 値)。開いたときの値から始め、タップで直す
     @State private var features: [String: String] = [:]
     @State private var showImageTools = false
@@ -65,18 +57,6 @@ struct ItemImageEditView: View {
                     Button("閉じる") { dismiss() }
                         .disabled(viewModel.isSaving)
                 }
-            }
-            .navigationDestination(isPresented: $showReplacePicker) {
-                ItemImageReplaceView(
-                    viewModel: .init(item: viewModel.item),
-                    onReplaced: handleReplaced
-                )
-            }
-            .alert("編集中の内容があります", isPresented: $showReplaceConfirmation) {
-                Button("キャンセル", role: .cancel) {}
-                Button("差し替えに進む") { showReplacePicker = true }
-            } message: {
-                Text("商品画像に差し替えると、いまの編集内容は反映されません。")
             }
         }
         .interactiveDismissDisabled(viewModel.isSaving)
@@ -147,7 +127,6 @@ struct ItemImageEditView: View {
                                 .frame(width: brushSize / 2, height: brushSize / 2)
                                 .frame(width: 30, height: 30)
                         }
-                        webReferenceImagesCard
                     }
                 }
                 .padding(.horizontal, 16)
@@ -438,50 +417,6 @@ struct ItemImageEditView: View {
         .buttonStyle(.plain)
         .disabled(disabled)
         .opacity(disabled ? 0.4 : 1)
-    }
-
-    // MARK: - ネットの画像 (参考 / 差し替え)
-
-    /// このアイテムの「きれいな画像」をネット検索して横並びで見せる。
-    /// 検索ワードは差し替え画面と同じ「色 + カテゴリ」(検索時のみ「ユニクロ」が付く)。
-    /// 撮影切り抜きのアイテムでは差し替えモード: タップ → 拡大プレビュー → そのまま差し替え。
-    /// 10件に気に入るものが無ければ行末の「検索して探す」で ItemImageReplaceView へ。
-    private var webReferenceImagesCard: some View {
-        WebItemImagesRow(
-            searchWord: ItemImageReplaceViewModel.defaultQuery(for: viewModel.item),
-            typeLabel: viewModel.item.item_type,
-            replaceContext: viewModel.item.isPhotoCropImage ? .init(
-                item: viewModel.item,
-                extraWarning: viewModel.hasChanges ? "いまの編集内容は反映されません" : nil,
-                onReplaced: handleReplaced
-            ) : nil,
-            onSearchMore: viewModel.item.isPhotoCropImage ? {
-                // 編集中の内容は差し替えに引き継がれないため、変更がある時だけ確認する
-                if viewModel.hasChanges {
-                    showReplaceConfirmation = true
-                } else {
-                    showReplacePicker = true
-                }
-            } : nil
-        )
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.black.opacity(0.07), lineWidth: 1)
-        )
-    }
-
-    /// 差し替え完了 (拡大プレビュー / 検索画面のどちらから来ても同じ)。
-    /// サーバ反映済みのため、クローゼット一覧へ伝えたうえで
-    /// 編集画面も新しいアイテムで開き直す (続けて消しゴム等で微調整できる)。
-    private func handleReplaced(oldId: String, newItem: ClosetItem) {
-        onSaved(oldId, newItem)
-        currentStroke = []
-        viewModel = .init(item: newItem)
-        Task { await viewModel.loadImage() }
     }
 
     private var editCtaBar: some View {

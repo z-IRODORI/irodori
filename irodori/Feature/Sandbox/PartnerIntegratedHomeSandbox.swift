@@ -40,7 +40,6 @@ struct PartnerIntegratedHomeSandboxView: View {
     @State private var showOnboardingSheet = false
     @State private var showFullBodyPicker = false
     @State private var showStandardItemPicker = false
-    @State private var showKeywordSearch = false
     @State private var showTasteVote = false
     @State private var showingPrefecturePicker = false
     @State private var selectedReasonItem: DailyRecommendationItem? = nil
@@ -152,16 +151,6 @@ struct PartnerIntegratedHomeSandboxView: View {
                         Button("閉じる") { showStandardItemPicker = false }
                     }
                 }
-            }
-        }
-        .sheet(isPresented: $showKeywordSearch) {
-            NavigationStack {
-                KeywordItemSearchView()
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("閉じる") { showKeywordSearch = false }
-                        }
-                    }
             }
         }
         .sheet(isPresented: $showTasteVote) {
