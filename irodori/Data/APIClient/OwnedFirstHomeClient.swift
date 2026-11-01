@@ -210,7 +210,17 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
 
     private let baseURL: String
 
+    /// 動作確認用: DEBUG ビルドだけ、ホームの API を手元のサーバーへ向ける (例: http://127.0.0.1:8081)
+    static let debugBaseURLKey = "debug.ownedFirstBaseURL"
+
     init(baseURL: String = OwnedFirstHomeClient.productionBaseURL) {
+        #if DEBUG
+        if baseURL == Self.productionBaseURL,
+           let override = UserDefaults.standard.string(forKey: Self.debugBaseURLKey), !override.isEmpty {
+            self.baseURL = override
+            return
+        }
+        #endif
         self.baseURL = baseURL
     }
 
