@@ -21,6 +21,8 @@ struct RenewalGridLayout: View {
 
     /// コーデの画像の高さ。2 段が最初の画面に収まる高さにする
     static let imageHeight: CGFloat = 152
+    /// 見出しを写真に重ねる見せ方では、見出しの分だけ写真を縦に大きくする
+    static let coverHeight: CGFloat = 196
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
@@ -41,6 +43,9 @@ private struct RenewalGridCard: View {
     let actions: RenewalRecipeActions
 
     @State private var askingReason = false
+    /// コーデの画像の見せ方 (くらべて決めるまで DEBUG で切り替える)
+    @AppStorage(RenewalGridVisualStyle.storageKey) private var visualRaw = RenewalGridVisualStyle.stack.rawValue
+    private var visualStyle: RenewalGridVisualStyle { RenewalGridVisualStyle(rawValue: visualRaw) ?? .stack }
     @State private var askingColor = false
 
     private var reaction: RenewalRecipeReaction? { actions.reaction(recipe) }
@@ -48,8 +53,8 @@ private struct RenewalGridCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button { actions.onDetail(recipe) } label: {
-                RenewalRecipeVisual(recipe: recipe, actions: actions, height: RenewalGridLayout.imageHeight)
-                    .environment(\.renewalCompactBoard, true)
+                RenewalGridVisual(recipe: recipe, actions: actions, style: visualStyle,
+                                  height: visualStyle == .cover ? RenewalGridLayout.coverHeight : RenewalGridLayout.imageHeight)
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -57,18 +62,22 @@ private struct RenewalGridCard: View {
             .accessibilityLabel("案\(index + 1) \(recipe.displayTitle)。タップで詳細")
             .overlay(alignment: .topLeading) { if index == 0 { pickBadge.padding(6) } }
             .overlay(alignment: .topTrailing) { likeButton.padding(4) }
-            .overlay(alignment: .bottomLeading) { modelThumb.padding(6) }
+            // 写真を出す見せ方では、写真そのものがコーデモデルなので小さな写真は出さない
+            .overlay(alignment: .bottomLeading) { if visualStyle == .stack || visualStyle == .board { modelThumb.padding(6) } }
             // 相棒の返事が出ている間は、手持ちの状態を隠す (重ならないように)
-            .overlay(alignment: .bottomTrailing) { if ackText == nil { statusBadge.padding(6) } }
+            .overlay(alignment: .bottomTrailing) { if ackText == nil && !recipe.owned_items.isEmpty { statusBadge.padding(6) } }
             .overlay(alignment: .bottom) { ackBubble }
 
-            Text(recipe.displayTitle)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(RenewalTokens.ink)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, minHeight: 34, alignment: .topLeading)
-                .accessibilityAddTraits(.isHeader)
+            // 見出しを写真に重ねる見せ方では、ここには出さない
+            if visualStyle != .cover || recipe.example?.image_url?.isEmpty != false {
+                Text(recipe.displayTitle)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .lineLimit(2, reservesSpace: true)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .accessibilityAddTraits(.isHeader)
+            }
 
             HStack(spacing: 6) {
                 decideButton
@@ -233,8 +242,7 @@ private struct RenewalGridCard: View {
                         in: RoundedRectangle(cornerRadius: RenewalTokens.controlRadius + 2))
             .overlay(RoundedRectangle(cornerRadius: RenewalTokens.controlRadius + 2)
                 .stroke(decided ? RenewalTokens.controlBorder : Color.clear, lineWidth: 1))
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
+            .contentShape(Rectangle().inset(by: -5))
         }
         .buttonStyle(.plain)
         .disabled(actions.isSending)
@@ -253,8 +261,7 @@ private struct RenewalGridCard: View {
                     .frame(width: 40, height: 34)
                     .overlay(RoundedRectangle(cornerRadius: RenewalTokens.controlRadius + 2)
                         .stroke(RenewalTokens.controlBorder, lineWidth: 1))
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
+                    .contentShape(Rectangle().inset(by: -5))
             }
             .buttonStyle(.plain)
             .disabled(reaction == .sending || reaction?.isDisliked == true)
