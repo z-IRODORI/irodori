@@ -129,6 +129,8 @@ struct OwnedFirstHomeResponse: Codable, Hashable {
     let daily_angle_label: String
     let climate: OwnedFirstClimate?
     let greeting: String
+    /// ホームの上に吹き出し1行で出す短いひとこと (15〜25字)。古いサーバには無い
+    var headline: String? = nil
     let data_nudge: String?
     let speaking_style: String
     let tone: String

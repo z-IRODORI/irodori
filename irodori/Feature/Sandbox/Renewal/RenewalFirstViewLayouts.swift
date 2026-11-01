@@ -17,12 +17,18 @@ import SwiftUI
 import Kingfisher
 
 enum RenewalFirstViewLayout: String, CaseIterable, Identifiable {
-    case list, peek
+    case grid, list, peek
 
     var id: String { rawValue }
     static let storageKey = "renewalSandbox.firstViewLayout.v2"
 
-    var label: String { self == .list ? "リスト" : "のぞき見" }
+    var label: String {
+        switch self {
+        case .grid: return "2列 (本番)"
+        case .list: return "リスト"
+        case .peek: return "のぞき見"
+        }
+    }
 }
 
 enum RenewalVisualMode: String, CaseIterable, Identifiable {
@@ -426,6 +432,8 @@ struct RenewalFlatLayBoard: View {
     let pieces: [RenewalFlatPiece]
     var showsExampleTag = true
     var height: CGFloat = 200
+    /// 小さなカード (ホームの2列) では、1枚ずつの札 (手持ちにあり / 買い足す / 羽織り) を出さない
+    @Environment(\.renewalCompactBoard) private var compact
 
     private var large: Bool { height >= 300 }
 
@@ -443,10 +451,10 @@ struct RenewalFlatLayBoard: View {
                     // トップスを2枚重ねるときは「羽織り」「インナー」と添え、どちらをどう着るか分かるようにする
                     let layered = outer.slot == "tops"
                     if let top { piece(top).frame(width: w * 0.60, height: h * 0.48).position(x: w * 0.70, y: h * 0.26) }
-                    if layered && top != nil { layerTag("インナー").position(x: w * 0.88, y: h * 0.06) }
+                    if layered && top != nil && !compact { layerTag("インナー").position(x: w * 0.88, y: h * 0.06) }
                     if let bottom { piece(bottom).frame(width: w * 0.64, height: h * 0.60).position(x: w * 0.62, y: h * 0.69) }
                     piece(outer).frame(width: w * 0.70, height: h * 0.58).position(x: w * 0.35, y: h * 0.30)
-                    if layered { layerTag("羽織り").position(x: w * 0.12, y: h * 0.06) }
+                    if layered && !compact { layerTag("羽織り").position(x: w * 0.12, y: h * 0.06) }
                     if let shoes { piece(shoes).frame(width: w * 0.46, height: h * 0.27).position(x: w * 0.23, y: h * 0.85) }
                 } else {
                     if let bottom { piece(bottom).frame(width: w * 0.72, height: h * 0.68).position(x: w * 0.63, y: h * 0.65) }
@@ -510,7 +518,7 @@ struct RenewalFlatLayBoard: View {
                 .strokeBorder(matched ? RenewalTokens.owned : RenewalTokens.muted.opacity(0.55),
                               style: StrokeStyle(lineWidth: matched ? 2 : 1.5, dash: matched ? [] : [5, 3]))
         )
-        .overlay(alignment: .bottomLeading) { label(p) }
+        .overlay(alignment: .bottomLeading) { if !compact { label(p) } }
         .scaleEffect(matched ? 1 : 0.86)
         .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
     }
@@ -1057,5 +1065,17 @@ struct RenewalShimmer: View {
             withAnimation(.linear(duration: 1.3).repeatForever(autoreverses: false)) { phase = 1 }
         }
         .accessibilityHidden(true)
+    }
+}
+
+private struct RenewalCompactBoardKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// 服のボードを小さなカードに入れるとき true (札を出さない)
+    var renewalCompactBoard: Bool {
+        get { self[RenewalCompactBoardKey.self] }
+        set { self[RenewalCompactBoardKey.self] = newValue }
     }
 }

@@ -446,16 +446,21 @@ struct RenewalLiveHomeView: View {
 
     private var response: OwnedFirstHomeResponse? { model.responses[scope] }
     // 本番はリスト × コーデモデルのアイテムで固定 (切替は Sandbox のみ)
-    private var layout: RenewalFirstViewLayout { host.isSandbox ? (RenewalFirstViewLayout(rawValue: layoutRaw) ?? .list) : .list }
+    private var layout: RenewalFirstViewLayout { host.isSandbox ? (RenewalFirstViewLayout(rawValue: layoutRaw) ?? .grid) : .grid }
+    /// 「主役の服を選んで組む」の列を開いているか (2列では、ふだんは上の行のボタンだけにする)
+    @State private var showPivotStrip = false
     private var visualMode: RenewalVisualMode { host.isSandbox ? (RenewalVisualMode(rawValue: visualRaw) ?? .exampleItems) : .exampleItems }
 
     var body: some View {
         ScrollViewReader { scrollProxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                partnerHeader
-                    .coachFrame(.partner, active: !host.isSandbox)
-                if let items = response?.closet_items, !items.isEmpty {
+                Group {
+                    if layout == .grid { gridHeader } else { partnerHeader }
+                }
+                .coachFrame(.partner, active: !host.isSandbox)
+                if let items = response?.closet_items, !items.isEmpty,
+                   layout != .grid || showPivotStrip || model.pivotItemId(scope) != nil {
                     RenewalPivotStrip(
                         items: items,
                         pinnedId: model.pivotItemId(scope),
@@ -629,6 +634,114 @@ struct RenewalLiveHomeView: View {
         .padding(.top, 4)
     }
 
+    // MARK: ① 2列のときの上の行 (気温を大きく・相棒はひとこと)
+
+    /// 気温の数字を大きく、相棒は吹き出し1行 (タップで相棒画面、長押しで話し方)。
+    /// 「主役の服を選んで組む」は右のボタンにまとめ、押すと服の列が開く
+    private var gridHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                if let w = response?.weather {
+                    Image(systemName: weatherSymbol(w.condition))
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(RenewalTokens.muted)
+                        .frame(width: 28)
+                    (Text("\(w.max_temp)°").font(.system(size: 34, weight: .bold))
+                     + Text(" / \(w.min_temp)°").font(.system(size: 15, weight: .semibold)).foregroundColor(RenewalTokens.muted))
+                        .monospacedDigit()
+                        .foregroundStyle(RenewalTokens.ink)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(scope == .today ? "今日" : "明日") \(RenewalLiveHomeModel.dateLabel(scope))\(response?.weather.condition.isEmpty == false ? " ・ \(response?.weather.condition ?? "")" : "")")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(RenewalTokens.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    if let climate = response?.climate {
+                        Text(climate.label)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color(red: 0.70, green: 0.33, blue: 0.04))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color(red: 1.0, green: 0.95, blue: 0.90), in: Capsule())
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(metaAccessibility)
+
+            HStack(spacing: 8) {
+                Button(action: onOpenPartner) {
+                    HStack(spacing: 8) {
+                        RenewalPartnerAvatar(typeName: partnerTypeName, size: 28)
+                        Text(headlineText)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(response == nil ? RenewalTokens.muted : RenewalTokens.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(RenewalTokens.raised, in: Capsule())
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                    Haptic.impact(.medium)
+                    onOpenToneSheet()
+                })
+                .accessibilityLabel("相棒: \(headlineText)")
+                .accessibilityHint("相棒画面を開く")
+                if response?.closet_items.isEmpty == false {
+                    Button {
+                        Haptic.selection()
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { showPivotStrip.toggle() }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(pivotButtonLabel).lineLimit(1)
+                            Image(systemName: showPivotStrip ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(RenewalTokens.ink)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 30)
+                        .background(RenewalTokens.surface, in: Capsule())
+                        .overlay(Capsule().stroke(RenewalTokens.controlBorder, lineWidth: 1))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("主役の服を選んで組む")
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+    }
+
+    /// 相棒のひとこと (短いもの)。古いサーバでは長いひとことの最初の1文
+    private var headlineText: String {
+        guard let response else { return "相棒が手持ちの服から組んでいます…" }
+        if let h = response.headline, !h.isEmpty { return h }
+        let first = response.greeting.split(whereSeparator: { "。！？".contains($0) }).first.map(String.init) ?? response.greeting
+        return first
+    }
+
+    private var pivotButtonLabel: String {
+        if let id = model.pivotItemId(scope),
+           let item = response?.closet_items.first(where: { $0.item_id == id }) {
+            return "主役：\(item.label.split(separator: " ").last.map(String.init) ?? item.label)"
+        }
+        return "主役：おまかせ"
+    }
+
     // MARK: 動き
 
     static var todayKey: String {
@@ -773,6 +886,9 @@ struct RenewalLiveHomeView: View {
         )
         Group {
             switch layout {
+            case .grid:
+                RenewalGridLayout(recipes: response.recipes, actions: actions, introDelay: introDelay, introToken: introKey)
+                    .id(introKey)
             case .list:
                 RenewalListLayout(recipes: response.recipes, actions: actions, introDelay: introDelay, introToken: introKey)
                     .environment(\.renewalPulseItemId, pulseItemId)
@@ -788,7 +904,7 @@ struct RenewalLiveHomeView: View {
     }
 
     /// 主役を選んだことは相棒カードが伝えるので、ここは短く1行にする
-    private var followUpMessage: String { "3案ともピンとこなかったら教えてね" }
+    private var followUpMessage: String { "どれもピンとこなかったら教えてね" }
 
     private var pivotLabel: String {
         if let id = model.pivotItemId(scope),
