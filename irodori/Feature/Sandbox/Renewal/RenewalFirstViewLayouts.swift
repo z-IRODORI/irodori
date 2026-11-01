@@ -695,6 +695,11 @@ struct RenewalListLayout: View {
 
     private func hasModel(_ r: OwnedFirstRecipe) -> Bool { (r.example?.image_url ?? "").isEmpty == false }
 
+    /// ボード (184) から決定ボタン (44) と間を引いた高さ。気温の注意があるときはその分だけ縮める
+    private func modelHeight(_ r: OwnedFirstRecipe) -> CGFloat {
+        r.climate_warnings?.isEmpty == false ? 100 : 134
+    }
+
     /// 上: 見出し (左上・大きめ) / 左: アイテムのボード (カード幅の約58%) / 右: 状態・説明 (控えめ)・コーデモデル・決定
     private func itemRow(_ recipe: OwnedFirstRecipe, index: Int) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -720,31 +725,36 @@ struct RenewalListLayout: View {
                 .accessibilityLabel("案\(index + 1)。タップで詳細")
 
                 VStack(alignment: .leading, spacing: 6) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        let counts = completionCounts(recipe, actions)
-                        RenewalCompletionSegments(owned: counts.0, total: counts.1)
-                        Text(statusText(recipe, actions))
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(RenewalTokens.ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                    }
-                    // コーデモデルが無い案は、その分の高さを説明に回す (空白を作らない)
-                    Text(recipe.reason)
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(RenewalTokens.muted)
-                        .lineSpacing(2)
-                        .lineLimit(hasModel(recipe) ? 2 : 6)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if !hasModel(recipe) && recipe.missing_items.isEmpty {
-                        Label("手持ちだけで組んだ案", systemImage: "hanger")
-                            .font(.system(size: 11, weight: .medium))
+                    if hasModel(recipe) {
+                        // コーデモデルがある案は文字を出さず、写真を大きく見せる (状態・説明は詳細で見る)
+                        if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w).lineLimit(2) }
+                        RenewalCoordeModelChip(example: recipe.example, height: modelHeight(recipe))
+                    } else {
+                        VStack(alignment: .leading, spacing: 4) {
+                            let counts = completionCounts(recipe, actions)
+                            RenewalCompletionSegments(owned: counts.0, total: counts.1)
+                            Text(statusText(recipe, actions))
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(RenewalTokens.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                        }
+                        // コーデモデルが無い案は、写真の分の高さを説明に回す (空白を作らない)
+                        Text(recipe.reason)
+                            .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(RenewalTokens.muted)
+                            .lineSpacing(2)
+                            .lineLimit(6)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if recipe.missing_items.isEmpty {
+                            Label("手持ちだけで組んだ案", systemImage: "hanger")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(RenewalTokens.muted)
+                        }
+                        if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
+                        if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w).lineLimit(2) }
+                        Spacer(minLength: 0)
                     }
-                    if actions.showCharCount { RenewalCharCountBadge(text: recipe.reason) }
-                    if let w = recipe.climate_warnings?.first { ClimateWarningText(text: w).lineLimit(2) }
-                    Spacer(minLength: 0)
-                    RenewalCoordeModelChip(example: recipe.example, height: 76)
                     CompactDecideButton(recipe: recipe, actions: actions, fullWidth: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
