@@ -113,6 +113,8 @@ struct MainTabView: View {
                     FavoritesView(path: $path)
                 case .brandMatch:
                     BrandMatchView(path: $path)
+                case .produce:
+                    ProduceView(path: $path)
                 case .fashionType:
                     FashionTypeView(
                         path: $path,

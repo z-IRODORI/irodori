@@ -81,6 +81,8 @@ struct PartnerProfileView: View {
     var onMissionAction: ((String) -> Void)? = nil
     /// 「あなたに合う 10 ブランド」(一覧への遷移は呼び出し元)。nil なら出さない
     var onBrandMatchTap: (() -> Void)? = nil
+    /// 相棒のプロデュース (キャラクター → ブランド → アイテム → コーデ)
+    var onProduceTap: (() -> Void)? = nil
 
     @State private var viewModel = PartnerProfileViewModel()
     @State private var showAllMissions = false
@@ -98,6 +100,7 @@ struct PartnerProfileView: View {
                 if let p = profile {
                     VStack(spacing: 24) {
                         header(p.understanding)
+                        if let onProduceTap { produceCard(onProduceTap) }
                         if let weekly = p.weekly, !found.isEmpty { weeklyStrip(weekly) }
                         if let combos = p.color_combos, !combos.isEmpty { colorCombos(combos) }
                         missions(p) { action in
@@ -225,6 +228,49 @@ struct PartnerProfileView: View {
     }
 
     /// 理解度の下に並べる白いカプセルのボタン (アイコン + 文字 + 任意の小さな数)
+    /// 相棒のプロデュースの入口 (理解度のすぐ下)。相棒画面のほかのカードと同じ白いカード・黒のカプセル
+    private func produceCard(_ action: @escaping () -> Void) -> some View {
+        Button {
+            Haptic.impact(.soft)
+            action()
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("NEW ・ 相棒のプロデュース")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(RenewalTokens.accentPink)
+                Text("あなたを 4 ステップでプロデュース")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(RenewalTokens.ink)
+                HStack(spacing: 4) {
+                    ForEach(["キャラクター", "ブランド", "アイテム", "コーデ"], id: \.self) { step in
+                        Text(step)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(RenewalTokens.ink)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(RenewalTokens.raised, in: Capsule())
+                        if step != "コーデ" {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(RenewalTokens.muted)
+                        }
+                    }
+                }
+                Text("プロデュースしてもらう")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(Capsule().fill(RenewalTokens.primaryFill))
+                    .padding(.top, 4)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .partnerSoftCard()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("相棒のプロデュース。キャラクター、ブランド、アイテム、コーデの順にプロデュースしてもらう")
+    }
+
     private func headerAction(_ title: String, icon: String, badge: String? = nil,
                               action: @escaping () -> Void) -> some View {
         Button {

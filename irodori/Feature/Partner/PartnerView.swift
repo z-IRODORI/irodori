@@ -87,6 +87,12 @@ struct PartnerView: View {
                     onClose()
                 }
                 path.append(.brandMatch)
+            },
+            onProduceTap: {
+                if let onClose {
+                    onClose()
+                }
+                path.append(.produce)
             }
         )
     }
