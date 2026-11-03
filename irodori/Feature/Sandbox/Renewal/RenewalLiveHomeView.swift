@@ -563,58 +563,51 @@ struct RenewalLiveHomeView: View {
 
     // MARK: ① 相棒カード
 
-    /// 相棒カード: 左上に日付と 最高気温 (赤) / 最低気温 (青)、右上に相棒。
-    /// 相棒の吹き出しは下の段いっぱいに置き、しっぽを上の相棒へ向ける (誰が話しているか分かるように)。
-    /// カード全体で相棒画面を開く (長押しで話し方)
+    /// 相棒カード (1段): 左に相棒、その右に 日付と 最高気温 (赤) / 最低気温 (青)、さらに右に相棒のひとこと (ちょうどいい服)。
+    /// 高さを抑えるため、気温とひとことを横に並べる。カード全体で相棒画面を開く (長押しで話し方)
     private var partnerHeader: some View {
         Button(action: onOpenPartner) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .bottom, spacing: 12) {
-                    weatherBlock
-                    Spacer(minLength: 0)
-                    RenewalPartnerAvatar(typeName: partnerTypeName, size: Self.avatarSize)
-                        .padding(3)
-                        .background(Circle().fill(RenewalTokens.raised))
-                }
-                Group {
-                    if let response {
-                        RenewalSpokenText(
-                            text: Self.lineBroken(response.greeting),
-                            animate: !reduceMotion && spokenDay != Self.todayKey,
-                            tapToFinish: false,
-                            onFinished: { spokenDay = Self.todayKey }
-                        )
-                        .foregroundStyle(RenewalTokens.ink)
-                    } else {
-                        Text("相棒が今日の服を考えています…")
-                            .foregroundStyle(RenewalTokens.muted)
-                            .redacted(reason: .placeholder)
+            HStack(alignment: .center, spacing: 12) {
+                RenewalPartnerAvatar(typeName: partnerTypeName, size: 40)
+                weatherBlock
+                Rectangle()
+                    .fill(RenewalTokens.border)
+                    .frame(width: 1)
+                    .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 4) {
+                    Group {
+                        if let response {
+                            RenewalSpokenText(
+                                text: response.greeting,
+                                animate: !reduceMotion && spokenDay != Self.todayKey,
+                                tapToFinish: false,
+                                onFinished: { spokenDay = Self.todayKey }
+                            )
+                            .foregroundStyle(RenewalTokens.ink)
+                        } else {
+                            Text("相棒が今日の服を考えています…")
+                                .foregroundStyle(RenewalTokens.muted)
+                                .redacted(reason: .placeholder)
+                        }
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .lineSpacing(2)
+                    .lineLimit(4)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    if host.showCharCount, let response {
+                        RenewalCharCountBadge(text: response.greeting)
                     }
                 }
-                .font(.system(size: 14, weight: .medium))
-                .lineSpacing(4)
-                .lineLimit(3)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.top, 12 + Self.tailHeight)
-                .padding(.bottom, 12)
-                .background(
-                    RenewalTopTailBubble(radius: 14, tailWidth: 18, tailHeight: Self.tailHeight,
-                                         tailCenterFromTrailing: Self.avatarSize / 2 + 3)
-                        .fill(RenewalTokens.raised)
-                )
-                .padding(.top, 6)
-                if host.showCharCount, let response {
-                    RenewalCharCountBadge(text: response.greeting).padding(.top, 6)
-                }
             }
-            .padding(16)
-            .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(RenewalTokens.border.opacity(0.6), lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(RenewalTokens.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(RenewalTokens.border.opacity(0.6), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+            .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
@@ -626,22 +619,12 @@ struct RenewalLiveHomeView: View {
         .padding(.top, 4)
     }
 
-    private static let avatarSize: CGFloat = 46
-    private static let tailHeight: CGFloat = 10
-
-    /// 文の切れ目 (。) で改行し、「朝/晩」のような途中で折り返さないようにする
-    static func lineBroken(_ text: String) -> String {
-        let sentences = text.split(separator: "。", omittingEmptySubsequences: true).map { $0 + "。" }
-        guard sentences.count > 1, !text.contains("\n") else { return text }
-        let joined = sentences.joined(separator: "\n")
-        return text.hasSuffix("。") ? joined : String(joined.dropLast())
-    }
-
-    /// 上に小さく「明日 11/2(月)」、下に大きく「21° / 13°」(最高は赤・最低は青、同じ大きさ)
+    /// 上に小さく「今日 11/3(火)」、下に「19° / 13°」(最高は赤・最低は青、同じ大きさ)。
+    /// 最高と最低が同じでも (当日の昼以降は気象庁が最低気温を出さないため)、そのまま出す
     private var weatherBlock: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 2) {
             Text("\(scope == .today ? "今日" : "明日") \(RenewalLiveHomeModel.dateLabel(scope))")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(RenewalTokens.muted)
                 .lineLimit(1)
             HStack(alignment: .firstTextBaseline, spacing: 0) {
@@ -649,18 +632,19 @@ struct RenewalLiveHomeView: View {
                     Text("\(w.max_temp)°")
                         .foregroundStyle(Self.maxTempColor)
                     Text("/")
-                        .font(.system(size: 26, weight: .light))
+                        .font(.system(size: 16, weight: .light))
                         .foregroundStyle(RenewalTokens.muted.opacity(0.5))
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 3)
                     Text("\(w.min_temp)°")
                         .foregroundStyle(Self.minTempColor)
                 } else {
                     Text("--°").foregroundStyle(RenewalTokens.muted)
                 }
             }
-            .font(.system(size: 38, weight: .bold, design: .rounded))
+            .font(.system(size: 22, weight: .bold, design: .rounded))
             .monospacedDigit()
         }
+        .fixedSize()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(metaAccessibility)
     }
@@ -1095,28 +1079,6 @@ private struct SandboxNavigation: ViewModifier {
         } else {
             content
         }
-    }
-}
-
-/// 上辺にしっぽが付いた吹き出し (しっぽは右上の相棒の方を向く)。rect の上 tailHeight はしっぽの分
-struct RenewalTopTailBubble: Shape {
-    var radius: CGFloat = 14
-    var tailWidth: CGFloat = 14
-    var tailHeight: CGFloat = 8
-    /// しっぽの中心の、右端からの距離
-    var tailCenterFromTrailing: CGFloat = 26
-
-    func path(in rect: CGRect) -> Path {
-        let body = CGRect(x: rect.minX, y: rect.minY + tailHeight, width: rect.width, height: rect.height - tailHeight)
-        var p = Path(roundedRect: body, cornerRadius: radius)
-        let cx = rect.maxX - tailCenterFromTrailing
-        var tail = Path()
-        tail.move(to: CGPoint(x: cx - tailWidth / 2, y: body.minY + 1))
-        tail.addLine(to: CGPoint(x: cx, y: rect.minY))
-        tail.addLine(to: CGPoint(x: cx + tailWidth / 2, y: body.minY + 1))
-        tail.closeSubpath()
-        p.addPath(tail)
-        return p.normalized()
     }
 }
 
