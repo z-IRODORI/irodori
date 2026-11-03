@@ -66,9 +66,13 @@ struct RenewalRecipeActions {
     var onDislike: ((OwnedFirstRecipe, RenewalDislikeReason, RenewalColorTarget?) -> Void)? = nil
     /// 今日・明日以外の日 (カレンダーから開いたとき) の決定ボタンの文言
     var actionLabelOverride: String? = nil
+    /// 決めたあとの文言 (プロデュースの「持ってる・買った」では「登録済み」)
+    var decidedLabel: String = "決定済み"
+    /// true なら全部の案を決めた扱いにする (プロデュースは主役の1着を登録したら全案が登録済み)
+    var decidedAll: Bool = false
 
     var actionLabel: String { actionLabelOverride ?? scope.actionLabel }
-    func isDecided(_ r: OwnedFirstRecipe) -> Bool { decidedId == r.recipe_id }
+    func isDecided(_ r: OwnedFirstRecipe) -> Bool { decidedAll || decidedId == r.recipe_id }
 }
 
 // MARK: - 切替メニュー (Sandbox 用)
@@ -241,7 +245,7 @@ private struct CompactDecideButton: View {
         } label: {
             HStack(spacing: 4) {
                 if decided { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)) }
-                Text(decided ? "決定済み" : actions.actionLabel)
+                Text(decided ? actions.decidedLabel : actions.actionLabel)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }

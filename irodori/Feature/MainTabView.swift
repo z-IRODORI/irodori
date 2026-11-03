@@ -115,6 +115,8 @@ struct MainTabView: View {
                     BrandMatchView(path: $path)
                 case .produce:
                     ProduceView(path: $path)
+                case .produceCoordinates(let item):
+                    ProduceCoordinatesView(item: item)
                 case .fashionType:
                     FashionTypeView(
                         path: $path,

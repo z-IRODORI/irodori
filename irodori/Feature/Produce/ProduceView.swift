@@ -5,6 +5,7 @@
 //  相棒のプロデュース (設計書: proposals/2026-11-03-produce.html)。
 //  1 枚の縦スクロールに ① キャラクター → ② 合うブランド → ③ 今のおすすめアイテム を並べる。
 //  ② のブランドを押すと ③ が選び直され、③ のアイテムを押すと理由の画面が開く。
+//  理由の画面の「このアイテムで3案組む」で ④ (ProduceCoordinatesView) へ進む。
 //  プロデュースの 4 問にまだ答えていない人には、先に 4 問だけを聞く。
 //  見た目は相棒画面と同じ (RenewalTokens・白いカード・黒のカプセルのボタン)。
 //
@@ -46,8 +47,20 @@ final class ProduceViewModel {
         await load(brandId: id)
     }
 
-    /// アイテムへの反応。「違う」「もう持ってる」はアイテムを選び直す
+    /// アイテムへの反応。「違う」「もう持ってる」はアイテムを選び直す。
+    /// 「もう持ってる」はクローゼットに登録する (決定 C。④ の「持ってる・買った」と同じ)
     func react(_ item: ProduceItem, reaction: String, reason: String? = nil) async {
+        if reaction == "owned" {
+            if let res = await client.registerOwned(userId: uid, itemKey: item.item_key) {
+                NotificationCenter.default.post(name: .closetDidChange, object: res.item_id)
+                ToastManager.shared.show(res.registered ? "クローゼットに登録したよ" : "もうクローゼットにあったよ")
+            } else {
+                ToastManager.shared.show("登録できませんでした。もう一度お試しください")
+                return
+            }
+            await load(brandId: response?.selected_brand_id)
+            return
+        }
         await client.sendFeedback(userId: uid, itemKey: item.item_key, reaction: reaction, reason: reason)
         if reaction == "like" {
             if var res = response, let i = res.items?.firstIndex(where: { $0.id == item.id }) {
@@ -91,11 +104,21 @@ struct ProduceView: View {
         .navigationTitle("プロデュース")
         .navigationBarTitleDisplayMode(.inline)
         .task { if viewModel.response == nil { await viewModel.load() } }
+        // ④ で「持ってる・買った」を押したら、そのアイテムを除いて選び直す
+        .onReceive(NotificationCenter.default.publisher(for: .closetDidChange)) { _ in
+            guard viewModel.phase == .ready else { return }
+            Task { await viewModel.load(brandId: viewModel.response?.selected_brand_id) }
+        }
         .sheet(item: $openedItem) { item in
-            ProduceItemSheet(item: item, brand: viewModel.response?.brands?.first { $0.id == item.brand_id }) { reaction, reason in
-                openedItem = nil
-                Task { await viewModel.react(item, reaction: reaction, reason: reason) }
-            }
+            ProduceItemSheet(item: item, brand: viewModel.response?.brands?.first { $0.id == item.brand_id },
+                             onReact: { reaction, reason in
+                                 openedItem = nil
+                                 Task { await viewModel.react(item, reaction: reaction, reason: reason) }
+                             },
+                             onCompose: {
+                                 openedItem = nil
+                                 path.append(.produceCoordinates(item))
+                             })
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
@@ -366,6 +389,8 @@ struct ProduceItemSheet: View {
     let brand: ProduceBrand?
     /// (reaction, reason) like | dislike + taste/season/price | owned
     let onReact: (String, String?) -> Void
+    /// 「このアイテムで3案組む」(④ へ)
+    let onCompose: () -> Void
 
     @State private var askingReason = false
 
@@ -411,8 +436,9 @@ struct ProduceItemSheet: View {
                 Text("ブランドの実際の商品ではなく、その系統のアイテムの例です。")
                     .font(.system(size: 11))
                     .foregroundStyle(RenewalTokens.muted)
+                reactButton("このアイテムで3案組む", filled: true, action: onCompose)
                 HStack(spacing: 10) {
-                    reactButton(item.reaction == "like" ? "いいね済み" : "♡ いいね", filled: item.reaction == "like") {
+                    reactButton(item.reaction == "like" ? "♥ いいね済み" : "♡ いいね", filled: false) {
                         onReact("like", nil)
                     }
                     reactButton("違う", filled: false) { askingReason = true }

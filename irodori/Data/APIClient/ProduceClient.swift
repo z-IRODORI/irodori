@@ -4,7 +4,9 @@
 //
 //  相棒のプロデュース (キャラクター → ブランド → アイテム → コーデ) の API。
 //  GET  api/produce            ① キャラクター ② ブランド 3 件 ③ おすすめアイテム 3 点 (理由つき)
-//  POST api/produce/feedback   アイテムへの いいね / 違う (理由) / もう持ってる
+//  POST api/produce/feedback   アイテムへの いいね / 違う (理由)
+//  POST api/produce/owned      「持ってる・買った」→ クローゼットに 1 着登録 (もう持っていれば登録しない)
+//  ④ コーデ 3 案は OwnedFirstHomeClient.produceCoordinates (ホームと同じ形)
 //
 
 import Foundation
@@ -76,6 +78,18 @@ struct ProduceItem: Codable, Hashable, Identifiable {
     var id: String { item_key }
 }
 
+struct ProduceOwnedResponse: Codable {
+    let status: String
+    let item_key: String
+    let registered: Bool
+    let item_id: String?
+}
+
+private struct ProduceOwnedBody: Encodable {
+    let user_id: String
+    let item_key: String
+}
+
 private struct ProduceFeedbackBody: Encodable {
     let user_id: String
     let item_key: String
@@ -122,5 +136,19 @@ struct ProduceClient {
                                                                      reaction: reaction, reason: reason))
         guard let (_, res) = try? await URLSession.shared.data(for: req) else { return false }
         return (res as? HTTPURLResponse)?.statusCode == 200
+    }
+
+    /// 「持ってる・買った」。登録できたら (もう持っていた場合も) レスポンスを返す
+    func registerOwned(userId: String, itemKey: String) async -> ProduceOwnedResponse? {
+        guard let url = URL(string: "\(Self.baseURL)/api/produce/owned") else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // 画像のコピーがあるので、Render のコールドスタートも見込んで長めに待つ
+        req.timeoutInterval = 60
+        req.httpBody = try? JSONEncoder().encode(ProduceOwnedBody(user_id: userId, item_key: itemKey))
+        guard let (data, res) = try? await URLSession.shared.data(for: req),
+              (res as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return try? JSONDecoder().decode(ProduceOwnedResponse.self, from: data)
     }
 }

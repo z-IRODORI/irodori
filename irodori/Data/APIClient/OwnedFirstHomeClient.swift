@@ -30,6 +30,8 @@ struct OwnedFirstMissingItem: Codable, Hashable, Identifiable {
     let fit: String?
     /// 同じ種類のアイテムカタログ画像 (コーデモデルが無い案の定番などに付く)
     let image_url: String?
+    /// プロデュースの主役 (まだ持っていない服) のときだけ: アイテムカタログのキー
+    var item_key: String? = nil
 
     var id: String { "\(slot)_\(label)" }
 }
@@ -313,6 +315,38 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
 
     /// reason: like (案ごとのいいね) | cold | color | style | mood (見送り)。recipes が1件なら案ごと
     func feedback(uid: String, targetDate: String, reason: String, recipes: [OwnedFirstRecipe], colorTarget: RenewalColorTarget? = nil) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError> {
+        let body = feedbackBody(targetDate: targetDate, reason: reason, recipes: recipes, colorTarget: colorTarget)
+        return try await post(path: "api/home/owned-first/feedback", uid: uid, body: body)
+    }
+
+    // MARK: - プロデュース (まだ持っていない服を主役にした3案。組み方・カードはホームと同じ)
+
+    func produceCoordinates(uid: String, gender: String, itemKey: String, refresh: Bool = false) async throws -> Result<OwnedFirstHomeResponse, HTTPError> {
+        var components = URLComponents(string: "\(baseURL)/api/produce/coordinates")!
+        var query = [
+            URLQueryItem(name: "user_id", value: uid),
+            URLQueryItem(name: "gender", value: gender),
+            URLQueryItem(name: "item_key", value: itemKey),
+        ]
+        if let code = UserDefaults.standard.string(forKey: UserDefaultsKey.prefectureCode.rawValue), !code.isEmpty {
+            query.append(URLQueryItem(name: "prefecture_code", value: code))
+        }
+        if refresh { query.append(URLQueryItem(name: "refresh", value: "true")) }
+        components.queryItems = query
+        guard let url = components.url else { return .failure(.responseError) }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 60
+        return try await send(request)
+    }
+
+    /// プロデュースの案への いいね / ちょっと違う (ホームと同じ記録に source=produce が付く)
+    func produceFeedback(uid: String, targetDate: String, reason: String, recipe: OwnedFirstRecipe, colorTarget: RenewalColorTarget? = nil) async throws -> Result<OwnedFirstFeedbackResponse, HTTPError> {
+        let body = feedbackBody(targetDate: targetDate, reason: reason, recipes: [recipe], colorTarget: colorTarget)
+        return try await post(path: "api/produce/coordinate-feedback", uid: uid, body: body)
+    }
+
+    private func feedbackBody(targetDate: String, reason: String, recipes: [OwnedFirstRecipe], colorTarget: RenewalColorTarget?) -> FeedbackBody {
         // 対象を選んだときは、その部分の服の色系統だけを送る (無ければ案の主な色系統)
         var families = Array(Set(recipes.map(\.main_family)))
         if let colorTarget {
@@ -322,7 +356,7 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
             }
             if !picked.isEmpty { families = Array(Set(picked)) }
         }
-        let body = FeedbackBody(
+        return FeedbackBody(
             target_date: targetDate,
             reason: reason,
             recipe_ids: recipes.map(\.recipe_id),
@@ -331,7 +365,6 @@ final class OwnedFirstHomeClient: OwnedFirstHomeClientProtocol {
             item_ids: recipes.count == 1 ? recipes[0].owned_items.map(\.item_id) : [],
             color_target: colorTarget?.rawValue
         )
-        return try await post(path: "api/home/owned-first/feedback", uid: uid, body: body)
     }
 
     func examples(uid: String, poolIds: [String]) async throws -> Result<OwnedFirstExamplesResponse, HTTPError> {
