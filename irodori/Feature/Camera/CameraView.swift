@@ -123,6 +123,10 @@ struct CameraView: View {
         .navigationBarBackButtonHidden()
         .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea()
+        // 左端から右へスワイプで閉じる (✕ と同じ動き)
+        .edgeSwipeToClose {
+            if path.isEmpty { dismiss() } else { path.removeLast() }
+        }
         .onAppear {
             AnalyticsLogger.shared.log(screen: .cameraScreenView)
             checkCameraPermission()   // カメラを初期化

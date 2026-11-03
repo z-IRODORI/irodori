@@ -3,10 +3,10 @@
 //  irodori
 //
 //  本人が写った写真1枚をもとに、フォトライブラリから「本人の全身写真」をピックアップする機能。
-//  3ステップ (開いてすぐ ① から始め、タップ数を減らす):
+//  3ステップ:
 //    ① 準備: 本人が写った写真を1枚選ぶ + 対象期間 (枚数と所要時間は実測から見積もる)
-//    ② 検索中 (進捗と残り時間)
-//    ③ 結果の確認 (候補グリッドから選んで追加)
+//    ② 検索中: 画面を閉じても裏で続ける (FullBodyScanStore。画面の下のトーストで進み具合と見つかった枚数を出す)
+//    ③ 候補: これまでに見つけた写真から選んで追加 (候補は端末に保存し、いつでも開ける)
 //
 
 import SwiftUI
@@ -44,8 +44,6 @@ final class FullBodyPickerViewModel {
 
     var step: Step = .setup
     var faceImage: UIImage?
-    var progress: Double = 0
-    var candidates: [FullBodyCandidate] = []
     var selected: Set<String> = []
     var errorMessage: String?
     var scanPeriod: ScanPeriod = .year1 {
@@ -58,8 +56,6 @@ final class FullBodyPickerViewModel {
     var secondsPerPhoto: Double?
     var isMeasuring = false
     var photoAccessDenied = false
-    /// 検索中の残り秒数 (実際の進み具合から算出)
-    var remainingSeconds: Double?
 
     private let service = FullBodyPickerService()
     private static let measuredRateKey = "fullBodyPicker.secondsPerPhoto"
@@ -115,56 +111,30 @@ final class FullBodyPickerViewModel {
         errorMessage = nil
     }
 
-    func startSearch() {
-        guard let faceImage else { return }
-        step = .searching
-        progress = 0
-        remainingSeconds = estimatedSeconds
-        candidates = []
-        selected = []
-
-        let service = self.service
-        Task {
-            // embedding 抽出（重いのでバックグラウンド）
-            let emb = await Task.detached(priority: .userInitiated) {
-                service.targetEmbedding(from: faceImage)
-            }.value
-
-            guard let emb else {
-                self.errorMessage = "顔を認識できませんでした。顔がはっきり写った写真を選んでください。"
-                self.step = .setup
-                return
-            }
-
-            let months = self.scanPeriod.rawValue
-            let total = self.photoCount ?? 0
-            let start = Date()
-            let result = await service.pickFullBodyPhotos(targetEmbedding: emb, months: months) { p in
-                Task { @MainActor in
-                    self.progress = p
-                    // 実際の進み具合から残り時間を出す (序盤は見積もりのまま)
-                    let elapsed = Date().timeIntervalSince(start)
-                    if p > 0.05 { self.remainingSeconds = elapsed / p * (1 - p) }
-                }
-            }
-            // 次回の見積もりに使うため、今回の1枚あたりの秒数を保存
-            let elapsed = Date().timeIntervalSince(start)
-            if total >= 20 {
-                let rate = elapsed / Double(total)
-                UserDefaults.standard.set(rate, forKey: Self.measuredRateKey)
-                self.secondsPerPhoto = rate
-            }
-            self.candidates = result
-            self.step = .result
+    /// 裏で検索を始める。始められたら true (画面を閉じてほかの操作に戻ってよい)
+    func startSearchInBackground() async -> Bool {
+        guard let faceImage else { return false }
+        let ok = await FullBodyScanStore.shared.start(
+            faceImage: faceImage, months: scanPeriod.rawValue, photoCount: photoCount ?? 0)
+        if !ok {
+            errorMessage = "顔を認識できませんでした。顔がはっきり写った写真を選んでください。"
         }
+        return ok
     }
 
     func toggle(_ id: String) {
         if selected.contains(id) { selected.remove(id) } else { selected.insert(id) }
     }
 
-    var selectedImages: [UIImage] {
-        candidates.filter { selected.contains($0.id) }.map(\.image)
+    /// 選んだ写真を、送るための大きさで読み直す
+    func loadSelectedImages() async -> [UIImage] {
+        var images: [UIImage] = []
+        for c in FullBodyScanStore.shared.saved where selected.contains(c.id) {
+            if let image = await FullBodyPickerService.loadImage(localIdentifier: c.id, target: CGSize(width: 1600, height: 1600)) {
+                images.append(image)
+            }
+        }
+        return images
     }
 
     /// 顔があれば顔中心、無ければ中央を正方形に切り抜く
@@ -193,6 +163,20 @@ struct FullBodyPickerView: View {
     let onClose: () -> Void
 
     @State private var viewModel = FullBodyPickerViewModel()
+    private var store = FullBodyScanStore.shared
+
+    init(onComplete: @escaping ([UIImage]) -> Void, onClose: @escaping () -> Void) {
+        self.onComplete = onComplete
+        self.onClose = onClose
+        // 検索中ならその様子、見つけた写真があれば候補、無ければ準備から
+        let vm = FullBodyPickerViewModel()
+        if FullBodyScanStore.shared.isScanning {
+            vm.step = .searching
+        } else if !FullBodyScanStore.shared.saved.isEmpty {
+            vm.step = .result
+        }
+        _viewModel = State(initialValue: vm)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -206,6 +190,12 @@ struct FullBodyPickerView: View {
             }
         }
         .background(Color.white)
+        .onChange(of: store.phase) { _, phase in
+            if phase == .finished, viewModel.step == .searching {
+                store.hideToast()
+                viewModel.step = .result
+            }
+        }
     }
 }
 
@@ -290,7 +280,10 @@ private struct SetupStep: View {
 
             Button {
                 Haptic.impact(.medium)
-                viewModel.startSearch()
+                Task {
+                    // 裏で探すので、画面は閉じてほかの操作に戻る (進み具合は画面の下のトーストで見える)
+                    if await viewModel.startSearchInBackground() { onClose() }
+                }
             } label: {
                 Text("全身写真を探す")
                     .font(.system(size: 16, weight: .bold))
@@ -415,12 +408,13 @@ private struct SetupStep: View {
     }
 }
 
-// MARK: - ② 検索中
+// MARK: - ② 検索中 (裏で続く。ここでは様子だけ見せる)
 
 private struct SearchingStep: View {
     let viewModel: FullBodyPickerViewModel
     let onClose: () -> Void
 
+    private var store: FullBodyScanStore { FullBodyScanStore.shared }
     @State private var pulse = false
 
     var body: some View {
@@ -429,12 +423,6 @@ private struct SearchingStep: View {
 
             Spacer()
 
-            Text("最近の写真を調べています。\nそのままお待ちください。")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            // 円形ローディング（同心円のパルス）
             ZStack {
                 ForEach(0..<3, id: \.self) { i in
                     Circle()
@@ -450,64 +438,96 @@ private struct SearchingStep: View {
                     .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(.white)
             }
-            .padding(.vertical, 40)
+            .padding(.vertical, 32)
             .onAppear { pulse = true }
 
-            Text("\(Int(viewModel.progress * 100))%")
-                .font(.system(size: 18, weight: .bold))
+            // 見つかった枚数をその場で増やす
+            Text("\(store.foundCount)枚見つかりました")
+                .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.black)
                 .monospacedDigit()
-            if let remaining = viewModel.remainingSeconds, viewModel.progress < 1 {
-                Text("残り\(FullBodyPickerViewModel.durationLabel(remaining))")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .padding(.top, 2)
-            }
+                .contentTransition(.numericText())
+                .animation(.easeOut(duration: 0.3), value: store.foundCount)
+            Text("\(Int(store.progress * 100))%")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .padding(.top, 4)
 
-            ProgressView(value: viewModel.progress)
+            ProgressView(value: store.progress)
                 .tint(.pink)
                 .padding(.horizontal, 60)
                 .padding(.top, 8)
 
+            Text("閉じても探し続けます。\n進み具合は画面の下に出ます。")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 20)
+
             Spacer()
+
+            Button {
+                Haptic.impact(.soft)
+                onClose()
+            } label: {
+                Text("閉じてほかのことをする")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .overlay(Capsule().stroke(Color.black.opacity(0.15), lineWidth: 1))
+            }
+            .padding(.horizontal, 24)
 
             Text("写真はこの端末の中だけで解析され、\n外部に送信・保存されることはありません。")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.bottom, 24)
+                .padding(.vertical, 16)
         }
     }
 }
 
-// MARK: - ③ 結果の確認
+// MARK: - ③ 候補 (これまでに見つけた写真。いつでも開いて選べる)
 
 private struct ResultStep: View {
-    let viewModel: FullBodyPickerViewModel
+    @Bindable var viewModel: FullBodyPickerViewModel
     let onClose: () -> Void
     let onComplete: ([UIImage]) -> Void
 
+    private var store: FullBodyScanStore { FullBodyScanStore.shared }
+    @State private var isSending = false
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
     var body: some View {
         VStack(spacing: 0) {
-            PickerHeader(title: "写真の確認", onClose: onClose, showProgress: true, activeSegments: 3)
+            PickerHeader(title: "見つけた全身写真", onClose: onClose, showProgress: true, activeSegments: 3)
 
-            if viewModel.candidates.isEmpty {
+            if store.saved.isEmpty {
                 emptyState
             } else {
-                Text("あなたが全身で写った写真の候補です。追加したい写真を選んでください。")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 12)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("追加したい写真を選んでください（\(store.saved.count)枚）")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    Button("もう一度探す") { viewModel.step = .setup }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.pink)
+                        .disabled(store.isScanning)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
 
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 8) {
-                        ForEach(viewModel.candidates) { candidate in
-                            candidateCell(candidate)
+                        ForEach(store.saved) { candidate in
+                            CandidateCell(candidate: candidate,
+                                          isSelected: viewModel.selected.contains(candidate.id)) {
+                                Haptic.impact(.soft)
+                                viewModel.toggle(candidate.id)
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -519,60 +539,31 @@ private struct ResultStep: View {
         }
     }
 
-    private func candidateCell(_ candidate: FullBodyCandidate) -> some View {
-        let isSelected = viewModel.selected.contains(candidate.id)
-        return Button {
-            Haptic.impact(.soft)
-            viewModel.toggle(candidate.id)
-        } label: {
-            GeometryReader { geo in
-                Image(uiImage: candidate.image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geo.size.width, height: geo.size.width * 1.3)
-                    .clipped()
-            }
-            .aspectRatio(1.0 / 1.3, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(alignment: .topTrailing) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(isSelected ? AnyShapeStyle(brandGradient) : AnyShapeStyle(.white))
-                    .background(Circle().fill(.black.opacity(isSelected ? 0 : 0.15)).frame(width: 24, height: 24))
-                    .padding(6)
-            }
-            .overlay(alignment: .bottomLeading) {
-                // 本人らしさ（コサイン類似度）。閾値調整の目安。
-                Text(String(format: "%.0f%%", candidate.similarity * 100))
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(.black.opacity(0.45)))
-                    .padding(5)
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(isSelected ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.clear), lineWidth: 2.5)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
     private var addButton: some View {
         Button {
             Haptic.impact(.medium)
-            onComplete(viewModel.selectedImages)
+            isSending = true
+            Task {
+                let images = await viewModel.loadSelectedImages()
+                isSending = false
+                onComplete(images)
+            }
         } label: {
-            Text(viewModel.selected.isEmpty ? "写真を選んでください" : "\(viewModel.selected.count)枚の写真を追加")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(viewModel.selected.isEmpty ? AnyShapeStyle(Color.gray.opacity(0.3)) : AnyShapeStyle(brandGradient))
-                .clipShape(Capsule())
+            Group {
+                if isSending {
+                    ProgressView().tint(.white)
+                } else {
+                    Text(viewModel.selected.isEmpty ? "写真を選んでください" : "\(viewModel.selected.count)枚の写真を追加")
+                }
+            }
+            .font(.system(size: 16, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(viewModel.selected.isEmpty ? AnyShapeStyle(Color.gray.opacity(0.3)) : AnyShapeStyle(brandGradient))
+            .clipShape(Capsule())
         }
-        .disabled(viewModel.selected.isEmpty)
+        .disabled(viewModel.selected.isEmpty || isSending)
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
     }
@@ -596,6 +587,49 @@ private struct ResultStep: View {
                 .foregroundStyle(.pink)
                 .padding(.top, 4)
             Spacer()
+        }
+    }
+}
+
+/// 候補の1枚 (写真フォルダから読み直して出す。写真が消されていたら灰色のまま)
+private struct CandidateCell: View {
+    let candidate: FullBodyScanStore.SavedCandidate
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        Button(action: onTap) {
+            GeometryReader { geo in
+                ZStack {
+                    Color.gray.opacity(0.1)
+                    if let image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    }
+                }
+                .frame(width: geo.size.width, height: geo.size.width * 1.3)
+                .clipped()
+            }
+            .aspectRatio(1.0 / 1.3, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(alignment: .topTrailing) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(isSelected ? AnyShapeStyle(brandGradient) : AnyShapeStyle(.white))
+                    .background(Circle().fill(.black.opacity(isSelected ? 0 : 0.15)).frame(width: 24, height: 24))
+                    .padding(6)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isSelected ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.clear), lineWidth: 2.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .task(id: candidate.id) {
+            image = await FullBodyPickerService.loadImage(localIdentifier: candidate.id, target: CGSize(width: 400, height: 400))
         }
     }
 }

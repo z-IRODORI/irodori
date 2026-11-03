@@ -9,6 +9,12 @@ struct MainTabView: View {
     private let analysisJobStore = AnalysisJobStore.shared
     private let pushManager = PushNotificationManager.shared
 
+    /// いまカメラ画面を開いている
+    private var isCameraFront: Bool {
+        if case .camera = path.last { return true }
+        return false
+    }
+
     var body: some View {
         @Bindable var vm = viewModel
         NavigationStack(path: $path) {
@@ -146,6 +152,7 @@ struct MainTabView: View {
                 ToastView(message: message, style: toastManager.style)
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
+                    .swipeToDismiss(edge: .top) { toastManager.dismiss() }
                     .transition(.asymmetric(
                         insertion: .move(edge: .top).combined(with: .opacity),
                         removal: .move(edge: .top).combined(with: .opacity)
@@ -166,6 +173,10 @@ struct MainTabView: View {
         // v2 解析ジョブの常駐トースター (全タブ・push 先でも見える)。
         // タブバーのすぐ上に浮かせ、完了タップでカメラ遷移時と同じ結果画面へ push する
         .overlay(alignment: .bottom) {
+          VStack(spacing: 8) {
+            // 写真フォルダから全身写真を探している間のトースト (進み具合を左から塗る)。
+            // カメラ画面ではシャッターに重なるので出さない (閉じれば出る)
+            if !isCameraFront { FullBodyScanToast() }
             AnalysisStatusToast { job, originalImage in
                 if let image = originalImage, let coordinateId = job.coordinateId {
                     // カメラから遷移した時と同一の結果画面 (保存済み結果を表示)
@@ -183,7 +194,24 @@ struct MainTabView: View {
                     )))
                 }
             }
-            .padding(.bottom, 58)  // タブバー上端 (~38pt) + 余白 20pt
+          }
+          .padding(.bottom, 58)  // タブバー上端 (~38pt) + 余白 20pt
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: FullBodyScanStore.shared.phase)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: FullBodyScanStore.shared.isToastHidden)
+        // 全身写真の検索が終わったトーストを押した → 見つけた写真を選ぶ画面
+        .fullScreenCover(isPresented: Bindable(FullBodyScanStore.shared).openResultRequest) {
+            FullBodyPickerView(
+                onComplete: { images in
+                    FullBodyScanStore.shared.openResultRequest = false
+                    if let first = images.first {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            path.append(.coordinateReview(.init(image: first, fromFirstTakePhotoView: false)))
+                        }
+                    }
+                },
+                onClose: { FullBodyScanStore.shared.openResultRequest = false }
+            )
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: analysisJobStore.current)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: analysisJobStore.isToastSuppressed)

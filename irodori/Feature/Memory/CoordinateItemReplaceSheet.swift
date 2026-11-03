@@ -89,7 +89,7 @@ struct CoordinateItemReplaceSheet: View {
                 .padding(20)
             }
             .overlay { if working { ProgressView().controlSize(.large) } }
-            .navigationTitle("アイテムを直す")
+            .navigationTitle("アイテムを変更")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

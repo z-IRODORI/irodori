@@ -173,6 +173,7 @@ struct SplashView: View {
                 ToastView(message: message)
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
+                    .swipeToDismiss(edge: .top) { toastManager.dismiss() }
                     .transition(.asymmetric(
                         insertion: .move(edge: .top).combined(with: .opacity),
                         removal: .move(edge: .top).combined(with: .opacity)

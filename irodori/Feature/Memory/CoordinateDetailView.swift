@@ -16,7 +16,6 @@ struct CoordinateDetailView: View {
     @State private var selectedItem: CoordinateDetailResponse.CoordinateItem?
     /// 「アイテムを直す」で選んだ着用アイテム
     @State private var editingItem: CoordinateDetailResponse.CoordinateItem?
-    @State private var isEditingItems = false
     @State private var confirmDelete = false
     @Environment(\.dismiss) private var dismiss
     let showHeader: Bool
@@ -189,19 +188,13 @@ struct CoordinateDetailView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.black)
                 Spacer()
-                // 解析で違うアイテムが出たとき用。押すと各アイテムに「直す」が出る
-                Button(isEditingItems ? "完了" : "違うアイテムを直す") {
-                    Haptic.selection()
-                    withAnimation(.easeOut(duration: 0.2)) { isEditingItems.toggle() }
-                }
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isEditingItems ? .black : .secondary)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(items) { item in
+                      VStack(spacing: 6) {
                         Button {
-                            if isEditingItems { editingItem = item } else { selectedItem = item }
+                            selectedItem = item
                         } label: {
                             VStack(spacing: 0) {
                                 CachedAsyncImage(url: URL(string: item.item_image_path)!) { phase in
@@ -225,26 +218,25 @@ struct CoordinateDetailView: View {
                             }
                             .background(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(alignment: .topTrailing) {
-                                if isEditingItems {
-                                    Text("直す")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Capsule().fill(.black))
-                                        .padding(6)
-                                        .transition(.scale.combined(with: .opacity))
-                                }
-                            }
                         }
                         .buttonStyle(.plain)
-                        .contextMenu {
-                            Button { editingItem = item } label: { Label("別のアイテムに直す", systemImage: "arrow.triangle.2.circlepath") }
-                            Button(role: .destructive) {
-                                Task { _ = await viewModel.removeItem(item.id) }
-                            } label: { Label("コーデから外す", systemImage: "minus.circle") }
+
+                        // アイテムごとに「変更」を出し、押すとクローゼットから選び直せる (外すのもその画面から)
+                        Button {
+                            Haptic.selection()
+                            editingItem = item
+                        } label: {
+                            Label("変更", systemImage: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 12)
+                                .frame(height: 28)
+                                .overlay(Capsule().stroke(Color.black.opacity(0.15), lineWidth: 1))
+                                .contentShape(Rectangle().inset(by: -8))
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(item.item_type)を別のアイテムに変更")
+                      }
                     }
                 }
             }

@@ -13,7 +13,7 @@ struct PhoneAuthView: View {
     let onSignInSuccess: () -> Void
 
     @FocusState private var isPhoneNumberFieldFocused: Bool
-    @FocusState private var isCodeFieldFocused: Bool
+    @State private var isCodeFieldFocused = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -194,14 +194,11 @@ struct PhoneAuthView: View {
     /// 6桁コードの入力欄 (非表示の TextField + 表示用ボックス)
     private var codeInputBoxes: some View {
         ZStack {
-            TextField("", text: Bindable(viewModel).codeText)
-                .keyboardType(.numberPad)
-                .textContentType(.oneTimeCode)
-                .foregroundColor(.clear)
-                .tint(.clear)
+            // 「メッセージから」の自動入力を確実に受けるため、UIKit の入力欄を使う
+            OneTimeCodeField(text: Bindable(viewModel).codeText, isFocused: $isCodeFieldFocused,
+                             length: PhoneAuthViewModel.codeLength)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
-                .focused($isCodeFieldFocused)
                 .onChange(of: viewModel.codeText) { _, newValue in
                     viewModel.formatCodeText(newValue)
                     if viewModel.codeText.count == PhoneAuthViewModel.codeLength {

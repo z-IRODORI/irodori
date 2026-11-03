@@ -271,8 +271,10 @@ final class CalendarViewModel {
         let calendar = Calendar(identifier: .gregorian)
         let today = Date()
 
-        let loadedSignupDate = repository.load()
-        let signupDate = loadedSignupDate ?? calendar.date(byAdding: .year, value: -1, to: today)!
+        // 端末の登録日は、登録のやり直しや機種変更で新しい日付になることがある
+        // (その前に撮ったコーデの月が出なくなる)。少なくとも1年前の月からは必ず出す
+        let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: today)!
+        let signupDate = min(repository.load() ?? oneYearAgo, oneYearAgo)
 
         // 予定コーデ (未来日) をストックできるよう、来月分までグリッドを描画する
         let displayEnd = calendar.date(byAdding: .month, value: 1, to: today) ?? today

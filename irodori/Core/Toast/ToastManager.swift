@@ -24,6 +24,12 @@ final class ToastManager {
 
     /// 既存呼び出しの大半が失敗通知のため、デフォルトは .error (赤)。
     /// 成功・案内は style: .normal (黒) を明示する。
+    /// スワイプで閉じたとき
+    func dismiss() {
+        dismissTask?.cancel()
+        message = nil
+    }
+
     func show(_ message: String, style: ToastStyle = .error) {
         self.message = message
         self.style = style

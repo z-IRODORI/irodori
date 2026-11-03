@@ -97,7 +97,8 @@ final class FullBodyPickerService {
         months: Int = 12,
         limit: Int = .max,
         threshold: Float = 0.45,
-        progress: @escaping @Sendable (Double) -> Void
+        progress: @escaping @Sendable (Double) -> Void,
+        onFound: @escaping @Sendable (FullBodyCandidate) -> Void = { _ in }
     ) async -> [FullBodyCandidate] {
         guard await requestAuthorization() else { return [] }
 
@@ -114,6 +115,8 @@ final class FullBodyPickerService {
         var candidates: [FullBodyCandidate] = []
 
         for (i, asset) in assets.enumerated() {
+            // 途中でやめた (トーストの ✕) ときは、そこまでの候補を返す
+            if Task.isCancelled { break }
             progress(Double(i) / Double(assets.count))
             guard let ui = await Self.requestImage(asset, manager: manager, target: CGSize(width: 720, height: 720)),
                   let cg = ui.cgImage else { continue }
@@ -129,11 +132,22 @@ final class FullBodyPickerService {
             // ③ 全身判定（足首/膝の姿勢で確認）
             guard detectFullBody.isFullBody(in: cg) else { continue }
 
-            candidates.append(FullBodyCandidate(id: asset.localIdentifier, image: ui, similarity: sim))
+            let candidate = FullBodyCandidate(id: asset.localIdentifier, image: ui, similarity: sim)
+            candidates.append(candidate)
+            // 見つかったその場で知らせる (見つかった枚数を検索中に出す・途中でも保存する)
+            onFound(candidate)
         }
 
         progress(1.0)
         return candidates.sorted { $0.similarity > $1.similarity }
+    }
+
+    // MARK: - 保存した候補の画像を読み直す
+
+    /// 写真の ID (localIdentifier) から画像を読む。写真が消されていたら nil
+    static func loadImage(localIdentifier: String, target: CGSize) async -> UIImage? {
+        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil).firstObject else { return nil }
+        return await requestImage(asset, manager: PHImageManager.default(), target: target)
     }
 
     // MARK: - PHImageManager async ラッパー

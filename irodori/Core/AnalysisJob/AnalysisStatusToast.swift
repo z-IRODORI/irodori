@@ -71,6 +71,10 @@ struct AnalysisStatusToast: View {
                 .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 4)
             }
             .buttonStyle(.plain)
+            // 下へ払うと閉じる (解析中・失敗は ✕ と同じ、完了は結果を開かずに閉じる)
+            .swipeToDismiss(edge: .bottom) {
+                if job.status == .completed { store.clearAfterOpeningResult() } else { store.cancel() }
+            }
             .accessibilityIdentifier("analysis-status-toast")
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }

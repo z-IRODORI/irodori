@@ -168,6 +168,9 @@ extension View {
             if let exp = expGained.wrappedValue {
                 PartnerExpToast(exp: exp)
                     .padding(.top, 8)
+                    .swipeToDismiss(edge: .top) {
+                        withAnimation(.easeIn(duration: 0.25)) { expGained.wrappedValue = nil }
+                    }
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .task {
                         try? await Task.sleep(nanoseconds: 1_800_000_000)

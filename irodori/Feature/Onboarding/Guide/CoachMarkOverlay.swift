@@ -35,9 +35,13 @@ struct CoachMarkOverlay: View {
         .animation(.easeInOut(duration: 0.25), value: center.current)
     }
 
-    /// 指す先の位置 (グローバル)。カメラはシステムのタブバーの中なので、並び順から計算する
+    /// 指す先の位置 (グローバル)。カメラはシステムのタブバーの中なので、実際のタブのボタンの位置を読む。
+    /// 読めないときだけ、並び順から計算する
     private func targetRect(_ target: CoachTarget, size: CGSize) -> CGRect? {
         if target == .camera {
+            if let rect = Self.tabButtonFrame(index: Self.cameraTabIndex) {
+                return rect
+            }
             let bottom = Self.windowSafeAreaBottom
             // タブの並び (MainTabView): ホーム / カレンダー / 相棒 / カメラ / クローゼット → カメラは5つ中4番目
             let itemWidth = size.width / CGFloat(Self.tabCount)
@@ -52,6 +56,42 @@ struct CoachMarkOverlay: View {
 
     private static let tabCount = 5
     private static let cameraTabIndex = 3
+
+    /// システムのタブバーの index 番目のボタンの位置 (ウィンドウ座標)。
+    /// iOS 26 のタブバーは左右に余白のある浮いた形で、画面幅の等分では位置が合わないため、実物から読む
+    private static func tabButtonFrame(index: Int) -> CGRect? {
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first,
+              let tabBar = findTabBar(in: window), !tabBar.isHidden else { return nil }
+        // タブのボタン (UIControl) を左から並べる。同じ位置に重なったもの・小さすぎるものは除く
+        var buttons: [CGRect] = []
+        collectControls(in: tabBar, into: &buttons, window: window)
+        let sorted = buttons
+            .filter { $0.width >= 30 && $0.height >= 30 }
+            .sorted { $0.midX < $1.midX }
+        var unique: [CGRect] = []
+        for r in sorted where !unique.contains(where: { abs($0.midX - r.midX) < 8 }) { unique.append(r) }
+        guard unique.count == tabCount, unique.indices.contains(index) else { return nil }
+        return unique[index]
+    }
+
+    private static func findTabBar(in view: UIView) -> UITabBar? {
+        if let bar = view as? UITabBar { return bar }
+        for sub in view.subviews {
+            if let bar = findTabBar(in: sub) { return bar }
+        }
+        return nil
+    }
+
+    private static func collectControls(in view: UIView, into rects: inout [CGRect], window: UIWindow) {
+        for sub in view.subviews where !sub.isHidden && sub.alpha > 0.01 {
+            if sub is UIControl {
+                rects.append(sub.convert(sub.bounds, to: window))
+            } else {
+                collectControls(in: sub, into: &rects, window: window)
+            }
+        }
+    }
 
     private static var windowSafeAreaBottom: CGFloat {
         let window = UIApplication.shared.connectedScenes

@@ -173,7 +173,7 @@ struct ProfileView: View {
             HStack {
                 Spacer()
                 Button(action: { showSettingsSheet = true }) {
-                    Image(systemName: "person.crop.circle")
+                    accountIcon
                         .frame(width: 44, height: 44)
                 }
                 .font(.system(size: 22))
@@ -327,6 +327,22 @@ struct ProfileView: View {
             .background(Color.gray.opacity(0.15))
             .foregroundStyle(.black)
             .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    /// 右上のアカウントアイコン: アカウント写真があれば写真、無ければ人のアイコン
+    @ViewBuilder
+    private var accountIcon: some View {
+        if let url = viewModel.getProfileImageURL(),
+           let image = UIImage(contentsOfFile: url.path) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 30, height: 30)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.black.opacity(0.12), lineWidth: 0.5))
+        } else {
+            Image(systemName: "person.crop.circle")
         }
     }
 
