@@ -282,7 +282,7 @@ struct HomeView: View {
                             OnboardingWalkthroughView(onFinish: {})
                                 .toolbar(.hidden, for: .navigationBar)
                         }
-                        Toggle("4つの質問の答えを本番に保存しない", isOn: $onboardingDryRun)
+                        Toggle("8つの質問の答えを本番に保存しない", isOn: $onboardingDryRun)
                         Button("初回オンボーディングからやり直す") {
                             showHomeSandboxSheet = false
                             Task {

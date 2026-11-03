@@ -2,9 +2,11 @@
 //  PartnerOnboardingFlowView.swift
 //  irodori
 //
-//  初回オンボーディング刷新（カード形式・MECE4問 + 相棒誕生UX）。
+//  初回オンボーディング刷新（カード形式・8問 + 相棒誕生UX）。
 //  Step 0: 相棒の紹介と3つのメリット
-//  Step 1: 4つの質問（1問1画面・タップで自動進行）
+//  Step 1: 8つの質問（1問1画面・タップで自動進行）
+//          相棒のタイプを決める4問 (印象・感覚・提案・話し方) + プロデュースのための4問
+//          (服の数・月の金額・1着の最高額・好きなブランドの数。ファッション感度と予算に使う)
 //  Step 2: 回答から誕生した相棒の発表・理由（4つの特徴）・最初の挨拶
 //
 
@@ -24,6 +26,8 @@ struct PartnerOnboardingQuestion: Identifiable {
     let axis: String
     let axisBadge: String
     let questionText: String
+    /// 質問の下の補足 (例: 「スーツ・制服は除く」)
+    var hint: String? = nil
     let options: [PartnerOnboardingOption]
 
     var id: Int { index }
@@ -63,6 +67,59 @@ struct PartnerOnboardingQuestion: Identifiable {
         ),
         PartnerOnboardingQuestion(
             index: 3,
+            axis: "closet_size",
+            axisBadge: "持っている服",
+            questionText: "普段着は何着くらい\n持ってる？",
+            hint: "トップス・ボトムス・アウターを合わせて。だいたいでOK",
+            options: [
+                .init(id: "lt20", label: "〜20 着", value: "lt20"),
+                .init(id: "20_50", label: "20〜50 着", value: "20_50"),
+                .init(id: "50_100", label: "50〜100 着", value: "50_100"),
+                .init(id: "100p", label: "100 着以上", value: "100p")
+            ]
+        ),
+        PartnerOnboardingQuestion(
+            index: 4,
+            axis: "monthly_spend",
+            axisBadge: "予算感",
+            questionText: "服に使うのは、\n月にどのくらい？",
+            hint: "ならした平均で",
+            options: [
+                .init(id: "lt3k", label: "ほぼ使わない（〜3 千円）", value: "lt3k"),
+                .init(id: "3k_10k", label: "3 千〜1 万円", value: "3k_10k"),
+                .init(id: "10k_30k", label: "1〜3 万円", value: "10k_30k"),
+                .init(id: "30k_50k", label: "3〜5 万円", value: "30k_50k"),
+                .init(id: "50kp", label: "5 万円以上", value: "50kp")
+            ]
+        ),
+        PartnerOnboardingQuestion(
+            index: 5,
+            axis: "max_price",
+            axisBadge: "予算感",
+            questionText: "普段着 1 着に払った\n最高額は？",
+            hint: "スーツ・制服・式の服は除く",
+            options: [
+                .init(id: "lt3k", label: "〜3 千円", value: "lt3k"),
+                .init(id: "3k_10k", label: "3 千〜1 万円", value: "3k_10k"),
+                .init(id: "10k_25k", label: "1〜2.5 万円", value: "10k_25k"),
+                .init(id: "25k_60k", label: "2.5〜6 万円", value: "25k_60k"),
+                .init(id: "60kp", label: "6 万円以上", value: "60kp")
+            ]
+        ),
+        PartnerOnboardingQuestion(
+            index: 6,
+            axis: "brand_count",
+            axisBadge: "好きなブランド",
+            questionText: "好きなブランドは\nいくつある？",
+            options: [
+                .init(id: "none", label: "特にない", value: "none"),
+                .init(id: "1_2", label: "1〜2", value: "1_2"),
+                .init(id: "3_5", label: "3〜5", value: "3_5"),
+                .init(id: "6p", label: "6 つ以上", value: "6p")
+            ]
+        ),
+        PartnerOnboardingQuestion(
+            index: 7,
             axis: "tone",
             axisBadge: "相棒の話し方",
             questionText: "最後に、相棒には\nどんな話し方がいい？",
@@ -88,6 +145,8 @@ final class PartnerOnboardingFlowViewModel {
         case confirm
         case loading
         case birth(PartnerOnboardingResponse)
+        /// ファッション感度が 70 点未満の人だけ: 誕生のあとに 3 枚の案内
+        case beginnerGuide
     }
 
     var step: Step = .intro
@@ -95,6 +154,11 @@ final class PartnerOnboardingFlowViewModel {
     var priority: String = "F"
     var rangeVal: String = "C"
     var tone: String = "gentle"
+    // プロデュースのための4問 (どれも1問1画面で選ぶので、送るときには必ず答えが入っている)
+    var closetSize: String = "20_50"
+    var monthlySpend: String = "3k_10k"
+    var maxPrice: String = "3k_10k"
+    var brandCount: String = "none"
     var selectedValueInCurrentStep: String? = nil
 
     /// 保存できなかったとき (確認画面に戻して知らせる)
@@ -109,11 +173,30 @@ final class PartnerOnboardingFlowViewModel {
 
     /// 確認画面に並べる「質問 → 選んだ答え」
     var answerSummary: [(index: Int, badge: String, label: String)] {
-        let values = [impression, priority, rangeVal, tone]
-        return PartnerOnboardingQuestion.all.map { q in
-            let v = q.index < values.count ? values[q.index] : ""
+        PartnerOnboardingQuestion.all.map { q in
+            let v = value(for: q.axis)
             return (q.index, q.axisBadge, q.options.first { $0.value == v }?.label ?? "未回答")
         }
+    }
+
+    private func value(for axis: String) -> String {
+        switch axis {
+        case "impression": return impression
+        case "priority": return priority
+        case "range": return rangeVal
+        case "tone": return tone
+        case "closet_size": return closetSize
+        case "monthly_spend": return monthlySpend
+        case "max_price": return maxPrice
+        case "brand_count": return brandCount
+        default: return ""
+        }
+    }
+
+    /// サーバに送るプロデュースのための4問
+    var profileAnswers: PartnerProfileAnswers {
+        PartnerProfileAnswers(closet_size: closetSize, monthly_spend: monthlySpend,
+                              max_price: maxPrice, brand_count: brandCount)
     }
 
     func jump(to index: Int) {
@@ -145,7 +228,7 @@ final class PartnerOnboardingFlowViewModel {
             withAnimation(.easeInOut(duration: 0.25)) {
                 step = .question(PartnerOnboardingQuestion.all.count - 1)
             }
-        case .loading, .birth:
+        case .loading, .birth, .beginnerGuide:
             break
         }
     }
@@ -163,6 +246,14 @@ final class PartnerOnboardingFlowViewModel {
             rangeVal = option.value
         case "tone":
             tone = option.value
+        case "closet_size":
+            closetSize = option.value
+        case "monthly_spend":
+            monthlySpend = option.value
+        case "max_price":
+            maxPrice = option.value
+        case "brand_count":
+            brandCount = option.value
         default:
             break
         }
@@ -197,7 +288,13 @@ final class PartnerOnboardingFlowViewModel {
         // 端末にも保存しない (保存すると、サーバの相棒と食い違って古いキャラに戻るため)
         if OnboardingDebug.dryRun {
             try? await Task.sleep(for: .seconds(1.2))
-            let mock = PartnerOnboardingResponse.mock(impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+            var mock = PartnerOnboardingResponse.mock(impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+            // サーバと同じ式で感度だけ出す (初心者向けの案内の出方を確かめられるように)
+            let closetPoints = ["lt20": 0, "20_50": 33, "50_100": 67, "100p": 100][closetSize] ?? 0
+            let brandPoints = ["none": 0, "1_2": 33, "3_5": 67, "6p": 100][brandCount] ?? 0
+            let score = Int((Double(closetPoints + brandPoints) / 2).rounded())
+            mock.fashion_sense = FashionSense(answered: true, level: score < 70 ? "beginner" : "enthusiast",
+                                              needs_beginner_guide: score < 70, visible: false, score: nil, budget_tier: nil)
             if mode == .registration { PartnerLocalMirror.markOnboardingCompleted() }
             Haptic.notify(.success)
             withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) { step = .birth(mock) }
@@ -208,9 +305,9 @@ final class PartnerOnboardingFlowViewModel {
         let result: Result<PartnerOnboardingResponse, HTTPError>?
         switch mode {
         case .registration:
-            result = try? await partnerClient.saveOnboarding(userId: uid, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+            result = try? await partnerClient.saveOnboarding(userId: uid, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone, profile: profileAnswers)
         case .update:
-            result = try? await partnerClient.updatePartner(userId: uid, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+            result = try? await partnerClient.updatePartner(userId: uid, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone, profile: profileAnswers)
         }
         guard case .success(let response)? = result else {
             Haptic.notify(.error)
@@ -241,7 +338,7 @@ final class PartnerOnboardingFlowViewModel {
     }
 }
 
-/// 4つの質問の答えをどこに保存するか
+/// 8つの質問の答えをどこに保存するか
 enum PartnerAnswerMode {
     /// 会員登録の流れで初めて相棒が生まれる
     case registration
@@ -258,6 +355,8 @@ struct PartnerOnboardingFlowView: View {
     let onComplete: () -> Void
 
     @State private var viewModel = PartnerOnboardingFlowViewModel()
+    /// 初心者向けの案内の3枚目で「定番を選ぶ」を押した
+    @State private var showStandardItems = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -277,6 +376,26 @@ struct PartnerOnboardingFlowView: View {
                 loadingStepView
             case .birth(let response):
                 birthStepView(response: response)
+            case .beginnerGuide:
+                BeginnerGuideView(
+                    onPickStandardItems: { showStandardItems = true },
+                    onFinish: onComplete
+                )
+                .transition(.opacity)
+            }
+        }
+        // 「定番を選ぶ」: 選び終わったら (閉じても) ホームへ
+        .sheet(isPresented: $showStandardItems, onDismiss: onComplete) {
+            NavigationStack {
+                SelectStandardItemView(path: .constant([]), onComplete: { showStandardItems = false })
+                    .navigationTitle("定番アイテムから追加")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("閉じる") { showStandardItems = false }
+                                .foregroundStyle(.black)
+                        }
+                    }
             }
         }
         .background(Color.white.ignoresSafeArea())
@@ -497,14 +616,14 @@ struct PartnerOnboardingFlowView: View {
 
             // 下部CTA
             VStack(spacing: 10) {
-                Text("まずは4つの質問で、相棒にあなたのことを教えてください")
+                Text("まずは8つの質問で、相棒にあなたのことを教えてください")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
 
                 Button(action: {
                     viewModel.startQuestions()
                 }) {
-                    Text("4つの質問に答える（約30秒）")
+                    Text("8つの質問に答える（約1分）")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -547,7 +666,7 @@ struct PartnerOnboardingFlowView: View {
         }
     }
 
-    // MARK: - Step 1: 4つの質問（カード形式・1問1画面）
+    // MARK: - Step 1: 8つの質問（カード形式・1問1画面）
 
     private func questionStepView(question: PartnerOnboardingQuestion) -> some View {
         let total = PartnerOnboardingQuestion.all.count
@@ -609,7 +728,7 @@ struct PartnerOnboardingFlowView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("4つの質問に答えると、あなたの好みを理解した相棒に変化します")
+                Text("8つの質問に答えると、あなたの好みを理解した相棒に変化します")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineSpacing(2)
@@ -637,6 +756,11 @@ struct PartnerOnboardingFlowView: View {
                     .foregroundStyle(.black)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
+                if let hint = question.hint {
+                    Text(hint)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 24)
@@ -662,7 +786,7 @@ struct PartnerOnboardingFlowView: View {
                                 .foregroundStyle(isSelected ? .white : Color.gray.opacity(0.45))
                         }
                         .padding(.horizontal, 18)
-                        .padding(.vertical, 18)
+                        .padding(.vertical, question.options.count >= 5 ? 14 : 18)
                         .background(isSelected ? Color.black : Color.white)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(
@@ -674,7 +798,7 @@ struct PartnerOnboardingFlowView: View {
                 }
             }
             .padding(.horizontal, 24)
-            .padding(.top, 24)
+            .padding(.top, question.options.count >= 5 ? 18 : 24)
 
             Spacer()
         }
@@ -794,7 +918,12 @@ struct PartnerOnboardingFlowView: View {
             VStack(spacing: 10) {
                 Button(action: {
                     Haptic.impact(.medium)
-                    onComplete()
+                    // 初めて相棒が生まれた人で、ファッション感度が 70 点未満なら、基本の案内を 3 枚はさむ
+                    if mode == .registration, response.fashion_sense?.needs_beginner_guide == true {
+                        withAnimation(.easeInOut(duration: 0.25)) { viewModel.step = .beginnerGuide }
+                    } else {
+                        onComplete()
+                    }
                 }) {
                     Text("相棒とコーデを見てみる")
                         .font(.system(size: 16, weight: .semibold))

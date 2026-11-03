@@ -57,6 +57,8 @@ struct PartnerOnboardingResponse: Codable, Hashable {
     let home_briefing: String
     let traits: [PartnerOnboardingTrait]
     let state: PartnerState
+    /// ファッション感度 (プロデュースの4問に答えたとき。古いサーバは返さない)
+    var fashion_sense: FashionSense? = nil
 
     static func mock(
         impression: String = "soft",
@@ -594,4 +596,20 @@ struct PartnerSpeakingStyleResponse: Decodable, Hashable {
             presets: presets
         )
     }
+}
+
+
+/// ファッション感度。点数 (score) は本人が「見る」を押したときだけ入る
+struct FashionSense: Codable, Hashable {
+    let answered: Bool
+    let level: String?               // beginner (70点未満) | enthusiast
+    let needs_beginner_guide: Bool
+    let visible: Bool
+    let score: Int?
+    let budget_tier: Double?
+}
+
+struct FashionSenseEnvelope: Codable, Hashable {
+    let status: String
+    let fashion_sense: FashionSense
 }

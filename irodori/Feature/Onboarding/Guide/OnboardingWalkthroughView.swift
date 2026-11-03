@@ -30,7 +30,7 @@ struct OnboardingWalkthroughView: View {
               body: "天気と手持ちの服から、毎日3つのコーデを用意します。"),
         .init(hue: .lilac, eyebrow: "相棒",
               title: "選ぶのは、\nあなた専属の「相棒」",
-              body: "4つの質問で、あなたに合う相棒が生まれます。好みや着た服を覚えて育っていきます。"),
+              body: "8つの質問で、あなたに合う相棒が生まれます。好みや着た服を覚えて育っていきます。"),
         .init(hue: .peach, eyebrow: "育てかた",
               title: "見せるほど、\nあなたの服で組める",
               body: "写真や服を教えると提案の精度が上がり、ふたりの記録も増えていきます。"),
@@ -134,7 +134,7 @@ struct OnboardingWalkthroughView: View {
                     withAnimation(.easeInOut(duration: 0.3)) { page += 1 }
                 }
             } label: {
-                Text(isLast ? "4つの質問に答えて相棒に会う" : "つぎへ")
+                Text(isLast ? "8つの質問に答えて相棒に会う" : "つぎへ")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
@@ -304,7 +304,7 @@ private struct WalkthroughPartnersScene: View {
             }
             .frame(height: 270)
 
-            Text("4つの質問で決まります")
+            Text("8つの質問で決まります")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(RenewalTokens.muted)
         }

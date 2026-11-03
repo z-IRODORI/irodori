@@ -30,6 +30,28 @@ protocol PartnerClientProtocol {
     /// 登録後に相棒画面から答え直す (POST api/partner/update)。データを消さず相棒を育てる
     func updatePartner(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError>
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError>
+    /// 8問の登録・答え直し (プロデュースのための4問つき)
+    func saveOnboarding(userId: String, impression: String, priority: String, rangeVal: String, tone: String, profile: PartnerProfileAnswers?) async throws -> Result<PartnerOnboardingResponse, HTTPError>
+    func updatePartner(userId: String, impression: String, priority: String, rangeVal: String, tone: String, profile: PartnerProfileAnswers?) async throws -> Result<PartnerOnboardingResponse, HTTPError>
+}
+
+/// プロデュースのための4問 (服の数・月の金額・1着の最高額・好きなブランドの数)
+struct PartnerProfileAnswers: Codable, Hashable {
+    let closet_size: String
+    let monthly_spend: String
+    let max_price: String
+    let brand_count: String
+}
+
+extension PartnerClientProtocol {
+    // モックやテスト用のクライアントは4問を受け取らなくてよい (4問だけで相棒を作る)
+    func saveOnboarding(userId: String, impression: String, priority: String, rangeVal: String, tone: String, profile: PartnerProfileAnswers?) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try await saveOnboarding(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+    }
+
+    func updatePartner(userId: String, impression: String, priority: String, rangeVal: String, tone: String, profile: PartnerProfileAnswers?) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try await updatePartner(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone)
+    }
 }
 
 // MARK: - リクエストボディ
@@ -40,6 +62,36 @@ private struct PartnerOnboardingBody: Encodable {
     let priority: String
     let range: String
     let tone: String
+    var closet_size: String? = nil
+    var monthly_spend: String? = nil
+    var max_price: String? = nil
+    var brand_count: String? = nil
+
+    init(user_id: String, impression: String, priority: String, range: String, tone: String,
+         profile: PartnerProfileAnswers? = nil) {
+        self.user_id = user_id
+        self.impression = impression
+        self.priority = priority
+        self.range = range
+        self.tone = tone
+        self.closet_size = profile?.closet_size
+        self.monthly_spend = profile?.monthly_spend
+        self.max_price = profile?.max_price
+        self.brand_count = profile?.brand_count
+    }
+}
+
+private struct PartnerProfileAnswersBody: Encodable {
+    let user_id: String
+    let closet_size: String
+    let monthly_spend: String
+    let max_price: String
+    let brand_count: String
+}
+
+private struct FashionSenseVisibilityBody: Encodable {
+    let user_id: String
+    let visible: Bool
 }
 
 private struct AdviceFeedbackBody: Encodable {
@@ -195,29 +247,43 @@ final class PartnerClient: PartnerClientProtocol {
     }
 
     func saveOnboarding(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
-        try await post(
-            endpoint: "api/partner/onboarding",
-            body: PartnerOnboardingBody(
-                user_id: userId,
-                impression: impression,
-                priority: priority,
-                range: rangeVal,
-                tone: tone
-            )
-        )
+        try await saveOnboarding(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone, profile: nil)
     }
 
     func updatePartner(userId: String, impression: String, priority: String, rangeVal: String, tone: String) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try await updatePartner(userId: userId, impression: impression, priority: priority, rangeVal: rangeVal, tone: tone, profile: nil)
+    }
+
+    func saveOnboarding(userId: String, impression: String, priority: String, rangeVal: String, tone: String, profile: PartnerProfileAnswers?) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
+        try await post(
+            endpoint: "api/partner/onboarding",
+            body: PartnerOnboardingBody(user_id: userId, impression: impression, priority: priority,
+                                        range: rangeVal, tone: tone, profile: profile)
+        )
+    }
+
+    func updatePartner(userId: String, impression: String, priority: String, rangeVal: String, tone: String, profile: PartnerProfileAnswers?) async throws -> Result<PartnerOnboardingResponse, HTTPError> {
         try await post(
             endpoint: "api/partner/update",
-            body: PartnerOnboardingBody(
-                user_id: userId,
-                impression: impression,
-                priority: priority,
-                range: rangeVal,
-                tone: tone
-            )
+            body: PartnerOnboardingBody(user_id: userId, impression: impression, priority: priority,
+                                        range: rangeVal, tone: tone, profile: profile)
         )
+    }
+
+    /// すでに相棒がいる人が、プロデュースのための4問だけに答える (POST api/partner/profile-answers)
+    func saveProfileAnswers(userId: String, answers: PartnerProfileAnswers) async throws -> Result<FashionSenseEnvelope, HTTPError> {
+        try await post(
+            endpoint: "api/partner/profile-answers",
+            body: PartnerProfileAnswersBody(user_id: userId, closet_size: answers.closet_size,
+                                            monthly_spend: answers.monthly_spend, max_price: answers.max_price,
+                                            brand_count: answers.brand_count)
+        )
+    }
+
+    /// 「感度を見る」を押した (POST api/partner/fashion-sense/visibility)
+    func setFashionSenseVisible(userId: String, visible: Bool = true) async throws -> Result<FashionSenseEnvelope, HTTPError> {
+        try await post(endpoint: "api/partner/fashion-sense/visibility",
+                       body: FashionSenseVisibilityBody(user_id: userId, visible: visible))
     }
 
     func proposeOutfitSuggestion(userId: String, gender: String, when: String, looks: [String], withWho: String?, whereText: String?, prefectureCode: String?) async throws -> Result<OutfitSuggestionResponse, HTTPError> {
