@@ -53,7 +53,7 @@ final class ProduceViewModel {
         if reaction == "owned" {
             if let res = await client.registerOwned(userId: uid, itemKey: item.item_key) {
                 NotificationCenter.default.post(name: .closetDidChange, object: res.item_id)
-                ToastManager.shared.show(res.registered ? "クローゼットに登録したよ" : "もうクローゼットにあったよ")
+                ToastManager.shared.show(res.registered ? "クローゼットに登録したよ" : "もうクローゼットにあったよ", style: .normal)
             } else {
                 ToastManager.shared.show("登録できませんでした。もう一度お試しください")
                 return

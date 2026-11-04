@@ -207,6 +207,6 @@ struct ProduceCoordinatesView: View {
         NotificationCenter.default.post(name: .closetDidChange, object: res.item_id)
         ToastManager.shared.show(res.registered
             ? "クローゼットに登録したよ。次からホームの3案にも使うね"
-            : "もうクローゼットにあったよ。プロデュースには出さないね")
+            : "もうクローゼットにあったよ。プロデュースには出さないね", style: .normal)
     }
 }
