@@ -3,7 +3,8 @@
 //  irodori
 //
 //  相棒のプロデュース (設計書: proposals/2026-11-03-produce.html)。
-//  1 枚の縦スクロールに ① キャラクター → ② 合うブランド → ③ 今のおすすめアイテム を並べる。
+//  1 枚の縦スクロールに、相棒のひとこと → ① あなたのタイプ → ② 合うブランド → ③ 次に買う服 → ④ コーデ3案 を並べる。
+//  「プロデュース」= ブランド・服・コーデを提案してもらうこと、が画面の頭で分かるようにする。
 //  ② のブランドを押すと ③ が選び直され、③ のアイテムを押すと理由の画面が開く。
 //  理由の画面の「このアイテムで3案組む」で ④ (ProduceCoordinatesView) へ進む。
 //  プロデュースの 4 問にまだ答えていない人には、先に 4 問だけを聞く。
@@ -101,7 +102,7 @@ struct ProduceView: View {
             }
         }
         .background(RenewalTokens.ground.ignoresSafeArea())
-        .navigationTitle("プロデュース")
+        .navigationTitle("相棒のプロデュース")
         .navigationBarTitleDisplayMode(.inline)
         .task { if viewModel.response == nil { await viewModel.load() } }
         // ④ で「持ってる・買った」を押したら、そのアイテムを除いて選び直す
@@ -127,20 +128,57 @@ struct ProduceView: View {
     private func content(_ res: ProduceResponse) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                intro(res)
                 characterCard(res)
                 brandsCard(res)
                 itemsSection(res)
+                coordinatesCard(res)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
     }
 
-    // MARK: ① キャラクター
+    // MARK: 相棒のひとこと (何を提案する画面か)
+
+    private func intro(_ res: ProduceResponse) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            PartnerIconImage(size: 40)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("合うブランドと服、コーデを提案するね")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 4) {
+                    ForEach(Array(PartnerProfileView.produceOffers.enumerated()), id: \.offset) { i, offer in
+                        if i > 0 {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(RenewalTokens.muted)
+                        }
+                        Text(offer.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(RenewalTokens.ink)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(RenewalTokens.raised, in: Capsule())
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .partnerSoftCard(16)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: ① タイプ (提案のもと)
 
     private func characterCard(_ res: ProduceResponse) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            stepLabel("① あなたのキャラクター")
+            stepLabel("① あなたのタイプ（提案のもと）")
             HStack(spacing: 12) {
                 PartnerIconImage(size: 48)
                 VStack(alignment: .leading, spacing: 2) {
@@ -223,8 +261,8 @@ struct ProduceView: View {
 
     private func brandsCard(_ res: ProduceResponse) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            stepLabel("② あなたに合うブランド")
-            Text("押すと、そのブランドの系統でアイテムを選び直すよ")
+            stepLabel("② 提案：あなたに合うブランド")
+            Text("押すと、そのブランドの系統で③の服を選び直すよ")
                 .font(.system(size: 11))
                 .foregroundStyle(RenewalTokens.muted)
                 .padding(.bottom, 4)
@@ -291,12 +329,15 @@ struct ProduceView: View {
 
     private func itemsSection(_ res: ProduceResponse) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            stepLabel("③ 今のおすすめアイテム")
+            stepLabel("③ 提案：次に買うならこの服")
             if let s = res.season?.first {
                 Text("\(s.month)の平年は最高 \(Int(s.max_temp))℃。これからの季節に着られるものから選んだよ")
                     .font(.system(size: 11))
                     .foregroundStyle(RenewalTokens.muted)
             }
+            Text("押すと、選んだ理由と、手持ちの服と合わせたコーデ3案が見られるよ")
+                .font(.system(size: 11))
+                .foregroundStyle(RenewalTokens.muted)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(res.items ?? []) { item in
@@ -332,10 +373,56 @@ struct ProduceView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(RenewalTokens.accentPink)
             }
+            Text("理由とコーデを見る ›")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(RenewalTokens.muted)
         }
         .padding(10)
         .frame(width: 170)
         .partnerSoftCard(16)
+    }
+
+    // MARK: ④ コーデ3案 (服のシートの奥に隠れないよう、画面にも入口を置く)
+
+    @ViewBuilder
+    private func coordinatesCard(_ res: ProduceResponse) -> some View {
+        if let first = res.items?.first {
+            VStack(alignment: .leading, spacing: 8) {
+                stepLabel("④ 提案：その服で組むコーデ")
+                Text("③ の服を主役に、手持ちの服と合わせて3案組むよ")
+                    .font(.system(size: 12))
+                    .foregroundStyle(RenewalTokens.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    Haptic.impact(.soft)
+                    path.append(.produceCoordinates(first))
+                } label: {
+                    HStack(spacing: 10) {
+                        itemImage(first, height: 52)
+                            .frame(width: 52)
+                        Text("「\(first.label)」でコーデ3案を見る")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(8)
+                    .padding(.trailing, 8)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(RenewalTokens.primaryFill))
+                }
+                .buttonStyle(.plain)
+                Text("ほかの服で組むときは、③ の服を押してね")
+                    .font(.system(size: 11))
+                    .foregroundStyle(RenewalTokens.muted)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .partnerSoftCard()
+        }
     }
 
     // MARK: 部品
@@ -389,7 +476,7 @@ struct ProduceItemSheet: View {
     let brand: ProduceBrand?
     /// (reaction, reason) like | dislike + taste/season/price | owned
     let onReact: (String, String?) -> Void
-    /// 「このアイテムで3案組む」(④ へ)
+    /// 「この服でコーデ3案を見る」(④ へ)
     let onCompose: () -> Void
 
     @State private var askingReason = false
@@ -436,7 +523,7 @@ struct ProduceItemSheet: View {
                 Text("ブランドの実際の商品ではなく、その系統のアイテムの例です。")
                     .font(.system(size: 11))
                     .foregroundStyle(RenewalTokens.muted)
-                reactButton("このアイテムで3案組む", filled: true, action: onCompose)
+                reactButton("この服でコーデ3案を見る", filled: true, action: onCompose)
                 HStack(spacing: 10) {
                     reactButton(item.reaction == "like" ? "♥ いいね済み" : "♡ いいね", filled: false) {
                         onReact("like", nil)

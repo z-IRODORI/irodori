@@ -227,50 +227,68 @@ struct PartnerProfileView: View {
         .animation(.easeOut(duration: 0.4), value: u.pct)
     }
 
-    /// 理解度の下に並べる白いカプセルのボタン (アイコン + 文字 + 任意の小さな数)
-    /// 相棒のプロデュースの入口 (理解度のすぐ下)。相棒画面のほかのカードと同じ白いカード・黒のカプセル
+    /// 相棒のプロデュースの入口 (理解度のすぐ下)。相棒画面のほかのカードと同じ白いカード・黒のカプセル。
+    /// 「プロデュース」だけでは何をしてくれるか伝わらないので、もらえる提案 (ブランド・服・コーデ) を並べて見せる
     private func produceCard(_ action: @escaping () -> Void) -> some View {
         Button {
             Haptic.impact(.soft)
             action()
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("NEW ・ 相棒のプロデュース")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(RenewalTokens.accentPink)
-                Text("あなたを 4 ステップでプロデュース")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(RenewalTokens.ink)
-                HStack(spacing: 4) {
-                    ForEach(["キャラクター", "ブランド", "アイテム", "コーデ"], id: \.self) { step in
-                        Text(step)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(RenewalTokens.ink)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(RenewalTokens.raised, in: Capsule())
-                        if step != "コーデ" {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(RenewalTokens.muted)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("あなたに合う服を、相棒が提案")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(RenewalTokens.ink)
+                    Text("ブランド選びから、次に買う服、コーデまで提案するよ")
+                        .font(.system(size: 12))
+                        .foregroundStyle(RenewalTokens.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 8) {
+                    ForEach(Self.produceOffers, id: \.title) { offer in
+                        VStack(spacing: 6) {
+                            Image(systemName: offer.icon)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(RenewalTokens.ink)
+                                .frame(height: 20)
+                            Text(offer.title)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(RenewalTokens.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                        .background(RenewalTokens.raised, in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
-                Text("プロデュースしてもらう")
+                Text("提案してもらう")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 40)
                     .background(Capsule().fill(RenewalTokens.primaryFill))
-                    .padding(.top, 4)
+                    .padding(.top, 2)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .partnerSoftCard()
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("相棒のプロデュース。キャラクター、ブランド、アイテム、コーデの順にプロデュースしてもらう")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("相棒のプロデュース。あなたに合うブランド、次に買う服、その服で組むコーデを提案してもらう")
+        .accessibilityAddTraits(.isButton)
     }
 
+    /// プロデュースでもらえる提案 (入口のカードに並べる)
+    static let produceOffers: [(icon: String, title: String)] = [
+        ("tag.fill", "合うブランド"),
+        ("tshirt.fill", "次に買う服"),
+        ("sparkles", "コーデ3案"),
+    ]
+
+    /// 理解度の下に並べる白いカプセルのボタン (アイコン + 文字 + 任意の小さな数)
     private func headerAction(_ title: String, icon: String, badge: String? = nil,
                               action: @escaping () -> Void) -> some View {
         Button {

@@ -50,7 +50,7 @@ struct ProduceQuestionsView: View {
                     }
                 }
                 .frame(height: 4)
-                Text("あと \(questions.count - index) 問でプロデュースできるよ")
+                Text("あと \(questions.count - index) 問で、合うブランド・服・コーデを提案するよ")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
