@@ -13,6 +13,30 @@ final class AnalyticsLogger {
 
     private init() {}
 
+    // MARK: - 計測するビルド
+
+    /// 計測を送るのは App Store から入れたビルドだけ。
+    /// 開発中 (Debug)・TestFlight の動作確認が数字に混ざると、本番の計測にブレが出るため送らない
+    static var isCollectionEnabled: Bool {
+        #if DEBUG
+        return false
+        #else
+        return !isTestFlight
+        #endif
+    }
+
+    /// TestFlight から入れたビルドは、レシートの名前が sandboxReceipt になる
+    private static var isTestFlight: Bool {
+        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    }
+
+    /// FirebaseApp.configure() の直後に呼ぶ。
+    /// Info.plist の FIREBASE_ANALYTICS_COLLECTION_ENABLED を NO にしてあるので、App Store のビルドだけここで有効にする
+    /// (自動で送られる first_open・session_start・screen_view も止まる)
+    func configureCollection() {
+        Analytics.setAnalyticsCollectionEnabled(Self.isCollectionEnabled)
+    }
+
     func log(screen: GAEventScreen, parameters: [String: Any]? = nil) {
         Analytics.logEvent(screen.rawValue, parameters: parameters)
     }
