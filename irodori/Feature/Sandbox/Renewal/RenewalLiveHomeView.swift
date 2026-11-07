@@ -248,6 +248,18 @@ final class RenewalLiveHomeModel {
         }
     }
 
+    /// クローゼットの服が消えた・増えたとき (クローゼット画面・服の詳細・プロデュースの登録)。
+    /// 表示中の3案と「主役の服」は取った時点のクローゼットのままなので、裏で取り直して差し替える
+    /// (サーバの当日のキャッシュはクローゼットが変わると作り直される)。
+    /// changedItemId: 消した (または足した) 服。主役に選んでいた服が消えたら、主役の指定を外す
+    func closetDidChange(changedItemId: String?) async {
+        guard !uid.isEmpty else { return }
+        for scope in Array(responses.keys) where !loading.contains(scope) {
+            if let id = changedItemId, pivots[scope] == id { pivots[scope] = nil }
+            await fetch(scope, refresh: false, silent: true)
+        }
+    }
+
     func load(_ scope: RenewalScope, force: Bool = false, refresh: Bool = false) async {
         guard force || responses[scope] == nil, !loading.contains(scope) else { return }
         guard !uid.isEmpty else {

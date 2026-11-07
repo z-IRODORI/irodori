@@ -89,6 +89,10 @@ struct HomeView: View {
                 await viewModel.reloadDailyRecommendation()
             }
         }
+        // クローゼットの服を消した・足した: 3案と「主役の服」を取り直す (消した服が使われ続けないように)
+        .onReceive(NotificationCenter.default.publisher(for: .closetDidChange)) { note in
+            Task { await ownedFirstModel.closetDidChange(changedItemId: note.object as? String) }
+        }
         .fullScreenCover(isPresented: $showPartnerOnboardingSheet) {
             PartnerOnboardingFlowView(
                 showCloseButton: true,
