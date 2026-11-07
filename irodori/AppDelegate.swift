@@ -13,6 +13,8 @@ import FirebaseAuth
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         FirebaseApp.configure()
+        // 計測は App Store のビルドだけ (Debug・TestFlight は送らない)
+        AnalyticsLogger.shared.configureCollection()
         // リモートプッシュ (FCM): 玄関カメラの記録完了通知。許可ダイアログはここでは出さない
         PushNotificationManager.shared.configure()
 
