@@ -759,7 +759,7 @@ struct BMDetailSheet: View {
 // MARK: - 価格帯 (詳細の上部)
 
 /// 手に入るかを最初に判断できるように: 段階の名前 + トップスの目安の金額 + 5 段階のメーター +
-/// あなたの予算感との比べ + 公式の価格の例 (調査値があるときだけ)。
+/// あなたの予算感との比べ + 日本での価格の例 (調査値があるときだけ。公式通販・正規取扱店・別注品の定価)。
 /// 下で「この価格帯、あなたにはどう？」に 安い / ちょうどいい / 高い で答えられる。答えると相棒が予算感を覚え
 /// (相棒のミッションにも数える)、10 選を選び直す
 struct BMPriceCard: View {
@@ -810,7 +810,7 @@ struct BMPriceCard: View {
             if !examples.isEmpty {
                 BMRule(leading: 16)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("公式の価格の例")
+                    Text("日本での価格の例")
                         .font(.system(size: 12))
                         .foregroundStyle(BMTokens.muted)
                     ForEach(Array(examples.enumerated()), id: \.offset) { _, e in

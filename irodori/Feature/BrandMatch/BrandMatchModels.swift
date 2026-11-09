@@ -57,7 +57,7 @@ struct BMBrand: Identifiable {
     /// proposals/brand-match/SCHEMA.md の price.tier の表 (シャツ・ブラウス・カットソー・ニット)
     static let tierGuides = ["", "〜3千円", "3千〜1万円", "1万〜2.5万円", "2.5万〜6万円", "6万円〜"]
 
-    /// 公式の価格の例 (調査値) を「アイテム / 価格」に分ける。
+    /// 日本での価格の例 (調査値) を「アイテム / 価格」に分ける。
     /// 例: 「シャツ 2千〜3千円台 / ジーンズ 3千〜4千円台」→ [(シャツ, 2千〜3千円台), (ジーンズ, 3千〜4千円台)]
     var priceExamples: [(item: String, price: String)] {
         guard let r = priceRange else { return [] }
