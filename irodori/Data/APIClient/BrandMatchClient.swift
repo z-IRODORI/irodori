@@ -17,7 +17,18 @@ protocol BrandMatchClientProtocol {
 }
 
 final class BrandMatchClient: BrandMatchClientProtocol {
-    static let baseURL = "https://irodori-api.onrender.com"
+    static let productionBaseURL = "https://irodori-api.onrender.com"
+    /// 動作確認用: DEBUG ビルドだけ、ブランド 10 選の API を手元のサーバーへ向ける (例: http://127.0.0.1:8082)
+    static let debugBaseURLKey = "debug.brandMatchBaseURL"
+
+    static var baseURL: String {
+        #if DEBUG
+        if let override = UserDefaults.standard.string(forKey: debugBaseURLKey), !override.isEmpty {
+            return override
+        }
+        #endif
+        return productionBaseURL
+    }
 
     func fetch(userId: String, gender: String, age: Int?) async -> Result<BrandMatchResponse, HTTPError> {
         var comps = URLComponents(string: "\(Self.baseURL)/api/brand-match")!
@@ -181,6 +192,15 @@ struct BrandMatchResponse: Decodable {
         let axes: Scores
         let official_url: String?
         let image: Image?
+        /// 海外ブランドだけ: 発祥の国・都市 (日本語) と、日本での買い方。日本発や古いサーバーでは nil
+        let origin_country_ja: String?
+        let origin_city_ja: String?
+        let japan_presence: JapanPresence?
+
+        struct JapanPresence: Decodable {
+            let note: String?
+            let jp_url: String?
+        }
 
         struct Price: Decodable {
             let tier: Int
@@ -255,7 +275,10 @@ extension BrandMatchResponse.Brand {
                 BMImage(file: "", kind: BMImageKind(apiValue: im.kind), label: im.label, dark: im.dark,
                         source: im.source, sourcePage: im.source_page, license: im.license,
                         url: URL(string: BrandMatchClient.baseURL + im.path))
-            })
+            },
+            origin: origin_country_ja.map { c in [c, origin_city_ja].compactMap { $0 }.joined(separator: "・") },
+            japanNote: japan_presence?.note,
+            japanURL: japan_presence?.jp_url)
     }
 }
 

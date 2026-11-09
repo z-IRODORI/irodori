@@ -37,6 +37,14 @@ struct BMBrand: Identifiable {
     let officialURL: String?
     /// ブランドの画像 (ロゴ → 運営会社のロゴ → デザイナー → 店舗・会社の写真 の順で見つかったもの)。無ければ頭文字
     let image: BMImage?
+    /// 海外ブランドだけ: 発祥 (例: フランス・パリ)。日本発は nil
+    var origin: String? = nil
+    /// 海外ブランドだけ: 日本での買い方 (1 文。日本法人の直営店・ライセンス・海外の通販から発送 など)
+    var japanNote: String? = nil
+    /// 海外ブランドだけ: 日本公式サイト・日本の公式通販 (見つかったとき)。「公式サイト」はこちらを先に開く
+    var japanURL: String? = nil
+
+    var isOverseas: Bool { origin != nil }
 
     var yen: String { String(repeating: "¥", count: tier) }
     /// 読み上げ用 (「¥¥¥」は「円円円」と読まれるため)
@@ -49,7 +57,7 @@ struct BMBrand: Identifiable {
     /// proposals/brand-match/SCHEMA.md の price.tier の表 (シャツ・ブラウス・カットソー・ニット)
     static let tierGuides = ["", "〜3千円", "3千〜1万円", "1万〜2.5万円", "2.5万〜6万円", "6万円〜"]
 
-    /// 公式の価格の例 (調査値) を「アイテム / 価格」に分ける。
+    /// 日本での価格の例 (調査値) を「アイテム / 価格」に分ける。
     /// 例: 「シャツ 2千〜3千円台 / ジーンズ 3千〜4千円台」→ [(シャツ, 2千〜3千円台), (ジーンズ, 3千〜4千円台)]
     var priceExamples: [(item: String, price: String)] {
         guard let r = priceRange else { return [] }
