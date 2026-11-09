@@ -37,6 +37,14 @@ struct BMBrand: Identifiable {
     let officialURL: String?
     /// ブランドの画像 (ロゴ → 運営会社のロゴ → デザイナー → 店舗・会社の写真 の順で見つかったもの)。無ければ頭文字
     let image: BMImage?
+    /// 海外ブランドだけ: 発祥 (例: フランス・パリ)。日本発は nil
+    var origin: String? = nil
+    /// 海外ブランドだけ: 日本での買い方 (1 文。日本法人の直営店・ライセンス・海外の通販から発送 など)
+    var japanNote: String? = nil
+    /// 海外ブランドだけ: 日本公式サイト・日本の公式通販 (見つかったとき)。「公式サイト」はこちらを先に開く
+    var japanURL: String? = nil
+
+    var isOverseas: Bool { origin != nil }
 
     var yen: String { String(repeating: "¥", count: tier) }
     /// 読み上げ用 (「¥¥¥」は「円円円」と読まれるため)

@@ -471,6 +471,14 @@ struct BMDetailSheet: View {
                     fact("創業", founded)
                     BMRule(leading: 16)
                     fact("運営", brand.company)
+                    if let origin = brand.origin {
+                        BMRule(leading: 16)
+                        fact("発祥", origin)
+                    }
+                    if let note = brand.japanNote {
+                        BMRule(leading: 16)
+                        fact("日本では", note)
+                    }
                     if let f = brand.features {
                         BMRule(leading: 16)
                         Text(f)
@@ -637,7 +645,7 @@ struct BMDetailSheet: View {
     private var notes: some View {
         VStack(alignment: .leading, spacing: 6) {
             note("あなたとの相性 (好みの一致度・チャート・こんな人に合う) は、ファッションタイプとブランドの特徴から IRODORI が見立てたものです。")
-            note("価格帯は、トップスの通常の定価をもとにした 5 段階です。創業・運営・価格は 2026 年 10 月の調査値です。")
+            note("価格帯は、トップスの日本での通常の定価をもとにした 5 段階です。創業・運営・価格は 2026 年の調査値です。")
             note("IRODORI とブランドの提携はありません。")
             if let img = brand.image, let src = img.source {
                 let credit = "画像の出典: " + src + ((img.license ?? "").isEmpty ? "" : "（\(img.license ?? "")）")
@@ -689,7 +697,8 @@ struct BMDetailSheet: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(like ? .isSelected : [])
-                if let s = brand.officialURL, let url = URL(string: s) {
+                // 海外ブランドは、日本公式サイトがあればそちらを開く
+                if let s = brand.japanURL ?? brand.officialURL, let url = URL(string: s) {
                     Link(destination: url) {
                         HStack(spacing: 4) {
                             Text("公式サイト")
